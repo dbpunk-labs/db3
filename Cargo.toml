@@ -5,3 +5,9 @@ edition = "2021"
 
 
 [dependencies]
+nix = "0.22"
+async-trait = "0.1.7"
+
+[[bin]]
+name = "rtstore"
+path = "src/bin/rtstore.rs"
