@@ -1,0 +1,24 @@
+[package]
+name = "rtstore"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+nix = "0.22"
+async-trait = "0.1.7"
+tonic = "0.3.1"
+bytes = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+prost-types = "0.9"
+thiserror = "1.0.30"
+
+[[bin]]
+name = "rtstore"
+path = "src/bin/rtstore.rs"
+
+
+
+[build-dependencies]
+tonic-build = "0.6.2"
