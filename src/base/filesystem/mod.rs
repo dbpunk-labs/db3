@@ -20,43 +20,38 @@ mod posix_file_system;
 mod reader;
 mod writer;
 
-use crate::error::Result;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-
-use crate::error::RTStoreError;
+use crate::error::{RTStoreError, Result};
 use async_trait::async_trait;
 pub use posix_file_system::SyncPosixFileSystem;
 pub use reader::RandomAccessFileReader;
 pub use reader::SequentialFileReader;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 pub use writer::WritableFileWriter;
 
-#[async_trait]
 pub trait RandomAccessFile: 'static + Send + Sync {
-    async fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
+    fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
         self.read_exact(offset, data.len(), data).await
     }
-    async fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize>;
+    fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize>;
     fn file_size(&self) -> usize;
     fn use_direct_io(&self) -> bool {
         false
     }
 }
 
-#[async_trait]
 pub trait SequentialFile: 'static + Send + Sync {
-    async fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize>;
+    fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize>;
     fn get_file_size(&self) -> usize;
 }
 
-#[async_trait]
 pub trait WritableFile: Send {
-    async fn append(&mut self, data: &[u8]) -> Result<()>;
-    async fn truncate(&mut self, offset: u64) -> Result<()>;
+    fn append(&mut self, data: &[u8]) -> Result<()>;
+    fn truncate(&mut self, offset: u64) -> Result<()>;
     fn allocate(&mut self, offset: u64, len: u64) -> Result<()>;
-    async fn sync(&mut self) -> Result<()>;
-    async fn fsync(&mut self) -> Result<()>;
+    fn sync(&mut self) -> Result<()>;
+    fn fsync(&mut self) -> Result<()>;
     fn use_direct_io(&mut self) -> bool {
         false
     }
@@ -72,7 +67,6 @@ pub struct IOOption {
     pub buffer_size: usize,
 }
 
-#[async_trait]
 pub trait FileSystem: Send + Sync {
     fn open_writable_file_in(
         &self,
@@ -96,7 +90,7 @@ pub trait FileSystem: Send + Sync {
 
     fn open_sequential_file(&self, path: &Path) -> Result<Box<SequentialFileReader>>;
 
-    async fn read_file_content(&self, path: &Path) -> Result<Vec<u8>> {
+    fn read_file_content(&self, path: &Path) -> Result<Vec<u8>> {
         let mut reader = self.open_sequential_file(path)?;
         let sz = reader.file_size();
         let mut data = vec![0u8; sz];
@@ -144,12 +138,12 @@ pub struct InMemFile {
 
 #[async_trait]
 impl WritableFile for InMemFile {
-    async fn append(&mut self, data: &[u8]) -> Result<()> {
+    fn append(&mut self, data: &[u8]) -> Result<()> {
         self.buf.extend_from_slice(data);
         Ok(())
     }
 
-    async fn truncate(&mut self, offset: u64) -> Result<()> {
+    fn truncate(&mut self, offset: u64) -> Result<()> {
         self.buf.resize(offset as usize, 0);
         Ok(())
     }
@@ -158,20 +152,19 @@ impl WritableFile for InMemFile {
         Ok(())
     }
 
-    async fn sync(&mut self) -> Result<()> {
+    fn sync(&mut self) -> Result<()> {
         self.fsync().await
     }
 
-    async fn fsync(&mut self) -> Result<()> {
+    fn fsync(&mut self) -> Result<()> {
         let mut fs = self.fs.lock().unwrap();
         fs.files.insert(self.filename.clone(), self.buf.clone());
         Ok(())
     }
 }
 
-#[async_trait]
 impl RandomAccessFile for InMemFile {
-    async fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
+    fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
         if offset >= self.buf.len() {
             Ok(0)
         } else if offset + data.len() > self.buf.len() {
@@ -184,7 +177,7 @@ impl RandomAccessFile for InMemFile {
         }
     }
 
-    async fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize> {
+    fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize> {
         if offset >= self.buf.len() {
             Ok(0)
         } else if offset + n > self.buf.len() {
@@ -201,9 +194,8 @@ impl RandomAccessFile for InMemFile {
     }
 }
 
-#[async_trait]
 impl SequentialFile for InMemFile {
-    async fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize> {
+    fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize> {
         let x = self.read(self.offset, data).await?;
         self.offset += x;
         Ok(x)

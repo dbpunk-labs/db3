@@ -19,11 +19,12 @@
 // Copyright (c) 2017-present, PingCAP, Inc. Licensed under Apache-2.0.
 
 use std::fs::{read_dir, rename};
-use std::io::{Result as IoResult, Write};
+use std::io::{Error, Write};
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::error::Result;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::{self, OFlag};
@@ -53,7 +54,7 @@ pub fn from_nix_error(e: nix::Error, custom: &'static str) -> std::io::Error {
 }
 
 impl RawFile {
-    pub fn open<P: ?Sized + NixPath>(path: &P) -> IoResult<Self> {
+    pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let flags = OFlag::O_RDWR;
         // Permission 644
         let mode = Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH;
@@ -63,7 +64,7 @@ impl RawFile {
     }
 
     #[allow(unused_variables)]
-    pub fn open_for_read<P: ?Sized + NixPath>(path: &P, direct: bool) -> IoResult<Self> {
+    pub fn open_for_read<P: ?Sized + NixPath>(path: &P, direct: bool) -> Result<Self> {
         #[allow(unused_mut)]
         let mut flags = OFlag::O_RDONLY;
         #[cfg(target_os = "linux")]
@@ -77,7 +78,7 @@ impl RawFile {
         ))
     }
 
-    pub fn create<P: ?Sized + NixPath>(path: &P) -> IoResult<Self> {
+    pub fn create<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         // fail_point!("log_fd::create::err", |_| {
         //     Err(from_nix_error(nix::Error::EINVAL, "fp"))
         // });
@@ -88,28 +89,31 @@ impl RawFile {
         Ok(RawFile(fd))
     }
 
-    pub fn close(&self) -> IoResult<()> {
+    pub fn close(&self) -> Result<()> {
         // fail_point!("log_fd::close::err", |_| {
         //     Err(from_nix_error(nix::Error::EINVAL, "fp"))
         // });
-        close(self.0).map_err(|e| from_nix_error(e, "close"))
+        close(self.0).map_err(|e| from_nix_error(e, "close"))?;
+        Ok(())
     }
 
-    pub fn sync(&self) -> IoResult<()> {
+    pub fn sync(&self) -> Result<()> {
         // fail_point!("log_fd::sync::err", |_| {
         //     Err(from_nix_error(nix::Error::EINVAL, "fp"))
         // });
         #[cfg(target_os = "linux")]
         {
-            nix::unistd::fdatasync(self.0).map_err(|e| from_nix_error(e, "fdatasync"))
+            nix::unistd::fdatasync(self.0).map_err(|e| from_nix_error(e, "fdatasync"))?;
+            Ok(())
         }
         #[cfg(not(target_os = "linux"))]
         {
-            nix::unistd::fsync(self.0).map_err(|e| from_nix_error(e, "fsync"))
+            nix::unistd::fsync(self.0).map_err(|e| from_nix_error(e, "fsync"))?;
+            Ok(())
         }
     }
 
-    pub fn read(&self, mut offset: usize, buf: &mut [u8]) -> IoResult<usize> {
+    pub fn read(&self, mut offset: usize, buf: &mut [u8]) -> Result<usize> {
         let mut readed = 0;
         while readed < buf.len() {
             // fail_point!("log_fd::read::err", |_| {
@@ -118,7 +122,7 @@ impl RawFile {
             let bytes = match pread(self.0, &mut buf[readed..], offset as i64) {
                 Ok(bytes) => bytes,
                 Err(e) if e == Errno::EAGAIN => continue,
-                Err(e) => return Err(from_nix_error(e, "pread")),
+                Err(e) => return Err(RTStoreError::from(from_nix_error(e, "pread"))),
             };
             // EOF
             if bytes == 0 {
@@ -130,13 +134,13 @@ impl RawFile {
         Ok(readed)
     }
 
-    pub fn write(&self, mut offset: usize, content: &[u8]) -> IoResult<usize> {
+    pub fn write(&self, mut offset: usize, content: &[u8]) -> Result<usize> {
         let mut written = 0;
         while written < content.len() {
             let bytes = match pwrite(self.0, &content[written..], offset as i64) {
                 Ok(bytes) => bytes,
                 Err(e) if e == Errno::EAGAIN => continue,
-                Err(e) => return Err(from_nix_error(e, "pwrite")),
+                Err(e) => return Err(RTStoreError::from(from_nix_error(e, "pwrite"))),
             };
             if bytes == 0 {
                 break;
@@ -147,18 +151,20 @@ impl RawFile {
         Ok(written)
     }
 
-    pub fn file_size(&self) -> IoResult<usize> {
-        lseek(self.0, 0, Whence::SeekEnd)
+    pub fn file_size(&self) -> Result<usize> {
+        let size = lseek(self.0, 0, Whence::SeekEnd)
             .map(|n| n as usize)
-            .map_err(|e| from_nix_error(e, "lseek"))
+            .map_err(|e| from_nix_error(e, "lseek"))?;
+        Ok(size)
     }
 
-    pub fn truncate(&self, offset: usize) -> IoResult<()> {
-        ftruncate(self.0, offset as i64).map_err(|e| from_nix_error(e, "ftruncate"))
+    pub fn truncate(&self, offset: usize) -> Result<()> {
+        ftruncate(self.0, offset as i64).map_err(|e| from_nix_error(e, "ftruncate"))?;
+        Ok(())
     }
 
     #[allow(unused_variables)]
-    pub fn allocate(&self, offset: usize, size: usize) -> IoResult<()> {
+    pub fn allocate(&self, offset: usize, size: usize) -> Result<()> {
         #[cfg(target_os = "linux")]
         {
             fcntl::fallocate(
@@ -167,7 +173,8 @@ impl RawFile {
                 offset as i64,
                 size as i64,
             )
-            .map_err(|e| from_nix_error(e, "fallocate"))
+            .map_err(|e| from_nix_error(e, "fallocate"))?;
+            Ok(())
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -192,13 +199,13 @@ pub struct PosixWritableFile {
 }
 
 impl PosixWritableFile {
-    pub fn open<P: ?Sized + NixPath>(path: &P) -> IoResult<Self> {
+    pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let fd = RawFile::open(path)?;
         let file_size = fd.file_size()?;
         Ok(Self::new(Arc::new(fd), file_size))
     }
 
-    pub fn create<P: ?Sized + NixPath>(path: &P) -> IoResult<Self> {
+    pub fn create<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let fd = RawFile::create(path)?;
         let file_size = fd.file_size()?;
         Ok(Self::new(Arc::new(fd), file_size))
@@ -216,13 +223,15 @@ impl PosixWritableFile {
 #[async_trait]
 impl WritableFile for PosixWritableFile {
     async fn append(&mut self, data: &[u8]) -> Result<()> {
-        self.write_all(data).map_err(|e| Error::Io(Box::new(e)))
+        self.write_all(data).map_err(|e| Error::Io(Box::new(e)))?;
+        Ok(())
     }
 
     async fn truncate(&mut self, offset: u64) -> Result<()> {
         self.inner
             .truncate(offset as usize)
-            .map_err(|e| Error::Io(Box::new(e)))
+            .map_err(|e| Error::Io(Box::new(e)))?;
+        Ok(())
     }
 
     fn allocate(&mut self, offset: u64, len: u64) -> Result<()> {
@@ -248,7 +257,7 @@ impl WritableFile for PosixWritableFile {
 }
 
 impl Write for PosixWritableFile {
-    fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let new_written = self.offset + buf.len();
         if new_written > self.capacity {
             let alloc = std::cmp::max(new_written - self.capacity, FILE_ALLOCATE_SIZE);
@@ -264,7 +273,7 @@ impl Write for PosixWritableFile {
         Ok(len)
     }
 
-    fn flush(&mut self) -> IoResult<()> {
+    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
@@ -275,7 +284,7 @@ pub struct PosixReadableFile {
 }
 
 impl PosixReadableFile {
-    pub fn open<P: ?Sized + NixPath>(path: &P) -> IoResult<Self> {
+    pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let fd = RawFile::open_for_read(path, false)?;
         let file_size = fd.file_size()?;
         Ok(Self {
@@ -310,7 +319,7 @@ pub struct PosixSequentialFile {
 }
 
 impl PosixSequentialFile {
-    pub fn open<P: ?Sized + NixPath>(path: &P) -> IoResult<Self> {
+    pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let fd = RawFile::open_for_read(path, false)?;
         let file_size = fd.file_size()?;
         Ok(Self {
@@ -321,17 +330,13 @@ impl PosixSequentialFile {
     }
 }
 
-#[async_trait]
 impl SequentialFile for PosixSequentialFile {
-    async fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize> {
+    fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize> {
         if self.offset >= self.file_size {
             return Ok(0);
         }
         let rest = std::cmp::min(data.len(), self.file_size - self.offset);
-        let x = self
-            .inner
-            .read(self.offset, &mut data[..rest])
-            .map_err(|e| Error::Io(Box::new(e)))?;
+        let x = self.inner.read(self.offset, &mut data[..rest])?;
         self.offset += x;
         Ok(x)
     }
@@ -352,7 +357,7 @@ impl FileSystem for SyncPosixFileSystem {
     }
 
     fn open_random_access_file(&self, p: &Path) -> Result<Box<RandomAccessFileReader>> {
-        let f = PosixReadableFile::open(p).map_err(|e| Error::Io(Box::new(e)))?;
+        let f = PosixReadableFile::open(p)?;
         let filename = p
             .file_name()
             .ok_or_else(|| Error::InvalidFile("path has no file name".to_string()))?
@@ -363,7 +368,7 @@ impl FileSystem for SyncPosixFileSystem {
     }
 
     fn open_sequential_file(&self, path: &Path) -> Result<Box<SequentialFileReader>> {
-        let f = PosixSequentialFile::open(path).map_err(|e| Error::Io(Box::new(e)))?;
+        let f = PosixSequentialFile::open(path)?;
         let reader = SequentialFileReader::new(
             Box::new(f),
             path.file_name().unwrap().to_str().unwrap().to_string(),
@@ -372,19 +377,21 @@ impl FileSystem for SyncPosixFileSystem {
     }
 
     fn remove(&self, path: &Path) -> Result<()> {
-        std::fs::remove_file(path).map_err(|e| Error::Io(Box::new(e)))
+        std::fs::remove_file(path)?;
+        Ok(())
     }
 
     fn list_files(&self, path: &Path) -> Result<Vec<PathBuf>> {
         let mut files = vec![];
-        for f in read_dir(path).map_err(|e| Error::Io(Box::new(e)))? {
+        for f in read_dir(path)? {
             files.push(f?.path());
         }
         Ok(files)
     }
 
     fn rename(&self, origin: &Path, target: &Path) -> Result<()> {
-        rename(origin, target).map_err(|e| Error::Io(Box::new(e)))
+        rename(origin, target)?;
+        Ok(())
     }
 
     fn file_exist(&self, path: &Path) -> Result<bool> {

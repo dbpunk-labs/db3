@@ -17,23 +17,31 @@
 //
 
 use std::fmt;
+use std::io::{Error as IoError, ErrorKind};
 
 /// The error system for rtstore
+#[derive(Debug, Error)]
 pub enum RTStoreError {
+    #[error("table with name {tname} was not found")]
     TableNotFoundError { tname: String },
-    //
+    #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
+    #[error("filesystem io error:{0}")]
+    FSIoError(IoError),
 }
 
-impl fmt::Display for RTStoreError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            RTStoreError::TableNotFoundError { tname } => {
-                write!(f, "table with name {} is not found", tname)
-            }
-            RTStoreError::FSInvalidFileError { path } => {
-                write!(f, "bad file with name or path {}", path)
-            }
+/// convert io error to rtstore error
+impl From<IoError> for RTStoreError {
+    fn from(error: IoError) -> Self {
+        FSIoError(error)
+    }
+}
+
+impl From<RTStoreError> for IoError {
+    fn from(error: RTStoreError) -> Self {
+        match error {
+            RTStoreError::FSIoError(e) => e,
+            _ => IoError::from(ErrorKind::Other),
         }
     }
 }
