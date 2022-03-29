@@ -16,8 +16,8 @@
 // limitations under the License.
 //
 
-use std::fmt;
 use std::io::{Error as IoError, ErrorKind};
+use thiserror::Error;
 
 /// The error system for rtstore
 #[derive(Debug, Error)]
@@ -33,7 +33,7 @@ pub enum RTStoreError {
 /// convert io error to rtstore error
 impl From<IoError> for RTStoreError {
     fn from(error: IoError) -> Self {
-        FSIoError(error)
+        RTStoreError::FSIoError(error)
     }
 }
 

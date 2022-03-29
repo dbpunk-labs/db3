@@ -47,50 +47,50 @@ impl WritableFileWriter {
         }
     }
 
-    pub async fn append(&mut self, data: &[u8]) -> Result<()> {
+    pub fn append(&mut self, data: &[u8]) -> Result<()> {
         self.file_size += data.len();
         if self.max_buffer_size == 0 {
-            self.writable_file.append(data).await?;
+            self.writable_file.append(data)?;
         } else if self.buf.is_empty() && data.len() >= self.max_buffer_size {
-            self.writable_file.append(data).await?;
+            self.writable_file.append(data)?;
         } else {
             self.buf.extend_from_slice(data);
             if self.buf.len() >= self.max_buffer_size {
-                self.writable_file.append(&self.buf).await?;
+                self.writable_file.append(&self.buf)?;
                 self.buf.clear();
             }
         }
         Ok(())
     }
 
-    pub async fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         if !self.buf.is_empty() {
-            self.writable_file.append(&self.buf).await?;
+            self.writable_file.append(&self.buf)?;
             self.buf.clear();
         }
         Ok(())
     }
 
-    pub async fn pad(&mut self, pad_bytes: usize) -> Result<()> {
+    pub fn pad(&mut self, pad_bytes: usize) -> Result<()> {
         self.file_size += pad_bytes;
         if self.buf.is_empty() {
             self.buf.resize(pad_bytes, 0);
-            self.writable_file.append(&self.buf).await?;
+            self.writable_file.append(&self.buf)?;
         } else if pad_bytes < 100 {
             let pad: [u8; 100] = [0u8; 100];
-            self.append(&pad[..pad_bytes]).await?;
+            self.append(&pad[..pad_bytes])?;
         } else {
             let pad = vec![0u8; pad_bytes];
-            self.append(&pad).await?;
+            self.append(&pad)?;
         }
         Ok(())
     }
 
-    pub async fn sync(&mut self) -> Result<()> {
+    pub fn sync(&mut self) -> Result<()> {
         if !self.buf.is_empty() {
-            self.flush().await?;
+            self.flush()?;
         }
-        self.writable_file.sync().await?;
+        self.writable_file.sync()?;
         Ok(())
     }
 

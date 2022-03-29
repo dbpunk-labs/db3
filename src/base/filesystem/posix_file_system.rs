@@ -1,7 +1,7 @@
 //
 //
 // posix_file_system.rs
-// Copyright (C) 2022 peasdb.ai Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,13 +19,12 @@
 // Copyright (c) 2017-present, PingCAP, Inc. Licensed under Apache-2.0.
 
 use std::fs::{read_dir, rename};
-use std::io::{Error, Write};
+use std::io::Write;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::error::Result;
-use async_trait::async_trait;
+use crate::error::{RTStoreError, Result};
 use nix::errno::Errno;
 use nix::fcntl::{self, OFlag};
 use nix::sys::stat::Mode;
@@ -79,9 +78,6 @@ impl RawFile {
     }
 
     pub fn create<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
-        // fail_point!("log_fd::create::err", |_| {
-        //     Err(from_nix_error(nix::Error::EINVAL, "fp"))
-        // });
         let flags = OFlag::O_RDWR | OFlag::O_CREAT;
         // Permission 644
         let mode = Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH;
@@ -90,17 +86,11 @@ impl RawFile {
     }
 
     pub fn close(&self) -> Result<()> {
-        // fail_point!("log_fd::close::err", |_| {
-        //     Err(from_nix_error(nix::Error::EINVAL, "fp"))
-        // });
         close(self.0).map_err(|e| from_nix_error(e, "close"))?;
         Ok(())
     }
 
     pub fn sync(&self) -> Result<()> {
-        // fail_point!("log_fd::sync::err", |_| {
-        //     Err(from_nix_error(nix::Error::EINVAL, "fp"))
-        // });
         #[cfg(target_os = "linux")]
         {
             nix::unistd::fdatasync(self.0).map_err(|e| from_nix_error(e, "fdatasync"))?;
@@ -116,9 +106,6 @@ impl RawFile {
     pub fn read(&self, mut offset: usize, buf: &mut [u8]) -> Result<usize> {
         let mut readed = 0;
         while readed < buf.len() {
-            // fail_point!("log_fd::read::err", |_| {
-            //     Err(from_nix_error(nix::Error::EINVAL, "fp"))
-            // });
             let bytes = match pread(self.0, &mut buf[readed..], offset as i64) {
                 Ok(bytes) => bytes,
                 Err(e) if e == Errno::EAGAIN => continue,
@@ -220,17 +207,14 @@ impl PosixWritableFile {
     }
 }
 
-#[async_trait]
 impl WritableFile for PosixWritableFile {
-    async fn append(&mut self, data: &[u8]) -> Result<()> {
-        self.write_all(data).map_err(|e| Error::Io(Box::new(e)))?;
+    fn append(&mut self, data: &[u8]) -> Result<()> {
+        self.write_all(data)?;
         Ok(())
     }
 
-    async fn truncate(&mut self, offset: u64) -> Result<()> {
-        self.inner
-            .truncate(offset as usize)
-            .map_err(|e| Error::Io(Box::new(e)))?;
+    fn truncate(&mut self, offset: u64) -> Result<()> {
+        self.inner.truncate(offset as usize)?;
         Ok(())
     }
 
@@ -247,12 +231,14 @@ impl WritableFile for PosixWritableFile {
         Ok(())
     }
 
-    async fn sync(&mut self) -> Result<()> {
-        self.inner.sync().map_err(|e| Error::Io(Box::new(e)))
+    fn sync(&mut self) -> Result<()> {
+        self.inner.sync()?;
+        Ok(())
     }
 
-    async fn fsync(&mut self) -> Result<()> {
-        self.inner.sync().map_err(|e| Error::Io(Box::new(e)))
+    fn fsync(&mut self) -> Result<()> {
+        self.inner.sync()?;
+        Ok(())
     }
 }
 
@@ -294,18 +280,15 @@ impl PosixReadableFile {
     }
 }
 
-#[async_trait]
 impl RandomAccessFile for PosixReadableFile {
-    async fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
-        self.inner
-            .read(offset, data)
-            .map_err(|e| Error::Io(Box::new(e)))
+    fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
+        let size = self.inner.read(offset, data)?;
+        Ok(size)
     }
 
-    async fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize> {
-        self.inner
-            .read(offset, &mut data[..n])
-            .map_err(|e| Error::Io(Box::new(e)))
+    fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize> {
+        let size = self.inner.read(offset, &mut data[..n])?;
+        Ok(size)
     }
 
     fn file_size(&self) -> usize {
@@ -351,7 +334,7 @@ pub struct SyncPosixFileSystem {}
 impl FileSystem for SyncPosixFileSystem {
     fn open_writable_file_writer(&self, path: &Path) -> Result<Box<WritableFileWriter>> {
         let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
-        let f = PosixWritableFile::create(path).map_err(|e| Error::Io(Box::new(e)))?;
+        let f = PosixWritableFile::create(path)?;
         let writer = WritableFileWriter::new(Box::new(f), file_name, 0);
         Ok(Box::new(writer))
     }
@@ -360,9 +343,13 @@ impl FileSystem for SyncPosixFileSystem {
         let f = PosixReadableFile::open(p)?;
         let filename = p
             .file_name()
-            .ok_or_else(|| Error::InvalidFile("path has no file name".to_string()))?
+            .ok_or_else(|| RTStoreError::FSInvalidFileError {
+                path: "path has no file name".to_string(),
+            })?
             .to_str()
-            .ok_or_else(|| Error::InvalidFile("filename is not encode by utf8".to_string()))?;
+            .ok_or_else(|| RTStoreError::FSInvalidFileError {
+                path: "filename is not encode by utf8".to_string(),
+            })?;
         let reader = RandomAccessFileReader::new(Box::new(f), filename.to_string());
         Ok(Box::new(reader))
     }
@@ -414,29 +401,24 @@ mod tests {
         let mut f = fs
             .open_writable_file_writer(&dir.path().join("sst"))
             .unwrap();
-        let r = Runtime::new().unwrap();
-        r.block_on(async move {
-            f.append("abcd".as_bytes()).await.unwrap();
-            f.append("efgh".as_bytes()).await.unwrap();
-            f.append("ijkl".as_bytes()).await.unwrap();
-            f.sync().await.unwrap();
-        });
+        f.append("abcd".as_bytes()).await.unwrap();
+        f.append("efgh".as_bytes()).await.unwrap();
+        f.append("ijkl".as_bytes()).await.unwrap();
+        f.sync();
 
         let mut f = fs.open_sequential_file(&dir.path().join("sst")).unwrap();
-        r.block_on(async move {
-            let mut v = vec![0; 7];
-            let x = f.read(&mut v).await.unwrap();
-            assert_eq!(x, 7);
-            let s = String::from_utf8(v.clone()).unwrap();
-            assert_eq!(s.as_str(), "abcdefg");
+        let mut v = vec![0; 7];
+        let x = f.read(&mut v).await.unwrap();
+        assert_eq!(x, 7);
+        let s = String::from_utf8(v.clone()).unwrap();
+        assert_eq!(s.as_str(), "abcdefg");
 
-            let _x = f.read(&mut v).await.unwrap();
-            #[cfg(not(target_os = "linux"))]
-            {
-                assert_eq!(_x, 5);
-            }
-            let s = String::from_utf8((&v[..5]).to_vec()).unwrap();
-            assert_eq!(s.as_str(), "hijkl");
-        });
+        let _x = f.read(&mut v).await.unwrap();
+        #[cfg(not(target_os = "linux"))]
+        {
+            assert_eq!(_x, 5);
+        }
+        let s = String::from_utf8((&v[..5]).to_vec()).unwrap();
+        assert_eq!(s.as_str(), "hijkl");
     }
 }

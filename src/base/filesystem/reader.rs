@@ -31,12 +31,12 @@ impl RandomAccessFileReader {
     pub fn new(file: Box<dyn RandomAccessFile>, filename: String) -> Self {
         Self { file, filename }
     }
-    pub async fn read_exact(&self, offset: usize, n: usize, buf: &mut [u8]) -> Result<usize> {
-        self.file.read_exact(offset, n, buf).await
+    pub fn read_exact(&self, offset: usize, n: usize, buf: &mut [u8]) -> Result<usize> {
+        self.file.read_exact(offset, n, buf)
     }
 
-    pub async fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        self.file.read(offset, buf).await
+    pub fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        self.file.read(offset, buf)
     }
 
     pub fn name(&self) -> &str {
@@ -62,8 +62,8 @@ impl SequentialFileReader {
         Self { file, filename }
     }
 
-    pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.file.read_sequential(buf).await
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        self.file.read_sequential(buf)
     }
 
     pub fn name(&self) -> &str {

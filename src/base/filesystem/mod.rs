@@ -32,7 +32,7 @@ pub use writer::WritableFileWriter;
 
 pub trait RandomAccessFile: 'static + Send + Sync {
     fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
-        self.read_exact(offset, data.len(), data).await
+        self.read_exact(offset, data.len(), data)
     }
     fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize>;
     fn file_size(&self) -> usize;
@@ -98,9 +98,7 @@ pub trait FileSystem: Send + Sync {
         let mut offset = 0;
         while offset < data.len() {
             let block_size = std::cmp::min(data.len() - offset, BUFFER_SIZE);
-            let read_size = reader
-                .read(&mut data[offset..(offset + block_size)])
-                .await?;
+            let read_size = reader.read(&mut data[offset..(offset + block_size)])?;
             offset += read_size;
             if read_size < block_size {
                 data.resize(offset, 0);
@@ -153,7 +151,7 @@ impl WritableFile for InMemFile {
     }
 
     fn sync(&mut self) -> Result<()> {
-        self.fsync().await
+        self.fsync()
     }
 
     fn fsync(&mut self) -> Result<()> {
@@ -196,7 +194,7 @@ impl RandomAccessFile for InMemFile {
 
 impl SequentialFile for InMemFile {
     fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize> {
-        let x = self.read(self.offset, data).await?;
+        let x = self.read(self.offset, data)?;
         self.offset += x;
         Ok(x)
     }
