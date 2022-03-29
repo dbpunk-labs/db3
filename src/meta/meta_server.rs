@@ -1,6 +1,6 @@
 //
 //
-// build.rs
+// meta_server.rs
 // Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,18 +15,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+use super::table::Table;
+use crate::error::{RTStoreError, Result};
+use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::rtstore_meta_proto::meta_server::{Meta, MetaServer};
+use crate::proto::rtstore_meta_proto::{CreateTableRequest, CreateTableResponse};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tonic::{transport::Server, Request, Response, Status};
+uselog!(debug, info, warn);
 
-fn main() {
-    tonic_build::configure()
-        .build_server(true)
-        .compile(
-            &[
-                "proto/rtstore_base.proto",
-                "proto/rtstore_meta_server.proto",
-            ],
-            &["proto"],
-        )
-        .unwrap();
+struct MetaServerState {
+    tables: HashMap<String, Table>,
+}
+impl MetaServerState {
+    fn new() -> Self {
+        Self {
+            tables: HashMap::new(),
+        }
+    }
+
+    pub fn create_table(&mut self, table_desc: &RtStoreTableDesc) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

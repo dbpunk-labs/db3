@@ -26,7 +26,6 @@ pub struct WritableFileWriter {
     writable_file: Box<dyn WritableFile>,
     buf: Vec<u8>,
     file_size: usize,
-    last_sync_size: u64,
     max_buffer_size: usize,
 }
 
@@ -41,7 +40,6 @@ impl WritableFileWriter {
             file_name,
             writable_file,
             buf: Vec::with_capacity(std::cmp::min(65536, max_buffer_size)),
-            last_sync_size: 0,
             file_size,
             max_buffer_size,
         }

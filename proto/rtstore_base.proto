@@ -39,22 +39,14 @@ enum RTStoreType {
     kJson = 22;
 }
 
-enum RTStorePartitionType {
-    // use hash function to make a partition statically
-    kHash = 0;
-    // use range function to make a partition dynamically
-    kRange = 1;
-}
-
 message RTStorePartitionDesc {
-    RTStorePartitionType ptype = 1;
-    // only support one column if ptype is kRange
     repeated string columns = 2;
     int32 partition_count = 3;
-    int32 range_count = 4;
-    // only used if ptype is kRange
+
+    // range merge and split strategy
     int32 split_record_count = 5;
     int32 merge_record_count = 6;
+    string range_column = 7;
 }
 
 message RTStoreColumnDesc {
@@ -73,6 +65,7 @@ message RTStoreTableDesc {
     // the table name is like test.dev.table1
     repeated string name = 1;
     RTStoreSchemaDesc schema = 2;
+    RTStorePartitionDesc partition_desc = 3;
 }
 
 enum RTStoreStatusType {

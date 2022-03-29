@@ -401,19 +401,19 @@ mod tests {
         let mut f = fs
             .open_writable_file_writer(&dir.path().join("sst"))
             .unwrap();
-        f.append("abcd".as_bytes()).await.unwrap();
-        f.append("efgh".as_bytes()).await.unwrap();
-        f.append("ijkl".as_bytes()).await.unwrap();
+        f.append("abcd".as_bytes()).unwrap();
+        f.append("efgh".as_bytes()).unwrap();
+        f.append("ijkl".as_bytes()).unwrap();
         f.sync();
 
         let mut f = fs.open_sequential_file(&dir.path().join("sst")).unwrap();
         let mut v = vec![0; 7];
-        let x = f.read(&mut v).await.unwrap();
+        let x = f.read(&mut v).unwrap();
         assert_eq!(x, 7);
         let s = String::from_utf8(v.clone()).unwrap();
         assert_eq!(s.as_str(), "abcdefg");
 
-        let _x = f.read(&mut v).await.unwrap();
+        let _x = f.read(&mut v).unwrap();
         #[cfg(not(target_os = "linux"))]
         {
             assert_eq!(_x, 5);

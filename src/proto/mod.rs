@@ -1,7 +1,7 @@
 //
 //
-// catalog.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// mod.rs
+// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,4 +16,9 @@
 // limitations under the License.
 //
 
-
+pub mod rtstore_base_proto {
+    tonic::include_proto!("rtstore_base_proto");
+}
+pub mod rtstore_meta_proto {
+    tonic::include_proto!("rtstore_meta_proto");
+}

@@ -16,26 +16,30 @@
 // limitations under the License.
 //
 
+use crate::proto::rtstore_base_proto::RtStoreTableDesc;
 use arrow::datatypes::{Schema, SchemaRef};
 use std::ops::Range;
+uselog!(info, warn, debug);
+
+pub struct Cell {
+    pub range: Range<u64>,
+    pub partition_index: usize,
+    pub num_rows: u64,
+}
 
 /// the smallest data unit for table store
-pub struct Cell {
-    partition_index:usize,
-    time_range: Range<u64>,
-    num_rows:u64,
+pub struct Partition {
+    pub partition_index: usize,
+    pub num_rows: u64,
+    pub cells: Vec<Cell>,
 }
 
 pub struct Table {
     // name of table like db1.user
-    pub name:String,
-    // schema for table 
+    pub name: String,
+    // schema for table
     // more go to https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/schema.rs
-    pub schema:SchemaRef,
-    // partition keys for table
-    pub partition_keys:Vec<String>,
-    pub partition_count:usize,
-    pub time_key:String,
-    // partition data with time range
-    pub cell_records_limit: usize,
+    pub schema: SchemaRef,
+    pub table_desc: RtStoreTableDesc,
+    pub partitions: Vec<Partition>,
 }

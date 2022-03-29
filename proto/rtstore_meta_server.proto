@@ -32,7 +32,7 @@ message CreateTableResponse {
 }
 
 // The rtstore meta server definition.
-service MetaServer {
+service Meta {
     // method for adding a new table
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse) {}
 }
