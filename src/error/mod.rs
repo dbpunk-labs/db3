@@ -24,6 +24,8 @@ use thiserror::Error;
 pub enum RTStoreError {
     #[error("table with name {tname} was not found")]
     TableNotFoundError { tname: String },
+    #[error("invalid table names for {error}")]
+    TableInvalidNamesError { error: String },
     #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]

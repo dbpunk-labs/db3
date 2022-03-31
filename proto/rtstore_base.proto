@@ -42,7 +42,6 @@ enum RTStoreType {
 message RTStorePartitionDesc {
     repeated string columns = 2;
     int32 partition_count = 3;
-
     // range merge and split strategy
     int32 split_record_count = 5;
     int32 merge_record_count = 6;

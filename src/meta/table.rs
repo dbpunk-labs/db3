@@ -22,24 +22,41 @@ use std::ops::Range;
 uselog!(info, warn, debug);
 
 pub struct Cell {
-    pub range: Range<u64>,
-    pub partition_index: usize,
-    pub num_rows: u64,
+    range: Range<u64>,
+    partition_index: usize,
+    num_rows: u64,
 }
 
 /// the smallest data unit for table store
 pub struct Partition {
-    pub partition_index: usize,
-    pub num_rows: u64,
-    pub cells: Vec<Cell>,
+    partition_index: usize,
+    num_rows: u64,
+    cells: Vec<Cell>,
 }
 
 pub struct Table {
     // name of table like db1.user
-    pub name: String,
+    id: String,
     // schema for table
     // more go to https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/schema.rs
-    pub schema: SchemaRef,
-    pub table_desc: RtStoreTableDesc,
-    pub partitions: Vec<Partition>,
+    schema: SchemaRef,
+    table_desc: Arc<RtStoreTableDesc>,
+    partitions: Vec<Partition>,
+}
+
+impl Table {
+    pub fn gen_id(table_desc: &RtStoreTableDesc) -> Result<String> {
+        // validate table name and join names with dot
+        if table_desc.names.len() <= 0 {
+            return Err(RTStoreError::TableInvalidNamesError {
+                error: "empty name".to_string(),
+            });
+        }
+        Ok(table_desc.names.join("."))
+    }
+
+    pub fn new(table_desc: &RtStoreTableDesc) -> Result<Self> {
+        let id = Self::gen_id(table_desc)?;
+        info!("gen a new table id {}", id);
+    }
 }

@@ -17,7 +17,7 @@
 //
 use super::table::Table;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::rtstore_base_proto::{RtStoreStatus, RtStoreStatusType, RtStoreTableDesc};
 use crate::proto::rtstore_meta_proto::meta_server::{Meta, MetaServer};
 use crate::proto::rtstore_meta_proto::{CreateTableRequest, CreateTableResponse};
 use std::collections::HashMap;
@@ -26,17 +26,47 @@ use tonic::{transport::Server, Request, Response, Status};
 uselog!(debug, info, warn);
 
 struct MetaServerState {
+    // key is the id of table
     tables: HashMap<String, Table>,
 }
+
 impl MetaServerState {
     fn new() -> Self {
         Self {
             tables: HashMap::new(),
         }
     }
-
     pub fn create_table(&mut self, table_desc: &RtStoreTableDesc) -> Result<()> {
+        // join the names of table desc
         Ok(())
+    }
+}
+
+struct MetaServerImpl {
+    state: Arc<Mutex<MetaServerState>>,
+}
+
+impl MetaServerImpl {
+    pub fn new() -> Self {
+        Self {
+            state: Arc::new(Mutex::new(MetaServerState::new())),
+        }
+    }
+}
+
+#[tonic::async_trait]
+impl MetaServer for MetaServerImpl {
+    async fn create_table(
+        &self,
+        request: Request<CreateTableRequest>,
+    ) -> Result<Response<CreateTableResponse>, Status> {
+        let rtstore_status = RtStoreStatus {
+            stype: RtStoreStatusType::kOk,
+            msg: "ok".to_string(),
+        };
+        Ok(Response::new(CreateTableResponse {
+            status: rtstore_status,
+        }));
     }
 }
 
