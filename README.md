@@ -1,2 +1,2 @@
 # rtstore
-realtime table store for data warehouse
+a table store engine for realtime ingesting and analytics
