@@ -1,6 +1,6 @@
 //
 //
-// meta_server.proto
+// catalog.rs
 // Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,23 +17,3 @@
 //
 
 
-syntax = "proto3";
-
-import "rtstore_base.proto";
-
-package rtstore_meta_proto;
-
-message CreateTableRequest {
-    rtstore_base_proto.RTStoreTableDesc table_desc = 1;
-}
-
-message CreateTableResponse {
-    rtstore_base_proto.RTStoreStatus status = 1;
-}
-
-// The rtstore meta server definition.
-service Meta {
-
-    // method for adding a new table
-    rpc CreateTable (CreateTableRequest) returns (CreateTableResponse) {}
-}
