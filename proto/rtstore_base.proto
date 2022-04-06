@@ -62,7 +62,7 @@ message RTStoreSchemaDesc {
 
 message RTStoreTableDesc {
     // the table name is like test.dev.table1
-    repeated string name = 1;
+    repeated string names = 1;
     RTStoreSchemaDesc schema = 2;
     RTStorePartitionDesc partition_desc = 3;
 }

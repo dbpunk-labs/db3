@@ -1,7 +1,7 @@
 //
 //
 // mod.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+pub mod row;
 
-pub mod meta_server;
-pub mod table;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {}
+}

@@ -16,9 +16,11 @@
 // limitations under the License.
 //
 
+use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::RtStoreTableDesc;
 use arrow::datatypes::{Schema, SchemaRef};
 use std::ops::Range;
+use std::sync::Arc;
 uselog!(info, warn, debug);
 
 pub struct Cell {
@@ -40,8 +42,10 @@ pub struct Table {
     // schema for table
     // more go to https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/schema.rs
     schema: SchemaRef,
+    // rtstore table description
     table_desc: Arc<RtStoreTableDesc>,
     partitions: Vec<Partition>,
+    db_dir: String,
 }
 
 impl Table {
@@ -55,8 +59,9 @@ impl Table {
         Ok(table_desc.names.join("."))
     }
 
-    pub fn new(table_desc: &RtStoreTableDesc) -> Result<Self> {
+    pub fn new(table_desc: &RtStoreTableDesc) -> Result<Option<Self>> {
         let id = Self::gen_id(table_desc)?;
         info!("gen a new table id {}", id);
+        Ok(None)
     }
 }

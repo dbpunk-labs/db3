@@ -25,55 +25,55 @@ use std::sync::{Arc, Mutex};
 use tonic::{transport::Server, Request, Response, Status};
 uselog!(debug, info, warn);
 
-struct MetaServerState {
+struct MetaServiceState {
     // key is the id of table
     tables: HashMap<String, Table>,
 }
 
-impl MetaServerState {
+impl MetaServiceState {
     fn new() -> Self {
         Self {
             tables: HashMap::new(),
         }
     }
+
     pub fn create_table(&mut self, table_desc: &RtStoreTableDesc) -> Result<()> {
         // join the names of table desc
         Ok(())
     }
 }
 
-struct MetaServerImpl {
-    state: Arc<Mutex<MetaServerState>>,
+struct MetaServiceImpl {
+    state: Arc<Mutex<MetaServiceState>>,
 }
 
-impl MetaServerImpl {
+impl MetaServiceImpl {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(Mutex::new(MetaServerState::new())),
+            state: Arc::new(Mutex::new(MetaServiceState::new())),
         }
     }
 }
 
 #[tonic::async_trait]
-impl MetaServer for MetaServerImpl {
+impl Meta for MetaServiceImpl {
     async fn create_table(
         &self,
         request: Request<CreateTableRequest>,
-    ) -> Result<Response<CreateTableResponse>, Status> {
+    ) -> std::result::Result<Response<CreateTableResponse>, Status> {
         let rtstore_status = RtStoreStatus {
-            stype: RtStoreStatusType::kOk,
+            stype: RtStoreStatusType::KOk as i32,
             msg: "ok".to_string(),
         };
         Ok(Response::new(CreateTableResponse {
-            status: rtstore_status,
-        }));
+            status: Some(rtstore_status),
+        }))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn it_works() {}
 }

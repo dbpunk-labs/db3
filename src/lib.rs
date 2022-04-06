@@ -21,5 +21,6 @@ extern crate uselog_rs;
 pub mod error;
 use error::*;
 pub mod base;
+pub mod codec;
 pub mod meta;
 pub mod proto;
