@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use crate::base::arrow_parquet_utils::*;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::RtStoreTableDesc;
 use arrow::datatypes::{Schema, SchemaRef};
@@ -59,9 +60,22 @@ impl Table {
         Ok(table_desc.names.join("."))
     }
 
-    pub fn new(table_desc: &RtStoreTableDesc) -> Result<Option<Self>> {
+    pub fn new(table_desc: &RtStoreTableDesc, db_dir: &str) -> Result<Self> {
         let id = Self::gen_id(table_desc)?;
         info!("gen a new table id {}", id);
-        Ok(None)
+        let schema = match &table_desc.schema {
+            Some(s) => Ok(s),
+            _ => Err(RTStoreError::TableSchemaInvalidError {
+                name: id.to_string(),
+            }),
+        }?;
+        let arrow_schema_ref = table_desc_to_arrow_schema(&schema)?;
+        Ok(Self {
+            id,
+            schema: arrow_schema_ref,
+            table_desc: Arc::new(table_desc.clone()),
+            partitions: Vec::new(),
+            db_dir: db_dir.to_string(),
+        })
     }
 }

@@ -30,6 +30,10 @@ pub enum RTStoreError {
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]
     FSIoError(IoError),
+    #[error("fail to convert {0} to rtstore column type")]
+    TableSchemaConvertError(i32),
+    #[error("the schema for table {name} is invalid")]
+    TableSchemaInvalidError { name: String },
 }
 
 /// convert io error to rtstore error

@@ -18,20 +18,20 @@
 use super::table::Table;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreStatus, RtStoreStatusType, RtStoreTableDesc};
-use crate::proto::rtstore_meta_proto::meta_server::{Meta, MetaServer};
+use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{CreateTableRequest, CreateTableResponse};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tonic::{transport::Server, Request, Response, Status};
+use tonic::{Request, Response, Status};
 uselog!(debug, info, warn);
 
-struct MetaServiceState {
+pub struct MetaServiceState {
     // key is the id of table
     tables: HashMap<String, Table>,
 }
 
 impl MetaServiceState {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             tables: HashMap::new(),
         }
@@ -43,7 +43,7 @@ impl MetaServiceState {
     }
 }
 
-struct MetaServiceImpl {
+pub struct MetaServiceImpl {
     state: Arc<Mutex<MetaServiceState>>,
 }
 

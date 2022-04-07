@@ -47,9 +47,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_encode() -> Result<()> {
-        let config = config::standard();
-        let mut buf: Vec<u8> = Vec::new();
+    fn it_encode() -> Result<(), std::io::Error> {
         let batch = vec![
             vec![Data::Bool(true), Data::Int32(12)],
             vec![Data::Bool(false), Data::Int32(11)],
@@ -59,6 +57,10 @@ mod tests {
             schema_version: 1,
             id: "eth.price".to_string(),
         };
-        bincode::encode_into_slice(&row_batch, &buf)?;
+        let encoded: Vec<u8> = bincode::serialize(&row_batch).unwrap();
+        assert_eq!(encoded.len(), 71);
+        let new_row_batch: RowRecordBatch = bincode::deserialize(&encoded[..]).unwrap();
+        assert_eq!(row_batch.schema_version, new_row_batch.schema_version);
+        Ok(())
     }
 }

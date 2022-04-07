@@ -21,22 +21,24 @@ syntax = "proto3";
 
 package rtstore_base_proto;
 
-// the all types supported in rtstore
+// the all types are supported by rtstore
 enum RTStoreType {
-    kBool = 0;
-    kSmallInt = 2;
-    kInt = 3;
-    kBigInt = 4;
-    kFloat = 5;
-    kDouble = 6;
-    kDate = 9;
+    KBool = 0;
+    // int16
+    KSmallInt = 2;
+    // int32
+    KInt = 3;
+    KBigInt = 4;
+    KFloat = 5;
+    KDouble = 6;
+    KDate = 9;
+    KDecimal = 10;
     //timestamp type
-    kTimestamp_Second = 11;
-    kTimestamp_MillsSecond = 12;
-    kTimestamp_MicrosSecond = 13;
+    KTimestampSecond = 11;
+    KTimestampMillsSecond = 12;
+    KTimestampMicroSecond = 13;
     // string type
-    kString_Utf8 = 21;
-    kJson = 22;
+    KStringUtf8 = 21;
 }
 
 message RTStorePartitionDesc {
@@ -52,7 +54,6 @@ message RTStoreColumnDesc {
     string name = 1;
     RTStoreType ctype = 2;
     bool null_allowed = 3;
-    bytes default_value = 4;
 }
 
 message RTStoreSchemaDesc {
@@ -65,7 +66,6 @@ message RTStoreTableDesc {
     repeated string names = 1;
     RTStoreSchemaDesc schema = 2;
     RTStorePartitionDesc partition_desc = 3;
-
 }
 
 enum RTStoreStatusType {
