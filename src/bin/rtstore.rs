@@ -24,14 +24,33 @@ use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
 use tonic::transport::Server;
 extern crate pretty_env_logger;
 uselog!(debug, info, warn);
+use clap::{Args, Parser, Subcommand};
+
+#[derive(Debug, Parser)]
+#[clap(name = "rtstore")]
+#[clap(about = "a table store engine for realtime ingesting and analytics", long_about = None)]
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Start MetaServer
+    #[clap(arg_required_else_help = true)]
+    Meta {
+        #[clap(required = true)]
+        port: i32,
+    },
+}
 
 fn setup_log() {
     pretty_env_logger::init();
 }
-async fn start_metaserver() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "127.0.0.1:9527".parse().unwrap();
+async fn start_metaserver(port: i32) -> Result<(), Box<dyn std::error::Error>> {
+    let addr = format!("127.0.0.1:{}", port).parse().unwrap();
     let meta_service = MetaServiceImpl::new();
-    info!("start metaserver on port 9527");
+    info!("start metaserver on port {}", port);
     Server::builder()
         .add_service(MetaServer::new(meta_service))
         .serve(addr)
@@ -42,5 +61,8 @@ async fn start_metaserver() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_log();
-    start_metaserver().await
+    let args = Cli::parse();
+    match args.command {
+        Commands::Meta { port } => start_metaserver(port).await,
+    }
 }
