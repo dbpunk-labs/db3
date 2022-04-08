@@ -21,47 +21,39 @@ syntax = "proto3";
 
 package rtstore_base_proto;
 
-// the all types supported in rtstore
+// the all types are supported by rtstore
 enum RTStoreType {
-    kBool = 0;
-    kSmallInt = 2;
-    kInt = 3;
-    kBigInt = 4;
-    kFloat = 5;
-    kDouble = 6;
-    kDate = 9;
+    KBool = 0;
+    // int16
+    KSmallInt = 2;
+    // int32
+    KInt = 3;
+    KBigInt = 4;
+    KFloat = 5;
+    KDouble = 6;
+    KDate = 9;
+    KDecimal = 10;
     //timestamp type
-    kTimestamp_Second = 11;
-    kTimestamp_MillsSecond = 12;
-    kTimestamp_MicrosSecond = 13;
+    KTimestampSecond = 11;
+    KTimestampMillsSecond = 12;
+    KTimestampMicroSecond = 13;
     // string type
-    kString_Utf8 = 21;
-    kJson = 22;
-}
-
-enum RTStorePartitionType {
-    // use hash function to make a partition statically
-    kHash = 0;
-    // use range function to make a partition dynamically
-    kRange = 1;
+    KStringUtf8 = 21;
 }
 
 message RTStorePartitionDesc {
-    RTStorePartitionType ptype = 1;
-    // only support one column if ptype is kRange
     repeated string columns = 2;
     int32 partition_count = 3;
-    int32 range_count = 4;
-    // only used if ptype is kRange
+    // range merge and split strategy
     int32 split_record_count = 5;
     int32 merge_record_count = 6;
+    string range_column = 7;
 }
 
 message RTStoreColumnDesc {
     string name = 1;
     RTStoreType ctype = 2;
     bool null_allowed = 3;
-    bytes default_value = 4;
 }
 
 message RTStoreSchemaDesc {
@@ -71,18 +63,8 @@ message RTStoreSchemaDesc {
 
 message RTStoreTableDesc {
     // the table name is like test.dev.table1
-    repeated string name = 1;
+    repeated string names = 1;
     RTStoreSchemaDesc schema = 2;
+    RTStorePartitionDesc partition_desc = 3;
 }
 
-enum RTStoreStatusType {
-    kOk = 0;
-    // table related error
-    kTableNameDuplicatedError = 11;
-    kTableNotFoundError = 12;
-}
-
-message RTStoreStatus {
-    RTStoreStatusType stype = 1;
-    string msg = 2;
-}

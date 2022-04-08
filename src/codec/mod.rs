@@ -1,6 +1,6 @@
 //
 //
-// build.rs
+// mod.rs
 // Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,19 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
-fn main() {
-    tonic_build::configure()
-        .build_server(true)
-        .compile(
-            &[
-                "proto/rtstore_base.proto",
-                "proto/rtstore_meta_server.proto",
-            ],
-            &["proto"],
-        )
-        .unwrap();
-}
+pub mod row;
 
 #[cfg(test)]
 mod tests {

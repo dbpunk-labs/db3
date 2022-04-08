@@ -16,6 +16,10 @@
 // limitations under the License.
 //
 
-pub mod error;
-use error::*;
+#[macro_use(uselog)]
+extern crate uselog_rs;
 pub mod base;
+pub mod codec;
+pub mod error;
+pub mod meta;
+pub mod proto;

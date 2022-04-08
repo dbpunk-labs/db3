@@ -16,4 +16,6 @@
 // limitations under the License.
 //
 
+pub mod arrow_parquet_utils;
 pub mod filesystem;
+pub mod strings;
