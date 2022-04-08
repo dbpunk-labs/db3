@@ -20,11 +20,13 @@
 #[macro_use(uselog)]
 extern crate uselog_rs;
 use rtstore::meta::meta_server::MetaServiceImpl;
+use rtstore::proto::rtstore_meta_proto::meta_client::MetaClient;
 use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
+use rtstore::proto::rtstore_meta_proto::PingRequest;
 use tonic::transport::Server;
 extern crate pretty_env_logger;
 uselog!(debug, info, warn);
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[clap(name = "rtstore")]
@@ -42,11 +44,19 @@ enum Commands {
         #[clap(required = true)]
         port: i32,
     },
+
+    /// Start Client Cli
+    #[clap(arg_required_else_help = true)]
+    Client {
+        #[clap(required = true)]
+        port: i32,
+    },
 }
 
 fn setup_log() {
     pretty_env_logger::init();
 }
+
 async fn start_metaserver(port: i32) -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("127.0.0.1:{}", port).parse().unwrap();
     let meta_service = MetaServiceImpl::new();
@@ -58,11 +68,21 @@ async fn start_metaserver(port: i32) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn start_client(port: i32) -> Result<(), Box<dyn std::error::Error>> {
+    let addr = format!("http://127.0.0.1:{}", port);
+    let mut client = MetaClient::connect(addr).await?;
+    let request = tonic::Request::new(PingRequest {});
+    let response = client.ping(request).await?;
+    println!("{:?}", response);
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_log();
     let args = Cli::parse();
     match args.command {
         Commands::Meta { port } => start_metaserver(port).await,
+        Commands::Client { port } => start_client(port).await,
     }
 }

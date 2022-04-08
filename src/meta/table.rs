@@ -19,7 +19,7 @@
 use crate::base::arrow_parquet_utils::*;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::RtStoreTableDesc;
-use arrow::datatypes::{Schema, SchemaRef};
+use arrow::datatypes::SchemaRef;
 use std::ops::Range;
 use std::sync::Arc;
 uselog!(info, warn, debug);

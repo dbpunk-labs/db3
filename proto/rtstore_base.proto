@@ -68,14 +68,3 @@ message RTStoreTableDesc {
     RTStorePartitionDesc partition_desc = 3;
 }
 
-enum RTStoreStatusType {
-    kOk = 0;
-    // table related error
-    kTableNameDuplicatedError = 11;
-    kTableNotFoundError = 12;
-}
-
-message RTStoreStatus {
-    RTStoreStatusType stype = 1;
-    string msg = 2;
-}

@@ -26,14 +26,18 @@ pub enum RTStoreError {
     TableNotFoundError { tname: String },
     #[error("invalid table names for {error}")]
     TableInvalidNamesError { error: String },
+    #[error("table with name {name} exists")]
+    TableNamesExistError { name: String },
     #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]
     FSIoError(IoError),
     #[error("fail to convert {0} to rtstore column type")]
     TableSchemaConvertError(i32),
-    #[error("the schema for table {name} is invalid")]
+    #[error("the schema for table {name} is invalid, please check the input")]
     TableSchemaInvalidError { name: String },
+    #[error("create table error for {err}")]
+    MetaRpcCreateTableError { err: String },
 }
 
 /// convert io error to rtstore error
@@ -49,6 +53,12 @@ impl From<RTStoreError> for IoError {
             RTStoreError::FSIoError(e) => e,
             _ => IoError::from(ErrorKind::Other),
         }
+    }
+}
+
+impl From<RTStoreError> for String {
+    fn from(error: RTStoreError) -> Self {
+        format!("{}", error).to_string()
     }
 }
 

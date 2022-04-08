@@ -28,12 +28,13 @@ message CreateTableRequest {
 }
 
 message CreateTableResponse {
-    rtstore_base_proto.RTStoreStatus status = 1;
 }
 
+message PingRequest{}
+message PingResponse{}
 // The rtstore meta server definition.
 service Meta {
-
     // method for adding a new table
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse) {}
+    rpc Ping(PingRequest) returns (PingResponse) {}
 }

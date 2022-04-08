@@ -17,9 +17,11 @@
 //
 use super::table::Table;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreStatus, RtStoreStatusType, RtStoreTableDesc};
+use crate::proto::rtstore_base_proto::RtStoreTableDesc;
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
-use crate::proto::rtstore_meta_proto::{CreateTableRequest, CreateTableResponse};
+use crate::proto::rtstore_meta_proto::{
+    CreateTableRequest, CreateTableResponse, PingRequest, PingResponse,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
@@ -39,7 +41,17 @@ impl MetaServiceState {
 
     pub fn create_table(&mut self, table_desc: &RtStoreTableDesc) -> Result<()> {
         // join the names of table desc
-        Ok(())
+        let id = Table::gen_id(table_desc)?;
+        debug!("create table with id {}", id);
+        match self.tables.get(&id) {
+            Some(_) => Err(RTStoreError::TableNamesExistError { name: id }),
+            _ => {
+                let db_dir: &str = "db_dir";
+                let table = Table::new(table_desc, db_dir)?;
+                self.tables.insert(id, table);
+                Ok(())
+            }
+        }
     }
 }
 
@@ -55,19 +67,45 @@ impl MetaServiceImpl {
     }
 }
 
+impl From<RTStoreError> for Status {
+    fn from(error: RTStoreError) -> Self {
+        match error {
+            RTStoreError::TableInvalidNamesError { .. }
+            | RTStoreError::TableSchemaConvertError { .. }
+            | RTStoreError::TableSchemaInvalidError { .. }
+            | RTStoreError::MetaRpcCreateTableError { .. } => Status::invalid_argument(error),
+            RTStoreError::TableNotFoundError { .. } => Status::not_found(error),
+            RTStoreError::FSInvalidFileError { .. } | RTStoreError::FSIoError(_) => {
+                Status::internal(error)
+            }
+            RTStoreError::TableNamesExistError { .. } => Status::already_exists(error),
+        }
+    }
+}
+
 #[tonic::async_trait]
 impl Meta for MetaServiceImpl {
     async fn create_table(
         &self,
         request: Request<CreateTableRequest>,
     ) -> std::result::Result<Response<CreateTableResponse>, Status> {
-        let rtstore_status = RtStoreStatus {
-            stype: RtStoreStatusType::KOk as i32,
-            msg: "ok".to_string(),
-        };
-        Ok(Response::new(CreateTableResponse {
-            status: Some(rtstore_status),
-        }))
+        let create_request = request.into_inner();
+        let table_desc = match &create_request.table_desc {
+            Some(t) => Ok(t),
+            _ => Err(RTStoreError::MetaRpcCreateTableError {
+                err: "input is invalid for empty table description".to_string(),
+            }),
+        }?;
+        let mut local_state = self.state.lock().unwrap();
+        local_state.create_table(&table_desc)?;
+        Ok(Response::new(CreateTableResponse {}))
+    }
+
+    async fn ping(
+        &self,
+        request: Request<PingRequest>,
+    ) -> std::result::Result<Response<PingResponse>, Status> {
+        Ok(Response::new(PingResponse {}))
     }
 }
 
