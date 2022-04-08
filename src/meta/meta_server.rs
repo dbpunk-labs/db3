@@ -38,7 +38,6 @@ impl MetaServiceState {
             tables: HashMap::new(),
         }
     }
-
     pub fn create_table(&mut self, table_desc: &RtStoreTableDesc) -> Result<()> {
         // join the names of table desc
         let id = Table::gen_id(table_desc)?;
@@ -48,6 +47,7 @@ impl MetaServiceState {
             _ => {
                 let db_dir: &str = "db_dir";
                 let table = Table::new(table_desc, db_dir)?;
+                info!("create a new table with id {} successfully", id);
                 self.tables.insert(id, table);
                 Ok(())
             }

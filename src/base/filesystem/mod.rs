@@ -212,11 +212,7 @@ impl FileSystem for InMemFileSystem {
             filename: filename.to_str().unwrap().to_string(),
             offset: 0,
         };
-        Ok(Box::new(WritableFileWriter::new(
-            Box::new(f),
-            filename.to_str().unwrap().to_string(),
-            128,
-        )))
+        Ok(Box::new(WritableFileWriter::new(Box::new(f), 128)))
     }
 
     fn open_random_access_file(&self, filename: &Path) -> Result<Box<RandomAccessFileReader>> {

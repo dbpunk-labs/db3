@@ -295,6 +295,7 @@ impl RandomAccessFile for PosixReadableFile {
         self.inner.file_size().unwrap()
     }
 }
+
 pub struct PosixSequentialFile {
     inner: Arc<RawFile>,
     file_size: usize,
@@ -335,7 +336,7 @@ impl FileSystem for SyncPosixFileSystem {
     fn open_writable_file_writer(&self, path: &Path) -> Result<Box<WritableFileWriter>> {
         let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
         let f = PosixWritableFile::create(path)?;
-        let writer = WritableFileWriter::new(Box::new(f), file_name, 0);
+        let writer = WritableFileWriter::new(Box::new(f), 0);
         Ok(Box::new(writer))
     }
 
