@@ -1,0 +1,88 @@
+name: ci
+on:
+  pull_request:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: khan/pull-request-comment-trigger@master
+        id: check
+        with:
+          trigger: '#style'
+      -
+        uses: actions/checkout@v2
+
+      - name: Install Nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+            components: rustfmt, clippy
+        if: steps.check.outputs.triggered == 'true'
+      -
+        name: Run cargo check
+        uses: actions-rs/toolchain@v1
+        with:
+            command: check
+        if: steps.check.outputs.triggered == 'true'
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: khan/pull-request-comment-trigger@master
+        id: check
+        with:
+          trigger: '#build'
+          reaction: eyes
+        env:
+          GITHUB_TOKEN: '${{ secrets.CR_PAT}}'
+
+      -
+        uses: actions/checkout@v2
+
+      - name: Install Nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+            components: rustfmt, clippy
+        if: steps.check.outputs.triggered == 'true'
+
+      -
+        name: Run cargo check
+        uses: actions-rs/toolchain@v1
+        with:
+            command: build
+        if: steps.check.outputs.triggered == 'true'
+
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: khan/pull-request-comment-trigger@master
+        id: check
+        with:
+          trigger: '#test'
+          reaction: rocket
+        env:
+          GITHUB_TOKEN: '${{ secrets.CR_PAT }}'
+      -
+        uses: actions/checkout@v2
+
+      - name: Install Nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+            components: rustfmt, clippy
+        if: steps.check.outputs.triggered == 'true'
+      -
+        name: Run cargo check
+        uses: actions-rs/toolchain@v1
+        with:
+            command: test
+        if: steps.check.outputs.triggered == 'true'
