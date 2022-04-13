@@ -38,6 +38,7 @@ jobs:
         with:
           trigger: '#build'
           reaction: eyes
+          github-token: ${{ secrets.CR_PAT}}  
         env:
           GITHUB_TOKEN: '${{ secrets.CR_PAT}}'
 
@@ -64,10 +65,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: khan/pull-request-comment-trigger@v1.1.0
-        id: check
+        id: check  
         with:
           trigger: '#test'
           reaction: rocket
+          github-token: ${{ secrets.CR_PAT}}  
         env:
           GITHUB_TOKEN: '${{ secrets.CR_PAT }}'
       -
