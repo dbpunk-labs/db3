@@ -9,7 +9,7 @@ jobs:
   style:
     runs-on: ubuntu-latest
     steps:
-      - uses: khan/pull-request-comment-trigger@master
+      - uses: khan/pull-request-comment-trigger@v1.1.0
         id: check
         with:
           trigger: '#style'
@@ -33,7 +33,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: khan/pull-request-comment-trigger@master
+      - uses: khan/pull-request-comment-trigger@v1.1.0
         id: check
         with:
           trigger: '#build'
@@ -63,7 +63,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: khan/pull-request-comment-trigger@master
+      - uses: khan/pull-request-comment-trigger@v1.1.0
         id: check
         with:
           trigger: '#test'
