@@ -25,7 +25,7 @@ jobs:
         if: steps.check.outputs.triggered == 'true'
       -
         name: Run cargo check
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/cargo@v1
         with:
             command: check
         if: steps.check.outputs.triggered == 'true'
@@ -54,7 +54,7 @@ jobs:
 
       -
         name: Run cargo check
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/cargo@v1
         with:
             command: build
         if: steps.check.outputs.triggered == 'true'
@@ -82,7 +82,7 @@ jobs:
         if: steps.check.outputs.triggered == 'true'
       -
         name: Run cargo check
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/cargo@v1
         with:
             command: test
         if: steps.check.outputs.triggered == 'true'
