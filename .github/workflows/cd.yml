@@ -101,7 +101,7 @@ jobs:
             target/${{ matrix.job.target }}/release/rtstore-tpl-*.tar.gz
             target/${{ matrix.job.target }}/release/rtstore-tpl-*.sha256
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CR_PAT }}
 
   publish-cargo:
     name: Publishing to Cargo
