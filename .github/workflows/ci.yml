@@ -129,5 +129,6 @@ jobs:
           cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v2
         with:
+          token: ${{secrets.COV_TOKEN}}
           directory: .
           flags: rust
