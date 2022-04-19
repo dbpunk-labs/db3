@@ -120,17 +120,14 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
-          components: rustfmt
+          components: rustfmt,llvm-tools-preview
       - uses: Swatinem/rust-cache@v1
-      - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: taiki-e/install-action@nextest
+      - name: Run rust test with coverage
+        run: |
+          cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
+      - uses: codecov/codecov-action@v2
         with:
-          args: '--all-features --workspace --ignore-tests --out Lcov'
-      - name: Upload to Coveralls
-        # upload only if push
-        if: ${{ github.event_name == 'push' }}
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.CR_PAT }}
-          path-to-lcov: './lcov.info'
-
+          directory: .
+          flags: rust
