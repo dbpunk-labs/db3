@@ -20,6 +20,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
+          components: rustfmt
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
@@ -58,7 +59,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
-          components: clippy
+          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v1
       - name: Clippy check
         uses: actions-rs/cargo@v1
@@ -78,6 +79,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
+          components: rustfmt
       - uses: Swatinem/rust-cache@v1
       - name: Check documentation
         env:
@@ -99,6 +101,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
+          components: rustfmt
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
@@ -117,6 +120,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
+          components: rustfmt
       - uses: Swatinem/rust-cache@v1
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
