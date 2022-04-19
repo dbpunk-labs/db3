@@ -46,7 +46,6 @@ pub struct Table {
     // rtstore table description
     table_desc: Arc<RtStoreTableDesc>,
     partitions: Vec<Partition>,
-    db_dir: String,
 }
 
 impl Table {
@@ -60,7 +59,7 @@ impl Table {
         Ok(table_desc.names.join("."))
     }
 
-    pub fn new(table_desc: &RtStoreTableDesc, db_dir: &str) -> Result<Self> {
+    pub fn new(table_desc: &RtStoreTableDesc) -> Result<Self> {
         let id = Self::gen_id(table_desc)?;
         info!("gen a new table id {}", id);
         let schema = match &table_desc.schema {
@@ -75,7 +74,6 @@ impl Table {
             schema: arrow_schema_ref,
             table_desc: Arc::new(table_desc.clone()),
             partitions: Vec::new(),
-            db_dir: db_dir.to_string(),
         })
     }
 }

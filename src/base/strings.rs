@@ -16,17 +16,14 @@
 // limitations under the License.
 //
 
-use log::info;
+uselog!(debug);
 use std::vec::Vec;
 
 const NUM_LABELS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const STORAGE_LABELS: [char; 7] = [' ', 'K', 'M', 'G', 'T', 'P', 'E'];
 
 pub fn to_readable_num_str(input: usize, len: usize) -> String {
-    let mut name: Vec<char> = Vec::new();
-    for i in 0..len {
-        name.push('0');
-    }
+    let mut name = vec!['0'; len];
     let mut shift = 0;
     let mut target = input;
     while shift < len {
@@ -46,7 +43,7 @@ pub fn bytes_to_readable_num_str(bytes_size: u64) -> String {
     while local_bytes_size > 0 && shift < max_shift {
         value /= 1024.0;
         shift += 1;
-        info!(
+        debug!(
             "input byte size {} local_bytes_size {}",
             bytes_size, local_bytes_size
         );
@@ -60,5 +57,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {}
+    fn test_it_readable_num_str_normal() {
+        let input = 10;
+        let size = 3;
+        let label = to_readable_num_str(10, 3);
+        assert_eq!("010", label);
+        let label = to_readable_num_str(10, 0);
+        assert_eq!("", label);
+    }
+
+    #[test]
+    fn test_bytes_to_readable_num_str() {
+        let less_1k = 1023;
+        let label = bytes_to_readable_num_str(less_1k);
+        assert_eq!("1023.00 ", label);
+    }
 }
