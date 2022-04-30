@@ -55,8 +55,20 @@ impl MetaServiceState {
     }
 }
 
+impl Default for MetaServiceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct MetaServiceImpl {
     state: Arc<Mutex<MetaServiceState>>,
+}
+
+impl Default for MetaServiceImpl {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MetaServiceImpl {
@@ -97,7 +109,7 @@ impl Meta for MetaServiceImpl {
             }),
         }?;
         let mut local_state = self.state.lock().unwrap();
-        local_state.create_table(&table_desc)?;
+        local_state.create_table(table_desc)?;
         Ok(Response::new(CreateTableResponse {}))
     }
 

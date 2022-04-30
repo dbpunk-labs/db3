@@ -28,8 +28,7 @@ clap = { version = "3.1.8", features = ["derive"] }
 
 [[bin]]
 name = "rtstore"
-path = "src/bin/rtstore.rs"
-
+path = "src/cmd/rtstore.rs"
 
 
 [build-dependencies]

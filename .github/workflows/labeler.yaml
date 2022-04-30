@@ -1,5 +1,3 @@
-
-  
 name: Label PRs
 
 on:
@@ -13,4 +11,6 @@ jobs:
     steps:
     - uses: srvaroa/labeler@master
       env:
-        GITHUB_TOKEN: "${{ secrets.CR_PAT }}
+        GITHUB_TOKEN: "${{ secrets.CR_PAT }}"
+        configuration-path: .github//labes.yaml
+        sync-labels: true

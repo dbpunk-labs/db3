@@ -219,11 +219,9 @@ impl FileSystem for InMemFileSystem {
         let filename = filename.to_str().unwrap().to_string();
         let fs = self.inner.lock().unwrap();
         match fs.files.get(&filename) {
-            None => {
-                return Err(RTStoreError::FSInvalidFileError {
-                    path: filename.clone(),
-                })
-            }
+            None => Err(RTStoreError::FSInvalidFileError {
+                path: filename.clone(),
+            }),
             Some(buf) => {
                 let f = InMemFile {
                     fs: self.inner.clone(),
@@ -240,11 +238,9 @@ impl FileSystem for InMemFileSystem {
         let fs = self.inner.lock().unwrap();
         let filename = path.to_str().unwrap();
         match fs.files.get(filename) {
-            None => {
-                return Err(RTStoreError::FSInvalidFileError {
-                    path: filename.to_string(),
-                })
-            }
+            None => Err(RTStoreError::FSInvalidFileError {
+                path: filename.to_string(),
+            }),
             Some(buf) => {
                 let f = InMemFile {
                     fs: self.inner.clone(),

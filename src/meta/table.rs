@@ -24,13 +24,13 @@ use std::ops::Range;
 use std::sync::Arc;
 uselog!(info, warn, debug);
 
+/// the smallest data unit for table store
 pub struct Cell {
     range: Range<u64>,
     partition_index: usize,
     num_rows: u64,
 }
 
-/// the smallest data unit for table store
 pub struct Partition {
     partition_index: usize,
     num_rows: u64,
@@ -51,7 +51,7 @@ pub struct Table {
 impl Table {
     pub fn gen_id(table_desc: &RtStoreTableDesc) -> Result<String> {
         // validate table name and join names with dot
-        if table_desc.names.len() <= 0 {
+        if table_desc.names.is_empty() {
             return Err(RTStoreError::TableInvalidNamesError {
                 error: "empty name".to_string(),
             });
@@ -68,7 +68,7 @@ impl Table {
                 name: id.to_string(),
             }),
         }?;
-        let arrow_schema_ref = table_desc_to_arrow_schema(&schema)?;
+        let arrow_schema_ref = table_desc_to_arrow_schema(schema)?;
         Ok(Self {
             id,
             schema: arrow_schema_ref,
