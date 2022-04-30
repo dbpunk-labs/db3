@@ -24,13 +24,13 @@ use std::ops::Range;
 use std::sync::Arc;
 uselog!(info, warn, debug);
 
+/// the smallest data unit for table store
 pub struct Cell {
     range: Range<u64>,
     partition_index: usize,
     num_rows: u64,
 }
 
-/// the smallest data unit for table store
 pub struct Partition {
     partition_index: usize,
     num_rows: u64,
@@ -46,13 +46,12 @@ pub struct Table {
     // rtstore table description
     table_desc: Arc<RtStoreTableDesc>,
     partitions: Vec<Partition>,
-    db_dir: String,
 }
 
 impl Table {
     pub fn gen_id(table_desc: &RtStoreTableDesc) -> Result<String> {
         // validate table name and join names with dot
-        if table_desc.names.len() <= 0 {
+        if table_desc.names.is_empty() {
             return Err(RTStoreError::TableInvalidNamesError {
                 error: "empty name".to_string(),
             });
@@ -60,7 +59,7 @@ impl Table {
         Ok(table_desc.names.join("."))
     }
 
-    pub fn new(table_desc: &RtStoreTableDesc, db_dir: &str) -> Result<Self> {
+    pub fn new(table_desc: &RtStoreTableDesc) -> Result<Self> {
         let id = Self::gen_id(table_desc)?;
         info!("gen a new table id {}", id);
         let schema = match &table_desc.schema {
@@ -69,13 +68,12 @@ impl Table {
                 name: id.to_string(),
             }),
         }?;
-        let arrow_schema_ref = table_desc_to_arrow_schema(&schema)?;
+        let arrow_schema_ref = table_desc_to_arrow_schema(schema)?;
         Ok(Self {
             id,
             schema: arrow_schema_ref,
             table_desc: Arc::new(table_desc.clone()),
             partitions: Vec::new(),
-            db_dir: db_dir.to_string(),
         })
     }
 }

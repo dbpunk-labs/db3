@@ -58,7 +58,7 @@ pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::{RTStoreError, Result};
+    use crate::error::Result;
     use crate::proto::rtstore_base_proto::RtStoreColumnDesc;
     #[test]
     fn it_convert_desc_to_arrow_schema() -> Result<()> {
@@ -75,7 +75,7 @@ mod tests {
         assert_eq!(1, schema_ref.fields().len());
         assert_eq!(&DataType::Boolean, schema_ref.fields()[0].data_type());
         assert_eq!("col1", schema_ref.fields()[0].name());
-        assert_eq!(true, schema_ref.fields()[0].is_nullable());
+        assert!(schema_ref.fields()[0].is_nullable());
         Ok(())
     }
 }

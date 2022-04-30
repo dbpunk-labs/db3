@@ -58,7 +58,7 @@ impl From<RTStoreError> for IoError {
 
 impl From<RTStoreError> for String {
     fn from(error: RTStoreError) -> Self {
-        format!("{}", error).to_string()
+        format!("{}", error)
     }
 }
 

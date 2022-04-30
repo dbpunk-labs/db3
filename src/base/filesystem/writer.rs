@@ -22,7 +22,6 @@ use super::WritableFile;
 use crate::error::Result;
 
 pub struct WritableFileWriter {
-    file_name: String,
     writable_file: Box<dyn WritableFile>,
     buf: Vec<u8>,
     file_size: usize,
@@ -30,14 +29,9 @@ pub struct WritableFileWriter {
 }
 
 impl WritableFileWriter {
-    pub fn new(
-        writable_file: Box<dyn WritableFile>,
-        file_name: String,
-        max_buffer_size: usize,
-    ) -> Self {
+    pub fn new(writable_file: Box<dyn WritableFile>, max_buffer_size: usize) -> Self {
         let file_size = writable_file.get_file_size();
         WritableFileWriter {
-            file_name,
             writable_file,
             buf: Vec::with_capacity(std::cmp::min(65536, max_buffer_size)),
             file_size,
@@ -47,9 +41,7 @@ impl WritableFileWriter {
 
     pub fn append(&mut self, data: &[u8]) -> Result<()> {
         self.file_size += data.len();
-        if self.max_buffer_size == 0 {
-            self.writable_file.append(data)?;
-        } else if self.buf.is_empty() && data.len() >= self.max_buffer_size {
+        if self.buf.is_empty() && data.len() >= self.max_buffer_size {
             self.writable_file.append(data)?;
         } else {
             self.buf.extend_from_slice(data);

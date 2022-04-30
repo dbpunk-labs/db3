@@ -1,90 +1,134 @@
-name: ci
+name: CI # Continuous Integration
+
 on:
+  push:
+    branches:
+      - main
   pull_request:
-    types: [opened]
-  issue_comment:
-    types: [created]
 
 jobs:
-  style:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: khan/pull-request-comment-trigger@v1.1.0
-        id: check
-        with:
-          trigger: '#style'
-      -
-        uses: actions/checkout@v2
-
-      - name: Install Nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: nightly
-            override: true
-            components: rustfmt, clippy
-        if: steps.check.outputs.triggered == 'true'
-      -
-        name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-            command: check
-        if: steps.check.outputs.triggered == 'true'
-
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: khan/pull-request-comment-trigger@v1.1.0
-        id: check
-        with:
-          trigger: '#build'
-          reaction: eyes
-          github-token: ${{ secrets.CR_PAT}}  
-        env:
-          GITHUB_TOKEN: '${{ secrets.CR_PAT}}'
-
-      -
-        uses: actions/checkout@v2
-
-      - name: Install Nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: nightly
-            override: true
-            components: rustfmt, clippy
-        if: steps.check.outputs.triggered == 'true'
-
-      -
-        name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-            command: build
-        if: steps.check.outputs.triggered == 'true'
-
 
   test:
+    name: Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: khan/pull-request-comment-trigger@v1.1.0
-        id: check  
-        with:
-          trigger: '#test'
-          reaction: rocket
-          github-token: ${{ secrets.CR_PAT}}  
-        env:
-          GITHUB_TOKEN: '${{ secrets.CR_PAT }}'
-      -
-        uses: actions/checkout@v2
-
-      - name: Install Nightly toolchain
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
-            override: true
-            components: rustfmt, clippy
-        if: steps.check.outputs.triggered == 'true'
-      -
-        name: Run cargo check
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --workspace
+
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - name: Check formatting
         uses: actions-rs/cargo@v1
         with:
-            command: test
-        if: steps.check.outputs.triggered == 'true'
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - name: Clippy check
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all-targets --all-features --workspace -- -D warnings
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --no-deps --document-private-items --all-features --workspace --examples
+
+  publish-dry-run:
+    name: Publish dry run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: publish
+          args: --dry-run
+
+  coverage:
+    name: Code coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: rustfmt,llvm-tools-preview
+      - uses: Swatinem/rust-cache@v1
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: taiki-e/install-action@nextest
+      - name: Run rust test with coverage
+        run: |
+          cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
+      - uses: codecov/codecov-action@v2
+        with:
+          token: ${{secrets.COV_TOKEN}}
+          directory: .
+          flags: rust

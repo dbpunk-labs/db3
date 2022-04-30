@@ -266,16 +266,13 @@ impl Write for PosixWritableFile {
 
 pub struct PosixReadableFile {
     inner: Arc<RawFile>,
-    file_size: usize,
 }
 
 impl PosixReadableFile {
     pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let fd = RawFile::open_for_read(path, false)?;
-        let file_size = fd.file_size()?;
         Ok(Self {
             inner: Arc::new(fd),
-            file_size,
         })
     }
 }
@@ -295,6 +292,7 @@ impl RandomAccessFile for PosixReadableFile {
         self.inner.file_size().unwrap()
     }
 }
+
 pub struct PosixSequentialFile {
     inner: Arc<RawFile>,
     file_size: usize,
@@ -333,9 +331,8 @@ pub struct SyncPosixFileSystem {}
 
 impl FileSystem for SyncPosixFileSystem {
     fn open_writable_file_writer(&self, path: &Path) -> Result<Box<WritableFileWriter>> {
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
         let f = PosixWritableFile::create(path)?;
-        let writer = WritableFileWriter::new(Box::new(f), file_name, 0);
+        let writer = WritableFileWriter::new(Box::new(f), 0);
         Ok(Box::new(writer))
     }
 
@@ -404,7 +401,7 @@ mod tests {
         f.append("abcd".as_bytes()).unwrap();
         f.append("efgh".as_bytes()).unwrap();
         f.append("ijkl".as_bytes()).unwrap();
-        f.sync();
+        f.sync().unwrap();
 
         let mut f = fs.open_sequential_file(&dir.path().join("sst")).unwrap();
         let mut v = vec![0; 7];

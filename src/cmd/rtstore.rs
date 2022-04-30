@@ -54,7 +54,7 @@ enum Commands {
 }
 
 fn setup_log() {
-    pretty_env_logger::init();
+    pretty_env_logger::init_timed();
 }
 
 async fn start_metaserver(port: i32) -> Result<(), Box<dyn std::error::Error>> {

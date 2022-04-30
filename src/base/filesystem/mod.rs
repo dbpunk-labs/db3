@@ -212,22 +212,16 @@ impl FileSystem for InMemFileSystem {
             filename: filename.to_str().unwrap().to_string(),
             offset: 0,
         };
-        Ok(Box::new(WritableFileWriter::new(
-            Box::new(f),
-            filename.to_str().unwrap().to_string(),
-            128,
-        )))
+        Ok(Box::new(WritableFileWriter::new(Box::new(f), 128)))
     }
 
     fn open_random_access_file(&self, filename: &Path) -> Result<Box<RandomAccessFileReader>> {
         let filename = filename.to_str().unwrap().to_string();
         let fs = self.inner.lock().unwrap();
         match fs.files.get(&filename) {
-            None => {
-                return Err(RTStoreError::FSInvalidFileError {
-                    path: filename.clone(),
-                })
-            }
+            None => Err(RTStoreError::FSInvalidFileError {
+                path: filename.clone(),
+            }),
             Some(buf) => {
                 let f = InMemFile {
                     fs: self.inner.clone(),
@@ -244,11 +238,9 @@ impl FileSystem for InMemFileSystem {
         let fs = self.inner.lock().unwrap();
         let filename = path.to_str().unwrap();
         match fs.files.get(filename) {
-            None => {
-                return Err(RTStoreError::FSInvalidFileError {
-                    path: filename.to_string(),
-                })
-            }
+            None => Err(RTStoreError::FSInvalidFileError {
+                path: filename.to_string(),
+            }),
             Some(buf) => {
                 let f = InMemFile {
                     fs: self.inner.clone(),

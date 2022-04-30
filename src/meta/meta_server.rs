@@ -46,8 +46,8 @@ impl MetaServiceState {
         match self.tables.get(&id) {
             Some(_) => Err(RTStoreError::TableNamesExistError { name: id }),
             _ => {
-                let db_dir: &str = "db_dir";
-                let table = Table::new(table_desc, db_dir)?;
+                let table = Table::new(table_desc)?;
+                info!("create a new table with id {} successfully", id);
                 self.tables.insert(id, table);
                 Ok(())
             }
@@ -55,8 +55,20 @@ impl MetaServiceState {
     }
 }
 
+impl Default for MetaServiceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct MetaServiceImpl {
     state: Arc<Mutex<MetaServiceState>>,
+}
+
+impl Default for MetaServiceImpl {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MetaServiceImpl {
@@ -97,7 +109,7 @@ impl Meta for MetaServiceImpl {
             }),
         }?;
         let mut local_state = self.state.lock().unwrap();
-        local_state.create_table(&table_desc)?;
+        local_state.create_table(table_desc)?;
         Ok(Response::new(CreateTableResponse {}))
     }
 

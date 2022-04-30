@@ -20,7 +20,6 @@
 syntax = "proto3";
 
 package rtstore_base_proto;
-
 // the all types are supported by rtstore
 enum RTStoreType {
     KBool = 0;
@@ -39,6 +38,40 @@ enum RTStoreType {
     KTimestampMicroSecond = 13;
     // string type
     KStringUtf8 = 21;
+}
+
+enum CellType {
+    KWritable = 0;
+    kReadOnly = 1;
+}
+
+// the smallest storage unit in rtstore
+message CellStatus {
+    // start timestamp
+    int64 start_ts = 1;
+    // end timestamp
+    int64 end_ts = 2;
+    // total row in cells
+    int64 num_rows = 3;
+    int32 cell_id = 4;
+    int32 partition_id = 5;
+    string display = 6;
+    string cell_store_uri = 7;
+    CellType ctype = 8;
+}
+
+message CellDesc {
+    string table_id = 1;
+    int32 partition_id = 2;
+    string cell_store_uri = 3;
+}
+
+// the logical storage unit for data group
+message PartitionStatus {
+    int32 partition_id = 1;
+    int32 cell_count = 2;
+    int64 num_rows = 3;
+    string display = 4;
 }
 
 message RTStorePartitionDesc {
@@ -66,5 +99,6 @@ message RTStoreTableDesc {
     repeated string names = 1;
     RTStoreSchemaDesc schema = 2;
     RTStorePartitionDesc partition_desc = 3;
+    // the root path for storing data , eg s3://xxxx/xx
+    string storage_uri = 4;
 }
-

@@ -61,6 +61,7 @@ mod tests {
         assert_eq!(encoded.len(), 71);
         let new_row_batch: RowRecordBatch = bincode::deserialize(&encoded[..]).unwrap();
         assert_eq!(row_batch.schema_version, new_row_batch.schema_version);
+        assert_eq!(row_batch.batch.len(), new_row_batch.batch.len());
         Ok(())
     }
 }
