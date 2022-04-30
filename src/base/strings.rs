@@ -56,8 +56,6 @@ mod tests {
 
     #[test]
     fn test_it_readable_num_str_normal() {
-        let input = 10;
-        let size = 3;
         let label = to_readable_num_str(10, 3);
         assert_eq!("010", label);
         let label = to_readable_num_str(10, 0);

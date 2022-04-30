@@ -41,9 +41,7 @@ impl WritableFileWriter {
 
     pub fn append(&mut self, data: &[u8]) -> Result<()> {
         self.file_size += data.len();
-        if self.max_buffer_size == 0 {
-            self.writable_file.append(data)?;
-        } else if self.buf.is_empty() && data.len() >= self.max_buffer_size {
+        if self.buf.is_empty() && data.len() >= self.max_buffer_size {
             self.writable_file.append(data)?;
         } else {
             self.buf.extend_from_slice(data);
