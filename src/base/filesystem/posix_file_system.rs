@@ -404,7 +404,7 @@ mod tests {
         f.append("abcd".as_bytes()).unwrap();
         f.append("efgh".as_bytes()).unwrap();
         f.append("ijkl".as_bytes()).unwrap();
-        f.sync();
+        f.sync().unwrap();
 
         let mut f = fs.open_sequential_file(&dir.path().join("sst")).unwrap();
         let mut v = vec![0; 7];

@@ -1,9 +1,9 @@
-# rtstore-tpl
+# rtstore
 
-[![Crates.io](https://img.shields.io/crates/v/rtstore-tpl.svg)](https://crates.io/crates/rtstore-tpl)
-[![Docs.rs](https://docs.rs/rtstore-tpl/badge.svg)](https://docs.rs/rtstore-tpl)
-[![CI](https://github.com/imrtstore/rtstore-tpl/workflows/CI/badge.svg)](https://github.com/imrtstore/rtstore-tpl/actions)
-[![Coverage Status](https://coveralls.io/repos/github/imrtstore/rtstore-tpl/badge.svg?branch=main)](https://coveralls.io/github/imrtstore/rtstore-tpl?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/rtstore.svg)](https://crates.io/crates/rtstore)
+[![Docs.rs](https://docs.rs/rtstore/badge.svg)](https://docs.rs/rtstore)
+[![CI](https://github.com/rtstore/rtstore/workflows/CI/badge.svg)](https://github.com/rtstore/rtstore/actions)
+[![Coverage Status](https://coveralls.io/repos/github/rtstore/rtstore/badge.svg?branch=main)](https://coveralls.io/github/rtstore/rtstore?branch=main)
 
 ## Installation
 
