@@ -127,7 +127,7 @@ jobs:
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
-      - uses: codecov/codecov-action@v2
+      - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}
           directory: .
