@@ -266,16 +266,13 @@ impl Write for PosixWritableFile {
 
 pub struct PosixReadableFile {
     inner: Arc<RawFile>,
-    file_size: usize,
 }
 
 impl PosixReadableFile {
     pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let fd = RawFile::open_for_read(path, false)?;
-        let file_size = fd.file_size()?;
         Ok(Self {
             inner: Arc::new(fd),
-            file_size,
         })
     }
 }

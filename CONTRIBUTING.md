@@ -8,7 +8,7 @@ wish to make by creating a new issue before making the change.
 ## Reporting issues
 
 Before reporting an issue on the
-[issue tracker](https://github.com/imrtstore/rtstore-tpl/issues),
+[issue tracker](https://github.com/rtstore/rtstore/issues),
 please check that it has not already been reported by searching for some related
 keywords.
 
@@ -19,7 +19,7 @@ Try to do one pull request per change.
 ### Updating the changelog
 
 Update the changes you have made in
-[CHANGELOG](https://github.com/imrtstore/rtstore-tpl/blob/main/CHANGELOG.md)
+[CHANGELOG](https://github.com/rtstore/rtstore/blob/main/CHANGELOG.md)
 file under the **Unreleased** section.
 
 Add the changes of your pull request to one of the following subsections,

@@ -58,7 +58,7 @@ pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::{RTStoreError, Result};
+    use crate::error::Result;
     use crate::proto::rtstore_base_proto::RtStoreColumnDesc;
     #[test]
     fn it_convert_desc_to_arrow_schema() -> Result<()> {
