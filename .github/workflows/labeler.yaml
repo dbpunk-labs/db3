@@ -12,5 +12,5 @@ jobs:
     - uses: srvaroa/labeler@master
       env:
         GITHUB_TOKEN: "${{ secrets.CR_PAT }}"
-        configuration-path: .github//labes.yaml
+        configuration-path: .github/labels.yaml
         sync-labels: true
