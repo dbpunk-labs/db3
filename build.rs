@@ -22,7 +22,7 @@ fn main() {
         .compile(
             &[
                 "proto/rtstore_base.proto",
-                "proto/rtstore_meta_server.proto",
+                "proto/rtstore_meta_node.proto",
             ],
             &["proto"],
         )

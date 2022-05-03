@@ -18,12 +18,22 @@ prost = "0.9"
 # Only necessary if using Protobuf well-known types:
 prost-types = "0.9"
 log = "0.4.16"
-arrow = { version = "10.0", features = ["prettyprint"] }
-parquet = { version = "10.0", features = ["arrow"] }
-pretty_env_logger = "0.4.0"
 uselog-rs = "0.3.0"
 bincode = "1.1.4"
 clap = { version = "3.1.8", features = ["derive"] }
+arrow = { version = "12", features = ["prettyprint"] }
+parquet = { version = "12", features = ["arrow"] }
+crossbeam-skiplist_piedb = "0.8.10"
+chrono = { version = "0.4", default-features = false }
+pretty_env_logger = "0.4.0"
+# Note datafusion must use the same version with sqlparser
+datafusion = {git = "https://github.com/piedb-dev/arrow-datafusion.git", rev = "17ead70"}
+sqlparser = {git = "https://github.com/piedb-dev/sqlparser-rs.git", rev = "22a6acf"}
+arc-swap = "0.4.2"
+crossbeam-utils = "0.7.2"
+msql-srv = { git = "https://github.com/imotai/msql-srv", rev = "ee14d86" }
+mysql = "22"
+mysql_async = "0.29.0"
 
 
 [[bin]]
@@ -33,3 +43,7 @@ path = "src/cmd/rtstore.rs"
 
 [build-dependencies]
 tonic-build = "0.6.2"
+
+[dev-dependencies]
+test-case = "2.0.2"
+

@@ -38,7 +38,7 @@ use super::{
     WritableFileWriter,
 };
 
-const FILE_ALLOCATE_SIZE: usize = 2 * 1024 * 1024;
+const FILE_ALLOCATE_SIZE: usize = 4 * 1024 * 1024;
 const MIN_ALLOCATE_SIZE: usize = 4 * 1024;
 
 /// A `LogFd` is a RAII file that provides basic I/O functionality.
@@ -53,36 +53,35 @@ pub fn from_nix_error(e: nix::Error, custom: &'static str) -> std::io::Error {
 }
 
 impl RawFile {
-    pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
-        let flags = OFlag::O_RDWR;
-        // Permission 644
-        let mode = Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH;
+    /// the  basic function for open a file
+    pub fn open<P: ?Sized + NixPath>(path: &P, mode: Mode, flags: OFlag) -> Result<Self> {
         Ok(RawFile(
             fcntl::open(path, flags, mode).map_err(|e| from_nix_error(e, "open"))?,
         ))
     }
-
-    #[allow(unused_variables)]
     pub fn open_for_read<P: ?Sized + NixPath>(path: &P, direct: bool) -> Result<Self> {
-        #[allow(unused_mut)]
-        let mut flags = OFlag::O_RDONLY;
-        #[cfg(target_os = "linux")]
-        if direct {
-            flags |= OFlag::O_DIRECT;
-        }
-        // Permission 644
         let mode = Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH;
-        Ok(RawFile(
-            fcntl::open(path, flags, mode).map_err(|e| from_nix_error(e, "open"))?,
-        ))
+        #[cfg(target_os = "linux")]
+        {
+            let mut flags = OFlag::O_RDONLY;
+            if direct {
+                flags |= OFlag::O_DIRECT;
+            }
+            RawFile::open(path, mode, flags)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let flags = OFlag::O_RDONLY;
+            if direct {}
+            RawFile::open(path, mode, flags)
+        }
     }
 
     pub fn create<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let flags = OFlag::O_RDWR | OFlag::O_CREAT;
         // Permission 644
         let mode = Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH;
-        let fd = fcntl::open(path, flags, mode).map_err(|e| from_nix_error(e, "open"))?;
-        Ok(RawFile(fd))
+        RawFile::open(path, mode, flags)
     }
 
     pub fn close(&self) -> Result<()> {
@@ -186,12 +185,6 @@ pub struct PosixWritableFile {
 }
 
 impl PosixWritableFile {
-    pub fn open<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
-        let fd = RawFile::open(path)?;
-        let file_size = fd.file_size()?;
-        Ok(Self::new(Arc::new(fd), file_size))
-    }
-
     pub fn create<P: ?Sized + NixPath>(path: &P) -> Result<Self> {
         let fd = RawFile::create(path)?;
         let file_size = fd.file_size()?;
@@ -386,10 +379,25 @@ impl FileSystem for SyncPosixFileSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::runtime::Runtime;
 
     #[test]
-    fn test_write_file() {
+    fn test_raw_fd_open_dir() -> Result<()> {
+        let dir = tempfile::Builder::new()
+            .prefix("test_raw_fd_dir")
+            .tempdir()
+            .unwrap();
+        let path = dir.path();
+        let flags = OFlag::O_RDWR;
+        // Permission 644
+        let mode = Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH;
+        if RawFile::open(path, mode, flags).is_ok() {
+            panic!();
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_sync_posix_file_system() -> Result<()> {
         let dir = tempfile::Builder::new()
             .prefix("test_write_file")
             .tempdir()
@@ -398,24 +406,25 @@ mod tests {
         let mut f = fs
             .open_writable_file_writer(&dir.path().join("sst"))
             .unwrap();
-        f.append("abcd".as_bytes()).unwrap();
-        f.append("efgh".as_bytes()).unwrap();
-        f.append("ijkl".as_bytes()).unwrap();
-        f.sync().unwrap();
+        f.append("abcd".as_bytes())?;
+        f.append("efgh".as_bytes())?;
+        f.append("ijkl".as_bytes())?;
+        f.sync()?;
 
-        let mut f = fs.open_sequential_file(&dir.path().join("sst")).unwrap();
+        let mut f = fs.open_sequential_file(&dir.path().join("sst"))?;
         let mut v = vec![0; 7];
-        let x = f.read(&mut v).unwrap();
+        let x = f.read(&mut v)?;
         assert_eq!(x, 7);
         let s = String::from_utf8(v.clone()).unwrap();
         assert_eq!(s.as_str(), "abcdefg");
 
-        let _x = f.read(&mut v).unwrap();
+        let _x = f.read(&mut v)?;
         #[cfg(not(target_os = "linux"))]
         {
             assert_eq!(_x, 5);
         }
         let s = String::from_utf8((&v[..5]).to_vec()).unwrap();
         assert_eq!(s.as_str(), "hijkl");
+        Ok(())
     }
 }

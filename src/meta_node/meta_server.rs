@@ -115,7 +115,7 @@ impl Meta for MetaServiceImpl {
 
     async fn ping(
         &self,
-        request: Request<PingRequest>,
+        _request: Request<PingRequest>,
     ) -> std::result::Result<Response<PingResponse>, Status> {
         Ok(Response::new(PingResponse {}))
     }
@@ -125,5 +125,7 @@ impl Meta for MetaServiceImpl {
 mod tests {
     use super::*;
     #[test]
-    fn it_works() {}
+    fn test_it_works() {
+        let _ = MetaServiceImpl::new();
+    }
 }

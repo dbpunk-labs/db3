@@ -41,7 +41,6 @@ pub struct Table {
     // name of table like db1.user
     id: String,
     // schema for table
-    // more go to https://github.com/apache/arrow-rs/blob/master/arrow/src/datatypes/schema.rs
     schema: SchemaRef,
     // rtstore table description
     table_desc: Arc<RtStoreTableDesc>,
@@ -69,11 +68,23 @@ impl Table {
             }),
         }?;
         let arrow_schema_ref = table_desc_to_arrow_schema(schema)?;
-        Ok(Self {
+        let cell = Cell {
+            range: std::ops::Range { start: 1, end: 2 },
+            partition_index: 1,
+            num_rows: 10,
+        };
+        let partition = Partition {
+            partition_index: 1,
+            num_rows: 100,
+            cells: vec![cell],
+        };
+        let table = Self {
             id,
             schema: arrow_schema_ref,
             table_desc: Arc::new(table_desc.clone()),
-            partitions: Vec::new(),
-        })
+            partitions: vec![partition],
+        };
+        Ok(table)
     }
+
 }

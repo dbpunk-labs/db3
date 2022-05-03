@@ -16,11 +16,3 @@
 // limitations under the License.
 //
 pub mod row;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {}
-}
