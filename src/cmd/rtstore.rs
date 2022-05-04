@@ -19,7 +19,7 @@
 //
 #[macro_use(uselog)]
 extern crate uselog_rs;
-use rtstore::meta::meta_server::MetaServiceImpl;
+use rtstore::meta_node::meta_server::MetaServiceImpl;
 use rtstore::proto::rtstore_meta_proto::meta_client::MetaClient;
 use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
 use rtstore::proto::rtstore_meta_proto::PingRequest;

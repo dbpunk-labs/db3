@@ -115,7 +115,7 @@ impl Meta for MetaServiceImpl {
 
     async fn ping(
         &self,
-        request: Request<PingRequest>,
+        _request: Request<PingRequest>,
     ) -> std::result::Result<Response<PingResponse>, Status> {
         Ok(Response::new(PingResponse {}))
     }
@@ -124,6 +124,51 @@ impl Meta for MetaServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn it_works() {}
+    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
+    #[tokio::test]
+    async fn test_ping() {
+        let meta = MetaServiceImpl::new();
+        let req = Request::new(PingRequest {});
+        let result = meta.ping(req).await;
+        if result.is_err() {
+            panic!("should go error");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_table_empty_desc() {
+        let meta = MetaServiceImpl::new();
+        let req = Request::new(CreateTableRequest { table_desc: None });
+        let result = meta.create_table(req).await;
+        if result.is_ok() {
+            panic!("should go error");
+        }
+    }
+
+    fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
+        let col1 = RtStoreColumnDesc {
+            name: "col1".to_string(),
+            ctype: 0,
+            null_allowed: true,
+        };
+        let schema = RtStoreSchemaDesc {
+            columns: vec![col1],
+            version: 1,
+        };
+        RtStoreTableDesc {
+            names: vec![tname.to_string()],
+            schema: Some(schema),
+            partition_desc: None,
+            storage_uri: "s3:///xxxx".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_table() {
+        let table_desc = Some(create_simple_table_desc("test.t1"));
+        let meta = MetaServiceImpl::new();
+        let req = Request::new(CreateTableRequest { table_desc });
+        let result = meta.create_table(req).await;
+        assert!(result.is_ok());
+    }
 }
