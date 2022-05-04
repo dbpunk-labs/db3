@@ -16,35 +16,35 @@
 // limitations under the License.
 //
 
-use crate::base::arrow_parquet_utils::*;
+//use crate::base::arrow_parquet_utils::*;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::RtStoreTableDesc;
-use arrow::datatypes::SchemaRef;
-use std::ops::Range;
-use std::sync::Arc;
-uselog!(info, warn, debug);
+//use arrow::datatypes::SchemaRef;
+//use std::ops::Range;
+//use std::sync::Arc;
+uselog!(info);
 
 /// the smallest data unit for table store
-pub struct Cell {
-    range: Range<u64>,
-    partition_index: usize,
-    num_rows: u64,
-}
-
-pub struct Partition {
-    partition_index: usize,
-    num_rows: u64,
-    cells: Vec<Cell>,
-}
+//pub struct Cell {
+//    range: Range<u64>,
+//    partition_index: usize,
+//    num_rows: u64,
+//}
+//
+//pub struct Partition {
+//    partition_index: usize,
+//    num_rows: u64,
+//    cells: Vec<Cell>,
+//}
 
 pub struct Table {
     // name of table like db1.user
-    id: String,
-    // schema for table
-    schema: SchemaRef,
-    // rtstore table description
-    table_desc: Arc<RtStoreTableDesc>,
-    partitions: Vec<Partition>,
+//id: String,
+// schema for table
+//schema: SchemaRef,
+// rtstore table description
+//table_desc: Arc<RtStoreTableDesc>,
+//partitions: Vec<Partition>,
 }
 
 impl Table {
@@ -61,30 +61,29 @@ impl Table {
     pub fn new(table_desc: &RtStoreTableDesc) -> Result<Self> {
         let id = Self::gen_id(table_desc)?;
         info!("gen a new table id {}", id);
-        let schema = match &table_desc.schema {
-            Some(s) => Ok(s),
-            _ => Err(RTStoreError::TableSchemaInvalidError {
-                name: id.to_string(),
-            }),
-        }?;
-        let arrow_schema_ref = table_desc_to_arrow_schema(schema)?;
-        let cell = Cell {
-            range: std::ops::Range { start: 1, end: 2 },
-            partition_index: 1,
-            num_rows: 10,
-        };
-        let partition = Partition {
-            partition_index: 1,
-            num_rows: 100,
-            cells: vec![cell],
-        };
-        let table = Self {
-            id,
-            schema: arrow_schema_ref,
-            table_desc: Arc::new(table_desc.clone()),
-            partitions: vec![partition],
-        };
-        Ok(table)
+        //let schema = match &table_desc.schema {
+        //    Some(s) => Ok(s),
+        //    _ => Err(RTStoreError::TableSchemaInvalidError {
+        //        name: id.to_string(),
+        //    }),
+        //}?;
+        //let arrow_schema_ref = table_desc_to_arrow_schema(schema)?;
+        //let cell = Cell {
+        //    range: std::ops::Range { start: 1, end: 2 },
+        //    partition_index: 1,
+        //    num_rows: 10,
+        //};
+        //let partition = Partition {
+        //    partition_index: 1,
+        //    num_rows: 100,
+        //    cells: vec![cell],
+        //};
+        //let table = Self {
+        //  id,
+        //   schema: arrow_schema_ref,
+        //    table_desc: Arc::new(table_desc.clone()),
+        //    partitions: vec![partition],
+        //};
+        Ok(Self {})
     }
-
 }

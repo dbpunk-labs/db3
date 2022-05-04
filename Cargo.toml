@@ -46,4 +46,5 @@ tonic-build = "0.6.2"
 
 [dev-dependencies]
 test-case = "2.0.2"
+criterion = "0.3"
 

@@ -58,6 +58,7 @@ message CellStatus {
     string display = 6;
     string cell_store_uri = 7;
     CellType ctype = 8;
+    int64 size_in_bytes = 9;
 }
 
 message CellDesc {

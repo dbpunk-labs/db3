@@ -27,8 +27,7 @@ message CreateTableRequest {
     rtstore_base_proto.RTStoreTableDesc table_desc = 1;
 }
 
-message CreateTableResponse {
-}
+message CreateTableResponse {}
 
 message PingRequest{}
 message PingResponse{}

@@ -1,6 +1,6 @@
 //
 //
-// row.rs
+// row_codec.rs
 // Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,10 +36,10 @@ pub enum Data {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct RowRecordBatch {
-    batch: Vec<Vec<Data>>,
-    schema_version: u32,
+    pub batch: Vec<Vec<Data>>,
+    pub schema_version: u32,
     // id for table
-    id: String,
+    pub id: String,
 }
 
 #[cfg(test)]
