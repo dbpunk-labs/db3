@@ -23,3 +23,4 @@ pub mod codec;
 pub mod error;
 pub mod meta_node;
 pub mod proto;
+pub mod store;

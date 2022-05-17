@@ -21,25 +21,31 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-    use rtstore::codec::row_codec::{Data, RowRecordBatch};
+    use rtstore::base::linked_list::LinkedList;
     use test::Bencher;
     #[bench]
-    fn bench_encode(b: &mut Bencher) {
-        let batch = vec![
-            vec![Data::Bool(true), Data::Int32(12)],
-            vec![Data::Bool(false), Data::Int32(11)],
-        ];
-
-        let row_batch = RowRecordBatch {
-            batch,
-            schema_version: 1,
-            id: "eth.price".to_string(),
-        };
-
+    fn bench_linked_list_push(b: &mut Bencher) {
+        let ll: LinkedList<i32> = LinkedList::new();
         b.iter(|| {
             // Inner closure, the actual test
-            for _i in 1..1000 {
-                bincode::serialize(&row_batch).unwrap();
+            for i in 1..1000 {
+                ll.push_front(i);
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_linked_list_it(b: &mut Bencher) {
+        let ll: LinkedList<i32> = LinkedList::new();
+        for i in 1..1000 {
+            ll.push_front(i);
+        }
+        b.iter(|| {
+            // Inner closure, the actual test
+            for i in 1..1000 {
+                for j in ll.iter() {
+                    i + j;
+                }
             }
         });
     }

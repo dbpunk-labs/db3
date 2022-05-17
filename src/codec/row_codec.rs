@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use crate::error::{RTStoreError, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -42,12 +43,26 @@ pub struct RowRecordBatch {
     pub id: String,
 }
 
+pub fn encode(batch: &RowRecordBatch) -> Result<Vec<u8>> {
+    match bincode::serialize(batch) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(RTStoreError::RowCodecError(e)),
+    }
+}
+
+pub fn decode(data: &[u8]) -> Result<RowRecordBatch> {
+    match bincode::deserialize(data) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(RTStoreError::RowCodecError(e)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn it_encode() -> Result<(), std::io::Error> {
+    fn it_encode() -> Result<()> {
         let batch = vec![
             vec![Data::Bool(true), Data::Int32(12)],
             vec![Data::Bool(false), Data::Int32(11)],
@@ -57,9 +72,9 @@ mod tests {
             schema_version: 1,
             id: "eth.price".to_string(),
         };
-        let encoded: Vec<u8> = bincode::serialize(&row_batch).unwrap();
+        let encoded: Vec<u8> = encode(&row_batch)?;
         assert_eq!(encoded.len(), 71);
-        let new_row_batch: RowRecordBatch = bincode::deserialize(&encoded[..]).unwrap();
+        let new_row_batch: RowRecordBatch = decode(&encoded[..])?;
         assert_eq!(row_batch.schema_version, new_row_batch.schema_version);
         assert_eq!(row_batch.batch.len(), new_row_batch.batch.len());
         Ok(())

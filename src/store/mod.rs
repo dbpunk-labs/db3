@@ -1,7 +1,7 @@
 //
 //
-// chunk.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// mod.rs
+// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,20 +16,4 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
-
-// the smallest unit for storing data
-pub struct Chunk {
-    // the uri for data 
-    uri:String,
-}
-
-
-impl Chunk {
-
-    pub fn new(uri:&str) ->Result<Self> {
-        Ok(Self {
-            uri
-        })
-    }
-}
+pub mod cell_store;

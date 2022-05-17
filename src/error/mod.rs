@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use s3::error::S3Error;
 use std::io::{Error as IoError, ErrorKind};
 use thiserror::Error;
 
@@ -38,12 +39,26 @@ pub enum RTStoreError {
     TableSchemaInvalidError { name: String },
     #[error("create table error for {err}")]
     MetaRpcCreateTableError { err: String },
+    #[error("the {name} of cell store config is invalid for {err}")]
+    CellStoreInvalidConfigError { name: String, err: String },
+    #[error("aws-s3: {0}")]
+    CellStoreS3Error(S3Error),
+    #[error("row codec error : {0}")]
+    RowCodecError(bincode::Error),
+    #[error("system busy for error : {0}")]
+    BaseBusyError(String),
 }
 
 /// convert io error to rtstore error
 impl From<IoError> for RTStoreError {
     fn from(error: IoError) -> Self {
         RTStoreError::FSIoError(error)
+    }
+}
+
+impl From<S3Error> for RTStoreError {
+    fn from(error: S3Error) -> Self {
+        RTStoreError::CellStoreS3Error(error)
     }
 }
 

@@ -87,10 +87,8 @@ impl From<RTStoreError> for Status {
             | RTStoreError::TableSchemaInvalidError { .. }
             | RTStoreError::MetaRpcCreateTableError { .. } => Status::invalid_argument(error),
             RTStoreError::TableNotFoundError { .. } => Status::not_found(error),
-            RTStoreError::FSInvalidFileError { .. } | RTStoreError::FSIoError(_) => {
-                Status::internal(error)
-            }
             RTStoreError::TableNamesExistError { .. } => Status::already_exists(error),
+            _ => Status::internal(error),
         }
     }
 }

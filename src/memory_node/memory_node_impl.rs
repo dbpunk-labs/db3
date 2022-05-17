@@ -1,7 +1,7 @@
 //
 //
-// mod.rs
-// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
+// memory_node_impl.rs
+// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,4 +16,10 @@
 // limitations under the License.
 //
 
-mod chunk;
+use crate::error::{RTStoreError, Result};
+use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
+use crate::proto::rtstore_memory_proto::{
+    AssignPartitionRequest, AssignPartitionResponse
+};
+

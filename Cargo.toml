@@ -34,7 +34,8 @@ crossbeam-utils = "0.7.2"
 msql-srv = { git = "https://github.com/imotai/msql-srv", rev = "ee14d86" }
 mysql = "22"
 mysql_async = "0.29.0"
-
+rust-s3 = "0.31"
+ringbuf = "0.2.8"
 
 [[bin]]
 name = "rtstore"
@@ -47,4 +48,4 @@ tonic-build = "0.6.2"
 [dev-dependencies]
 test-case = "2.0.2"
 criterion = "0.3"
-
+tempdir = "0.3.5"

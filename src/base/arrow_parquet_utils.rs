@@ -16,12 +16,18 @@
 // limitations under the License.
 //
 
+use crate::codec::row_codec::RowRecordBatch;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
+use arrow::array::{
+    Int32Builder, StringBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
+    TimestampNanosecondBuilder,
+};
 use arrow::datatypes::{
     DataType, Field as ArrowField, Schema, SchemaRef, TimeUnit, DECIMAL_MAX_PRECISION,
     DECIMAL_MAX_SCALE,
 };
+use arrow::record_batch::RecordBatch;
 use std::sync::Arc;
 
 pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef> {
@@ -54,6 +60,17 @@ pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef>
     }
     Ok(Arc::new(Schema::new(fields)))
 }
+
+#[allow(clippy::all)]
+enum RTStoreColumnBuilder {
+    RTStoreInt32Builder(Int32Builder),
+    RTStoreStrBuilder(StringBuilder),
+    RTStoreTimestampNsBuilder(TimestampNanosecondBuilder),
+    RTStoreTimestampMicrosBuilder(TimestampMicrosecondBuilder),
+    RTStoreTimestampMillsBuilder(TimestampMillisecondBuilder),
+}
+
+//pub fn rows_to_columns(schema: SchemaRef, rows: &RowRecordBatch) -> Result<RecordBatch> {}
 
 #[cfg(test)]
 mod tests {

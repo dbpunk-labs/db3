@@ -20,7 +20,11 @@ fn main() {
     tonic_build::configure()
         .build_server(true)
         .compile(
-            &["proto/rtstore_base.proto", "proto/rtstore_meta_node.proto"],
+            &[
+                "proto/rtstore_base.proto",
+                "proto/rtstore_meta_node.proto",
+                "proto/rtstore_memory_node.proto",
+            ],
             &["proto"],
         )
         .unwrap();
