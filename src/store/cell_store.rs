@@ -147,7 +147,7 @@ impl CellStore {
         let log_path_str = format!("{}/0000.binlog", config.local_binlog_path_prefix);
         let log_path = Path::new(&log_path_str);
         let fs = SyncPosixFileSystem {};
-        let writer = fs.open_writable_file_writer(&log_path)?;
+        let writer = fs.open_writable_file_writer(log_path)?;
         let bucket = bucket.with_path_style();
         //TODO recover some status data from persistence
         Ok(CellStore {
@@ -232,16 +232,18 @@ mod tests {
             panic!("should has some config error");
         }
 
-        if let Ok(_) = CellStoreConfig::new(
+        if CellStoreConfig::new(
             bucket_name,
             "",
             &valid_schema,
             local_binlog_path_prefix,
             auth.clone(),
-        ) {
+        )
+        .is_ok()
+        {
             panic!("should has some config error");
         }
-        if let Ok(_) = CellStoreConfig::new(bucket_name, region, &valid_schema, "", auth.clone()) {
+        if CellStoreConfig::new(bucket_name, region, &valid_schema, "", auth.clone()).is_ok() {
             panic!("should has some config error");
         }
     }
@@ -257,13 +259,13 @@ mod tests {
             region,
             &valid_schema,
             local_binlog_path_prefix,
-            auth.clone(),
+            auth,
         )
     }
 
     #[test]
     fn test_normal_config() {
-        if let Err(_) = gen_a_normal_config() {
+        if gen_a_normal_config().is_err() {
             panic!("should be ok");
         }
     }
@@ -271,7 +273,7 @@ mod tests {
     #[test]
     fn test_init_cell_store() {
         let config = gen_a_normal_config().unwrap();
-        if let Err(_) = CellStore::new(config) {
+        if CellStore::new(config).is_err() {
             panic!("should be ok");
         }
     }
@@ -284,7 +286,7 @@ mod tests {
             config.local_binlog_path_prefix = tmp_dir_path_str.to_string();
             if let Ok(c) = CellStore::new(config) {
                 let batch = gen_sample_row_batch();
-                if let Err(e) = c.put_records(batch).await {
+                if c.put_records(batch).await.is_err() {
                     panic!("should be ok")
                 }
                 assert_eq!(2, c.get_total_rows_in_memory());

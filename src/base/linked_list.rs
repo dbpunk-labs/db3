@@ -41,8 +41,14 @@ pub struct LinkedList<V> {
     size: AtomicU64,
 }
 
+impl<V> Default for LinkedList<V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<V> LinkedList<V> {
-    pub fn new() -> LinkedList<V> {
+    pub fn new() -> Self {
         let head = AtomicPtr::default();
         Self {
             head,
@@ -95,7 +101,7 @@ impl<'a, T: 'a> Iterator for LinkedListIter<'a, T> {
 
     fn next(&mut self) -> Option<&'a T> {
         let curr_ptr = self.curr.load(Ordering::Acquire);
-        if curr_ptr == (0 as *mut _) {
+        if curr_ptr == std::ptr::null_mut() {
             return None;
         }
         // SAFE: curr_ptr was checked for null
@@ -118,7 +124,7 @@ mod tests {
     #[test]
     fn test_push_front() {
         let ll: LinkedList<i32> = LinkedList::new();
-        if let Err(_) = ll.push_front(1) {
+        if ll.push_front(1).is_err() {
             panic!("should be ok");
         }
         assert_eq!(1, ll.size());
@@ -127,7 +133,7 @@ mod tests {
     #[test]
     fn test_it() {
         let ll: LinkedList<i32> = LinkedList::new();
-        if let Err(_) = ll.push_front(1) {
+        if ll.push_front(1).is_err() {
             panic!("should be ok");
         }
         assert_eq!(1, ll.size());
