@@ -212,23 +212,27 @@ mod tests {
         let region = "cn";
         let schema = Arc::new(Schema::empty());
         let local_binlog_path_prefix = "/test/binlog";
-        if let Ok(_) = CellStoreConfig::new(
+        if CellStoreConfig::new(
             bucket_name,
             region,
             &schema,
             local_binlog_path_prefix,
             auth.clone(),
-        ) {
+        )
+        .is_ok()
+        {
             panic!("should has some config error");
         }
 
-        if let Ok(_) = CellStoreConfig::new(
+        if CellStoreConfig::new(
             "",
             region,
             &valid_schema,
             local_binlog_path_prefix,
             auth.clone(),
-        ) {
+        )
+        .is_ok()
+        {
             panic!("should has some config error");
         }
 

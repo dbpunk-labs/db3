@@ -23,7 +23,7 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
       - name: Setup s3 mock environment
-        run: docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock
+        run: docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 5
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -117,7 +117,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Setup s3 mock environment
-        run: docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock
+        run: docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 5
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
