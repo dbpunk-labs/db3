@@ -181,6 +181,7 @@ impl CellStore {
         table.push_front(records)?;
         self.total_rows_in_memory
             .fetch_add(size as u64, Ordering::Relaxed);
+        // save record to binlog
         if let Ok(mut guard) = self.lock_data.lock() {
             guard.writer.append(&data)
         } else {
