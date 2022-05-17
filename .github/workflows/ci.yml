@@ -23,7 +23,7 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
       - name: Setup s3 mock environment
-        run: docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 5
+        run: docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 10
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -116,8 +116,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Setup s3 mock environment
-        run: docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 5
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -130,6 +128,8 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Run rust test with coverage
         run: |
+          docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock
+          sleep 10
           cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:
