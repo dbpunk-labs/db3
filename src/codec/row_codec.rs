@@ -25,6 +25,7 @@ pub enum Data {
     Int8(i8),
     UInt8(u8),
     Int16(i16),
+    UInt16(u16),
     Int32(i32),
     Int64(i64),
     Float(f32),
@@ -33,6 +34,25 @@ pub enum Data {
     Date(u32),
     // time in millsseconds
     Timestamp(u64),
+}
+
+impl Data {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Data::Bool(_) => "Bool",
+            Data::Int8(_) => "Int8",
+            Data::UInt8(_) => "UInt8",
+            Data::Int16(_) => "Int16",
+            Data::UInt16(_) => "UInt16",
+            Data::Int32(_) => "Int32",
+            Data::Int64(_) => "Int64",
+            Data::Float(_) => "Float",
+            Data::Double(_) => "Double",
+            Data::Varchar(_) => "Varchar",
+            Data::Date(_) => "Date",
+            Data::Timestamp(_) => "Timestamp",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

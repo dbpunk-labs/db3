@@ -207,7 +207,12 @@ mod tests {
     #[test]
     fn test_invalid_config() {
         let valid_schema = Arc::new(Schema::new(vec![Field::new("c1", DataType::Int64, true)]));
-        let auth = Credentials::from_profile(Some("default")).unwrap();
+		let auth = Credentials::from_env_specific(
+            Some("AWS_S3_ACCESS_KEY"),
+            Some("AWS_S3_SECRET_KEY"),
+            None,
+            None,
+        ).unwrap();
         let bucket_name = "test_bk";
         let region = "cn";
         let schema = Arc::new(Schema::empty());
@@ -254,7 +259,12 @@ mod tests {
 
     fn gen_a_normal_config() -> Result<CellStoreConfig> {
         let valid_schema = Arc::new(Schema::new(vec![Field::new("c1", DataType::Int64, true)]));
-        let auth = Credentials::from_profile(Some("default")).unwrap();
+		let auth = Credentials::from_env_specific(
+            Some("AWS_S3_ACCESS_KEY"),
+            Some("AWS_S3_SECRET_KEY"),
+            None,
+            None,
+        ).unwrap();
         let bucket_name = "test_bk";
         let region = "http://127.0.0.1:9090";
         let local_binlog_path_prefix = "./test/binlog";

@@ -23,6 +23,8 @@ package rtstore_base_proto;
 // the all types are supported by rtstore
 enum RTStoreType {
     KBool = 0;
+    // int8
+    KTinyInt = 1;
     // int16
     KSmallInt = 2;
     // int32

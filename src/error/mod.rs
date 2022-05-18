@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use arrow::error::ArrowError;
 use s3::error::S3Error;
 use std::io::{Error as IoError, ErrorKind};
 use thiserror::Error;
@@ -29,6 +30,10 @@ pub enum RTStoreError {
     TableInvalidNamesError { error: String },
     #[error("table with name {name} exists")]
     TableNamesExistError { name: String },
+    #[error("table type mismatch left {left} and right {right}")]
+    TableTypeMismatchError { left: String, right: String },
+    #[error("table to arrow for error : {0}")]
+    TableArrowError(ArrowError),
     #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]
@@ -59,6 +64,12 @@ impl From<IoError> for RTStoreError {
 impl From<S3Error> for RTStoreError {
     fn from(error: S3Error) -> Self {
         RTStoreError::CellStoreS3Error(error)
+    }
+}
+
+impl From<ArrowError> for RTStoreError {
+    fn from(error: ArrowError) -> Self {
+        RTStoreError::TableArrowError(error)
     }
 }
 
