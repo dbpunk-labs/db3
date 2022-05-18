@@ -20,9 +20,9 @@ use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, Int8Builder, StringBuilder,
+    ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder,
     TimestampMicrosecondBuilder, TimestampMillisecondBuilder, TimestampNanosecondBuilder,
-    UInt16Builder, UInt8Builder,
+    UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
 };
 use arrow::datatypes::{
     DataType, Field as ArrowField, Schema, SchemaRef, TimeUnit, DECIMAL_MAX_PRECISION,
@@ -72,6 +72,9 @@ enum RTStoreColumnBuilder {
     RTStoreInt16Builder(Int16Builder),
     RTStoreUInt16Builder(UInt16Builder),
     RTStoreInt32Builder(Int32Builder),
+    RTStoreUInt32Builder(UInt32Builder),
+    RTStoreInt64Builder(Int64Builder),
+    RTStoreUInt64Builder(UInt64Builder),
     RTStoreStrBuilder(StringBuilder),
     RTStoreTimestampNsBuilder(TimestampNanosecondBuilder),
     RTStoreTimestampMicrosBuilder(TimestampMicrosecondBuilder),
@@ -197,6 +200,32 @@ pub fn rows_to_columns(schema: &SchemaRef, rows: &RowRecordBatch) -> Result<Reco
                         r_index
                     );
                 }
+                DataType::Int64 => {
+                    primary_type_convert!(
+                        RTStoreInt64Builder,
+                        Int64Builder,
+                        Int64,
+                        builders,
+                        index,
+                        column,
+                        rows,
+                        array_refs,
+                        r_index
+                    );
+                }
+                DataType::UInt64 => {
+                    primary_type_convert!(
+                        RTStoreUInt64Builder,
+                        UInt64Builder,
+                        UInt64,
+                        builders,
+                        index,
+                        column,
+                        rows,
+                        array_refs,
+                        r_index
+                    );
+                }
                 DataType::Utf8 => {
                     if builders.len() <= index {
                         let builder = RTStoreColumnBuilder::RTStoreStrBuilder(StringBuilder::new(
@@ -234,6 +263,10 @@ mod tests {
     use super::*;
     use crate::error::Result;
     use crate::proto::rtstore_base_proto::RtStoreColumnDesc;
+    use arrow::array::{
+        Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt64Array, UInt8Array,
+    };
+
     macro_rules! test_schema_convert {
         ($func:ident, $type:ident, $target_type:ident) => {
             #[test]
@@ -317,4 +350,38 @@ mod tests {
         }
         Ok(())
     }
+    macro_rules! test_num_convert {
+        ($func:ident, $type:ident, $sys_type:tt, $builder:ident) => {
+            #[test]
+            fn $func() -> Result<()> {
+                let fields = vec![ArrowField::new("col1", DataType::$type, false)];
+                let schema = Arc::new(Schema::new(fields));
+                let batch = vec![
+                    vec![Data::$type(12 as $sys_type)],
+                    vec![Data::$type(11 as $sys_type)],
+                ];
+                let row_batch = RowRecordBatch {
+                    batch,
+                    schema_version: 1,
+                    id: "eth.price".to_string(),
+                };
+                let record_batch = rows_to_columns(&schema, &row_batch)?;
+                let array = record_batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<$builder>()
+                    .expect("fail to down cast");
+                assert_eq!(12 as $sys_type, array.value(0));
+                assert_eq!(11 as $sys_type, array.value(1));
+                Ok(())
+            }
+        };
+    }
+    test_num_convert!(test_int32_convert, Int32, i32, Int32Array);
+    test_num_convert!(test_int8_convert, Int8, i8, Int8Array);
+    test_num_convert!(test_uint8_convert, UInt8, u8, UInt8Array);
+    test_num_convert!(test_int16_convert, Int16, i16, Int16Array);
+    test_num_convert!(test_uint16_convert, UInt16, u16, UInt16Array);
+    test_num_convert!(test_int64_convert, Int64, i64, Int64Array);
+    test_num_convert!(test_uint64_convert, UInt64, u64, UInt64Array);
 }

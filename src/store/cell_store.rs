@@ -18,13 +18,12 @@
 
 use crate::base::filesystem::{FileSystem, SyncPosixFileSystem, WritableFileWriter};
 use crate::base::linked_list::LinkedList;
-use crate::codec::row_codec::{encode, Data, RowRecordBatch};
+use crate::codec::row_codec::{encode, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use arc_swap::ArcSwap;
 use arrow::datatypes::SchemaRef;
 use s3::bucket::Bucket;
 use s3::creds::Credentials;
-use s3::error::S3Error;
 use s3::region::Region;
 use std::fs;
 use std::path::Path;
@@ -47,11 +46,11 @@ pub struct CellStoreConfig {
     // the auth config for s3
     auth: Credentials,
     //
-    row_buffer_size: u32,
+    max_rows_to_columns: u32,
 }
 
 impl CellStoreConfig {
-    fn new(
+    pub fn new(
         bucket_name: &str,
         region: &str,
         schema: &SchemaRef,
@@ -94,7 +93,7 @@ impl CellStoreConfig {
                 schema: schema.clone(),
                 local_binlog_path_prefix: local_binlog_path_prefix.to_string(),
                 auth,
-                row_buffer_size: 10 * 1024,
+                max_rows_to_columns: 10 * 1024,
             }),
             Err(e) => Err(RTStoreError::CellStoreInvalidConfigError {
                 name: String::from("region"),
@@ -126,12 +125,17 @@ pub struct CellStore {
     log_counter: AtomicU64,
     // the handler of s3 bucket
     bucket: Bucket,
+    // lock for binlog
     lock_data: Arc<Mutex<CellStoreLockData>>,
+    // memory table for row store
     row_memtable: ArcSwap<LinkedList<RowRecordBatch>>,
+    row_memtable_size: AtomicU64,
+    // memory table for column store
+    //column_memtable: ArcSwap<LinkedList<RecordBatch>>,
 }
 
 impl CellStore {
-    fn new(config: CellStoreConfig) -> Result<Self> {
+    pub fn new(config: CellStoreConfig) -> Result<Self> {
         info!(
             "init a new cell store with bucket {} and region {}",
             config.bucket_name, config.region
@@ -161,6 +165,7 @@ impl CellStore {
             bucket,
             lock_data: Arc::new(Mutex::new(CellStoreLockData { writer })),
             row_memtable: ArcSwap::from(Arc::new(LinkedList::new())),
+            row_memtable_size: AtomicU64::new(0),
         })
     }
 
@@ -181,6 +186,8 @@ impl CellStore {
         table.push_front(records)?;
         self.total_rows_in_memory
             .fetch_add(size as u64, Ordering::Relaxed);
+        self.row_memtable_size
+            .fetch_add(size as u64, Ordering::Relaxed);
         // save record to binlog
         if let Ok(mut guard) = self.lock_data.lock() {
             guard.writer.append(&data)
@@ -200,6 +207,7 @@ impl CellStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codec::row_codec::Data;
     use arrow::datatypes::Schema;
     use arrow::datatypes::*;
     use tempdir::TempDir;

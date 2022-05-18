@@ -20,26 +20,11 @@ mod posix_file_system;
 mod reader;
 mod writer;
 
-use crate::error::{RTStoreError, Result};
-use async_trait::async_trait;
+use crate::error::Result;
 pub use posix_file_system::SyncPosixFileSystem;
-pub use reader::RandomAccessFileReader;
 pub use reader::SequentialFileReader;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 pub use writer::WritableFileWriter;
-
-pub trait RandomAccessFile: 'static + Send + Sync {
-    fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
-        self.read_exact(offset, data.len(), data)
-    }
-    fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize>;
-    fn file_size(&self) -> usize;
-    fn use_direct_io(&self) -> bool {
-        false
-    }
-}
 
 pub trait SequentialFile: 'static + Send + Sync {
     fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize>;
@@ -86,8 +71,6 @@ pub trait FileSystem: Send + Sync {
         self.open_writable_file_writer(file_name)
     }
 
-    fn open_random_access_file(&self, p: &Path) -> Result<Box<RandomAccessFileReader>>;
-
     fn open_sequential_file(&self, path: &Path) -> Result<Box<SequentialFileReader>>;
 
     fn read_file_content(&self, path: &Path) -> Result<Vec<u8>> {
@@ -114,186 +97,4 @@ pub trait FileSystem: Send + Sync {
     fn list_files(&self, path: &Path) -> Result<Vec<PathBuf>>;
 
     fn file_exist(&self, path: &Path) -> Result<bool>;
-}
-
-#[derive(Default)]
-pub struct InMemFileSystemRep {
-    files: HashMap<String, Vec<u8>>,
-}
-
-#[derive(Default, Clone)]
-pub struct InMemFileSystem {
-    inner: Arc<Mutex<InMemFileSystemRep>>,
-}
-
-#[derive(Default, Clone)]
-pub struct InMemFile {
-    pub buf: Vec<u8>,
-    fs: Arc<Mutex<InMemFileSystemRep>>,
-    filename: String,
-    offset: usize,
-}
-
-#[async_trait]
-impl WritableFile for InMemFile {
-    fn append(&mut self, data: &[u8]) -> Result<()> {
-        self.buf.extend_from_slice(data);
-        Ok(())
-    }
-
-    fn truncate(&mut self, offset: u64) -> Result<()> {
-        self.buf.resize(offset as usize, 0);
-        Ok(())
-    }
-
-    fn allocate(&mut self, _offset: u64, _len: u64) -> Result<()> {
-        Ok(())
-    }
-
-    fn sync(&mut self) -> Result<()> {
-        self.fsync()
-    }
-
-    fn fsync(&mut self) -> Result<()> {
-        let mut fs = self.fs.lock().unwrap();
-        fs.files.insert(self.filename.clone(), self.buf.clone());
-        Ok(())
-    }
-}
-
-impl RandomAccessFile for InMemFile {
-    fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
-        if offset >= self.buf.len() {
-            Ok(0)
-        } else if offset + data.len() > self.buf.len() {
-            let rest = self.buf.len() - offset;
-            data[..rest].copy_from_slice(&self.buf[offset..(offset + rest)]);
-            Ok(rest)
-        } else {
-            data.copy_from_slice(&self.buf[offset..(offset + data.len())]);
-            Ok(data.len())
-        }
-    }
-
-    fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize> {
-        if offset >= self.buf.len() {
-            Ok(0)
-        } else if offset + n > self.buf.len() {
-            let rest = self.buf.len() - offset;
-            data[..rest].copy_from_slice(&self.buf[offset..(offset + rest)]);
-            Ok(rest)
-        } else {
-            data[..n].copy_from_slice(&self.buf[offset..(offset + n)]);
-            Ok(n)
-        }
-    }
-    fn file_size(&self) -> usize {
-        self.buf.len()
-    }
-}
-
-impl SequentialFile for InMemFile {
-    fn read_sequential(&mut self, data: &mut [u8]) -> Result<usize> {
-        let x = self.read(self.offset, data)?;
-        self.offset += x;
-        Ok(x)
-    }
-
-    fn get_file_size(&self) -> usize {
-        self.buf.len()
-    }
-}
-
-impl FileSystem for InMemFileSystem {
-    fn open_writable_file_writer(&self, filename: &Path) -> Result<Box<WritableFileWriter>> {
-        let f = InMemFile {
-            fs: self.inner.clone(),
-            buf: vec![],
-            filename: filename.to_str().unwrap().to_string(),
-            offset: 0,
-        };
-        Ok(Box::new(WritableFileWriter::new(Box::new(f), 128)))
-    }
-
-    fn open_random_access_file(&self, filename: &Path) -> Result<Box<RandomAccessFileReader>> {
-        let filename = filename.to_str().unwrap().to_string();
-        let fs = self.inner.lock().unwrap();
-        match fs.files.get(&filename) {
-            None => Err(RTStoreError::FSInvalidFileError {
-                path: filename.clone(),
-            }),
-            Some(buf) => {
-                let f = InMemFile {
-                    fs: self.inner.clone(),
-                    buf: buf.clone(),
-                    filename: filename.clone(),
-                    offset: 0,
-                };
-                Ok(Box::new(RandomAccessFileReader::new(Box::new(f), filename)))
-            }
-        }
-    }
-
-    fn open_sequential_file(&self, path: &Path) -> Result<Box<SequentialFileReader>> {
-        let fs = self.inner.lock().unwrap();
-        let filename = path.to_str().unwrap();
-        match fs.files.get(filename) {
-            None => Err(RTStoreError::FSInvalidFileError {
-                path: filename.to_string(),
-            }),
-            Some(buf) => {
-                let f = InMemFile {
-                    fs: self.inner.clone(),
-                    buf: buf.clone(),
-                    filename: filename.to_string(),
-                    offset: 0,
-                };
-                Ok(Box::new(SequentialFileReader::new(
-                    Box::new(f),
-                    filename.to_string(),
-                )))
-            }
-        }
-    }
-
-    fn remove(&self, path: &Path) -> Result<()> {
-        let filename = path.to_str().unwrap();
-        let mut fs = self.inner.lock().unwrap();
-        fs.files
-            .remove(filename)
-            .ok_or_else(|| RTStoreError::FSInvalidFileError {
-                path: filename.to_string(),
-            })?;
-        Ok(())
-    }
-
-    fn rename(&self, origin: &Path, target: &Path) -> Result<()> {
-        let filename = origin.to_str().unwrap();
-        let mut fs = self.inner.lock().unwrap();
-        let f = fs
-            .files
-            .remove(filename)
-            .ok_or_else(|| RTStoreError::FSInvalidFileError {
-                path: filename.to_string(),
-            })?;
-        let filename = target.to_str().unwrap();
-        fs.files.insert(filename.to_string(), f);
-        Ok(())
-    }
-
-    fn list_files(&self, _: &Path) -> Result<Vec<PathBuf>> {
-        let fs = self.inner.lock().unwrap();
-        let files = fs
-            .files
-            .iter()
-            .map(|(k, _)| PathBuf::from(k.clone()))
-            .collect();
-        Ok(files)
-    }
-
-    fn file_exist(&self, path: &Path) -> Result<bool> {
-        let fs = self.inner.lock().unwrap();
-        let filename = path.to_str().unwrap();
-        Ok(fs.files.get(filename).is_some())
-    }
 }

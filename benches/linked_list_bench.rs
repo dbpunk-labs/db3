@@ -44,7 +44,7 @@ mod tests {
             // Inner closure, the actual test
             for i in 1..1000 {
                 for j in ll.iter() {
-                    i + j;
+                    let _ = i + j;
                 }
             }
         });

@@ -35,7 +35,9 @@ msql-srv = { git = "https://github.com/imotai/msql-srv", rev = "ee14d86" }
 mysql = "22"
 mysql_async = "0.29.0"
 rust-s3 = "0.31"
-ringbuf = "0.2.8"
+crc32c = "0.6"
+yatp = { git = "https://github.com/tikv/yatp.git", branch = "master" }
+
 
 [[bin]]
 name = "rtstore"

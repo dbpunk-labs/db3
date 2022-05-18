@@ -1,6 +1,6 @@
 //
 //
-// mod.rs
+// slice.rs
 // Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +16,18 @@
 // limitations under the License.
 //
 
-pub mod arrow_parquet_utils;
-pub mod filesystem;
-pub mod linked_list;
-pub mod log;
-pub mod slice;
-pub mod strings;
+#[derive(Default, Clone)]
+pub struct Slice {
+    pub offset: usize,
+    pub limit: usize,
+}
+
+impl Slice {
+    pub fn len(&self) -> usize {
+        if self.offset > self.limit {
+            0
+        } else {
+            self.limit - self.offset
+        }
+    }
+}
