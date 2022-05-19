@@ -16,12 +16,12 @@
 // limitations under the License.
 //
 
-use crate::base::arrow_parquet_utils;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
 use crate::proto::rtstore_memory_proto::{AssignPartitionRequest, AssignPartitionResponse};
 use crate::store::cell_store::{CellStore, CellStoreConfig};
+use crate::base::arrow_parquet_utils;
 use s3::creds::Credentials;
 use s3::region::Region;
 use std::collections::HashMap;
