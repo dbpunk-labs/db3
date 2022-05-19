@@ -18,4 +18,7 @@
 
 pub mod arrow_parquet_utils;
 pub mod filesystem;
+pub mod linked_list;
+pub mod log;
+pub mod slice;
 pub mod strings;

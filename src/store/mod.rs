@@ -16,4 +16,4 @@
 // limitations under the License.
 //
 
-mod chunk;
+pub mod cell_store;

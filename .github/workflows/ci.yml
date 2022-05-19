@@ -22,7 +22,21 @@ jobs:
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
+      - name: Setup s3 mock environment
+        run: |
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id = test" >> ~/.aws/credentials
+          echo "aws_secret_access_key = test" >> ~/.aws/credentials
+          export AWS_EC2_METADATA_DISABLED=true
+          docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 10
+          aws --endpoint-url http://127.0.0.1:9090/ s3 mb s3://testbucket
       - uses: actions-rs/cargo@v1
+        env:
+          AWS_S3_ACCESS_KEY: test
+          AWS_S3_SECRET_KEY: test
+          AWS_S3_ENDPOINT: http://127.0.0.1:9090
+          AWS_EC2_METADATA_DISABLED: true
         with:
           command: test
           args: --all-features --workspace
@@ -124,9 +138,22 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
+      - name: Setup s3 mock environment
+        run: |
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id = test" >> ~/.aws/credentials
+          echo "aws_secret_access_key = test" >> ~/.aws/credentials
+          export AWS_EC2_METADATA_DISABLED=true
+          docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 10
+          aws --endpoint-url http://127.0.0.1:9090/ s3 mb s3://testbucket
       - name: Run rust test with coverage
         run: |
+          export AWS_S3_ACCESS_KEY=test
+          export AWS_S3_SECRET_KEY=test
+          export AWS_EC2_METADATA_DISABLED=true
           cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
+
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}

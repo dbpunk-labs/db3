@@ -23,6 +23,8 @@ package rtstore_base_proto;
 // the all types are supported by rtstore
 enum RTStoreType {
     KBool = 0;
+    // int8
+    KTinyInt = 1;
     // int16
     KSmallInt = 2;
     // int32
@@ -59,12 +61,6 @@ message CellStatus {
     string cell_store_uri = 7;
     CellType ctype = 8;
     int64 size_in_bytes = 9;
-}
-
-message CellDesc {
-    string table_id = 1;
-    int32 partition_id = 2;
-    string cell_store_uri = 3;
 }
 
 // the logical storage unit for data group

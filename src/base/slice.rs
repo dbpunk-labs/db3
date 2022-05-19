@@ -1,7 +1,7 @@
 //
 //
-// mod.rs
-// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
+// slice.rs
+// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,18 @@
 // limitations under the License.
 //
 
-pub mod rtstore_base_proto {
-    tonic::include_proto!("rtstore_base_proto");
+#[derive(Default, Clone)]
+pub struct Slice {
+    pub offset: usize,
+    pub limit: usize,
 }
 
-pub mod rtstore_meta_proto {
-    tonic::include_proto!("rtstore_meta_proto");
-}
-
-pub mod rtstore_memory_proto {
-    tonic::include_proto!("rtstore_memory_proto");
+impl Slice {
+    pub fn len(&self) -> usize {
+        if self.offset > self.limit {
+            0
+        } else {
+            self.limit - self.offset
+        }
+    }
 }

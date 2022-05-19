@@ -16,6 +16,9 @@
 // limitations under the License.
 //
 
+use arrow::error::ArrowError;
+use parquet::errors::ParquetError;
+use s3::error::S3Error;
 use std::io::{Error as IoError, ErrorKind};
 use thiserror::Error;
 
@@ -28,22 +31,58 @@ pub enum RTStoreError {
     TableInvalidNamesError { error: String },
     #[error("table with name {name} exists")]
     TableNamesExistError { name: String },
+    #[error("table type mismatch left {left} and right {right}")]
+    TableTypeMismatchError { left: String, right: String },
+    #[error("table to arrow for error : {0}")]
+    TableArrowError(ArrowError),
     #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]
     FSIoError(IoError),
+    #[error("reach the end of file")]
+    FSIoEofError,
+    #[error("fail to read log for {0}")]
+    FSLogReaderError(String),
+    #[error("parquet error: {0}")]
+    FSParquetError(ParquetError),
     #[error("fail to convert {0} to rtstore column type")]
     TableSchemaConvertError(i32),
     #[error("the schema for table {name} is invalid, please check the input")]
     TableSchemaInvalidError { name: String },
     #[error("create table error for {err}")]
     MetaRpcCreateTableError { err: String },
+    #[error("the {name} of cell store config is invalid for {err}")]
+    CellStoreInvalidConfigError { name: String, err: String },
+    #[error("aws-s3: {0}")]
+    CellStoreS3Error(S3Error),
+    #[error("row codec error : {0}")]
+    RowCodecError(bincode::Error),
+    #[error("system busy for error : {0}")]
+    BaseBusyError(String),
 }
 
 /// convert io error to rtstore error
 impl From<IoError> for RTStoreError {
     fn from(error: IoError) -> Self {
         RTStoreError::FSIoError(error)
+    }
+}
+
+impl From<ParquetError> for RTStoreError {
+    fn from(error: ParquetError) -> Self {
+        RTStoreError::FSParquetError(error)
+    }
+}
+
+impl From<S3Error> for RTStoreError {
+    fn from(error: S3Error) -> Self {
+        RTStoreError::CellStoreS3Error(error)
+    }
+}
+
+impl From<ArrowError> for RTStoreError {
+    fn from(error: ArrowError) -> Self {
+        RTStoreError::TableArrowError(error)
     }
 }
 

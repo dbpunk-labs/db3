@@ -33,10 +33,7 @@ use nix::unistd::{close, ftruncate, lseek, Whence};
 use nix::NixPath;
 
 use super::reader::SequentialFileReader;
-use super::{
-    FileSystem, RandomAccessFile, RandomAccessFileReader, SequentialFile, WritableFile,
-    WritableFileWriter,
-};
+use super::{FileSystem, SequentialFile, WritableFile, WritableFileWriter};
 
 const FILE_ALLOCATE_SIZE: usize = 4 * 1024 * 1024;
 const MIN_ALLOCATE_SIZE: usize = 4 * 1024;
@@ -270,22 +267,6 @@ impl PosixReadableFile {
     }
 }
 
-impl RandomAccessFile for PosixReadableFile {
-    fn read(&self, offset: usize, data: &mut [u8]) -> Result<usize> {
-        let size = self.inner.read(offset, data)?;
-        Ok(size)
-    }
-
-    fn read_exact(&self, offset: usize, n: usize, data: &mut [u8]) -> Result<usize> {
-        let size = self.inner.read(offset, &mut data[..n])?;
-        Ok(size)
-    }
-
-    fn file_size(&self) -> usize {
-        self.inner.file_size().unwrap()
-    }
-}
-
 pub struct PosixSequentialFile {
     inner: Arc<RawFile>,
     file_size: usize,
@@ -327,21 +308,6 @@ impl FileSystem for SyncPosixFileSystem {
         let f = PosixWritableFile::create(path)?;
         let writer = WritableFileWriter::new(Box::new(f), 0);
         Ok(Box::new(writer))
-    }
-
-    fn open_random_access_file(&self, p: &Path) -> Result<Box<RandomAccessFileReader>> {
-        let f = PosixReadableFile::open(p)?;
-        let filename = p
-            .file_name()
-            .ok_or_else(|| RTStoreError::FSInvalidFileError {
-                path: "path has no file name".to_string(),
-            })?
-            .to_str()
-            .ok_or_else(|| RTStoreError::FSInvalidFileError {
-                path: "filename is not encode by utf8".to_string(),
-            })?;
-        let reader = RandomAccessFileReader::new(Box::new(f), filename.to_string());
-        Ok(Box::new(reader))
     }
 
     fn open_sequential_file(&self, path: &Path) -> Result<Box<SequentialFileReader>> {

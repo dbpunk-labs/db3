@@ -1,6 +1,6 @@
 //
 //
-// chunk.rs
+// memory_node_impl.rs
 // Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,19 +17,12 @@
 //
 
 use crate::error::{RTStoreError, Result};
+use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
+use crate::proto::rtstore_memory_proto::{
+    AssignPartitionRequest, AssignPartitionResponse
+};
 
-// the smallest unit for storing data
-pub struct Chunk {
-    // the uri for data 
-    uri:String,
-}
 
 
-impl Chunk {
 
-    pub fn new(uri:&str) ->Result<Self> {
-        Ok(Self {
-            uri
-        })
-    }
-}
