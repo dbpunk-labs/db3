@@ -79,20 +79,6 @@ impl MetaServiceImpl {
     }
 }
 
-impl From<RTStoreError> for Status {
-    fn from(error: RTStoreError) -> Self {
-        match error {
-            RTStoreError::TableInvalidNamesError { .. }
-            | RTStoreError::TableSchemaConvertError { .. }
-            | RTStoreError::TableSchemaInvalidError { .. }
-            | RTStoreError::MetaRpcCreateTableError { .. } => Status::invalid_argument(error),
-            RTStoreError::TableNotFoundError { .. } => Status::not_found(error),
-            RTStoreError::TableNamesExistError { .. } => Status::already_exists(error),
-            _ => Status::internal(error),
-        }
-    }
-}
-
 #[tonic::async_trait]
 impl Meta for MetaServiceImpl {
     async fn create_table(

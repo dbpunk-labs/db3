@@ -25,7 +25,7 @@ use arc_swap::ArcSwap;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use s3::bucket::Bucket;
-use s3::bucket_ops::{BucketConfiguration, CreateBucketResponse};
+use s3::bucket_ops::BucketConfiguration;
 use s3::command::Command;
 use s3::creds::Credentials;
 use s3::region::Region;
@@ -151,6 +151,10 @@ pub struct CellStore {
     column_memtable_size: AtomicU64,
     parquet_file_counter: AtomicU64,
 }
+
+unsafe impl Send for CellStore {}
+
+unsafe impl Sync for CellStore {}
 
 impl CellStore {
     pub fn new(config: CellStoreConfig) -> Result<Self> {

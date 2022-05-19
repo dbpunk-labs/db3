@@ -47,6 +47,18 @@ enum CellType {
     kReadOnly = 1;
 }
 
+message StorageRegion {
+    string region = 1;
+    string endpoint = 2;
+}
+
+message StorageBackendConfig {
+    string bucket = 1;
+    StorageRegion region = 2;
+    uint32 l1_rows_limit = 3;
+    uint32 l2_rows_limit = 4;
+}
+
 // the smallest storage unit in rtstore
 message CellStatus {
     // start timestamp

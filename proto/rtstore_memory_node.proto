@@ -26,10 +26,11 @@ message AssignPartitionRequest {
     // the id list for partitions
     repeated int32 partition_ids = 1;
     rtstore_base_proto.RTStoreTableDesc table_desc = 2;
+    string table_id = 3;
+    rtstore_base_proto.StorageBackendConfig config = 4;
 }
 
 message AssignPartitionResponse {}
-
 
 // The rtstore memory node server definition.
 service MemoryNode {

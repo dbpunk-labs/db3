@@ -16,13 +16,202 @@
 // limitations under the License.
 //
 
+use crate::base::arrow_parquet_utils;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
-use crate::proto::rtstore_memory_proto::{
-    AssignPartitionRequest, AssignPartitionResponse
-};
+use crate::proto::rtstore_memory_proto::{AssignPartitionRequest, AssignPartitionResponse};
+use crate::store::cell_store::{CellStore, CellStoreConfig};
+use s3::creds::Credentials;
+use s3::region::Region;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+use tonic::{Request, Response, Status};
 
+uselog!(info);
 
+struct MemoryNodeConfig {
+    binlog_root_dir: String,
+    tmp_store_root_dir: String,
+}
 
+struct MemoryNodeState {
+    // table->partition->cell
+    cells: HashMap<String, HashMap<i32, Arc<CellStore>>>,
+}
 
+impl MemoryNodeState {
+    fn new() -> Self {
+        Self {
+            cells: HashMap::new(),
+        }
+    }
+
+    fn build_region(storage: &Option<StorageRegion>) -> Result<Region> {
+        if let Some(storage_region) = storage {
+            if let Ok(r) = Region::from_str(&storage_region.region) {
+                match r {
+                    Region::Custom { .. } => Ok(Region::Custom {
+                        region: storage_region.region.to_string(),
+                        endpoint: storage_region.endpoint.to_string(),
+                    }),
+                    _ => Ok(r),
+                }
+            } else {
+                Ok(Region::Custom {
+                    region: storage_region.region.to_string(),
+                    endpoint: storage_region.endpoint.to_string(),
+                })
+            }
+        } else {
+            Err(RTStoreError::CellStoreInvalidConfigError {
+                name: "storage region".to_string(),
+                err: "is null".to_string(),
+            })
+        }
+    }
+
+    fn build_storage_auth() -> Credentials {
+        Credentials::from_env_specific(
+            Some("AWS_S3_ACCESS_KEY"),
+            Some("AWS_S3_SECRET_KEY"),
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    pub async fn build_cell_store(
+        table_id: &str,
+        partition_ids: &[i32],
+        table_desc: &RtStoreTableDesc,
+        storage_config: &StorageBackendConfig,
+        memory_node_confg: &MemoryNodeConfig,
+    ) -> Result<Vec<(i32, Arc<CellStore>)>> {
+        if let Some(rtstore_schema) = &table_desc.schema {
+            let schema = arrow_parquet_utils::table_desc_to_arrow_schema(&rtstore_schema)?;
+            let region = MemoryNodeState::build_region(&storage_config.region)?;
+            let mut cells: Vec<(i32, Arc<CellStore>)> = Vec::new();
+            for id in partition_ids {
+                let object_path = format!("{}/{}", table_id, id);
+                let auth = MemoryNodeState::build_storage_auth();
+                let cell_log_path = format!(
+                    "{}/{}/{}/log/",
+                    memory_node_confg.binlog_root_dir, table_id, id
+                );
+                let cell_tmp_path = format!(
+                    "{}/{}/{}/tmp/",
+                    memory_node_confg.tmp_store_root_dir, table_id, id
+                );
+                let cell_config = CellStoreConfig::new(
+                    &storage_config.bucket,
+                    region.clone(),
+                    &schema,
+                    &cell_log_path,
+                    auth,
+                    &cell_tmp_path,
+                    &object_path,
+                )?;
+                let cell_store = Arc::new(CellStore::new(cell_config)?);
+                cell_store.create_bucket().await?;
+                cells.push((*id, cell_store));
+            }
+            Ok(cells)
+        } else {
+            Err(RTStoreError::CellStoreInvalidConfigError {
+                name: "table schema".to_string(),
+                err: "is null".to_string(),
+            })
+        }
+    }
+
+    pub fn get_cell(&self, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
+        if let Some(internal_map) = self.cells.get(table_id) {
+            if let Some(cell) = internal_map.get(&pid) {
+                Some(cell.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn add_cells(
+        &mut self,
+        table_id: &str,
+        pid: i32,
+        cell_store: Arc<CellStore>,
+    ) -> Result<()> {
+        if let Some(internal_map) = self.cells.get_mut(table_id) {
+            match internal_map.get(&pid) {
+                Some(_) => Err(RTStoreError::CellStoreExistError {
+                    tid: table_id.to_string(),
+                    pid,
+                }),
+                _ => {
+                    internal_map.insert(pid, cell_store);
+                    Ok(())
+                }
+            }
+        } else {
+            let mut table: HashMap<i32, Arc<CellStore>> = HashMap::new();
+            table.insert(pid, cell_store);
+            self.cells.insert(table_id.to_string(), table);
+            Ok(())
+        }
+    }
+}
+
+impl Default for MemoryNodeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct MemoryNodeImpl {
+    state: Arc<Mutex<MemoryNodeState>>,
+    config: MemoryNodeConfig,
+}
+
+unsafe impl Send for MemoryNodeImpl {}
+
+unsafe impl Sync for MemoryNodeImpl {}
+
+#[tonic::async_trait]
+impl MemoryNode for MemoryNodeImpl {
+    async fn assign_partition(
+        &self,
+        request: Request<AssignPartitionRequest>,
+    ) -> std::result::Result<Response<AssignPartitionResponse>, Status> {
+        let assign_request = request.into_inner();
+        if let (Some(table_desc), Some(config)) =
+            (&assign_request.table_desc, &assign_request.config)
+        {
+            let cells = MemoryNodeState::build_cell_store(
+                &assign_request.table_id,
+                &assign_request.partition_ids,
+                table_desc,
+                config,
+                &self.config,
+            )
+            .await?;
+            match self.state.lock() {
+                Ok(mut node_state) => {
+                    for (id, cell) in cells {
+                        node_state.add_cells(&assign_request.table_id, id, cell)?;
+                    }
+                    Ok(Response::new(AssignPartitionResponse {}))
+                }
+                Err(_) => Err(Status::internal(RTStoreError::BaseBusyError(
+                    "fail to get lock".to_string(),
+                ))),
+            }
+        } else {
+            Err(Status::invalid_argument(
+                "table desc or config is null".to_string(),
+            ))
+        }
+    }
+}
