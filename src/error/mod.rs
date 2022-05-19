@@ -17,6 +17,7 @@
 //
 
 use arrow::error::ArrowError;
+use parquet::errors::ParquetError;
 use s3::error::S3Error;
 use std::io::{Error as IoError, ErrorKind};
 use thiserror::Error;
@@ -42,6 +43,8 @@ pub enum RTStoreError {
     FSIoEofError,
     #[error("fail to read log for {0}")]
     FSLogReaderError(String),
+    #[error("parquet error: {0}")]
+    FSParquetError(ParquetError),
     #[error("fail to convert {0} to rtstore column type")]
     TableSchemaConvertError(i32),
     #[error("the schema for table {name} is invalid, please check the input")]
@@ -62,6 +65,12 @@ pub enum RTStoreError {
 impl From<IoError> for RTStoreError {
     fn from(error: IoError) -> Self {
         RTStoreError::FSIoError(error)
+    }
+}
+
+impl From<ParquetError> for RTStoreError {
+    fn from(error: ParquetError) -> Self {
+        RTStoreError::FSParquetError(error)
     }
 }
 

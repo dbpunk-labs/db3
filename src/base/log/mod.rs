@@ -92,3 +92,45 @@ impl From<u8> for RecordError {
 
 pub use reader::LogReader;
 pub use writer::LogWriter;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::base::filesystem::{FileSystem, SyncPosixFileSystem};
+    use std::path::Path;
+    use tempdir::TempDir;
+
+    #[test]
+    fn simple_write_read_test() {
+        let tmp_dir_path = TempDir::new("log_test").expect("create temp dir");
+        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
+            let log_path_str = format!("{}/xxxx.log", tmp_dir_path_str);
+            let log_path = Path::new(&log_path_str);
+            let fs = SyncPosixFileSystem {};
+            if let Ok(writer) = fs.open_writable_file_writer(log_path) {
+                let mut log_writer = LogWriter::new(writer, 1);
+                let empty_data = "";
+                assert!(log_writer.add_record(empty_data.as_bytes()).is_ok());
+                let data = "hello world";
+                assert!(log_writer.add_record(data.as_bytes()).is_ok());
+                assert!(log_writer.fsync().is_ok());
+            } else {
+                panic!("should not be here");
+            }
+            if let Ok(reader) = fs.open_sequential_file(log_path) {
+                let mut log_reader = LogReader::new(reader);
+                let mut buffer: Vec<u8> = Vec::new();
+                // read a record
+                if let Ok(status) = log_reader.read_record(&mut buffer) {
+                    assert!(status);
+                    let data = String::from_utf8(buffer).unwrap();
+                    assert_eq!(&data, "hello world");
+                } else {
+                    panic!("should not be here");
+                }
+            }
+        } else {
+            panic!("should not be here");
+        }
+    }
+}

@@ -63,6 +63,9 @@ impl LogWriter {
     }
 
     pub fn add_record(&mut self, data: &[u8]) -> Result<()> {
+        if data.is_empty() {
+            return Ok(());
+        }
         let mut left = data.len();
         let mut begin = true;
         let mut offset = 0;

@@ -37,7 +37,7 @@ mysql_async = "0.29.0"
 rust-s3 = "0.31"
 crc32c = "0.6"
 yatp = { git = "https://github.com/tikv/yatp.git", branch = "master" }
-
+tempdir = "0.3.5"
 
 [[bin]]
 name = "rtstore"
@@ -50,4 +50,3 @@ tonic-build = "0.6.2"
 [dev-dependencies]
 test-case = "2.0.2"
 criterion = "0.3"
-tempdir = "0.3.5"

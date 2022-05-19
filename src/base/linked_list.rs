@@ -87,6 +87,10 @@ impl<V> LinkedList<V> {
         self.size.load(Ordering::Relaxed)
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.size.load(Ordering::Relaxed) == 0
+    }
+
     pub fn iter(&self) -> LinkedListIter<V> {
         LinkedListIter { curr: &self.head }
     }

@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use crate::base::linked_list::LinkedList;
 use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
@@ -29,6 +30,11 @@ use arrow::datatypes::{
     DECIMAL_MAX_SCALE,
 };
 use arrow::record_batch::RecordBatch;
+use parquet::arrow::arrow_writer::ArrowWriter;
+use parquet::basic::Compression;
+use parquet::file::properties::WriterProperties;
+use std::fs::File;
+use std::path::Path;
 use std::sync::Arc;
 uselog!(info, debug);
 
@@ -64,6 +70,23 @@ pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef>
     Ok(Arc::new(Schema::new(fields)))
 }
 
+pub fn dump_recordbatch(
+    path: &Path,
+    batches: &LinkedList<RecordBatch>,
+    schema: &SchemaRef,
+) -> Result<()> {
+    let properties = WriterProperties::builder()
+        .set_compression(Compression::GZIP)
+        .build();
+    let fd = File::create(path)?;
+    let mut writer = ArrowWriter::try_new(fd, schema.clone(), Some(properties.clone()))?;
+    for batch in batches.iter() {
+        writer.write(batch)?;
+    }
+    writer.close()?;
+    Ok(())
+}
+
 #[allow(clippy::all)]
 enum RTStoreColumnBuilder {
     RTStoreBooleanBuilder(BooleanBuilder),
@@ -84,8 +107,10 @@ enum RTStoreColumnBuilder {
 macro_rules! primary_type_convert {
     ($left_builder:ident, $right_builder:ident, $data_type:ident,
      $builders:ident, $index:ident, $column:ident,
-     $rows:ident, $array_refs:ident, $r_index:ident) => {
-        if $builders.len() <= $index {
+     $rows:ident, $array_refs:ident, $c_index:ident,
+     $e_index:ident) => {
+        let bsize = $builders.len();
+        if bsize <= $index {
             let builder =
                 RTStoreColumnBuilder::$left_builder($right_builder::new($rows.batch.len()));
             $builders.push(builder);
@@ -97,7 +122,7 @@ macro_rules! primary_type_convert {
         ) = (builder, $column)
         {
             internal_builder.append_value(*internal_v)?;
-            if $r_index == $rows.batch.len() - 1 {
+            if $c_index == $e_index && $array_refs.len() < bsize {
                 $array_refs.push(Arc::new(internal_builder.finish()));
             }
         } else {
@@ -109,148 +134,163 @@ macro_rules! primary_type_convert {
     };
 }
 
-pub fn rows_to_columns(schema: &SchemaRef, rows: &RowRecordBatch) -> Result<RecordBatch> {
-    if rows.batch.is_empty() {
+pub fn rows_to_columns(
+    schema: &SchemaRef,
+    rows_batch: &LinkedList<RowRecordBatch>,
+) -> Result<RecordBatch> {
+    if rows_batch.is_empty() {
         return Ok(RecordBatch::new_empty(schema.clone()));
     }
     let mut builders: Vec<RTStoreColumnBuilder> = Vec::new();
     let mut array_refs: Vec<ArrayRef> = Vec::new();
-    for r_index in 0..rows.batch.len() {
-        let r = &rows.batch[r_index];
-        for index in 0..schema.fields().len() {
-            let field = &schema.fields()[index];
-            let column = &r[index];
-            debug!("column {} , field {}", column.name(), field);
-            match field.data_type() {
-                DataType::Boolean => {
-                    primary_type_convert!(
-                        RTStoreBooleanBuilder,
-                        BooleanBuilder,
-                        Bool,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::UInt8 => {
-                    primary_type_convert!(
-                        RTStoreUInt8Builder,
-                        UInt8Builder,
-                        UInt8,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::Int8 => {
-                    primary_type_convert!(
-                        RTStoreInt8Builder,
-                        Int8Builder,
-                        Int8,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::Int16 => {
-                    primary_type_convert!(
-                        RTStoreInt16Builder,
-                        Int16Builder,
-                        Int16,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::UInt16 => {
-                    primary_type_convert!(
-                        RTStoreUInt16Builder,
-                        UInt16Builder,
-                        UInt16,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::Int32 => {
-                    primary_type_convert!(
-                        RTStoreInt32Builder,
-                        Int32Builder,
-                        Int32,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::Int64 => {
-                    primary_type_convert!(
-                        RTStoreInt64Builder,
-                        Int64Builder,
-                        Int64,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::UInt64 => {
-                    primary_type_convert!(
-                        RTStoreUInt64Builder,
-                        UInt64Builder,
-                        UInt64,
-                        builders,
-                        index,
-                        column,
-                        rows,
-                        array_refs,
-                        r_index
-                    );
-                }
-                DataType::Utf8 => {
-                    if builders.len() <= index {
-                        let builder = RTStoreColumnBuilder::RTStoreStrBuilder(StringBuilder::new(
-                            rows.batch.len(),
-                        ));
-                        builders.push(builder);
+    let end_index = rows_batch.size();
+    let mut current_index = 0;
+    for rows in rows_batch.iter() {
+        current_index += 1;
+        for r_index in 0..rows.batch.len() {
+            let r = &rows.batch[r_index];
+            for index in 0..schema.fields().len() {
+                let field = &schema.fields()[index];
+                let column = &r[index];
+                match field.data_type() {
+                    DataType::Boolean => {
+                        primary_type_convert!(
+                            RTStoreBooleanBuilder,
+                            BooleanBuilder,
+                            Bool,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
                     }
-                    let builder = &mut builders[index];
-                    if let (
-                        RTStoreColumnBuilder::RTStoreStrBuilder(str_builder),
-                        Data::Varchar(s),
-                    ) = (builder, column)
-                    {
-                        str_builder.append_value(s)?;
-                        if r_index == rows.batch.len() - 1 {
-                            array_refs.push(Arc::new(str_builder.finish()));
+                    DataType::UInt8 => {
+                        primary_type_convert!(
+                            RTStoreUInt8Builder,
+                            UInt8Builder,
+                            UInt8,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
+                    }
+                    DataType::Int8 => {
+                        primary_type_convert!(
+                            RTStoreInt8Builder,
+                            Int8Builder,
+                            Int8,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
+                    }
+                    DataType::Int16 => {
+                        primary_type_convert!(
+                            RTStoreInt16Builder,
+                            Int16Builder,
+                            Int16,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
+                    }
+                    DataType::UInt16 => {
+                        primary_type_convert!(
+                            RTStoreUInt16Builder,
+                            UInt16Builder,
+                            UInt16,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
+                    }
+                    DataType::Int32 => {
+                        primary_type_convert!(
+                            RTStoreInt32Builder,
+                            Int32Builder,
+                            Int32,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
+                    }
+                    DataType::Int64 => {
+                        primary_type_convert!(
+                            RTStoreInt64Builder,
+                            Int64Builder,
+                            Int64,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
+                    }
+                    DataType::UInt64 => {
+                        primary_type_convert!(
+                            RTStoreUInt64Builder,
+                            UInt64Builder,
+                            UInt64,
+                            builders,
+                            index,
+                            column,
+                            rows,
+                            array_refs,
+                            current_index,
+                            end_index
+                        );
+                    }
+                    DataType::Utf8 => {
+                        if builders.len() <= index {
+                            let builder = RTStoreColumnBuilder::RTStoreStrBuilder(
+                                StringBuilder::new(rows.batch.len()),
+                            );
+                            builders.push(builder);
                         }
-                    } else {
-                        return Err(RTStoreError::TableTypeMismatchError {
-                            left: "utf8".to_string(),
-                            right: column.name().to_string(),
-                        });
+                        let builder = &mut builders[index];
+                        if let (
+                            RTStoreColumnBuilder::RTStoreStrBuilder(str_builder),
+                            Data::Varchar(s),
+                        ) = (builder, column)
+                        {
+                            str_builder.append_value(s)?;
+                            if r_index == rows.batch.len() - 1 {
+                                array_refs.push(Arc::new(str_builder.finish()));
+                            }
+                        } else {
+                            return Err(RTStoreError::TableTypeMismatchError {
+                                left: "utf8".to_string(),
+                                right: column.name().to_string(),
+                            });
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }
@@ -365,7 +405,9 @@ mod tests {
                     schema_version: 1,
                     id: "eth.price".to_string(),
                 };
-                let record_batch = rows_to_columns(&schema, &row_batch)?;
+                let ll: LinkedList<RowRecordBatch> = LinkedList::new();
+                ll.push_front(row_batch)?;
+                let record_batch = rows_to_columns(&schema, &ll)?;
                 let array = record_batch
                     .column(0)
                     .as_any()

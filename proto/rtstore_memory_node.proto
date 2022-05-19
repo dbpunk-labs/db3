@@ -30,6 +30,7 @@ message AssignPartitionRequest {
 
 message AssignPartitionResponse {}
 
+
 // The rtstore memory node server definition.
 service MemoryNode {
     // method for assign partitions to memory node
