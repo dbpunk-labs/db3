@@ -117,6 +117,14 @@ impl CellStoreConfig {
             object_key_prefix: object_key_prefix.to_string(),
         })
     }
+
+    pub fn set_l1_rows_limit(&mut self, limit: u32) {
+        self.l1_rows_limit = limit;
+    }
+
+    pub fn set_l2_rows_limit(&mut self, limit: u32) {
+        self.l2_rows_limit = limit;
+    }
 }
 
 struct CellStoreLockData {

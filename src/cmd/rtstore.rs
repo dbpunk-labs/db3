@@ -19,7 +19,9 @@
 //
 #[macro_use(uselog)]
 extern crate uselog_rs;
+use rtstore::memory_node::memory_node_impl::{MemoryNodeConfig, MemoryNodeImpl};
 use rtstore::meta_node::meta_server::MetaServiceImpl;
+use rtstore::proto::rtstore_memory_proto::memory_node_server::MemoryNodeServer;
 use rtstore::proto::rtstore_meta_proto::meta_client::MetaClient;
 use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
 use rtstore::proto::rtstore_meta_proto::PingRequest;
@@ -38,7 +40,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Start MetaServer
+    /// Start Meta Node Server
     #[clap(arg_required_else_help = true)]
     Meta {
         #[clap(required = true)]
@@ -51,10 +53,40 @@ enum Commands {
         #[clap(required = true)]
         port: i32,
     },
+
+    /// Start Memory Node Server
+    #[clap(arg_required_else_help = true)]
+    MemoryNode {
+        #[clap(required = true)]
+        port: i32,
+        #[clap(required = true)]
+        binlog_root_dir: String,
+        #[clap(required = true)]
+        tmp_root_dir: String,
+    },
 }
 
 fn setup_log() {
     pretty_env_logger::init_timed();
+}
+
+async fn start_memory_node(
+    port: i32,
+    binlog_root_dir: &str,
+    tmp_root_dir: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = MemoryNodeConfig {
+        binlog_root_dir: binlog_root_dir.to_string(),
+        tmp_store_root_dir: tmp_root_dir.to_string(),
+    };
+    let addr = format!("127.0.0.1:{}", port).parse().unwrap();
+    let memory_node = MemoryNodeImpl::new(config);
+    info!("start memory node server on port {}", port);
+    Server::builder()
+        .add_service(MemoryNodeServer::new(memory_node))
+        .serve(addr)
+        .await?;
+    Ok(())
 }
 
 async fn start_metaserver(port: i32) -> Result<(), Box<dyn std::error::Error>> {
@@ -84,5 +116,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         Commands::Meta { port } => start_metaserver(port).await,
         Commands::Client { port } => start_client(port).await,
+        Commands::MemoryNode {
+            port,
+            binlog_root_dir,
+            tmp_root_dir,
+        } => start_memory_node(port, &binlog_root_dir, &tmp_root_dir).await,
     }
 }

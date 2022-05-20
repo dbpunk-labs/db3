@@ -143,7 +143,6 @@ mod tests {
             names: vec![tname.to_string()],
             schema: Some(schema),
             partition_desc: None,
-            storage_uri: "s3:///xxxx".to_string(),
         }
     }
 

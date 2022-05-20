@@ -16,12 +16,14 @@
 // limitations under the License.
 //
 
+use crate::base::arrow_parquet_utils;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
-use crate::proto::rtstore_memory_proto::{AssignPartitionRequest, AssignPartitionResponse};
+use crate::proto::rtstore_memory_proto::{
+    AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
+};
 use crate::store::cell_store::{CellStore, CellStoreConfig};
-use crate::base::arrow_parquet_utils;
 use s3::creds::Credentials;
 use s3::region::Region;
 use std::collections::HashMap;
@@ -31,12 +33,12 @@ use tonic::{Request, Response, Status};
 
 uselog!(info);
 
-struct MemoryNodeConfig {
-    binlog_root_dir: String,
-    tmp_store_root_dir: String,
+pub struct MemoryNodeConfig {
+    pub binlog_root_dir: String,
+    pub tmp_store_root_dir: String,
 }
 
-struct MemoryNodeState {
+pub struct MemoryNodeState {
     // table->partition->cell
     cells: HashMap<String, HashMap<i32, Arc<CellStore>>>,
 }
@@ -47,7 +49,6 @@ impl MemoryNodeState {
             cells: HashMap::new(),
         }
     }
-
     fn build_region(storage: &Option<StorageRegion>) -> Result<Region> {
         if let Some(storage_region) = storage {
             if let Ok(r) = Region::from_str(&storage_region.region) {
@@ -94,17 +95,19 @@ impl MemoryNodeState {
             let region = MemoryNodeState::build_region(&storage_config.region)?;
             let mut cells: Vec<(i32, Arc<CellStore>)> = Vec::new();
             for id in partition_ids {
-                let object_path = format!("{}/{}", table_id, id);
+                //TODO table id is not safe
+                let safe_table_id = table_id.replace(".", "_");
+                let object_path = format!("{}/{}", &safe_table_id, id);
                 let auth = MemoryNodeState::build_storage_auth();
                 let cell_log_path = format!(
                     "{}/{}/{}/log/",
-                    memory_node_confg.binlog_root_dir, table_id, id
+                    memory_node_confg.binlog_root_dir, &safe_table_id, id
                 );
                 let cell_tmp_path = format!(
                     "{}/{}/{}/tmp/",
-                    memory_node_confg.tmp_store_root_dir, table_id, id
+                    memory_node_confg.tmp_store_root_dir, &safe_table_id, id
                 );
-                let cell_config = CellStoreConfig::new(
+                let mut cell_config = CellStoreConfig::new(
                     &storage_config.bucket,
                     region.clone(),
                     &schema,
@@ -113,6 +116,8 @@ impl MemoryNodeState {
                     &cell_tmp_path,
                     &object_path,
                 )?;
+                cell_config.set_l1_rows_limit(storage_config.l1_rows_limit);
+                cell_config.set_l2_rows_limit(storage_config.l2_rows_limit);
                 let cell_store = Arc::new(CellStore::new(cell_config)?);
                 cell_store.create_bucket().await?;
                 cells.push((*id, cell_store));
@@ -138,12 +143,7 @@ impl MemoryNodeState {
         }
     }
 
-    pub fn add_cells(
-        &mut self,
-        table_id: &str,
-        pid: i32,
-        cell_store: Arc<CellStore>,
-    ) -> Result<()> {
+    pub fn add_cell(&mut self, table_id: &str, pid: i32, cell_store: Arc<CellStore>) -> Result<()> {
         if let Some(internal_map) = self.cells.get_mut(table_id) {
             match internal_map.get(&pid) {
                 Some(_) => Err(RTStoreError::CellStoreExistError {
@@ -175,12 +175,34 @@ pub struct MemoryNodeImpl {
     config: MemoryNodeConfig,
 }
 
+impl MemoryNodeImpl {
+    pub fn new(config: MemoryNodeConfig) -> Self {
+        Self {
+            state: Arc::new(Mutex::new(MemoryNodeState::new())),
+            config,
+        }
+    }
+
+    pub fn get_cell(&self, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
+        match self.state.lock() {
+            Ok(node_state) => node_state.get_cell(table_id, pid),
+            Err(_) => None,
+        }
+    }
+}
+
 unsafe impl Send for MemoryNodeImpl {}
 
 unsafe impl Sync for MemoryNodeImpl {}
 
 #[tonic::async_trait]
 impl MemoryNode for MemoryNodeImpl {
+    async fn append_records(
+        &self,
+        request: Request<AppendRecordsRequest>,
+    ) -> std::result::Result<Response<AppendRecordsResponse>, Status> {
+        Ok(Response::new(AppendRecordsResponse {}))
+    }
     async fn assign_partition(
         &self,
         request: Request<AssignPartitionRequest>,
@@ -200,7 +222,7 @@ impl MemoryNode for MemoryNodeImpl {
             match self.state.lock() {
                 Ok(mut node_state) => {
                     for (id, cell) in cells {
-                        node_state.add_cells(&assign_request.table_id, id, cell)?;
+                        node_state.add_cell(&assign_request.table_id, id, cell)?;
                     }
                     Ok(Response::new(AssignPartitionResponse {}))
                 }
@@ -212,6 +234,71 @@ impl MemoryNode for MemoryNodeImpl {
             Err(Status::invalid_argument(
                 "table desc or config is null".to_string(),
             ))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
+    use tempdir::TempDir;
+
+    #[tokio::test]
+    async fn test_assign_partitions() {
+        let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
+        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
+            let config = MemoryNodeConfig {
+                binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
+                tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
+            };
+            let memory_node = MemoryNodeImpl::new(config);
+            let assign_req = create_assign_partition_request("test.eth");
+            let req = Request::new(assign_req);
+            assert!(memory_node.assign_partition(req).await.is_ok());
+            assert!(memory_node.get_cell("test.eth", 3).is_none());
+            assert!(memory_node.get_cell("test.eth", 0).is_some());
+        } else {
+            panic!("should not be here");
+        }
+    }
+
+    fn create_assign_partition_request(tname: &str) -> AssignPartitionRequest {
+        let region = StorageRegion {
+            region: "".to_string(),
+            endpoint: "http://127.0.0.1:9090".to_string(),
+        };
+
+        let storage_config = StorageBackendConfig {
+            bucket: "test_bk_1".to_string(),
+            region: Some(region),
+            l1_rows_limit: 10 * 1024,
+            l2_rows_limit: 5 * 10 * 1024,
+        };
+        let table_desc = create_simple_table_desc(tname);
+        let pids: Vec<i32> = vec![0, 1, 2];
+        AssignPartitionRequest {
+            partition_ids: pids,
+            table_desc: Some(table_desc),
+            table_id: tname.to_string(),
+            config: Some(storage_config),
+        }
+    }
+
+    fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
+        let col1 = RtStoreColumnDesc {
+            name: "col1".to_string(),
+            ctype: 0,
+            null_allowed: true,
+        };
+        let schema = RtStoreSchemaDesc {
+            columns: vec![col1],
+            version: 1,
+        };
+        RtStoreTableDesc {
+            names: vec![tname.to_string()],
+            schema: Some(schema),
+            partition_desc: None,
         }
     }
 }

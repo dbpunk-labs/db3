@@ -32,8 +32,18 @@ message AssignPartitionRequest {
 
 message AssignPartitionResponse {}
 
+message AppendRecordsRequest {
+    string table_id = 1;
+    int32 partition_id = 2;
+    bytes records = 3;
+}
+
+message AppendRecordsResponse {}
+
 // The rtstore memory node server definition.
 service MemoryNode {
     // method for assign partitions to memory node
     rpc AssignPartition (AssignPartitionRequest) returns (AssignPartitionResponse) {}
+    // method for append records to cell store
+    rpc AppendRecords(AppendRecordsRequest) returns (AppendRecordsResponse) {}
 }

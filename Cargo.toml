@@ -29,7 +29,7 @@ pretty_env_logger = "0.4.0"
 # Note datafusion must use the same version with sqlparser
 datafusion = {git = "https://github.com/piedb-dev/arrow-datafusion.git", rev = "17ead70"}
 sqlparser = {git = "https://github.com/piedb-dev/sqlparser-rs.git", rev = "22a6acf"}
-arc-swap = "0.4.2"
+arc-swap = "1.5.0"
 crossbeam-utils = "0.7.2"
 msql-srv = { git = "https://github.com/imotai/msql-srv", rev = "ee14d86" }
 mysql = "22"

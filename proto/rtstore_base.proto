@@ -108,6 +108,4 @@ message RTStoreTableDesc {
     repeated string names = 1;
     RTStoreSchemaDesc schema = 2;
     RTStorePartitionDesc partition_desc = 3;
-    // the root path for storing data , eg s3://xxxx/xx
-    string storage_uri = 4;
 }
