@@ -14,7 +14,7 @@ serde_json = "1.0"
 thiserror = "1.0.30"
 tempfile = "3.3.0"
 tokio = { version = "1.17.0", features = ["full"] }
-prost = "0.9"
+prost = "0.10"
 # Only necessary if using Protobuf well-known types:
 prost-types = "0.9"
 log = "0.4.16"
