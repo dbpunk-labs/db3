@@ -17,6 +17,7 @@
 //
 
 use crate::base::arrow_parquet_utils;
+use crate::codec::row_codec::decode;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
@@ -29,6 +30,8 @@ use s3::region::Region;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::time::sleep;
 use tonic::{Request, Response, Status};
 
 uselog!(info);
@@ -41,6 +44,7 @@ pub struct MemoryNodeConfig {
 pub struct MemoryNodeState {
     // table->partition->cell
     cells: HashMap<String, HashMap<i32, Arc<CellStore>>>,
+    //cells_compaction_state: HashMap<String, HashMap<i32, bool>>,
 }
 
 impl MemoryNodeState {
@@ -96,7 +100,8 @@ impl MemoryNodeState {
             let mut cells: Vec<(i32, Arc<CellStore>)> = Vec::new();
             for id in partition_ids {
                 //TODO table id is not safe
-                let safe_table_id = table_id.replace(".", "_");
+                //
+                let safe_table_id = table_id.replace(".", "-");
                 let object_path = format!("{}/{}", &safe_table_id, id);
                 let auth = MemoryNodeState::build_storage_auth();
                 let cell_log_path = format!(
@@ -183,6 +188,30 @@ impl MemoryNodeImpl {
         }
     }
 
+    pub fn start_l2_compaction(&self, table_id: &str, pid: i32) {
+        let local_table_id = table_id.to_string();
+        let local_state = self.state.clone();
+        tokio::task::spawn(async move {
+            loop {
+                sleep(Duration::from_millis(1000)).await;
+                let cell_opt = match local_state.lock() {
+                    Ok(node_state) => node_state.get_cell(&local_table_id, pid),
+                    Err(_) => None,
+                };
+                if let Some(cell) = cell_opt {
+                    if cell.do_l2_compaction().await.is_ok() {
+                        info!(
+                            "do l2 compaction done for table {}, pid {}",
+                            &local_table_id, pid
+                        )
+                    }
+                } else {
+                    break;
+                }
+            }
+        });
+    }
+
     pub fn get_cell(&self, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
         match self.state.lock() {
             Ok(node_state) => node_state.get_cell(table_id, pid),
@@ -201,8 +230,21 @@ impl MemoryNode for MemoryNodeImpl {
         &self,
         request: Request<AppendRecordsRequest>,
     ) -> std::result::Result<Response<AppendRecordsResponse>, Status> {
-        Ok(Response::new(AppendRecordsResponse {}))
+        let append_request = request.into_inner();
+        if let Some(cell_store) =
+            self.get_cell(&append_request.table_id, append_request.partition_id)
+        {
+            let row_batch = decode(&append_request.records)?;
+            cell_store.put_records(row_batch).await?;
+            Ok(Response::new(AppendRecordsResponse {}))
+        } else {
+            Err(Status::from(RTStoreError::CellStoreNotFoundError {
+                tid: append_request.table_id.to_string(),
+                pid: append_request.partition_id,
+            }))
+        }
     }
+
     async fn assign_partition(
         &self,
         request: Request<AssignPartitionRequest>,
@@ -219,17 +261,25 @@ impl MemoryNode for MemoryNodeImpl {
                 &self.config,
             )
             .await?;
-            match self.state.lock() {
+            let mut cell_ids: Vec<i32> = Vec::new();
+            let result = match self.state.lock() {
                 Ok(mut node_state) => {
                     for (id, cell) in cells {
                         node_state.add_cell(&assign_request.table_id, id, cell)?;
+                        cell_ids.push(id);
                     }
                     Ok(Response::new(AssignPartitionResponse {}))
                 }
                 Err(_) => Err(Status::internal(RTStoreError::BaseBusyError(
                     "fail to get lock".to_string(),
                 ))),
+            };
+            if result.is_ok() {
+                for id in cell_ids {
+                    self.start_l2_compaction(&assign_request.table_id, id);
+                }
             }
+            result
         } else {
             Err(Status::invalid_argument(
                 "table desc or config is null".to_string(),
@@ -241,7 +291,9 @@ impl MemoryNode for MemoryNodeImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
+    use crate::codec::row_codec::{encode, Data, RowRecordBatch};
+    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
+    use std::thread;
     use tempdir::TempDir;
 
     #[tokio::test]
@@ -260,6 +312,77 @@ mod tests {
             assert!(memory_node.get_cell("test.eth", 0).is_some());
         } else {
             panic!("should not be here");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_append_records_compaction() -> Result<()> {
+        let tmp_dir_path = TempDir::new("append_compaction_records").expect("create temp dir");
+        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
+            let config = MemoryNodeConfig {
+                binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
+                tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
+            };
+            let memory_node = MemoryNodeImpl::new(config);
+            let assign_req = create_assign_partition_request("test.sol");
+            let req = Request::new(assign_req);
+            assert!(memory_node.assign_partition(req).await.is_ok());
+            assert!(memory_node.get_cell("test.sol", 3).is_none());
+            assert!(memory_node.get_cell("test.sol", 0).is_some());
+            for _ in 0..102400 {
+                let batch = gen_sample_row_batch();
+                let data = encode(&batch)?;
+                let req = Request::new(AppendRecordsRequest {
+                    table_id: "test.sol".to_string(),
+                    partition_id: 0,
+                    records: data,
+                });
+                assert!(memory_node.append_records(req).await.is_ok());
+            }
+        } else {
+            panic!("should not be here");
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_append_records() -> Result<()> {
+        let tmp_dir_path = TempDir::new("append_records").expect("create temp dir");
+        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
+            let config = MemoryNodeConfig {
+                binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
+                tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
+            };
+            let memory_node = MemoryNodeImpl::new(config);
+            let assign_req = create_assign_partition_request("test.btc");
+            let req = Request::new(assign_req);
+            assert!(memory_node.assign_partition(req).await.is_ok());
+            assert!(memory_node.get_cell("test.btc", 3).is_none());
+            let batch = gen_sample_row_batch();
+            let data = encode(&batch)?;
+            let req = Request::new(AppendRecordsRequest {
+                table_id: "test.btc".to_string(),
+                partition_id: 0,
+                records: data,
+            });
+            assert!(memory_node.get_cell("test.btc", 0).is_some());
+            assert!(memory_node.append_records(req).await.is_ok());
+        } else {
+            panic!("should not be here");
+        }
+        Ok(())
+    }
+
+    fn gen_sample_row_batch() -> RowRecordBatch {
+        let batch = vec![
+            vec![Data::Int64(12)],
+            vec![Data::Int64(11)],
+            vec![Data::Int64(10)],
+        ];
+        RowRecordBatch {
+            batch,
+            schema_version: 1,
+            id: "eth.price".to_string(),
         }
     }
 
@@ -288,7 +411,7 @@ mod tests {
     fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
         let col1 = RtStoreColumnDesc {
             name: "col1".to_string(),
-            ctype: 0,
+            ctype: RtStoreType::KBigInt as i32,
             null_allowed: true,
         };
         let schema = RtStoreSchemaDesc {

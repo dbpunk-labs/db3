@@ -56,6 +56,8 @@ pub enum RTStoreError {
     CellStoreInvalidConfigError { name: String, err: String },
     #[error("the cell exist in memory node with tid {tid} and pid {pid}")]
     CellStoreExistError { tid: String, pid: i32 },
+    #[error("the cell has not been found in memory node with tid {tid} and pid {pid}")]
+    CellStoreNotFoundError { tid: String, pid: i32 },
     #[error("aws-s3: {0}")]
     CellStoreS3Error(S3Error),
     #[error("row codec error : {0}")]
@@ -111,7 +113,8 @@ impl From<RTStoreError> for Status {
             | RTStoreError::TableSchemaConvertError { .. }
             | RTStoreError::TableSchemaInvalidError { .. }
             | RTStoreError::MetaRpcCreateTableError { .. } => Status::invalid_argument(error),
-            RTStoreError::TableNotFoundError { .. } => Status::not_found(error),
+            RTStoreError::TableNotFoundError { .. }
+            | RTStoreError::CellStoreNotFoundError { .. } => Status::not_found(error),
             RTStoreError::TableNamesExistError { .. }
             | RTStoreError::CellStoreExistError { .. } => Status::already_exists(error),
             _ => Status::internal(error),

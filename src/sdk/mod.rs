@@ -1,6 +1,6 @@
 //
 //
-// lib.rs
+// mod.rs
 // Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +15,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+//
 
-#[macro_use(uselog)]
-extern crate uselog_rs;
-pub mod base;
-pub mod codec;
-pub mod error;
-pub mod memory_node;
-pub mod meta_node;
-pub mod proto;
-pub mod sdk;
-pub mod store;
+pub mod memory_node_sdk;
