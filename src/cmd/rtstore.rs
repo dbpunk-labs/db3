@@ -85,6 +85,12 @@ async fn start_memory_node(
         my_endpoint: format!("http://{}", addr).to_string(),
     };
     let memory_node = MemoryNodeImpl::new(config);
+    if !meta_node.is_empty() {
+        if let Err(e) = memory_node.connect_meta_node().await {
+            warn!("fail to connect to meta node {} with err {}", meta_node, e);
+            return Ok(());
+        }
+    }
     info!("start memory node server on port {}", port);
     Server::builder()
         .add_service(MemoryNodeServer::new(memory_node))

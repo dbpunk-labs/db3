@@ -25,6 +25,7 @@ use crate::proto::rtstore_memory_proto::{
 };
 
 use std::sync::Arc;
+use tonic::transport::Endpoint;
 use tonic::{Request, Response, Status};
 
 pub struct MemoryNodeSDK {
@@ -36,7 +37,9 @@ pub struct MemoryNodeSDK {
 impl MemoryNodeSDK {
     pub async fn connect(endpoint: &str) -> std::result::Result<Self, tonic::transport::Error> {
         // create a new client connection
-        let client = Arc::new(MemoryNodeClient::connect(endpoint.to_string()).await?);
+        let rpc_endpoint = Endpoint::new(endpoint.to_string())?;
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(MemoryNodeClient::new(channel));
         Ok(MemoryNodeSDK {
             endpoint: endpoint.to_string(),
             client,
