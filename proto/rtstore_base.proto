@@ -20,6 +20,14 @@
 syntax = "proto3";
 
 package rtstore_base_proto;
+
+enum RTStoreNodeType {
+    KFrontendNode = 0;
+    kMetaNode = 1;
+    kMemoryNode = 2;
+    kComputeNode = 3;
+}
+
 // the all types are supported by rtstore
 enum RTStoreType {
     KBool = 0;
@@ -45,6 +53,18 @@ enum RTStoreType {
 enum CellType {
     KWritable = 0;
     kReadOnly = 1;
+}
+
+message StorageRegion {
+    string region = 1;
+    string endpoint = 2;
+}
+
+message StorageBackendConfig {
+    string bucket = 1;
+    StorageRegion region = 2;
+    uint32 l1_rows_limit = 3;
+    uint32 l2_rows_limit = 4;
 }
 
 // the smallest storage unit in rtstore
@@ -96,6 +116,4 @@ message RTStoreTableDesc {
     repeated string names = 1;
     RTStoreSchemaDesc schema = 2;
     RTStorePartitionDesc partition_desc = 3;
-    // the root path for storing data , eg s3://xxxx/xx
-    string storage_uri = 4;
 }

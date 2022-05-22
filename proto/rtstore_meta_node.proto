@@ -28,12 +28,19 @@ message CreateTableRequest {
 }
 
 message CreateTableResponse {}
-
 message PingRequest{}
 message PingResponse{}
+
+message RegisterNodeRequest {
+    rtstore_base_proto.RTStoreNodeType node_type = 1;
+    string endpoint = 2;
+}
+
+message RegisterNodeResponse {}
 // The rtstore meta server definition.
 service Meta {
     // method for adding a new table
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse) {}
     rpc Ping(PingRequest) returns (PingResponse) {}
+    rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse){}
 }

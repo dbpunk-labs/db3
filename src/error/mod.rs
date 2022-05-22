@@ -21,6 +21,7 @@ use parquet::errors::ParquetError;
 use s3::error::S3Error;
 use std::io::{Error as IoError, ErrorKind};
 use thiserror::Error;
+use tonic::Status;
 
 /// The error system for rtstore
 #[derive(Debug, Error)]
@@ -53,12 +54,22 @@ pub enum RTStoreError {
     MetaRpcCreateTableError { err: String },
     #[error("the {name} of cell store config is invalid for {err}")]
     CellStoreInvalidConfigError { name: String, err: String },
+    #[error("the cell exist in memory node with tid {tid} and pid {pid}")]
+    CellStoreExistError { tid: String, pid: i32 },
+    #[error("the cell has not been found in memory node with tid {tid} and pid {pid}")]
+    CellStoreNotFoundError { tid: String, pid: i32 },
     #[error("aws-s3: {0}")]
     CellStoreS3Error(S3Error),
     #[error("row codec error : {0}")]
     RowCodecError(bincode::Error),
     #[error("system busy for error : {0}")]
     BaseBusyError(String),
+    #[error("memory node with endpoint {0} exists")]
+    MemoryNodeExistError(String),
+    #[error("fail to connect to {0}")]
+    NodeRPCError(String),
+    #[error("invalid endpoint for node {name}")]
+    NodeRPCInvalidEndpointError { name: String },
 }
 
 /// convert io error to rtstore error
@@ -98,6 +109,22 @@ impl From<RTStoreError> for IoError {
 impl From<RTStoreError> for String {
     fn from(error: RTStoreError) -> Self {
         format!("{}", error)
+    }
+}
+
+impl From<RTStoreError> for Status {
+    fn from(error: RTStoreError) -> Self {
+        match error {
+            RTStoreError::TableInvalidNamesError { .. }
+            | RTStoreError::TableSchemaConvertError { .. }
+            | RTStoreError::TableSchemaInvalidError { .. }
+            | RTStoreError::MetaRpcCreateTableError { .. } => Status::invalid_argument(error),
+            RTStoreError::TableNotFoundError { .. }
+            | RTStoreError::CellStoreNotFoundError { .. } => Status::not_found(error),
+            RTStoreError::TableNamesExistError { .. }
+            | RTStoreError::CellStoreExistError { .. } => Status::already_exists(error),
+            _ => Status::internal(error),
+        }
     }
 }
 
