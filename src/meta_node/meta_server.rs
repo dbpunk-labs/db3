@@ -17,11 +17,13 @@
 //
 use super::table::Table;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{
-    CreateTableRequest, CreateTableResponse, PingRequest, PingResponse,
+    CreateTableRequest, CreateTableResponse, PingRequest, PingResponse, RegisterNodeRequest,
+    RegisterNodeResponse,
 };
+use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
@@ -30,12 +32,16 @@ uselog!(debug, info, warn);
 pub struct MetaServiceState {
     // key is the id of table
     tables: HashMap<String, Table>,
+    memory_nodes: HashMap<String, Arc<MemoryNodeSDK>>,
+    table_to_nodes: HashMap<String, HashMap<i32, String>>,
 }
 
 impl MetaServiceState {
     pub fn new() -> Self {
         Self {
             tables: HashMap::new(),
+            memory_nodes: HashMap::new(),
+            table_to_nodes: HashMap::new(),
         }
     }
 
@@ -49,6 +55,17 @@ impl MetaServiceState {
                 let table = Table::new(table_desc)?;
                 info!("create a new table with id {} successfully", id);
                 self.tables.insert(id, table);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn add_memory_node(&mut self, endpoint: &str, node: &Arc<MemoryNodeSDK>) -> Result<()> {
+        match self.memory_nodes.get(endpoint) {
+            Some(_) => Err(RTStoreError::MemoryNodeExistError(endpoint.to_string())),
+            _ => {
+                self.memory_nodes.insert(endpoint.to_string(), node.clone());
+                info!("add a new memory node {}", endpoint);
                 Ok(())
             }
         }
@@ -102,6 +119,36 @@ impl Meta for MetaServiceImpl {
         _request: Request<PingRequest>,
     ) -> std::result::Result<Response<PingResponse>, Status> {
         Ok(Response::new(PingResponse {}))
+    }
+
+    async fn register_node(
+        &self,
+        request: Request<RegisterNodeRequest>,
+    ) -> std::result::Result<Response<RegisterNodeResponse>, Status> {
+        let register_node_req = request.into_inner();
+        if RtStoreNodeType::KMemoryNode as i32 == register_node_req.node_type {
+            match MemoryNodeSDK::connect(&register_node_req.endpoint).await {
+                Ok(node_sdk) => {
+                    let node_sdk_arc = Arc::new(node_sdk);
+                    let mut local_state = self.state.lock().unwrap();
+                    local_state.add_memory_node(&register_node_req.endpoint, &node_sdk_arc)?;
+                    return Ok(Response::new(RegisterNodeResponse {}));
+                }
+                Err(e) => {
+                    warn!(
+                        "fail to connect memory node {} with err {}",
+                        &register_node_req.endpoint, e
+                    );
+                    return Err(Status::internal(RTStoreError::NodeRPCError(
+                        register_node_req.endpoint,
+                    )));
+                }
+            }
+        } else {
+            return Err(Status::invalid_argument(
+                "memory node is required".to_string(),
+            ));
+        }
     }
 }
 

@@ -64,6 +64,12 @@ pub enum RTStoreError {
     RowCodecError(bincode::Error),
     #[error("system busy for error : {0}")]
     BaseBusyError(String),
+    #[error("memory node with endpoint {0} exists")]
+    MemoryNodeExistError(String),
+    #[error("fail to connect to {0}")]
+    NodeRPCError(String),
+    #[error("invalid endpoint for node {name}")]
+    NodeRPCInvalidEndpointError { name: String },
 }
 
 /// convert io error to rtstore error

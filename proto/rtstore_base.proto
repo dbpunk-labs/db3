@@ -20,6 +20,14 @@
 syntax = "proto3";
 
 package rtstore_base_proto;
+
+enum RTStoreNodeType {
+    KFrontendNode = 0;
+    kMetaNode = 1;
+    kMemoryNode = 2;
+    kComputeNode = 3;
+}
+
 // the all types are supported by rtstore
 enum RTStoreType {
     KBool = 0;

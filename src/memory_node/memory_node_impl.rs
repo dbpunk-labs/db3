@@ -19,12 +19,16 @@
 use crate::base::arrow_parquet_utils;
 use crate::codec::row_codec::decode;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
+use crate::proto::rtstore_base_proto::{
+    RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+};
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
 use crate::proto::rtstore_memory_proto::{
     AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
 };
+use crate::sdk::meta_node_sdk::MetaNodeSDK;
 use crate::store::cell_store::{CellStore, CellStoreConfig};
+use arc_swap::ArcSwap;
 use s3::creds::Credentials;
 use s3::region::Region;
 use std::collections::HashMap;
@@ -39,6 +43,8 @@ uselog!(info);
 pub struct MemoryNodeConfig {
     pub binlog_root_dir: String,
     pub tmp_store_root_dir: String,
+    pub meta_node_endpoint: String,
+    pub my_endpoint: String,
 }
 
 pub struct MemoryNodeState {
@@ -178,6 +184,7 @@ impl Default for MemoryNodeState {
 pub struct MemoryNodeImpl {
     state: Arc<Mutex<MemoryNodeState>>,
     config: MemoryNodeConfig,
+    meta_node_client: ArcSwap<Option<MetaNodeSDK>>,
 }
 
 impl MemoryNodeImpl {
@@ -185,12 +192,40 @@ impl MemoryNodeImpl {
         Self {
             state: Arc::new(Mutex::new(MemoryNodeState::new())),
             config,
+            meta_node_client: ArcSwap::from(Arc::new(None)),
+        }
+    }
+
+    pub async fn connect_meta_node(&self) -> Result<()> {
+        if self.config.meta_node_endpoint.is_empty() {
+            return Err(RTStoreError::NodeRPCInvalidEndpointError {
+                name: "meta node ".to_string(),
+            });
+        }
+        if let Ok(meta_node_sdk) = MetaNodeSDK::connect(&self.config.meta_node_endpoint).await {
+            if meta_node_sdk
+                .register_node(&self.config.my_endpoint, RtStoreNodeType::KMemoryNode)
+                .await
+                .is_ok()
+            {
+                self.meta_node_client.store(Arc::new(Some(meta_node_sdk)));
+            } else {
+                return Err(RTStoreError::NodeRPCError(
+                    self.config.meta_node_endpoint.to_string(),
+                ));
+            }
+            return Ok(());
+        } else {
+            return Err(RTStoreError::NodeRPCError(
+                self.config.meta_node_endpoint.to_string(),
+            ));
         }
     }
 
     pub fn start_l2_compaction(&self, table_id: &str, pid: i32) {
         let local_table_id = table_id.to_string();
         let local_state = self.state.clone();
+        // TODO avoid start compaction repeated
         tokio::task::spawn(async move {
             loop {
                 sleep(Duration::from_millis(1000)).await;
