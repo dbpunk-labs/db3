@@ -338,6 +338,8 @@ mod tests {
             let config = MemoryNodeConfig {
                 binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
                 tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
+                meta_node_endpoint: "".to_string(),
+                my_endpoint: "".to_string(),
             };
             let memory_node = MemoryNodeImpl::new(config);
             let assign_req = create_assign_partition_request("test.eth");
@@ -357,6 +359,8 @@ mod tests {
             let config = MemoryNodeConfig {
                 binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
                 tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
+                meta_node_endpoint: "".to_string(),
+                my_endpoint: "".to_string(),
             };
             let memory_node = MemoryNodeImpl::new(config);
             let assign_req = create_assign_partition_request("test.sol");
@@ -387,6 +391,8 @@ mod tests {
             let config = MemoryNodeConfig {
                 binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
                 tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
+                meta_node_endpoint: "".to_string(),
+                my_endpoint: "".to_string(),
             };
             let memory_node = MemoryNodeImpl::new(config);
             let assign_req = create_assign_partition_request("test.btc");
