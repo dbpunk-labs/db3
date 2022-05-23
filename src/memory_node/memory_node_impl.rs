@@ -20,13 +20,13 @@ use crate::base::arrow_parquet_utils;
 use crate::codec::row_codec::decode;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
-    RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+    RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
 };
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
 use crate::proto::rtstore_memory_proto::{
     AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
 };
-use crate::sdk::meta_node_sdk::MetaNodeSDK;
+use crate::sdk::meta_etcd_sdk::{MetaEtcdConfig, MetaEtcdSDK};
 use crate::store::cell_store::{CellStore, CellStoreConfig};
 use arc_swap::ArcSwap;
 use s3::creds::Credentials;
@@ -43,8 +43,9 @@ uselog!(info);
 pub struct MemoryNodeConfig {
     pub binlog_root_dir: String,
     pub tmp_store_root_dir: String,
-    pub meta_node_endpoint: String,
-    pub my_endpoint: String,
+    pub etcd_cluster: String,
+    pub etcd_root_path: String,
+    pub node: RtStoreNode,
 }
 
 pub struct MemoryNodeState {
@@ -184,7 +185,7 @@ impl Default for MemoryNodeState {
 pub struct MemoryNodeImpl {
     state: Arc<Mutex<MemoryNodeState>>,
     config: MemoryNodeConfig,
-    meta_node_client: ArcSwap<Option<MetaNodeSDK>>,
+    meta_etcd_sdk: ArcSwap<Option<MetaEtcdSDK>>,
 }
 
 impl MemoryNodeImpl {
@@ -192,34 +193,30 @@ impl MemoryNodeImpl {
         Self {
             state: Arc::new(Mutex::new(MemoryNodeState::new())),
             config,
-            meta_node_client: ArcSwap::from(Arc::new(None)),
+            meta_etcd_sdk: ArcSwap::from(Arc::new(None)),
         }
     }
-
-    pub async fn connect_meta_node(&self) -> Result<()> {
-        if self.config.meta_node_endpoint.is_empty() {
+    pub async fn connect_to_meta(&self) -> Result<()> {
+        if self.config.etcd_cluster.is_empty() {
             return Err(RTStoreError::NodeRPCInvalidEndpointError {
-                name: "meta node ".to_string(),
+                name: "etcd cluster".to_string(),
             });
         }
-        if let Ok(meta_node_sdk) = MetaNodeSDK::connect(&self.config.meta_node_endpoint).await {
-            if meta_node_sdk
-                .register_node(&self.config.my_endpoint, RtStoreNodeType::KMemoryNode)
-                .await
-                .is_ok()
-            {
-                self.meta_node_client.store(Arc::new(Some(meta_node_sdk)));
-            } else {
-                return Err(RTStoreError::NodeRPCError(
-                    self.config.meta_node_endpoint.to_string(),
-                ));
-            }
-            return Ok(());
+        //TODO add auth information
+        let etcd_config = MetaEtcdConfig {
+            root_path: self.config.etcd_root_path.to_string(),
+            endpoints: self.config.etcd_cluster.to_string(),
+            options: None,
+        };
+        if let Ok(meta_etcd_sdk) = MetaEtcdSDK::new(etcd_config).await {
+            meta_etcd_sdk.register_node(&self.config.node).await?;
+            self.meta_etcd_sdk.store(Arc::new(Some(meta_etcd_sdk)));
         } else {
             return Err(RTStoreError::NodeRPCError(
-                self.config.meta_node_endpoint.to_string(),
+                self.config.etcd_cluster.to_string(),
             ));
         }
+        Ok(())
     }
 
     pub fn start_l2_compaction(&self, table_id: &str, pid: i32) {
@@ -331,16 +328,27 @@ mod tests {
     use std::thread;
     use tempdir::TempDir;
 
+    fn build_config(tmp_dir_path: &str) -> MemoryNodeConfig {
+        let node = RtStoreNode {
+            endpoint: "http://127.0.0.1:9191".to_string(),
+            node_type: RtStoreNodeType::KMemoryNode as i32,
+            ns: "127.0.0.1".to_string(),
+            port: 9191,
+        };
+        MemoryNodeConfig {
+            binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path).to_string(),
+            tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path).to_string(),
+            etcd_cluster: "127.0.0.1:9191".to_string(),
+            etcd_root_path: "/rtstore".to_string(),
+            node,
+        }
+    }
+
     #[tokio::test]
     async fn test_assign_partitions() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
         if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = MemoryNodeConfig {
-                binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
-                tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
-                meta_node_endpoint: "".to_string(),
-                my_endpoint: "".to_string(),
-            };
+            let config = build_config(tmp_dir_path_str);
             let memory_node = MemoryNodeImpl::new(config);
             let assign_req = create_assign_partition_request("test.eth");
             let req = Request::new(assign_req);
@@ -356,12 +364,7 @@ mod tests {
     async fn test_append_records_compaction() -> Result<()> {
         let tmp_dir_path = TempDir::new("append_compaction_records").expect("create temp dir");
         if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = MemoryNodeConfig {
-                binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
-                tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
-                meta_node_endpoint: "".to_string(),
-                my_endpoint: "".to_string(),
-            };
+            let config = build_config(tmp_dir_path_str);
             let memory_node = MemoryNodeImpl::new(config);
             let assign_req = create_assign_partition_request("test.sol");
             let req = Request::new(assign_req);
@@ -388,12 +391,7 @@ mod tests {
     async fn test_append_records() -> Result<()> {
         let tmp_dir_path = TempDir::new("append_records").expect("create temp dir");
         if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = MemoryNodeConfig {
-                binlog_root_dir: format!("{}/binlog_root_dir", tmp_dir_path_str).to_string(),
-                tmp_store_root_dir: format!("{}/tmp_store_root_dir", tmp_dir_path_str).to_string(),
-                meta_node_endpoint: "".to_string(),
-                my_endpoint: "".to_string(),
-            };
+            let config = build_config(tmp_dir_path_str);
             let memory_node = MemoryNodeImpl::new(config);
             let assign_req = create_assign_partition_request("test.btc");
             let req = Request::new(assign_req);

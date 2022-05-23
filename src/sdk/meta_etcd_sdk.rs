@@ -28,11 +28,11 @@ uselog!(info, warn);
 const BUFFER_SIZE: usize = 4 * 1024;
 pub struct MetaEtcdConfig {
     // the root path for rtstore
-    root_path: String,
+    pub root_path: String,
     // endpoints for etcd cluster
-    endpoints: Vec<String>,
+    pub endpoints: String,
     // auth options for etcd
-    options: Option<ConnectOptions>,
+    pub options: Option<ConnectOptions>,
 }
 
 pub struct MetaEtcdSDK {
@@ -42,7 +42,8 @@ pub struct MetaEtcdSDK {
 
 impl MetaEtcdSDK {
     pub async fn new(config: MetaEtcdConfig) -> Result<Self> {
-        match Client::connect(&config.endpoints, config.options.clone()).await {
+        let endpoints: Vec<&str> = config.endpoints.split(",").collect();
+        match Client::connect(endpoints, config.options.clone()).await {
             Ok(client) => Ok(MetaEtcdSDK {
                 client: Arc::new(Mutex::new(client)),
                 config,
@@ -178,7 +179,7 @@ mod tests {
     async fn create_a_local_etcd_sdk() -> Result<MetaEtcdSDK> {
         let config = MetaEtcdConfig {
             root_path: "/rtstore".to_string(),
-            endpoints: vec!["http://localhost:2379".to_string()],
+            endpoints: "http://localhost:2379".to_string(),
             options: None,
         };
         MetaEtcdSDK::new(config).await
@@ -220,7 +221,6 @@ mod tests {
                 panic!("should not be here");
             }
         }
-
         Ok(())
     }
 

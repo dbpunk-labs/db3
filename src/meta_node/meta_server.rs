@@ -17,17 +17,25 @@
 //
 use super::table::Table;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
+use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType, RtStoreTableDesc};
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{
     CreateTableRequest, CreateTableResponse, PingRequest, PingResponse, RegisterNodeRequest,
     RegisterNodeResponse,
 };
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
+use crate::sdk::meta_etcd_sdk::{MetaEtcdConfig, MetaEtcdSDK};
+use arc_swap::ArcSwap;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
 uselog!(debug, info, warn);
+
+pub struct MetaConfig {
+    pub node: RtStoreNode,
+    pub etcd_cluster: String,
+    pub etcd_root_path: String,
+}
 
 pub struct MetaServiceState {
     // key is the id of table
@@ -80,19 +88,40 @@ impl Default for MetaServiceState {
 
 pub struct MetaServiceImpl {
     state: Arc<Mutex<MetaServiceState>>,
-}
-
-impl Default for MetaServiceImpl {
-    fn default() -> Self {
-        Self::new()
-    }
+    config: MetaConfig,
+    meta_etcd_sdk: ArcSwap<Option<MetaEtcdSDK>>,
 }
 
 impl MetaServiceImpl {
-    pub fn new() -> Self {
+    pub fn new(config: MetaConfig) -> Self {
         Self {
             state: Arc::new(Mutex::new(MetaServiceState::new())),
+            config,
+            meta_etcd_sdk: ArcSwap::from(Arc::new(None)),
         }
+    }
+
+    pub async fn connect_to_meta(&self) -> Result<()> {
+        if self.config.etcd_cluster.is_empty() {
+            return Err(RTStoreError::NodeRPCInvalidEndpointError {
+                name: "etcd cluster".to_string(),
+            });
+        }
+        //TODO add auth information
+        let etcd_config = MetaEtcdConfig {
+            root_path: self.config.etcd_root_path.to_string(),
+            endpoints: self.config.etcd_cluster.to_string(),
+            options: None,
+        };
+        if let Ok(meta_etcd_sdk) = MetaEtcdSDK::new(etcd_config).await {
+            meta_etcd_sdk.register_node(&self.config.node).await?;
+            self.meta_etcd_sdk.store(Arc::new(Some(meta_etcd_sdk)));
+        } else {
+            return Err(RTStoreError::NodeRPCError(
+                self.config.etcd_cluster.to_string(),
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -156,9 +185,23 @@ impl Meta for MetaServiceImpl {
 mod tests {
     use super::*;
     use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
+
+    fn build_config() -> MetaConfig {
+        let node = RtStoreNode {
+            endpoint: "http://127.0.0.1:9191".to_string(),
+            node_type: RtStoreNodeType::KMetaNode as i32,
+            ns: "127.0.0.1".to_string(),
+            port: 9191,
+        };
+        MetaConfig {
+            node,
+            etcd_cluster: "127.0.0.1:9191".to_string(),
+            etcd_root_path: "/rtstore".to_string(),
+        }
+    }
     #[tokio::test]
     async fn test_ping() {
-        let meta = MetaServiceImpl::new();
+        let meta = MetaServiceImpl::new(build_config());
         let req = Request::new(PingRequest {});
         let result = meta.ping(req).await;
         if result.is_err() {
@@ -168,7 +211,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_table_empty_desc() {
-        let meta = MetaServiceImpl::new();
+        let meta = MetaServiceImpl::new(build_config());
         let req = Request::new(CreateTableRequest { table_desc: None });
         let result = meta.create_table(req).await;
         if result.is_ok() {
@@ -196,7 +239,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_table() {
         let table_desc = Some(create_simple_table_desc("test.t1"));
-        let meta = MetaServiceImpl::new();
+        let meta = MetaServiceImpl::new(build_config());
         let req = Request::new(CreateTableRequest { table_desc });
         let result = meta.create_table(req).await;
         assert!(result.is_ok());
