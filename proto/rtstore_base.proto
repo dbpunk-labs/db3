@@ -23,9 +23,16 @@ package rtstore_base_proto;
 
 enum RTStoreNodeType {
     KFrontendNode = 0;
-    kMetaNode = 1;
-    kMemoryNode = 2;
-    kComputeNode = 3;
+    KMetaNode = 1;
+    KMemoryNode = 2;
+    KComputeNode = 3;
+}
+
+message RTStoreNode {
+    string endpoint = 1;
+    RTStoreNodeType node_type = 2;
+    string ns = 3;
+    int32 port = 4;
 }
 
 // the all types are supported by rtstore

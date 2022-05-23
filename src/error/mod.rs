@@ -36,6 +36,8 @@ pub enum RTStoreError {
     TableTypeMismatchError { left: String, right: String },
     #[error("table to arrow for error : {0}")]
     TableArrowError(ArrowError),
+    #[error("table {table_id} encounter encoding or decoding error {err}")]
+    TableCodecError { table_id: String, err: String },
     #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]
@@ -70,6 +72,9 @@ pub enum RTStoreError {
     NodeRPCError(String),
     #[error("invalid endpoint for node {name}")]
     NodeRPCInvalidEndpointError { name: String },
+
+    #[error("fail to decode data from etcd for err {0}")]
+    EtcdCodecError(String),
 }
 
 /// convert io error to rtstore error
