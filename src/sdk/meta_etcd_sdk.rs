@@ -26,6 +26,7 @@ use tonic::codec::EncodeBuf;
 uselog!(info, warn);
 
 const BUFFER_SIZE: usize = 4 * 1024;
+
 pub struct MetaEtcdConfig {
     // the root path for rtstore
     pub root_path: String,

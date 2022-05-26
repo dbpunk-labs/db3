@@ -20,11 +20,10 @@ use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType, RtStoreTableDesc};
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{
-    CreateTableRequest, CreateTableResponse, PingRequest, PingResponse, RegisterNodeRequest,
-    RegisterNodeResponse,
+    CreateTableRequest, CreateTableResponse, PingRequest, PingResponse,
 };
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
-use crate::sdk::meta_etcd_sdk::{MetaEtcdConfig, MetaEtcdSDK};
+use crate::store::meta_store::MetaStore;
 use arc_swap::ArcSwap;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -89,7 +88,7 @@ impl Default for MetaServiceState {
 pub struct MetaServiceImpl {
     state: Arc<Mutex<MetaServiceState>>,
     config: MetaConfig,
-    meta_etcd_sdk: ArcSwap<Option<MetaEtcdSDK>>,
+    meta_store: ArcSwap<Option<MetaStore>>,
 }
 
 impl MetaServiceImpl {
@@ -148,36 +147,6 @@ impl Meta for MetaServiceImpl {
         _request: Request<PingRequest>,
     ) -> std::result::Result<Response<PingResponse>, Status> {
         Ok(Response::new(PingResponse {}))
-    }
-
-    async fn register_node(
-        &self,
-        request: Request<RegisterNodeRequest>,
-    ) -> std::result::Result<Response<RegisterNodeResponse>, Status> {
-        let register_node_req = request.into_inner();
-        if RtStoreNodeType::KMemoryNode as i32 == register_node_req.node_type {
-            match MemoryNodeSDK::connect(&register_node_req.endpoint).await {
-                Ok(node_sdk) => {
-                    let node_sdk_arc = Arc::new(node_sdk);
-                    let mut local_state = self.state.lock().unwrap();
-                    local_state.add_memory_node(&register_node_req.endpoint, &node_sdk_arc)?;
-                    return Ok(Response::new(RegisterNodeResponse {}));
-                }
-                Err(e) => {
-                    warn!(
-                        "fail to connect memory node {} with err {}",
-                        &register_node_req.endpoint, e
-                    );
-                    return Err(Status::internal(RTStoreError::NodeRPCError(
-                        register_node_req.endpoint,
-                    )));
-                }
-            }
-        } else {
-            return Err(Status::invalid_argument(
-                "memory node is required".to_string(),
-            ));
-        }
     }
 }
 

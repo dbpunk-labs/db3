@@ -18,7 +18,6 @@
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::RtStoreNodeType;
 use crate::proto::rtstore_meta_proto::meta_client::MetaClient;
-use crate::proto::rtstore_meta_proto::RegisterNodeRequest;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 uselog!(info);
@@ -36,20 +35,5 @@ impl MetaNodeSDK {
             endpoint: endpoint.to_string(),
             client,
         })
-    }
-
-    pub async fn register_node(
-        &self,
-        endpoint: &str,
-        node_type: RtStoreNodeType,
-    ) -> std::result::Result<(), Status> {
-        let mut client = self.client.as_ref().clone();
-        let register_node_req = RegisterNodeRequest {
-            node_type: node_type as i32,
-            endpoint: endpoint.to_string(),
-        };
-        let request = tonic::Request::new(register_node_req);
-        client.register_node(request).await?;
-        Ok(())
     }
 }

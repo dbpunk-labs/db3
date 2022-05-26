@@ -72,9 +72,10 @@ pub enum RTStoreError {
     NodeRPCError(String),
     #[error("invalid endpoint for node {name}")]
     NodeRPCInvalidEndpointError { name: String },
-
     #[error("fail to decode data from etcd for err {0}")]
     EtcdCodecError(String),
+    #[error("meta store type mismatch")]
+    MetaStoreTypeMisatchErr,
 }
 
 /// convert io error to rtstore error
