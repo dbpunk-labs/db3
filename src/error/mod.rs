@@ -76,6 +76,10 @@ pub enum RTStoreError {
     EtcdCodecError(String),
     #[error("meta store type mismatch")]
     MetaStoreTypeMisatchErr,
+    #[error("the {name} for {key} has exist")]
+    MetaStoreExistErr { name: String, key: String },
+    #[error("encounter some etcd error {0}")]
+    MetaStoreEtcdErr(etcd_client::Error),
 }
 
 /// convert io error to rtstore error
@@ -100,6 +104,12 @@ impl From<S3Error> for RTStoreError {
 impl From<ArrowError> for RTStoreError {
     fn from(error: ArrowError) -> Self {
         RTStoreError::TableArrowError(error)
+    }
+}
+
+impl From<etcd_client::Error> for RTStoreError {
+    fn from(error: etcd_client::Error) -> Self {
+        RTStoreError::MetaStoreEtcdErr(error)
     }
 }
 

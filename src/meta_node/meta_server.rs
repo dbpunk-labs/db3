@@ -23,8 +23,11 @@ use crate::proto::rtstore_meta_proto::{
     CreateTableRequest, CreateTableResponse, PingRequest, PingResponse,
 };
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
-use crate::store::meta_store::MetaStore;
-use arc_swap::ArcSwap;
+use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
+use arc_swap::ArcSwapOption;
+use bytes::Bytes;
+use etcd_client::{Client, ConnectOptions, EventType, GetOptions};
+use prost::Message;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
@@ -88,37 +91,119 @@ impl Default for MetaServiceState {
 pub struct MetaServiceImpl {
     state: Arc<Mutex<MetaServiceState>>,
     config: MetaConfig,
-    meta_store: ArcSwap<Option<MetaStore>>,
+    meta_store: ArcSwapOption<MetaStore>,
 }
+
+unsafe impl Send for MetaServiceImpl {}
+
+unsafe impl Sync for MetaServiceImpl {}
 
 impl MetaServiceImpl {
     pub fn new(config: MetaConfig) -> Self {
         Self {
             state: Arc::new(Mutex::new(MetaServiceState::new())),
             config,
-            meta_etcd_sdk: ArcSwap::from(Arc::new(None)),
+            meta_store: ArcSwapOption::from(None),
         }
     }
 
     pub async fn connect_to_meta(&self) -> Result<()> {
+        info!("connect to meta");
         if self.config.etcd_cluster.is_empty() {
             return Err(RTStoreError::NodeRPCInvalidEndpointError {
                 name: "etcd cluster".to_string(),
             });
         }
-        //TODO add auth information
-        let etcd_config = MetaEtcdConfig {
+        // connect to etcd
+        let endpoints: Vec<&str> = self.config.etcd_cluster.split(",").collect();
+        let etcd_client = match Client::connect(endpoints, None).await {
+            Ok(client) => Ok(client),
+            Err(e) => {
+                warn!("fail to connect etcd for err {}", e);
+                Err(RTStoreError::NodeRPCInvalidEndpointError {
+                    name: "etcd".to_string(),
+                })
+            }
+        }?;
+
+        let meta_store_config = MetaStoreConfig {
             root_path: self.config.etcd_root_path.to_string(),
-            endpoints: self.config.etcd_cluster.to_string(),
-            options: None,
+            store_type: MetaStoreType::MutableMetaStore,
         };
-        if let Ok(meta_etcd_sdk) = MetaEtcdSDK::new(etcd_config).await {
-            meta_etcd_sdk.register_node(&self.config.node).await?;
-            self.meta_etcd_sdk.store(Arc::new(Some(meta_etcd_sdk)));
-        } else {
-            return Err(RTStoreError::NodeRPCError(
-                self.config.etcd_cluster.to_string(),
-            ));
+        info!("register self {} to etcd", self.config.node.ns);
+        let meta_store = MetaStore::new(etcd_client, meta_store_config);
+        // register self to etcd
+        meta_store.add_node(&self.config.node).await?;
+        self.meta_store.store(Some(Arc::new(meta_store)));
+        let local_meta_store = self.meta_store.load().clone();
+        let local_state = self.state.clone();
+        if let Some(local_meta_store) = local_meta_store {
+            tokio::task::spawn(async move {
+                if let Ok(mut stream) = local_meta_store
+                    .subscribe_node_events(&RtStoreNodeType::KMemoryNode)
+                    .await
+                {
+                    while let Ok(Some(resp)) = stream.message().await {
+                        if resp.canceled() {
+                            break;
+                        }
+                        let mut new_add_nodes: Vec<RtStoreNode> = Vec::new();
+                        let mut deleted_nodes: Vec<RtStoreNode> = Vec::new();
+                        for event in resp.events() {
+                            match (event.event_type(), event.kv()) {
+                                (EventType::Put, Some(kv)) => {
+                                    let buf = Bytes::from(kv.value().to_vec());
+                                    match RtStoreNode::decode(buf) {
+                                        Ok(node) => {
+                                            if RtStoreNodeType::KMemoryNode as i32 == node.node_type
+                                            {
+                                                new_add_nodes.push(node);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            warn!("fail to decode data value ");
+                                        }
+                                    }
+                                }
+                                (EventType::Delete, Some(kv)) => {
+                                    let buf = Bytes::from(kv.value().to_vec());
+                                    match RtStoreNode::decode(buf) {
+                                        Ok(node) => {
+                                            if RtStoreNodeType::KMemoryNode as i32 == node.node_type
+                                            {
+                                                deleted_nodes.push(node);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            warn!("fail to decode data value ");
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    warn!("null kv data");
+                                }
+                            }
+                        }
+                        for node in new_add_nodes {
+                            match (
+                                MemoryNodeSDK::connect(&node.endpoint).await,
+                                local_state.lock(),
+                            ) {
+                                (Ok(sdk), Ok(mut state)) => {
+                                    let arc_sdk = Arc::new(sdk);
+                                    if state.add_memory_node(&node.endpoint, &arc_sdk).is_err() {
+                                        warn!("fail to connect memory node {}", &node.endpoint);
+                                    }
+                                }
+                                (_, _) => warn!("fail to connect memory node {}", &node.endpoint),
+                            }
+                        }
+                        for node in deleted_nodes {
+                            info!("delete node {}", node.endpoint);
+                        }
+                    }
+                }
+            });
         }
         Ok(())
     }

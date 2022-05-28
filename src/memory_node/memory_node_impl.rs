@@ -26,9 +26,10 @@ use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
 use crate::proto::rtstore_memory_proto::{
     AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
 };
-use crate::sdk::meta_etcd_sdk::{MetaEtcdConfig, MetaEtcdSDK};
 use crate::store::cell_store::{CellStore, CellStoreConfig};
+use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
 use arc_swap::ArcSwap;
+use etcd_client::{Client, ConnectOptions, GetOptions};
 use s3::creds::Credentials;
 use s3::region::Region;
 use std::collections::HashMap;
@@ -38,7 +39,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tonic::{Request, Response, Status};
 
-uselog!(info);
+uselog!(info, warn);
 
 pub struct MemoryNodeConfig {
     pub binlog_root_dir: String,
@@ -60,6 +61,7 @@ impl MemoryNodeState {
             cells: HashMap::new(),
         }
     }
+
     fn build_region(storage: &Option<StorageRegion>) -> Result<Region> {
         if let Some(storage_region) = storage {
             if let Ok(r) = Region::from_str(&storage_region.region) {
@@ -185,7 +187,7 @@ impl Default for MemoryNodeState {
 pub struct MemoryNodeImpl {
     state: Arc<Mutex<MemoryNodeState>>,
     config: MemoryNodeConfig,
-    meta_etcd_sdk: ArcSwap<Option<MetaEtcdSDK>>,
+    meta_store: ArcSwap<Option<MetaStore>>,
 }
 
 impl MemoryNodeImpl {
@@ -193,29 +195,38 @@ impl MemoryNodeImpl {
         Self {
             state: Arc::new(Mutex::new(MemoryNodeState::new())),
             config,
-            meta_etcd_sdk: ArcSwap::from(Arc::new(None)),
+            meta_store: ArcSwap::from(Arc::new(None)),
         }
     }
+
     pub async fn connect_to_meta(&self) -> Result<()> {
         if self.config.etcd_cluster.is_empty() {
             return Err(RTStoreError::NodeRPCInvalidEndpointError {
                 name: "etcd cluster".to_string(),
             });
         }
-        //TODO add auth information
-        let etcd_config = MetaEtcdConfig {
+
+        // connect to etcd
+        let endpoints: Vec<&str> = self.config.etcd_cluster.split(",").collect();
+        let etcd_client = match Client::connect(endpoints, None).await {
+            Ok(client) => Ok(client),
+            Err(e) => {
+                warn!("fail to connect etcd for err {}", e);
+                Err(RTStoreError::NodeRPCInvalidEndpointError {
+                    name: "etcd".to_string(),
+                })
+            }
+        }?;
+
+        let meta_store_config = MetaStoreConfig {
             root_path: self.config.etcd_root_path.to_string(),
-            endpoints: self.config.etcd_cluster.to_string(),
-            options: None,
+            store_type: MetaStoreType::ImmutableMetaStore,
         };
-        if let Ok(meta_etcd_sdk) = MetaEtcdSDK::new(etcd_config).await {
-            meta_etcd_sdk.register_node(&self.config.node).await?;
-            self.meta_etcd_sdk.store(Arc::new(Some(meta_etcd_sdk)));
-        } else {
-            return Err(RTStoreError::NodeRPCError(
-                self.config.etcd_cluster.to_string(),
-            ));
-        }
+
+        let meta_store = MetaStore::new(etcd_client, meta_store_config);
+        // register self to etcd
+        meta_store.add_node(&self.config.node).await?;
+        self.meta_store.store(Arc::new(Some(meta_store)));
         Ok(())
     }
 
@@ -238,6 +249,10 @@ impl MemoryNodeImpl {
                         )
                     }
                 } else {
+                    info!(
+                        "partition {} of table {} exist from compaction",
+                        &local_table_id, pid
+                    );
                     break;
                 }
             }

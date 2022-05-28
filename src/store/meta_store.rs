@@ -17,16 +17,23 @@
 //
 
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType, RtStoreTableDesc};
 use bytes::{Bytes, BytesMut};
-use etcd_client::{Client, ConnectOptions, GetOptions};
+use etcd_client::{Client, ConnectOptions, Event, GetOptions, WatchOptions, WatchStream, Watcher};
 use prost::Message;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+uselog!(info);
 
 const BUFFER_SIZE: usize = 4 * 1024;
+
 pub enum MetaStoreType {
     ImmutableMetaStore,
     MutableMetaStore,
+}
+
+struct MetaStoreState {
+    watchers: HashMap<String, Watcher>,
 }
 
 pub struct MetaStoreConfig {
@@ -36,12 +43,24 @@ pub struct MetaStoreConfig {
 
 pub struct MetaStore {
     config: MetaStoreConfig,
-    client: Arc<Mutex<Client>>,
+    state: Arc<Mutex<MetaStoreState>>,
+    client: Arc<Client>,
 }
 
+unsafe impl Send for MetaStore {}
+
+unsafe impl Sync for MetaStore {}
+
 impl MetaStore {
-    pub fn new(client: Arc<Mutex<Client>>, config: MetaStoreConfig) -> Self {
-        Self { config, client }
+    pub fn new(client: Client, config: MetaStoreConfig) -> Self {
+        let state = MetaStoreState {
+            watchers: HashMap::new(),
+        };
+        Self {
+            config,
+            state: Arc::new(Mutex::new(state)),
+            client: Arc::new(client),
+        }
     }
 
     pub async fn add_table(
@@ -68,18 +87,29 @@ impl MetaStore {
         }
     }
 
-    pub async fn add_node(&self, node: &RTStoreNode) -> Result<()> {
-        Ok(())
+    pub async fn add_node(&self, node: &RtStoreNode) -> Result<()> {
+        let key = format!(
+            "{}/nodes_{}/{}_{}",
+            self.config.root_path, node.node_type as i32, node.ns, node.port
+        );
+        let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
+        if let Err(e) = node.encode(&mut buf) {
+            return Err(RTStoreError::EtcdCodecError(
+                format!("encode descriptor  with err {} ", e).to_string(),
+            ));
+        }
+        let buf = buf.freeze();
+        self._put(key.as_bytes(), buf.as_ref()).await
     }
 
-    #[inline]
-    async fn _put(&self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) -> Result<()> {
-        match self.client.lock() {
-            Ok(etcd_client) => {
-                let mut kv_client = etcd_client.kv_client();
-                if let Err(e) = kv_client.put(key, value, None).await {
-                    Err(RTStoreError::MetaRpcCreateTableError {
-                        err: format!("fail to save descriptor  with err {} ", e).to_string(),
+    pub async fn subscribe_node_events(&self, node_type: &RtStoreNodeType) -> Result<WatchStream> {
+        let key = format!("{}/nodes_{}", self.config.root_path, *node_type as i32);
+        match self.state.lock() {
+            Ok(state) => {
+                if state.watchers.contains_key(&key) {
+                    Err(RTStoreError::MetaStoreExistErr {
+                        name: "watch node".to_string(),
+                        key: key.to_string(),
                     })
                 } else {
                     Ok(())
@@ -88,6 +118,22 @@ impl MetaStore {
             _ => Err(RTStoreError::BaseBusyError(
                 "fail to get lock of etcd client".to_string(),
             )),
+        }?;
+        let options = WatchOptions::new().with_prefix();
+        let mut watch_client = self.client.watch_client();
+        let (_, stream) = watch_client.watch(key.to_string(), Some(options)).await?;
+        Ok(stream)
+    }
+
+    #[inline]
+    async fn _put(&self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) -> Result<()> {
+        let mut kv_client = self.client.kv_client();
+        if let Err(e) = kv_client.put(key, value, None).await {
+            Err(RTStoreError::MetaRpcCreateTableError {
+                err: format!("fail to save descriptor  with err {} ", e).to_string(),
+            })
+        } else {
+            Ok(())
         }
     }
 }
@@ -95,6 +141,8 @@ impl MetaStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
     async fn create_a_etcd_client() -> Result<Client> {
         let endpoints: Vec<&str> = "http://localhost:2379".split(",").collect();
         if let Ok(client) = Client::connect(endpoints, None).await {
@@ -110,5 +158,52 @@ mod tests {
     async fn test_meta_store_init() -> Result<()> {
         assert!(create_a_etcd_client().await.is_ok());
         Ok(())
+    }
+
+    async fn create_a_meta_store() -> Result<MetaStore> {
+        let client = create_a_etcd_client().await?;
+        let config = MetaStoreConfig {
+            store_type: MetaStoreType::MutableMetaStore,
+            root_path: "/rtstore_test".to_string(),
+        };
+        Ok(MetaStore::new(client, config))
+    }
+
+    #[tokio::test]
+    async fn test_add_table() -> Result<()> {
+        let table_desc = create_simple_table_desc("test.eth");
+        let meta_store = create_a_meta_store().await?;
+        assert!(meta_store.add_table("test.eth", &table_desc).await.is_ok());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_add_node() -> Result<()> {
+        let meta_store = create_a_meta_store().await?;
+        let rtstore_node = RtStoreNode {
+            endpoint: "127.0.0.1:8989".to_string(),
+            node_type: RtStoreNodeType::KComputeNode as i32,
+            ns: "127.0.0.1".to_string(),
+            port: 8989,
+        };
+        assert!(meta_store.add_node(&rtstore_node).await.is_ok());
+        Ok(())
+    }
+
+    fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
+        let col1 = RtStoreColumnDesc {
+            name: "col1".to_string(),
+            ctype: RtStoreType::KBigInt as i32,
+            null_allowed: true,
+        };
+        let schema = RtStoreSchemaDesc {
+            columns: vec![col1],
+            version: 1,
+        };
+        RtStoreTableDesc {
+            names: vec![tname.to_string()],
+            schema: Some(schema),
+            partition_desc: None,
+        }
     }
 }

@@ -136,6 +136,7 @@ async fn start_metaserver(cmd: &Commands) -> Result<(), Box<dyn std::error::Erro
             etcd_root_path: etcd_root_path.to_string(),
         };
         let meta_service = MetaServiceImpl::new(config);
+        meta_service.connect_to_meta().await?;
         info!("start metaserver on addr {}", addr);
         Server::builder()
             .add_service(MetaServer::new(meta_service))
