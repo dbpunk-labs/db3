@@ -19,7 +19,7 @@ log = "0.4.16"
 uselog-rs = "0.3.0"
 bincode = "1.1.4"
 clap = { version = "3.1.8", features = ["derive"] }
-arrow = { version = "12", features = ["prettyprint"] }
+arrow = { version = "14", features = ["prettyprint"] }
 parquet = { version = "12", features = ["arrow"] }
 crossbeam = "0.8.1"
 chrono = { version = "0.4", default-features = false }
