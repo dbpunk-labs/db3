@@ -36,6 +36,8 @@ pub enum RTStoreError {
     TableTypeMismatchError { left: String, right: String },
     #[error("table to arrow for error : {0}")]
     TableArrowError(ArrowError),
+    #[error("table {table_id} encounter encoding or decoding error {err}")]
+    TableCodecError { table_id: String, err: String },
     #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]
@@ -70,6 +72,14 @@ pub enum RTStoreError {
     NodeRPCError(String),
     #[error("invalid endpoint for node {name}")]
     NodeRPCInvalidEndpointError { name: String },
+    #[error("fail to decode data from etcd for err {0}")]
+    EtcdCodecError(String),
+    #[error("meta store type mismatch")]
+    MetaStoreTypeMisatchErr,
+    #[error("the {name} for {key} has exist")]
+    MetaStoreExistErr { name: String, key: String },
+    #[error("encounter some etcd error {0}")]
+    MetaStoreEtcdErr(etcd_client::Error),
 }
 
 /// convert io error to rtstore error
@@ -94,6 +104,12 @@ impl From<S3Error> for RTStoreError {
 impl From<ArrowError> for RTStoreError {
     fn from(error: ArrowError) -> Self {
         RTStoreError::TableArrowError(error)
+    }
+}
+
+impl From<etcd_client::Error> for RTStoreError {
+    fn from(error: etcd_client::Error) -> Self {
+        RTStoreError::MetaStoreEtcdErr(error)
     }
 }
 

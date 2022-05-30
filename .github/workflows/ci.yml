@@ -22,6 +22,13 @@ jobs:
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
+      - name: Setup etcd3
+        run: |
+          wget https://github.com/etcd-io/etcd/releases/download/v3.5.4/etcd-v3.5.4-linux-amd64.tar.gz
+          tar -zxf etcd-v3.5.4-linux-amd64.tar.gz
+          cd etcd-v3.5.4-linux-amd64
+          ./etcd &
+
       - name: Setup s3 mock environment
         run: |
           mkdir -p ~/.aws
@@ -138,6 +145,12 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
+      - name: Setup etcd3
+        run: |
+          wget https://github.com/etcd-io/etcd/releases/download/v3.5.4/etcd-v3.5.4-linux-amd64.tar.gz
+          tar -zxf etcd-v3.5.4-linux-amd64.tar.gz
+          cd etcd-v3.5.4-linux-amd64
+          ./etcd &
       - name: Setup s3 mock environment
         run: |
           mkdir -p ~/.aws
