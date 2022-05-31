@@ -236,7 +236,7 @@ impl MemoryNodeImpl {
         // TODO avoid start compaction repeated
         tokio::task::spawn(async move {
             loop {
-                sleep(Duration::from_millis(1000)).await;
+                sleep(Duration::from_millis(1000 * 10)).await;
                 let cell_opt = match local_state.lock() {
                     Ok(node_state) => node_state.get_cell(&local_table_id, pid),
                     Err(_) => None,

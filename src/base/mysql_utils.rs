@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use crate::codec::row_codec::Data;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
@@ -25,12 +26,13 @@ use arrow::array::{
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::record_batch::RecordBatch;
+use chrono::NaiveDateTime;
 use msql_srv::Column as MySQLColumn;
 use msql_srv::ColumnFlags;
 use msql_srv::ColumnType;
 use msql_srv::OkResponse;
 use msql_srv::QueryResultWriter;
-use sqlparser::ast::{ColumnDef, ColumnOption, DataType as SPDataType};
+use sqlparser::ast::{ColumnDef, ColumnOption, DataType as SPDataType, Value};
 uselog!(info, warn);
 
 macro_rules! type_mapping {
@@ -43,6 +45,43 @@ macro_rules! type_mapping {
         };
         $columns.push(col);
     };
+}
+
+pub fn sql_value_to_data(val: &Value, store_type: &RtStoreType) -> Result<Data> {
+    match (store_type, val) {
+        (RtStoreType::KStringUtf8, Value::SingleQuotedString(s)) => {
+            Ok(Data::Varchar(s.to_string()))
+        }
+        (RtStoreType::KStringUtf8, Value::DoubleQuotedString(s)) => {
+            Ok(Data::Varchar(s.to_string()))
+        }
+        (RtStoreType::KBigInt, Value::Number(v, _)) => {
+            let val_int: i64 = v.parse().unwrap();
+            Ok(Data::Int64(val_int))
+        }
+        (RtStoreType::KInt, Value::Number(v, _)) => {
+            let val_int: i32 = v.parse().unwrap();
+            Ok(Data::Int32(val_int))
+        }
+        (RtStoreType::KFloat, Value::Number(v, _)) => {
+            let val: f32 = v.parse().unwrap();
+            Ok(Data::Float(val))
+        }
+        (RtStoreType::KDouble, Value::Number(v, _)) => {
+            let val: f64 = v.parse().unwrap();
+            Ok(Data::Double(val))
+        }
+        (RtStoreType::KTimestampMillsSecond, Value::SingleQuotedString(s))
+        | (RtStoreType::KTimestampMillsSecond, Value::DoubleQuotedString(s)) => {
+            let time = NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").unwrap();
+            let ts = time.timestamp() * 1000;
+            Ok(Data::Timestamp(ts as u64))
+        }
+        (_, _) => Err(RTStoreError::TableTypeMismatchError {
+            left: "left".to_string(),
+            right: "right".to_string(),
+        }),
+    }
 }
 
 pub fn record_batch_schema_to_mysql_schema(schema: &SchemaRef) -> Result<Vec<MySQLColumn>> {
