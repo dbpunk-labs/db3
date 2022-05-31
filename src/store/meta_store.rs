@@ -213,9 +213,10 @@ mod tests {
             port: 8989,
         };
         assert!(meta_store.add_node(&rtstore_node).await.is_ok());
-        let nodes = meta_store.get_nodes(rtstore_node.node_type)?;
+        let nodes = meta_store.get_nodes(RtStoreNodeType::KComputeNode).await?;
         assert_eq!(1, nodes.len());
         assert_eq!(rtstore_node.ns, nodes[0].ns);
+        Ok(())
     }
 
     fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
