@@ -19,12 +19,19 @@
 //
 #[macro_use(uselog)]
 extern crate uselog_rs;
-use rtstore::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType};
+use msql_srv::*;
+use tokio::net::TcpListener;
 
+use etcd_client::Client;
+use rtstore::error::RTStoreError;
+use rtstore::frontend_node::mysql::mysql_handler;
 use rtstore::memory_node::memory_node_impl::{MemoryNodeConfig, MemoryNodeImpl};
 use rtstore::meta_node::meta_server::{MetaConfig, MetaServiceImpl};
+use rtstore::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType};
 use rtstore::proto::rtstore_memory_proto::memory_node_server::MemoryNodeServer;
 use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
+use rtstore::sdk::meta_node_sdk::MetaNodeSDK;
+use rtstore::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
 use tonic::transport::Server;
 extern crate pretty_env_logger;
 uselog!(debug, info, warn);
@@ -62,6 +69,18 @@ enum Commands {
         binlog_root_dir: String,
         #[clap(required = true)]
         tmp_root_dir: String,
+        #[clap(required = true)]
+        etcd_cluster: String,
+        #[clap(required = true)]
+        etcd_root_path: String,
+        #[clap(required = true)]
+        ns: String,
+    },
+    /// Start Frontend Node Server
+    #[clap(arg_required_else_help = true)]
+    FrontendNode {
+        #[clap(required = true)]
+        port: i32,
         #[clap(required = true)]
         etcd_cluster: String,
         #[clap(required = true)]
@@ -148,6 +167,69 @@ async fn start_metaserver(cmd: &Commands) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+async fn build_meta_node_sdk(
+    etcd_cluster: &str,
+    etcd_root_path: &str,
+) -> rtstore::error::Result<MetaNodeSDK> {
+    let meta_store_config = MetaStoreConfig {
+        store_type: MetaStoreType::ImmutableMetaStore,
+        root_path: etcd_root_path.to_string(),
+    };
+    let etcd_cluster_endpoints: Vec<&str> = etcd_cluster.split(",").collect();
+    let client = match Client::connect(etcd_cluster_endpoints, None).await {
+        Ok(client) => Ok(client),
+        Err(_) => Err(RTStoreError::NodeRPCInvalidEndpointError {
+            name: "etcd".to_string(),
+        }),
+    }?;
+    let meta_store = MetaStore::new(client, meta_store_config);
+    let nodes = meta_store.get_nodes(RtStoreNodeType::KMetaNode).await?;
+    if nodes.is_empty() {
+        return Err(RTStoreError::MetaStoreNotFoundErr);
+    }
+    let meta_addr = format!("http://{}:{}", nodes[0].ns, nodes[0].port);
+    info!("connect to meta node {}", meta_addr);
+    match MetaNodeSDK::connect(&meta_addr).await {
+        Ok(sdk) => Ok(sdk),
+        Err(e) => Err(RTStoreError::NodeRPCError(
+            format!("fail to connect meta node for err {}", e).to_string(),
+        )),
+    }
+}
+
+async fn start_frontend_server(cmd: &Commands) -> Result<(), Box<dyn std::error::Error>> {
+    if let Commands::FrontendNode {
+        port,
+        etcd_cluster,
+        etcd_root_path,
+        ns,
+    } = cmd
+    {
+        if let Ok(sdk) = build_meta_node_sdk(etcd_cluster, etcd_root_path).await {
+            let addr = format!("{}:{}", ns, port);
+            info!("etcd {} {}", etcd_cluster, etcd_root_path);
+            info!("start frontend node on addr {}", addr);
+            let listener = TcpListener::bind(addr).await.unwrap();
+            let handler = mysql_handler::MySQLHandler::new(sdk);
+            loop {
+                let (socket, _) = listener.accept().await.unwrap();
+                let new_handler = handler.clone();
+                tokio::spawn(async move {
+                    let result = AsyncMysqlIntermediary::run_on(new_handler, socket).await;
+                    match result {
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!("fail to process incoming connection with e {}", e);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_log();
@@ -155,5 +237,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         Commands::Meta { .. } => start_metaserver(&args.command).await,
         Commands::MemoryNode { .. } => start_memory_node(&args.command).await,
+        Commands::FrontendNode { .. } => start_frontend_server(&args.command).await,
     }
 }

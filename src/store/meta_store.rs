@@ -102,6 +102,32 @@ impl MetaStore {
         self._put(key.as_bytes(), buf.as_ref()).await
     }
 
+    pub async fn get_nodes(&self, node_type: RtStoreNodeType) -> Result<Vec<RtStoreNode>> {
+        let key = format!("{}/nodes_{}/", self.config.root_path, node_type as i32);
+        let options = GetOptions::new().with_prefix();
+        let mut kv_client = self.client.kv_client();
+        match kv_client.get(key.as_bytes(), Some(options)).await {
+            Ok(resp) => {
+                let mut nodes: Vec<RtStoreNode> = Vec::new();
+                for kv in resp.kvs() {
+                    let buf = Bytes::from(kv.value().to_vec());
+                    match RtStoreNode::decode(buf) {
+                        Ok(node) => nodes.push(node),
+                        Err(e) => {
+                            return Err(RTStoreError::EtcdCodecError(
+                                format!("decode table err {}", e).to_string(),
+                            ));
+                        }
+                    }
+                }
+                Ok(nodes)
+            }
+            Err(e) => Err(RTStoreError::EtcdCodecError(
+                format!("decode table err {}", e).to_string(),
+            )),
+        }
+    }
+
     pub async fn subscribe_node_events(&self, node_type: &RtStoreNodeType) -> Result<WatchStream> {
         let key = format!("{}/nodes_{}", self.config.root_path, *node_type as i32);
         match self.state.lock() {
@@ -187,7 +213,9 @@ mod tests {
             port: 8989,
         };
         assert!(meta_store.add_node(&rtstore_node).await.is_ok());
-        Ok(())
+        let nodes = meta_store.get_nodes(rtstore_node.node_type)?;
+        assert_eq!(1, nodes.len());
+        assert_eq!(rtstore_node.ns, nodes[0].ns);
     }
 
     fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {

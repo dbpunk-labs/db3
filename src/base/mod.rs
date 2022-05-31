@@ -20,5 +20,6 @@ pub mod arrow_parquet_utils;
 pub mod filesystem;
 pub mod linked_list;
 pub mod log;
+pub mod mysql_utils;
 pub mod slice;
 pub mod strings;

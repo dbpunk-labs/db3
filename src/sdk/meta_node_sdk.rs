@@ -16,15 +16,26 @@
 // limitations under the License.
 //
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::RtStoreNodeType;
+use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
 use crate::proto::rtstore_meta_proto::meta_client::MetaClient;
+use crate::proto::rtstore_meta_proto::{CreateTableRequest, CreateTableResponse};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 uselog!(info);
+
 pub struct MetaNodeSDK {
     endpoint: String,
     // clone on use
     client: Arc<MetaClient<tonic::transport::Channel>>,
+}
+
+impl Clone for MetaNodeSDK {
+    fn clone(&self) -> Self {
+        Self {
+            endpoint: self.endpoint.to_string(),
+            client: self.client.clone(),
+        }
+    }
 }
 
 impl MetaNodeSDK {
@@ -35,5 +46,15 @@ impl MetaNodeSDK {
             endpoint: endpoint.to_string(),
             client,
         })
+    }
+
+    pub async fn create_table(&self, table: RtStoreTableDesc) -> std::result::Result<(), Status> {
+        let mut client = self.client.as_ref().clone();
+        let create_table_req = CreateTableRequest {
+            table_desc: Some(table),
+        };
+        let request = tonic::Request::new(create_table_req);
+        client.create_table(request).await?;
+        Ok(())
     }
 }

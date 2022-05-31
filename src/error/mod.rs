@@ -19,6 +19,8 @@
 use arrow::error::ArrowError;
 use parquet::errors::ParquetError;
 use s3::error::S3Error;
+use sqlparser::parser::ParserError;
+use sqlparser::tokenizer::TokenizerError;
 use std::io::{Error as IoError, ErrorKind};
 use thiserror::Error;
 use tonic::Status;
@@ -68,6 +70,8 @@ pub enum RTStoreError {
     BaseBusyError(String),
     #[error("memory node with endpoint {0} exists")]
     MemoryNodeExistError(String),
+    #[error("not enough memory node")]
+    MemoryNodeNotEnoughError,
     #[error("fail to connect to {0}")]
     NodeRPCError(String),
     #[error("invalid endpoint for node {name}")]
@@ -80,6 +84,10 @@ pub enum RTStoreError {
     MetaStoreExistErr { name: String, key: String },
     #[error("encounter some etcd error {0}")]
     MetaStoreEtcdErr(etcd_client::Error),
+    #[error("no meta store found")]
+    MetaStoreNotFoundErr,
+    #[error("fail to parse sql for error {0}")]
+    SQLParseError(String),
 }
 
 /// convert io error to rtstore error
@@ -92,6 +100,21 @@ impl From<IoError> for RTStoreError {
 impl From<ParquetError> for RTStoreError {
     fn from(error: ParquetError) -> Self {
         RTStoreError::FSParquetError(error)
+    }
+}
+
+impl From<ParserError> for RTStoreError {
+    fn from(error: ParserError) -> Self {
+        match error {
+            ParserError::TokenizerError(e) => RTStoreError::SQLParseError(e),
+            ParserError::ParserError(e) => RTStoreError::SQLParseError(e),
+        }
+    }
+}
+
+impl From<TokenizerError> for RTStoreError {
+    fn from(err: TokenizerError) -> Self {
+        RTStoreError::SQLParseError(err.message)
     }
 }
 
