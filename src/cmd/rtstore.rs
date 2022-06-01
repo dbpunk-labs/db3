@@ -231,10 +231,10 @@ async fn start_frontend_server(cmd: &Commands) -> Result<(), Box<dyn std::error:
                 build_memory_node_sdk(&meta_store).await,
             ) {
                 let addr = format!("{}:{}", ns, port);
-                info!("etcd {} {}", etcd_cluster, etcd_root_path);
                 info!("start frontend node on addr {}", addr);
                 let listener = TcpListener::bind(addr).await.unwrap();
                 let arc_store = Arc::new(meta_store);
+                arc_store.get_table_metas().await;
                 arc_store.subscribe_table_events().await;
                 let handler =
                     mysql_handler::MySQLHandler::new(meta_node_sdk, memory_node_sdk, arc_store);

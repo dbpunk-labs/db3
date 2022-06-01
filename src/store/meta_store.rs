@@ -143,6 +143,39 @@ impl MetaStore {
         }
     }
 
+    pub async fn get_table_metas(&self) {
+        let key = format!("{}/tables/", self.config.root_path);
+        let options = GetOptions::new().with_prefix();
+        let mut kv_client = self.client.kv_client();
+        let local_state = self.state.clone();
+        match kv_client.get(key.as_bytes(), Some(options)).await {
+            Ok(resp) => {
+                let mut tables: Vec<RtStoreTableDesc> = Vec::new();
+                for kv in resp.kvs() {
+                    let buf = Bytes::from(kv.value().to_vec());
+                    match RtStoreTableDesc::decode(buf) {
+                        Ok(table) => tables.push(table),
+                        Err(e) => {
+                            warn!("fail to decode table");
+                        }
+                    }
+                }
+                for table in tables {
+                    match local_state.lock() {
+                        Ok(mut state) => {
+                            let table_id = table.names.join(".");
+                            state.tables.insert(table_id, table);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("fail get tables for error {}", e);
+            }
+        }
+    }
+
     pub async fn subscribe_table_events(&self) {
         let key = format!("{}/tables/", self.config.root_path);
         let options = WatchOptions::new().with_prefix();
