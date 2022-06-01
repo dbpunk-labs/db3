@@ -16,7 +16,7 @@
 // limitations under the License.
 //
 
-use crate::codec::row_codec::Data;
+use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
@@ -32,7 +32,7 @@ use msql_srv::ColumnFlags;
 use msql_srv::ColumnType;
 use msql_srv::OkResponse;
 use msql_srv::QueryResultWriter;
-use sqlparser::ast::{ColumnDef, ColumnOption, DataType as SPDataType, Value};
+use sqlparser::ast::{ColumnDef, ColumnOption, DataType as SPDataType, Expr, Value};
 uselog!(info, warn);
 
 macro_rules! type_mapping {
@@ -45,6 +45,29 @@ macro_rules! type_mapping {
         };
         $columns.push(col);
     };
+}
+
+pub fn sql_to_row_batch(
+    table_full_name: &str,
+    schema: &RtStoreSchemaDesc,
+    values: &[Expr],
+) -> Result<RowRecordBatch> {
+    let mut row: Vec<Data> = Vec::new();
+    for (i, item) in values.iter().enumerate().take(schema.columns.len()) {
+        let column_desc = &schema.columns[i];
+        let ctype = RtStoreType::from_i32(column_desc.ctype);
+        if let (Expr::Value(v), Some(local_type)) = (item, ctype) {
+            let data = sql_value_to_data(v, &local_type)?;
+            row.push(data);
+        } else {
+            warn!("invalid expr {}", item);
+        }
+    }
+    Ok(RowRecordBatch {
+        batch: vec![row],
+        schema_version: 1,
+        id: table_full_name.to_string(),
+    })
 }
 
 pub fn sql_value_to_data(val: &Value, store_type: &RtStoreType) -> Result<Data> {

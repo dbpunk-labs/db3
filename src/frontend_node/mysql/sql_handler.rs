@@ -19,15 +19,17 @@
 use super::interruptible_parser::*;
 use crate::base::mysql_utils;
 use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
+use crate::store::meta_store::MetaStore;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use sqlparser::{
-    ast::{ColumnDef, Statement as SQLStatement, UnaryOperator},
+    ast::{ColumnDef, SetExpr, Statement as SQLStatement},
     dialect::{keywords::Keyword, MySqlDialect},
 };
 use std::sync::{Arc, Mutex};
 uselog!(debug, info, warn);
 use crate::error::{RTStoreError, Result};
+use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::sdk::meta_node_sdk::MetaNodeSDK;
 use parquet::record::Field;
 
@@ -38,17 +40,27 @@ pub struct SQLResult {
 #[derive(Clone)]
 pub struct SQLExecutor {
     meta_sdk: MetaNodeSDK,
+    meta_store: Arc<MetaStore>,
+    memory_sdk: MemoryNodeSDK,
 }
 
 unsafe impl Send for SQLExecutor {}
 unsafe impl Sync for SQLExecutor {}
 
 impl SQLExecutor {
-    pub fn new(meta_sdk: MetaNodeSDK) -> Self {
-        Self { meta_sdk }
+    pub fn new(
+        meta_sdk: MetaNodeSDK,
+        meta_store: Arc<MetaStore>,
+        memory_sdk: MemoryNodeSDK,
+    ) -> Self {
+        Self {
+            meta_sdk,
+            meta_store,
+            memory_sdk,
+        }
     }
 
-    pub fn parse_sql(&self, sql: &str) -> Result<(Keyword, SQLStatement)> {
+    pub fn parse_sql(sql: &str) -> Result<(Keyword, SQLStatement)> {
         let dialect = MySqlDialect {};
         let mut parser = InterruptibleParser::new(&dialect, sql)?;
         let keyword = parser.next_keyword()?;
@@ -63,6 +75,28 @@ impl SQLExecutor {
         } else {
             vec![table_name.to_string()]
         }
+    }
+
+    async fn handle_insert(&self, table_name: &str, expr: &SetExpr) -> Result<()> {
+        let table_desc_opt = self.meta_store.get_table_desc(table_name);
+        if let (Some(table_desc), SetExpr::Values(values)) = (table_desc_opt, expr) {
+            if let Some(schema) = &table_desc.schema {
+                let row_batch = mysql_utils::sql_to_row_batch(table_name, &schema, &values.0[0])?;
+                if self
+                    .memory_sdk
+                    .append_records(table_name, 0, &row_batch)
+                    .await
+                    .is_err()
+                {
+                    warn!("fail to append record to table {}", table_name);
+                } else {
+                    debug!("insert into table {} ok", table_name);
+                }
+            }
+        } else {
+            warn!("table with name {} not exist", table_name);
+        }
+        Ok(())
     }
 
     async fn handle_create_table(
@@ -83,14 +117,37 @@ impl SQLExecutor {
     }
 
     pub async fn execute(&self, sql: &str, db: Option<String>) -> Result<SQLResult> {
-        let (keyword, statement) = self.parse_sql(sql)?;
+        debug!("input sql {}", sql);
+        let (keyword, statement) = Self::parse_sql(sql)?;
         match (keyword, statement) {
             (Keyword::CREATE, SQLStatement::CreateTable { name, columns, .. }) => {
                 let table_full_name = self.build_full_name(&name.0[0].value, db);
                 self.handle_create_table(table_full_name, &columns).await?;
                 Ok(SQLResult { effected_rows: 1 })
             }
-            (_, _) => Ok(SQLResult { effected_rows: 0 }),
+            (
+                Keyword::INSERT,
+                SQLStatement::Insert {
+                    table_name, source, ..
+                },
+            ) => {
+                let table_full_name = self.build_full_name(&table_name.0[0].value, db).join(".");
+                debug!("process sql insert for table {} ", table_full_name);
+                self.handle_insert(&table_full_name, &source.body).await?;
+                Ok(SQLResult { effected_rows: 1 })
+            }
+
+            (_, _) => {
+                warn!("sql {} is not handled", sql);
+                Ok(SQLResult { effected_rows: 0 })
+            }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::base::mysql_utils;
+    use crate::error::Result;
 }

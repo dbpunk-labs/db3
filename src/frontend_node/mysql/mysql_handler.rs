@@ -17,7 +17,9 @@
 //
 
 use super::sql_handler::SQLExecutor;
+use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::sdk::meta_node_sdk::MetaNodeSDK;
+use crate::store::meta_store::MetaStore;
 use async_trait::async_trait;
 use msql_srv::AsyncMysqlShim;
 use msql_srv::InitWriter;
@@ -27,6 +29,7 @@ use msql_srv::QueryResultWriter;
 use msql_srv::StatementMetaWriter;
 use rand::RngCore;
 use std::io::{Error, Result};
+use std::sync::Arc;
 uselog!(debug, info, warn);
 
 pub struct MySQLHandler {
@@ -58,12 +61,16 @@ impl Clone for MySQLHandler {
 }
 
 impl MySQLHandler {
-    pub fn new(sdk: MetaNodeSDK) -> Self {
+    pub fn new(
+        sdk: MetaNodeSDK,
+        memory_node_sdk: MemoryNodeSDK,
+        meta_store: Arc<MetaStore>,
+    ) -> Self {
         Self {
             version: "8.0.26-rtstore".to_string(),
             id: 0,
             salt: [0 as u8; 20],
-            sql_executor: SQLExecutor::new(sdk),
+            sql_executor: SQLExecutor::new(sdk, meta_store, memory_node_sdk),
         }
     }
 }
