@@ -1,6 +1,6 @@
 //
 //
-// lib.rs
+// mysql_session.rs
 // Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,14 +16,8 @@
 // limitations under the License.
 //
 
-#[macro_use(uselog)]
-extern crate uselog_rs;
-pub mod base;
-pub mod codec;
-pub mod error;
-pub mod frontend_node;
-pub mod memory_node;
-pub mod meta_node;
-pub mod proto;
-pub mod sdk;
-pub mod store;
+
+pub struct MySQLSession {
+
+
+}

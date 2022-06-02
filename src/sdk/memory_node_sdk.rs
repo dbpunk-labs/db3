@@ -34,6 +34,15 @@ pub struct MemoryNodeSDK {
     client: Arc<MemoryNodeClient<tonic::transport::Channel>>,
 }
 
+impl Clone for MemoryNodeSDK {
+    fn clone(&self) -> Self {
+        Self {
+            endpoint: self.endpoint.to_string(),
+            client: self.client.clone(),
+        }
+    }
+}
+
 impl MemoryNodeSDK {
     pub async fn connect(endpoint: &str) -> std::result::Result<Self, tonic::transport::Error> {
         // create a new client connection

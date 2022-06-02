@@ -19,11 +19,13 @@
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType, RtStoreTableDesc};
 use bytes::{Bytes, BytesMut};
-use etcd_client::{Client, ConnectOptions, Event, GetOptions, WatchOptions, WatchStream, Watcher};
+use etcd_client::{
+    Client, ConnectOptions, Event, EventType, GetOptions, WatchOptions, WatchStream, Watcher,
+};
 use prost::Message;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-uselog!(info);
+uselog!(info, warn);
 
 const BUFFER_SIZE: usize = 4 * 1024;
 
@@ -33,7 +35,7 @@ pub enum MetaStoreType {
 }
 
 struct MetaStoreState {
-    watchers: HashMap<String, Watcher>,
+    tables: HashMap<String, RtStoreTableDesc>,
 }
 
 pub struct MetaStoreConfig {
@@ -43,8 +45,8 @@ pub struct MetaStoreConfig {
 
 pub struct MetaStore {
     config: MetaStoreConfig,
-    state: Arc<Mutex<MetaStoreState>>,
     client: Arc<Client>,
+    state: Arc<Mutex<MetaStoreState>>,
 }
 
 unsafe impl Send for MetaStore {}
@@ -54,12 +56,24 @@ unsafe impl Sync for MetaStore {}
 impl MetaStore {
     pub fn new(client: Client, config: MetaStoreConfig) -> Self {
         let state = MetaStoreState {
-            watchers: HashMap::new(),
+            tables: HashMap::new(),
         };
         Self {
             config,
-            state: Arc::new(Mutex::new(state)),
             client: Arc::new(client),
+            state: Arc::new(Mutex::new(state)),
+        }
+    }
+
+    pub fn get_table_desc(&self, table_id: &str) -> Option<RtStoreTableDesc> {
+        if let Ok(local_state) = self.state.lock() {
+            if let Some(desc) = local_state.tables.get(table_id) {
+                Some(desc.clone())
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 
@@ -70,6 +84,7 @@ impl MetaStore {
     ) -> Result<()> {
         if let MetaStoreType::MutableMetaStore = self.config.store_type {
             let key = format!("{}/tables/{}", self.config.root_path, table_full_name);
+            info!("add table with key {}", &key);
             let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
             if let Err(e) = table_desc.encode(&mut buf) {
                 return Err(RTStoreError::MetaRpcCreateTableError {
@@ -102,23 +117,112 @@ impl MetaStore {
         self._put(key.as_bytes(), buf.as_ref()).await
     }
 
-    pub async fn subscribe_node_events(&self, node_type: &RtStoreNodeType) -> Result<WatchStream> {
-        let key = format!("{}/nodes_{}", self.config.root_path, *node_type as i32);
-        match self.state.lock() {
-            Ok(state) => {
-                if state.watchers.contains_key(&key) {
-                    Err(RTStoreError::MetaStoreExistErr {
-                        name: "watch node".to_string(),
-                        key: key.to_string(),
-                    })
-                } else {
-                    Ok(())
+    pub async fn get_nodes(&self, node_type: RtStoreNodeType) -> Result<Vec<RtStoreNode>> {
+        let key = format!("{}/nodes_{}/", self.config.root_path, node_type as i32);
+        let options = GetOptions::new().with_prefix();
+        let mut kv_client = self.client.kv_client();
+        match kv_client.get(key.as_bytes(), Some(options)).await {
+            Ok(resp) => {
+                let mut nodes: Vec<RtStoreNode> = Vec::new();
+                for kv in resp.kvs() {
+                    let buf = Bytes::from(kv.value().to_vec());
+                    match RtStoreNode::decode(buf) {
+                        Ok(node) => nodes.push(node),
+                        Err(e) => {
+                            return Err(RTStoreError::EtcdCodecError(
+                                format!("decode table err {}", e).to_string(),
+                            ));
+                        }
+                    }
+                }
+                Ok(nodes)
+            }
+            Err(e) => Err(RTStoreError::EtcdCodecError(
+                format!("decode table err {}", e).to_string(),
+            )),
+        }
+    }
+
+    pub async fn get_table_metas(&self) {
+        let key = format!("{}/tables/", self.config.root_path);
+        let options = GetOptions::new().with_prefix();
+        let mut kv_client = self.client.kv_client();
+        let local_state = self.state.clone();
+        match kv_client.get(key.as_bytes(), Some(options)).await {
+            Ok(resp) => {
+                let mut tables: Vec<RtStoreTableDesc> = Vec::new();
+                for kv in resp.kvs() {
+                    let buf = Bytes::from(kv.value().to_vec());
+                    match RtStoreTableDesc::decode(buf) {
+                        Ok(table) => tables.push(table),
+                        Err(e) => {
+                            warn!("fail to decode table");
+                        }
+                    }
+                }
+                for table in tables {
+                    match local_state.lock() {
+                        Ok(mut state) => {
+                            let table_id = table.names.join(".");
+                            state.tables.insert(table_id, table);
+                        }
+                        _ => {}
+                    }
                 }
             }
-            _ => Err(RTStoreError::BaseBusyError(
-                "fail to get lock of etcd client".to_string(),
-            )),
-        }?;
+            Err(e) => {
+                warn!("fail get tables for error {}", e);
+            }
+        }
+    }
+
+    pub async fn subscribe_table_events(&self) {
+        let key = format!("{}/tables/", self.config.root_path);
+        let options = WatchOptions::new().with_prefix();
+        let mut watch_client = self.client.watch_client();
+        let local_state = self.state.clone();
+        //TODO avoid to subscribe table events twices
+        tokio::task::spawn(async move {
+            if let Ok((_, mut stream)) = watch_client.watch(key.to_string(), Some(options)).await {
+                while let Ok(Some(resp)) = stream.message().await {
+                    if resp.canceled() {
+                        break;
+                    }
+                    let mut new_add_tables: Vec<RtStoreTableDesc> = Vec::new();
+                    //TODO add delete tables
+                    for event in resp.events() {
+                        match (event.event_type(), event.kv()) {
+                            (EventType::Put, Some(kv)) => {
+                                let buf = Bytes::from(kv.value().to_vec());
+                                match RtStoreTableDesc::decode(buf) {
+                                    Ok(table_desc) => {
+                                        new_add_tables.push(table_desc);
+                                    }
+                                    _ => {
+                                        warn!("fail to decode table desc");
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    for table in new_add_tables {
+                        match local_state.lock() {
+                            Ok(mut state) => {
+                                let table_id = table.names.join(".");
+                                info!("add new table {}", &table_id);
+                                state.tables.insert(table_id, table);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    pub async fn subscribe_node_events(&self, node_type: &RtStoreNodeType) -> Result<WatchStream> {
+        let key = format!("{}/nodes_{}", self.config.root_path, *node_type as i32);
         let options = WatchOptions::new().with_prefix();
         let mut watch_client = self.client.watch_client();
         let (_, stream) = watch_client.watch(key.to_string(), Some(options)).await?;
@@ -187,6 +291,9 @@ mod tests {
             port: 8989,
         };
         assert!(meta_store.add_node(&rtstore_node).await.is_ok());
+        let nodes = meta_store.get_nodes(RtStoreNodeType::KComputeNode).await?;
+        assert_eq!(1, nodes.len());
+        assert_eq!(rtstore_node.ns, nodes[0].ns);
         Ok(())
     }
 

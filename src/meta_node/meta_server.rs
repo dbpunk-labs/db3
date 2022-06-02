@@ -17,7 +17,9 @@
 //
 use super::table::Table;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType, RtStoreTableDesc};
+use crate::proto::rtstore_base_proto::{
+    RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+};
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{
     CreateTableRequest, CreateTableResponse, PingRequest, PingResponse,
@@ -28,9 +30,11 @@ use arc_swap::ArcSwapOption;
 use bytes::Bytes;
 use etcd_client::{Client, ConnectOptions, EventType, GetOptions};
 use prost::Message;
+use rand::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
+
 uselog!(debug, info, warn);
 
 pub struct MetaConfig {
@@ -67,6 +71,15 @@ impl MetaServiceState {
                 self.tables.insert(id, table);
                 Ok(())
             }
+        }
+    }
+
+    pub fn get_table(&self, table_id: &str) -> Result<RtStoreTableDesc> {
+        match self.tables.get(table_id) {
+            Some(table) => Ok(table.get_table_desc().clone()),
+            _ => Err(RTStoreError::TableNotFoundError {
+                tname: table_id.to_string(),
+            }),
         }
     }
 
@@ -107,6 +120,51 @@ impl MetaServiceImpl {
         }
     }
 
+    pub async fn assign_partitions(&self, table_id: &str, partition_range: &[i32]) -> Result<()> {
+        let memory_node_sdk = self.random_choose_a_memory_node()?;
+        let table_desc = match self.state.lock() {
+            Ok(local_state) => Ok(local_state.get_table(table_id)?),
+            Err(_) => Err(RTStoreError::BaseBusyError("fail to get lock".to_string())),
+        }?;
+        let region = StorageRegion {
+            region: "".to_string(),
+            endpoint: "http://127.0.0.1:9090".to_string(),
+        };
+        let sconfig = StorageBackendConfig {
+            bucket: "/rtstore".to_string(),
+            region: Some(region),
+            l1_rows_limit: 10 * 1024,
+            l2_rows_limit: 5 * 10 * 1024,
+        };
+        if memory_node_sdk
+            .assign_partition(table_id, partition_range, &table_desc, &sconfig)
+            .await
+            .is_ok()
+        {
+            info!("assign table {} to memory node ok", table_id);
+        }
+        Ok(())
+    }
+
+    fn random_choose_a_memory_node(&self) -> Result<Arc<MemoryNodeSDK>> {
+        if let Ok(local_state) = self.state.lock() {
+            if local_state.memory_nodes.is_empty() {
+                return Err(RTStoreError::MemoryNodeNotEnoughError);
+            }
+            let mut rng = rand::thread_rng();
+            let rand_num: f64 = rng.gen();
+            let index: usize = (local_state.memory_nodes.len() as f64 * rand_num) as usize;
+            let mut current_index: usize = 0;
+            for (_, sdk) in &local_state.memory_nodes {
+                if current_index == index {
+                    return Ok(sdk.clone());
+                }
+                current_index += 1;
+            }
+        }
+        return Err(RTStoreError::MemoryNodeNotEnoughError);
+    }
+
     pub async fn connect_to_meta(&self) -> Result<()> {
         info!("connect to meta");
         if self.config.etcd_cluster.is_empty() {
@@ -125,7 +183,6 @@ impl MetaServiceImpl {
                 })
             }
         }?;
-
         let meta_store_config = MetaStoreConfig {
             root_path: self.config.etcd_root_path.to_string(),
             store_type: MetaStoreType::MutableMetaStore,
@@ -222,8 +279,27 @@ impl Meta for MetaServiceImpl {
                 err: "input is invalid for empty table description".to_string(),
             }),
         }?;
-        let mut local_state = self.state.lock().unwrap();
-        local_state.create_table(table_desc)?;
+
+        {
+            let mut local_state = self.state.lock().unwrap();
+            local_state.create_table(table_desc)?;
+        }
+
+        {
+            let table_full_name = Table::gen_id(table_desc)?;
+            let local_meta_store = self.meta_store.load().clone();
+            if let Some(meta_store) = local_meta_store {
+                meta_store.add_table(&table_full_name, table_desc).await?;
+            }
+            let partitions = vec![0, 1, 2];
+            if self
+                .assign_partitions(&table_full_name, &partitions)
+                .await
+                .is_err()
+            {
+                warn!("fail to assign partition for table {}", table_full_name);
+            }
+        }
         Ok(Response::new(CreateTableResponse {}))
     }
 
@@ -239,7 +315,6 @@ impl Meta for MetaServiceImpl {
 mod tests {
     use super::*;
     use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
-
     fn build_config() -> MetaConfig {
         let node = RtStoreNode {
             endpoint: "http://127.0.0.1:9191".to_string(),
