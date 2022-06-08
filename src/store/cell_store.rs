@@ -21,6 +21,7 @@ use crate::base::linked_list::LinkedList;
 use crate::base::{arrow_parquet_utils, log::LogWriter, strings};
 use crate::codec::row_codec::{encode, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
+use crate::store::object_store::{BucketFileSystem, S3FileSystem};
 use arc_swap::ArcSwap;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
@@ -30,8 +31,6 @@ use s3::command::Command;
 use s3::creds::Credentials;
 use s3::region::Region;
 use s3::request::Reqwest as RequestImpl;
-use s3::request_trait::Request;
-
 use std::fs;
 use std::path::Path;
 use std::str::Utf8Error;
@@ -52,7 +51,7 @@ pub struct CellStoreConfig {
     // the path prefix of binlog
     local_binlog_path_prefix: String,
     // the auth config for s3
-    auth: Credentials,
+    credentials: Credentials,
     // the limit rows in row memory table
     l1_rows_limit: u32,
     // the limit rows in column memory table
@@ -69,7 +68,7 @@ impl CellStoreConfig {
         region: Region,
         schema: &SchemaRef,
         local_binlog_path_prefix: &str,
-        auth: Credentials,
+        credentials: Credentials,
         tmp_dir_path_prefix: &str,
         object_key_prefix: &str,
     ) -> Result<Self> {
@@ -79,7 +78,6 @@ impl CellStoreConfig {
                 err: String::from("empty name"),
             });
         }
-
         if schema.fields().is_empty() {
             return Err(RTStoreError::CellStoreInvalidConfigError {
                 name: String::from("schema"),
@@ -110,7 +108,7 @@ impl CellStoreConfig {
             region,
             schema: schema.clone(),
             local_binlog_path_prefix: local_binlog_path_prefix.to_string(),
-            auth,
+            credentials,
             l1_rows_limit: 10 * 1024,
             l2_rows_limit: 10 * 1024 * 5,
             tmp_dir_path_prefix: tmp_dir_path_prefix.to_string(),
@@ -147,8 +145,6 @@ pub struct CellStore {
     binlog_data_size: AtomicU64,
     // the index for log name, eg 00001.log
     log_counter: AtomicU64,
-    // the handler of s3 bucket
-    bucket: Bucket,
     // lock for binlog
     lock_data: Arc<Mutex<CellStoreLockData>>,
     // memory table for row store
@@ -158,6 +154,7 @@ pub struct CellStore {
     column_memtable: ArcSwap<LinkedList<RecordBatch>>,
     column_memtable_size: AtomicU64,
     parquet_file_counter: AtomicU64,
+    bucket_fs: BucketFileSystem,
 }
 
 unsafe impl Send for CellStore {}
@@ -170,24 +167,10 @@ impl CellStore {
             "init a new cell store with bucket {} , region {}, tmp_dir_path_prefix {}, object_key_prefix {}",
             config.bucket_name, config.region, config.tmp_dir_path_prefix, config.object_key_prefix
         );
-
-        let bucket = match &config.region {
-            Region::Custom { .. } => {
-                let b = Bucket::new(
-                    &config.bucket_name,
-                    config.region.clone(),
-                    config.auth.clone(),
-                )?;
-                b.with_path_style()
-            }
-            _ => Bucket::new(
-                &config.bucket_name,
-                config.region.clone(),
-                config.auth.clone(),
-            )?,
-        };
         fs::create_dir_all(&config.local_binlog_path_prefix)?;
         fs::create_dir_all(&config.tmp_dir_path_prefix)?;
+        let s3_fs = S3FileSystem::new(config.region.clone(), config.credentials.clone());
+        let bucket_fs = s3_fs.new_bucket_fs(&config.bucket_name);
         let log_path_str = format!("{}/0000.binlog", config.local_binlog_path_prefix);
         let log_path = Path::new(&log_path_str);
         let fs = SyncPosixFileSystem {};
@@ -202,39 +185,18 @@ impl CellStore {
             total_data_on_external_storage: AtomicU64::new(0),
             binlog_data_size: AtomicU64::new(0),
             log_counter: AtomicU64::new(0),
-            bucket,
             lock_data: Arc::new(Mutex::new(CellStoreLockData { log_writer })),
             row_memtable: ArcSwap::from(Arc::new(LinkedList::new())),
             row_memtable_size: AtomicU64::new(0),
             column_memtable: ArcSwap::from(Arc::new(LinkedList::new())),
             column_memtable_size: AtomicU64::new(0),
             parquet_file_counter: AtomicU64::new(0),
+            bucket_fs,
         })
     }
 
     pub async fn create_bucket(&self) -> Result<()> {
-        let mut config = BucketConfiguration::default();
-        config.set_region(self.config.region.clone());
-        let command = Command::CreateBucket { config };
-        let bucket = match &self.config.region {
-            Region::Custom { .. } => {
-                let b = Bucket::new(
-                    &self.config.bucket_name,
-                    self.config.region.clone(),
-                    self.config.auth.clone(),
-                )?;
-                b.with_path_style()
-            }
-            _ => Bucket::new(
-                &self.config.bucket_name,
-                self.config.region.clone(),
-                self.config.auth.clone(),
-            )?,
-        };
-        let request = RequestImpl::new(&bucket, "", command);
-        request.response_data(false).await?;
-        info!("create bucket {} ok", &self.config.bucket_name);
-        Ok(())
+        self.bucket_fs.create_bucket().await
     }
 
     pub fn row_memtable_size(&self) -> u64 {
@@ -321,9 +283,8 @@ impl CellStore {
                     self.config.object_key_prefix, readable_str
                 );
                 debug!("plan to store file to {}", object_key);
-                let mut stream_fd = tokio::fs::File::open(file_path).await?;
-                self.bucket
-                    .put_object_stream(&mut stream_fd, object_key)
+                self.bucket_fs
+                    .put_with_file(&file_path, &object_key)
                     .await?;
             }
         }
@@ -347,8 +308,8 @@ mod tests {
     fn test_invalid_config() {
         let valid_schema = Arc::new(Schema::new(vec![Field::new("c1", DataType::Int64, true)]));
         let auth = Credentials::from_env_specific(
-            Some("AWS_S3_ACCESS_KEY"),
-            Some("AWS_S3_SECRET_KEY"),
+            Some("AWS_ACCESS_KEY_ID"),
+            Some("AWS_SECRET_ACCESS_KEY"),
             None,
             None,
         )
@@ -409,8 +370,8 @@ mod tests {
     fn gen_a_normal_config() -> Result<CellStoreConfig> {
         let valid_schema = Arc::new(Schema::new(vec![Field::new("c1", DataType::Int64, true)]));
         let auth = Credentials::from_env_specific(
-            Some("AWS_S3_ACCESS_KEY"),
-            Some("AWS_S3_SECRET_KEY"),
+            Some("AWS_ACCESS_KEY_ID"),
+            Some("AWS_SECRET_ACCESS_KEY"),
             None,
             None,
         )
@@ -479,7 +440,6 @@ mod tests {
         RowRecordBatch {
             batch,
             schema_version: 1,
-            id: "eth.price".to_string(),
         }
     }
 

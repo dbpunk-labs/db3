@@ -19,6 +19,7 @@
 #[macro_use(uselog)]
 extern crate uselog_rs;
 pub mod base;
+pub mod catalog;
 pub mod codec;
 pub mod error;
 pub mod frontend_node;

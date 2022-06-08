@@ -47,11 +47,7 @@ macro_rules! type_mapping {
     };
 }
 
-pub fn sql_to_row_batch(
-    table_full_name: &str,
-    schema: &RtStoreSchemaDesc,
-    values: &[Expr],
-) -> Result<RowRecordBatch> {
+pub fn sql_to_row_batch(schema: &RtStoreSchemaDesc, values: &[Expr]) -> Result<RowRecordBatch> {
     let mut row: Vec<Data> = Vec::new();
     for (i, item) in values.iter().enumerate().take(schema.columns.len()) {
         let column_desc = &schema.columns[i];
@@ -66,7 +62,6 @@ pub fn sql_to_row_batch(
     Ok(RowRecordBatch {
         batch: vec![row],
         schema_version: 1,
-        id: table_full_name.to_string(),
     })
 }
 

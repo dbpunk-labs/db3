@@ -28,6 +28,12 @@ use tonic::Status;
 /// The error system for rtstore
 #[derive(Debug, Error)]
 pub enum RTStoreError {
+    #[error("db with name {0} was not found")]
+    DBNotFoundError(String),
+    #[error("db with name {0} exist")]
+    DBNameExistError(String),
+    #[error("invalid input for a new database")]
+    DBInvalidInput,
     #[error("table with name {tname} was not found")]
     TableNotFoundError { tname: String },
     #[error("invalid table names for {error}")]
@@ -63,7 +69,7 @@ pub enum RTStoreError {
     #[error("the cell has not been found in memory node with tid {tid} and pid {pid}")]
     CellStoreNotFoundError { tid: String, pid: i32 },
     #[error("aws-s3: {0}")]
-    CellStoreS3Error(S3Error),
+    StoreS3Error(String),
     #[error("row codec error : {0}")]
     RowCodecError(bincode::Error),
     #[error("system busy for error : {0}")]
@@ -88,6 +94,8 @@ pub enum RTStoreError {
     MetaStoreNotFoundErr,
     #[error("fail to parse sql for error {0}")]
     SQLParseError(String),
+    #[error("fail to create credentials for s3")]
+    S3AuthError,
 }
 
 /// convert io error to rtstore error
@@ -120,7 +128,7 @@ impl From<TokenizerError> for RTStoreError {
 
 impl From<S3Error> for RTStoreError {
     fn from(error: S3Error) -> Self {
-        RTStoreError::CellStoreS3Error(error)
+        RTStoreError::StoreS3Error(format!("s3 error {}", error))
     }
 }
 

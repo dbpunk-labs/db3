@@ -23,16 +23,20 @@ import "rtstore_base.proto";
 
 package rtstore_meta_proto;
 
+message CreateDBRequest {
+    string db = 1;
+}
+
+message CreateDBResponse {}
+
 message CreateTableRequest {
     rtstore_base_proto.RTStoreTableDesc table_desc = 1;
 }
-
 message CreateTableResponse {}
-message PingRequest{}
-message PingResponse{}
+
 // The rtstore meta server definition.
 service Meta {
     // method for adding a new table
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse) {}
-    rpc Ping(PingRequest) returns (PingResponse) {}
+    rpc CreateDB(CreateDBRequest) returns(CreateDBResponse){}
 }

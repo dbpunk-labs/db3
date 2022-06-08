@@ -17,4 +17,3 @@
 //
 
 pub mod meta_server;
-pub mod table;

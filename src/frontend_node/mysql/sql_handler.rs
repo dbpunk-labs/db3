@@ -28,6 +28,7 @@ use sqlparser::{
 };
 use std::sync::{Arc, Mutex};
 uselog!(debug, info, warn);
+use crate::catalog::catalog::Catalog;
 use crate::error::{RTStoreError, Result};
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::sdk::meta_node_sdk::MetaNodeSDK;
@@ -40,8 +41,8 @@ pub struct SQLResult {
 #[derive(Clone)]
 pub struct SQLExecutor {
     meta_sdk: MetaNodeSDK,
-    meta_store: Arc<MetaStore>,
     memory_sdk: MemoryNodeSDK,
+    catalog: Arc<Catalog>,
 }
 
 unsafe impl Send for SQLExecutor {}
@@ -53,11 +54,16 @@ impl SQLExecutor {
         meta_store: Arc<MetaStore>,
         memory_sdk: MemoryNodeSDK,
     ) -> Self {
+        let catalog = Arc::new(Catalog::new(meta_store));
         Self {
             meta_sdk,
-            meta_store,
             memory_sdk,
+            catalog,
         }
+    }
+
+    pub async fn init(&self) -> Result<()> {
+        self.catalog.recover().await
     }
 
     pub fn parse_sql(sql: &str) -> Result<(Keyword, SQLStatement)> {
@@ -69,22 +75,16 @@ impl SQLExecutor {
         Ok((keyword, statement))
     }
 
-    fn build_full_name(&self, table_name: &str, db: Option<String>) -> Vec<String> {
-        if let Some(d) = db {
-            vec![d, table_name.to_string()]
-        } else {
-            vec![table_name.to_string()]
-        }
-    }
-
-    async fn handle_insert(&self, table_name: &str, expr: &SetExpr) -> Result<()> {
-        let table_desc_opt = self.meta_store.get_table_desc(table_name);
-        if let (Some(table_desc), SetExpr::Values(values)) = (table_desc_opt, expr) {
-            if let Some(schema) = &table_desc.schema {
-                let row_batch = mysql_utils::sql_to_row_batch(table_name, &schema, &values.0[0])?;
+    async fn handle_insert(&self, db: &str, table_name: &str, expr: &SetExpr) -> Result<()> {
+        let database = self.catalog.get_db(db)?;
+        let table = database.get_table(table_name)?;
+        if let SetExpr::Values(values) = expr {
+            if let Some(schema) = &table.get_table_desc().schema {
+                let row_batch = mysql_utils::sql_to_row_batch(&schema, &values.0[0])?;
+                //TODO add logical for partition
                 if self
                     .memory_sdk
-                    .append_records(table_name, 0, &row_batch)
+                    .append_records(db, table_name, 0, &row_batch)
                     .await
                     .is_err()
                 {
@@ -101,14 +101,17 @@ impl SQLExecutor {
 
     async fn handle_create_table(
         &self,
-        table_full_name: Vec<String>,
+        db: &str,
+        table_name: &str,
         columns: &Vec<ColumnDef>,
     ) -> Result<()> {
         let schema_desc = mysql_utils::sql_to_table_desc(columns)?;
         let table_desc = RtStoreTableDesc {
-            names: table_full_name,
+            name: table_name.to_string(),
             schema: Some(schema_desc),
             partition_desc: None,
+            db: db.to_string(),
+            ctime: 0,
         };
         if let Err(e) = self.meta_sdk.create_table(table_desc).await {
             warn!("fail  to create table for err {}", e);
@@ -119,10 +122,10 @@ impl SQLExecutor {
     pub async fn execute(&self, sql: &str, db: Option<String>) -> Result<SQLResult> {
         debug!("input sql {}", sql);
         let (keyword, statement) = Self::parse_sql(sql)?;
-        match (keyword, statement) {
-            (Keyword::CREATE, SQLStatement::CreateTable { name, columns, .. }) => {
-                let table_full_name = self.build_full_name(&name.0[0].value, db);
-                self.handle_create_table(table_full_name, &columns).await?;
+        match (keyword, statement, db) {
+            (Keyword::CREATE, SQLStatement::CreateTable { name, columns, .. }, Some(db_str)) => {
+                self.handle_create_table(&db_str, &name.0[0].value, &columns)
+                    .await?;
                 Ok(SQLResult { effected_rows: 1 })
             }
             (
@@ -130,14 +133,14 @@ impl SQLExecutor {
                 SQLStatement::Insert {
                     table_name, source, ..
                 },
+                Some(db_str),
             ) => {
-                let table_full_name = self.build_full_name(&table_name.0[0].value, db).join(".");
-                debug!("process sql insert for table {} ", table_full_name);
-                self.handle_insert(&table_full_name, &source.body).await?;
+                self.handle_insert(&db_str, &table_name.0[0].value, &source.body)
+                    .await?;
                 Ok(SQLResult { effected_rows: 1 })
             }
 
-            (_, _) => {
+            (_, _, _) => {
                 warn!("sql {} is not handled", sql);
                 Ok(SQLResult { effected_rows: 0 })
             }

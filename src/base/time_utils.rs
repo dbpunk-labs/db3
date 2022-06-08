@@ -1,6 +1,6 @@
 //
 //
-// mod.rs
+// time_utils.rs
 // Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,9 @@
 // limitations under the License.
 //
 
-pub mod arrow_parquet_utils;
-pub mod filesystem;
-pub mod linked_list;
-pub mod log;
-pub mod mysql_utils;
-pub mod slice;
-pub mod strings;
-pub mod time_utils;
+use chrono::offset::Utc;
+
+#[inline]
+pub fn now_in_second() -> i64 {
+    Utc::now().timestamp()
+}

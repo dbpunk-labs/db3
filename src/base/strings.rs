@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use crate::error::{RTStoreError, Result};
 uselog!(debug);
 const NUM_LABELS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const STORAGE_LABELS: [char; 7] = [' ', 'K', 'M', 'G', 'T', 'P', 'E'];
@@ -50,9 +51,46 @@ pub fn bytes_to_readable_num_str(bytes_size: u64) -> String {
     format!("{0:.2}{1}", value, STORAGE_LABELS[shift])
 }
 
+#[inline]
+pub fn gen_s3_url(bucket: &str, prefix: &[&str], filename: &str) -> String {
+    format!("s3://{}/{}/{}", bucket, prefix.join("/"), filename)
+}
+
+#[inline]
+pub fn parse_s3_url(url: &str) -> Result<(String, String)> {
+    let (_, path) = url
+        .split_once("s3://")
+        .ok_or_else(|| RTStoreError::FSInvalidFileError {
+            path: url.to_string(),
+        })?;
+    let (bucket, key) = path
+        .split_once("/")
+        .ok_or_else(|| RTStoreError::FSInvalidFileError {
+            path: url.to_string(),
+        })?;
+    Ok((bucket.to_owned(), key.to_owned()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_gen_s3_url() {
+        let url = gen_s3_url("test_bk", &["test"], "test.parquet");
+        assert_eq!("s3://test_bk/test/test.parquet", &url);
+        if let Ok((bucket, key)) = parse_s3_url(&url) {
+            assert_eq!(&bucket, "test_bk");
+            assert_eq!("test/test.parquet", &key);
+        } else {
+            panic!("should not be here");
+        }
+        if let Ok((bk, _)) = parse_s3_url("s3://bucket_name") {
+            assert_eq!(&bk, "bucket_name");
+        } else {
+            panic!("should not be here");
+        }
+    }
 
     #[test]
     fn test_it_readable_num_str_normal() {

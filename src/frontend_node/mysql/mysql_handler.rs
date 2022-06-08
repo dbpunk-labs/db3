@@ -17,6 +17,7 @@
 //
 
 use super::sql_handler::SQLExecutor;
+use crate::error::Result as RtStoreResult;
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::sdk::meta_node_sdk::MetaNodeSDK;
 use crate::store::meta_store::MetaStore;
@@ -72,6 +73,9 @@ impl MySQLHandler {
             salt: [0 as u8; 20],
             sql_executor: SQLExecutor::new(sdk, meta_store, memory_node_sdk),
         }
+    }
+    pub async fn init(&self) -> RtStoreResult<()> {
+        self.sql_executor.init().await
     }
 }
 

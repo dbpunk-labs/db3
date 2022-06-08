@@ -120,7 +120,17 @@ message RTStoreSchemaDesc {
 
 message RTStoreTableDesc {
     // the table name is like test.dev.table1
-    repeated string names = 1;
+    string name = 1;
     RTStoreSchemaDesc schema = 2;
     RTStorePartitionDesc partition_desc = 3;
+    string db = 4;
+    // time in second
+    int64 ctime = 5;
+}
+
+message RTStoreDatabase {
+    string db = 1;
+    // time in second
+    int64 ctime = 2;
+    StorageRegion region = 3;
 }

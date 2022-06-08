@@ -18,3 +18,4 @@
 
 pub mod cell_store;
 pub mod meta_store;
+pub mod object_store;

@@ -33,6 +33,7 @@ use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
 use rtstore::sdk::memory_node_sdk::MemoryNodeSDK;
 use rtstore::sdk::meta_node_sdk::MetaNodeSDK;
 use rtstore::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
+use rtstore::store::object_store::build_region;
 use std::sync::Arc;
 use tonic::transport::Server;
 extern crate pretty_env_logger;
@@ -60,6 +61,8 @@ enum Commands {
         etcd_root_path: String,
         #[clap(required = true)]
         ns: String,
+        #[clap(required = true)]
+        region: String,
     },
 
     /// Start Memory Node Server
@@ -106,32 +109,32 @@ async fn start_memory_node(memory_node: &Commands) -> Result<(), Box<dyn std::er
         ns,
     } = memory_node
     {
-        let bind_addr = format!("{}:{}", ns, port);
-        let node = RtStoreNode {
-            endpoint: format!("http://{}", bind_addr).to_string(),
-            node_type: RtStoreNodeType::KMemoryNode as i32,
-            ns: ns.to_string(),
-            port: *port,
-        };
-        let config = MemoryNodeConfig {
-            binlog_root_dir: binlog_root_dir.to_string(),
-            tmp_store_root_dir: tmp_root_dir.to_string(),
-            etcd_cluster: etcd_cluster.to_string(),
-            etcd_root_path: etcd_root_path.to_string(),
-            node,
-        };
-        let memory_node_impl = MemoryNodeImpl::new(config);
-        if !etcd_cluster.is_empty() {
-            if let Err(e) = memory_node_impl.connect_to_meta().await {
+        if let Ok(meta_store) = build_meta_store(etcd_cluster, etcd_root_path).await {
+            let bind_addr = format!("{}:{}", ns, port);
+            let node = RtStoreNode {
+                endpoint: format!("http://{}", bind_addr).to_string(),
+                node_type: RtStoreNodeType::KMemoryNode as i32,
+                ns: ns.to_string(),
+                port: *port,
+            };
+            let config = MemoryNodeConfig {
+                binlog_root_dir: binlog_root_dir.to_string(),
+                tmp_store_root_dir: tmp_root_dir.to_string(),
+                etcd_cluster: etcd_cluster.to_string(),
+                etcd_root_path: etcd_root_path.to_string(),
+                node,
+            };
+            let memory_node_impl = MemoryNodeImpl::new(config, Arc::new(meta_store));
+            if let Err(e) = memory_node_impl.init().await {
                 warn!("fail to connect to meta {} with err {}", etcd_cluster, e);
                 return Ok(());
             }
+            info!("start memory node server on addr {}", bind_addr);
+            Server::builder()
+                .add_service(MemoryNodeServer::new(memory_node_impl))
+                .serve(bind_addr.parse().unwrap())
+                .await?;
         }
-        info!("start memory node server on addr {}", bind_addr);
-        Server::builder()
-            .add_service(MemoryNodeServer::new(memory_node_impl))
-            .serve(bind_addr.parse().unwrap())
-            .await?;
     }
     Ok(())
 }
@@ -142,27 +145,32 @@ async fn start_metaserver(cmd: &Commands) -> Result<(), Box<dyn std::error::Erro
         etcd_cluster,
         etcd_root_path,
         ns,
+        region
     } = cmd
     {
-        let addr = format!("{}:{}", ns, port);
-        let node = RtStoreNode {
-            endpoint: format!("http://{}", addr),
-            node_type: RtStoreNodeType::KMetaNode as i32,
-            ns: ns.to_string(),
-            port: *port,
-        };
-        let config = MetaConfig {
-            node,
-            etcd_cluster: etcd_cluster.to_string(),
-            etcd_root_path: etcd_root_path.to_string(),
-        };
-        let meta_service = MetaServiceImpl::new(config);
-        meta_service.connect_to_meta().await?;
-        info!("start metaserver on addr {}", addr);
-        Server::builder()
-            .add_service(MetaServer::new(meta_service))
-            .serve(addr.parse().unwrap())
-            .await?;
+        if let Ok(meta_store) = build_meta_store(etcd_cluster, etcd_root_path).await {
+            let addr = format!("{}:{}", ns, port);
+            let node = RtStoreNode {
+                endpoint: format!("http://{}", addr),
+                node_type: RtStoreNodeType::KMetaNode as i32,
+                ns: ns.to_string(),
+                port: *port,
+            };
+            let r = build_region(&region, None);
+            let config = MetaConfig {
+                node,
+                etcd_cluster: etcd_cluster.to_string(),
+                etcd_root_path: etcd_root_path.to_string(),
+                region:r,
+            };
+            let meta_service = MetaServiceImpl::new(config, Arc::new(meta_store));
+            meta_service.init().await?;
+            info!("start metaserver on addr {}", addr);
+            Server::builder()
+                .add_service(MetaServer::new(meta_service))
+                .serve(addr.parse().unwrap())
+                .await?;
+        }
     } else {
         warn!("fail start meta node for bad args");
     }
@@ -234,10 +242,9 @@ async fn start_frontend_server(cmd: &Commands) -> Result<(), Box<dyn std::error:
                 info!("start frontend node on addr {}", addr);
                 let listener = TcpListener::bind(addr).await.unwrap();
                 let arc_store = Arc::new(meta_store);
-                arc_store.get_table_metas().await;
-                arc_store.subscribe_table_events().await;
                 let handler =
                     mysql_handler::MySQLHandler::new(meta_node_sdk, memory_node_sdk, arc_store);
+                assert!(handler.init().await.is_ok());
                 loop {
                     let (socket, _) = listener.accept().await.unwrap();
                     let new_handler = handler.clone();
