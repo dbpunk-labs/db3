@@ -155,7 +155,9 @@ impl<W: std::io::Write + Send> AsyncMysqlShim<W> for MySQLHandler {
         sql: &'a str,
         results: QueryResultWriter<'a, W>,
     ) -> Result<()> {
-        self.sql_executor.execute(sql, None).await.unwrap();
+        if let Ok(result) = self.sql_executor.execute(sql, None).await {
+            info!("execute {} ok", sql);
+        }
         results.completed(OkResponse::default())?;
         Ok(())
     }

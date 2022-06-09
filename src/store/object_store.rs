@@ -64,12 +64,15 @@ pub fn build_bucket(bucket_name: &str, region: &Region, credentials: &Credential
     }
 }
 
-fn build_credentials(access_key: Option<&str>, secret_key: Option<&str>) -> Result<Credentials> {
+pub fn build_credentials(
+    access_key: Option<&str>,
+    secret_key: Option<&str>,
+) -> Result<Credentials> {
     {
         if let (Some(ak), Some(sk)) = (access_key, secret_key) {
             // try build credentials from inputs
             Credentials::new(Some(ak), Some(sk), None, None, None)
-        } else if let (Ok(ak), Ok(sk)) = (env::var(ACCESS_KEY), env::var(SECRET_KEY)) {
+        } else if let (Ok(_), Ok(_)) = (env::var(ACCESS_KEY), env::var(SECRET_KEY)) {
             // try build credentials from environment
             Credentials::from_env_specific(Some(ACCESS_KEY), Some(SECRET_KEY), None, None)
         } else {

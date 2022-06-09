@@ -18,7 +18,9 @@
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
 use crate::proto::rtstore_meta_proto::meta_client::MetaClient;
-use crate::proto::rtstore_meta_proto::{CreateTableRequest, CreateTableResponse};
+use crate::proto::rtstore_meta_proto::{
+    CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
+};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 uselog!(info);
@@ -46,6 +48,14 @@ impl MetaNodeSDK {
             endpoint: endpoint.to_string(),
             client,
         })
+    }
+
+    pub async fn create_db(&self, db: &str) -> std::result::Result<(), Status> {
+        let mut client = self.client.as_ref().clone();
+        let create_req = CreateDbRequest { db: db.to_string() };
+        let request = tonic::Request::new(create_req);
+        client.create_db(request).await?;
+        Ok(())
     }
 
     pub async fn create_table(&self, table: RtStoreTableDesc) -> std::result::Result<(), Status> {

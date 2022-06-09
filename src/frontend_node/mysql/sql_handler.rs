@@ -119,6 +119,13 @@ impl SQLExecutor {
         Ok(())
     }
 
+    async fn handle_create_db(&self, db: &str) -> Result<()> {
+        if let Err(e) = self.meta_sdk.create_db(db).await {
+            warn!("fail to create db for err {}", e);
+        }
+        Ok(())
+    }
+
     pub async fn execute(&self, sql: &str, db: Option<String>) -> Result<SQLResult> {
         debug!("input sql {}", sql);
         let (keyword, statement) = Self::parse_sql(sql)?;
@@ -126,6 +133,10 @@ impl SQLExecutor {
             (Keyword::CREATE, SQLStatement::CreateTable { name, columns, .. }, Some(db_str)) => {
                 self.handle_create_table(&db_str, &name.0[0].value, &columns)
                     .await?;
+                Ok(SQLResult { effected_rows: 1 })
+            }
+            (Keyword::CREATE, SQLStatement::CreateDatabase { db_name, .. }, _) => {
+                self.handle_create_db(&db_name.0[0].value).await?;
                 Ok(SQLResult { effected_rows: 1 })
             }
             (

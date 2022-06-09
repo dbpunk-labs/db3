@@ -67,18 +67,6 @@ impl MetaStore {
         }
     }
 
-    pub fn get_table_desc(&self, table_id: &str) -> Option<RtStoreTableDesc> {
-        if let Ok(local_state) = self.state.lock() {
-            if let Some(desc) = local_state.tables.get(table_id) {
-                Some(desc.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
     pub async fn add_db(&self, db: &RtStoreDatabase) -> Result<()> {
         if let MetaStoreType::MutableMetaStore = self.config.store_type {
             let key = format!("{}/dbs/{}", self.config.root_path, &db.db);
@@ -96,20 +84,21 @@ impl MetaStore {
         }
     }
 
-    pub async fn add_table(
-        &self,
-        db: &str,
-        table_name: &str,
-        table_desc: &RtStoreTableDesc,
-    ) -> Result<()> {
+    pub async fn add_table(&self, table_desc: &RtStoreTableDesc) -> Result<()> {
         if let MetaStoreType::MutableMetaStore = self.config.store_type {
-            let key = format!("{}/tables/{}_{}", self.config.root_path, db, table_name);
+            let key = format!(
+                "{}/tables/{}_{}",
+                self.config.root_path, table_desc.db, table_desc.name
+            );
             info!("add table with key {}", &key);
             let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
             if let Err(e) = table_desc.encode(&mut buf) {
                 return Err(RTStoreError::MetaRpcCreateTableError {
-                    err: format!("encode descriptor of table {} with err {} ", table_name, e)
-                        .to_string(),
+                    err: format!(
+                        "encode descriptor of table {} with err {} ",
+                        table_desc.name, e
+                    )
+                    .to_string(),
                 });
             }
             let buf = buf.freeze();
@@ -247,7 +236,7 @@ mod tests {
     use super::*;
     use crate::proto::rtstore_base_proto::RtStoreTableDesc;
     use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
-    async fn create_a_etcd_client() -> Result<Client> {
+    async fn create_etcd_client() -> Result<Client> {
         let endpoints: Vec<&str> = "http://localhost:2379".split(",").collect();
         if let Ok(client) = Client::connect(endpoints, None).await {
             Ok(client)
@@ -259,13 +248,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_meta_store_init() -> Result<()> {
-        assert!(create_a_etcd_client().await.is_ok());
-        Ok(())
+    async fn test_meta_store_init() {
+        assert!(create_meta_store().await.is_ok());
     }
 
-    async fn create_a_meta_store() -> Result<MetaStore> {
-        let client = create_a_etcd_client().await?;
+    async fn create_meta_store() -> Result<MetaStore> {
+        let client = create_etcd_client().await?;
         let config = MetaStoreConfig {
             store_type: MetaStoreType::MutableMetaStore,
             root_path: "/rtstore_test".to_string(),
@@ -274,10 +262,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_table() -> Result<()> {
-        let table_desc = create_simple_table_desc("test.eth");
-        let meta_store = create_a_meta_store().await?;
-        assert!(meta_store.add_table("test.eth", &table_desc).await.is_ok());
+    async fn test_add_table_flow() -> Result<()> {
+        let table_desc = create_simple_table_desc("db1", "eth");
+        let meta_store = create_meta_store().await?;
+        assert!(meta_store.add_table(&table_desc).await.is_ok());
         Ok(())
     }
 
@@ -297,7 +285,7 @@ mod tests {
         Ok(())
     }
 
-    fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
+    fn create_simple_table_desc(db: &str, tname: &str) -> RtStoreTableDesc {
         let col1 = RtStoreColumnDesc {
             name: "col1".to_string(),
             ctype: RtStoreType::KBigInt as i32,
@@ -308,9 +296,10 @@ mod tests {
             version: 1,
         };
         RtStoreTableDesc {
-            names: vec![tname.to_string()],
+            names: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,
+            db: db.to_string(),
         }
     }
 }

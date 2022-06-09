@@ -124,9 +124,7 @@ impl Database {
         self.tables
             .get_or_insert_with(table_desc.name.clone(), || table);
         if !recover {
-            self.meta_store
-                .add_table(&self.db, &table_desc.name, table_desc)
-                .await?;
+            self.meta_store.add_table(table_desc).await?;
         }
         Ok(())
     }
