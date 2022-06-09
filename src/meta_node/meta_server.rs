@@ -258,6 +258,9 @@ impl Meta for MetaServiceImpl {
 mod tests {
     use super::*;
     use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
+    use crate::store::build_meta_store;
+    use crate::store::object_store::build_region;
+
     fn build_config() -> MetaConfig {
         let node = RtStoreNode {
             endpoint: "http://127.0.0.1:9191".to_string(),
@@ -265,25 +268,31 @@ mod tests {
             ns: "127.0.0.1".to_string(),
             port: 9191,
         };
+
         MetaConfig {
             node,
             etcd_cluster: "127.0.0.1:9191".to_string(),
             etcd_root_path: "/rtstore".to_string(),
+            region: build_region("", Some("http://127.0.0.1:9000".to_string())),
         }
     }
-    #[tokio::test]
-    async fn test_ping() {
-        let meta = MetaServiceImpl::new(build_config());
-        let req = Request::new(PingRequest {});
-        let result = meta.ping(req).await;
-        if result.is_err() {
-            panic!("should go error");
-        }
+
+    async fn build_meta_service() -> MetaServiceImpl {
+        let config = build_config();
+        let meta_store = build_meta_store(
+            &config.etcd_cluster,
+            &config.etcd_root_path,
+            MetaStoreType::MutableMetaStore,
+        )
+        .await
+        .unwrap();
+        let meta = MetaServiceImpl::new(config, Arc::new(meta_store));
+        meta
     }
 
     #[tokio::test]
     async fn test_create_table_empty_desc() {
-        let meta = MetaServiceImpl::new(build_config());
+        let meta = build_meta_service().await;
         let req = Request::new(CreateTableRequest { table_desc: None });
         let result = meta.create_table(req).await;
         if result.is_ok() {
@@ -291,7 +300,7 @@ mod tests {
         }
     }
 
-    fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
+    fn create_simple_table_desc(db: &str, tname: &str) -> RtStoreTableDesc {
         let col1 = RtStoreColumnDesc {
             name: "col1".to_string(),
             ctype: 0,
@@ -302,16 +311,18 @@ mod tests {
             version: 1,
         };
         RtStoreTableDesc {
-            names: vec![tname.to_string()],
+            name: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,
+            db: db.to_string(),
+            ctime: 0,
         }
     }
 
     #[tokio::test]
     async fn test_create_table() {
-        let table_desc = Some(create_simple_table_desc("test.t1"));
-        let meta = MetaServiceImpl::new(build_config());
+        let table_desc = Some(create_simple_table_desc("test", "t1"));
+        let meta = build_meta_service().await;
         let req = Request::new(CreateTableRequest { table_desc });
         let result = meta.create_table(req).await;
         assert!(result.is_ok());

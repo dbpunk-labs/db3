@@ -403,7 +403,6 @@ mod tests {
                 let row_batch = RowRecordBatch {
                     batch,
                     schema_version: 1,
-                    id: "eth.price".to_string(),
                 };
                 let ll: LinkedList<RowRecordBatch> = LinkedList::new();
                 ll.push_front(row_batch)?;

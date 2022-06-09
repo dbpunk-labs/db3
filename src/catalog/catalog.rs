@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+use super::table::Table;
 use crate::base::arrow_parquet_utils::*;
 use crate::base::time_utils;
 use crate::error::{RTStoreError, Result};
@@ -27,9 +28,19 @@ use crate::store::object_store::build_region;
 use arrow::datatypes::{Schema, SchemaRef};
 use chrono::offset::Utc;
 use crossbeam_skiplist_piedb::SkipMap;
+use datafusion::catalog::catalog::CatalogProvider;
+use datafusion::catalog::schema::SchemaProvider;
+use datafusion::datasource::{
+    file_format::parquet::ParquetFormat,
+    listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
+    TableProvider,
+};
+use datafusion::error::Result as DFResult;
+
 use s3::region::Region;
 
 uselog!(info, warn);
+use std::any::Any;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -116,11 +127,7 @@ impl Database {
                 })
             }
         }?;
-        let table = Arc::new(Table {
-            desc: table_desc.clone(),
-            parquet_schema: schema,
-            partition_to_nodes: Arc::new(SkipMap::new()),
-        });
+        let table = Arc::new(Table::new(&table_desc.clone(), schema));
         self.tables
             .get_or_insert_with(table_desc.name.clone(), || table);
         if !recover {
@@ -164,49 +171,38 @@ impl Database {
     }
 }
 
-#[derive(Clone)]
-pub struct Table {
-    desc: RtStoreTableDesc,
-    parquet_schema: SchemaRef,
-    partition_to_nodes: Arc<SkipMap<i32, RtStoreNode>>,
-}
-
-impl Table {
-    pub fn assign_partition_to_node(&self, pid: i32, node: RtStoreNode) -> Result<()> {
-        self.partition_to_nodes.remove(&pid);
-        self.partition_to_nodes.get_or_insert_with(pid, || node);
-        Ok(())
+impl SchemaProvider for Database {
+    fn as_any(&self) -> &dyn Any {
+        self
     }
-    #[inline]
-    pub fn get_table_desc(&self) -> &RtStoreTableDesc {
-        &self.desc
+    fn table_names(&self) -> Vec<String> {
+        self.get_table_names()
     }
 
-    #[inline]
-    pub fn get_schema(&self) -> &SchemaRef {
-        &self.parquet_schema
-    }
-
-    #[inline]
-    pub fn get_ctime(&self) -> i64 {
-        self.desc.ctime
-    }
-
-    #[inline]
-    pub fn get_name(&self) -> &str {
-        &self.desc.name
-    }
-
-    #[inline]
-    pub fn get_node_by_partition(&self, pid: i32) -> Option<RtStoreNode> {
-        let node_entry = self.partition_to_nodes.get(&pid);
-        match node_entry {
-            Some(entry) => {
-                let node = entry.value();
-                Some(node.clone())
+    fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
+        match self.get_table(name) {
+            Ok(t) => {
+                let table_path = format!("s3://{}/{}/", t.get_db(), t.get_name());
+                if let Ok(table_url) = ListingTableUrl::parse(&table_path) {
+                    let options = ListingOptions::new(Arc::new(ParquetFormat::default()));
+                    let config = ListingTableConfig::new(table_url)
+                        .with_listing_options(options.clone())
+                        .with_schema(t.get_schema().clone());
+                    if let Ok(table) = ListingTable::try_new(config) {
+                        Some(Arc::new(table))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             }
             _ => None,
         }
+    }
+
+    fn table_exist(&self, name: &str) -> bool {
+        self.tables.contains_key(name)
     }
 }
 
@@ -264,5 +260,30 @@ impl Catalog {
             db_names.push(e.key().clone());
         }
         db_names
+    }
+}
+
+impl CatalogProvider for Catalog {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema_names(&self) -> Vec<String> {
+        self.get_db_names()
+    }
+
+    fn schema(&self, name: &str) -> Option<Arc<dyn SchemaProvider>> {
+        match self.get_db(name) {
+            Ok(db) => Some(db),
+            _ => None,
+        }
+    }
+
+    fn register_schema(
+        &self,
+        _name: &str,
+        _schema: Arc<dyn SchemaProvider>,
+    ) -> DFResult<Option<Arc<dyn SchemaProvider>>> {
+        Ok(None)
     }
 }

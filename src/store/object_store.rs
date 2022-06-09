@@ -255,12 +255,8 @@ impl ObjectStore for S3FileSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::join;
-    use futures::stream::Collect;
-    use futures::StreamExt;
     use futures::TryStreamExt;
     use std::path::Path;
-
     #[tokio::test]
     async fn test_fs_create_bucket() -> Result<()> {
         let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
@@ -289,14 +285,18 @@ mod tests {
         let bucket_fs = s3.new_bucket_fs("test3");
         let file_path = Path::new("thirdparty/parquet-testing/data/repeated_no_annotation.parquet");
         bucket_fs
-            .put_with_file(&file_path, "test_key.parquet")
+            .put_with_file(&file_path, "ttt/test_key.parquet")
             .await?;
         let s3_path = "s3://test3/";
         if let Ok(stream) = s3.list_file(&s3_path).await {
             let ret: DFResult<Vec<FileMeta>> = stream.try_collect().await;
             match ret {
                 Ok(files) => {
-                    assert_eq!(1, files.len());
+                    let size = files.len();
+                    for file in files {
+                        info!("file path {}", file.path());
+                    }
+                    assert_eq!(size, 2);
                 }
                 _ => {
                     panic!("no files");

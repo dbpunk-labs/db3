@@ -271,7 +271,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_node() -> Result<()> {
-        let meta_store = create_a_meta_store().await?;
+        let meta_store = create_meta_store().await?;
         let rtstore_node = RtStoreNode {
             endpoint: "127.0.0.1:8989".to_string(),
             node_type: RtStoreNodeType::KComputeNode as i32,
@@ -296,10 +296,11 @@ mod tests {
             version: 1,
         };
         RtStoreTableDesc {
-            names: tname.to_string(),
+            name: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,
             db: db.to_string(),
+            ctime: 0,
         }
     }
 }

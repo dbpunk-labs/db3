@@ -46,6 +46,8 @@ pub enum RTStoreError {
     TableArrowError(ArrowError),
     #[error("table {table_id} encounter encoding or decoding error {err}")]
     TableCodecError { table_id: String, err: String },
+    #[error("bad url (0) for table")]
+    TableBadUrl(String),
     #[error("file with {path} is invalid")]
     FSInvalidFileError { path: String },
     #[error("filesystem io error:{0}")]

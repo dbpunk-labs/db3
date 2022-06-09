@@ -335,6 +335,7 @@ mod tests {
     use super::*;
     use crate::codec::row_codec::{encode, Data, RowRecordBatch};
     use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
+    use crate::store::build_readonly_meta_store;
     use std::thread;
     use tempdir::TempDir;
 
@@ -354,71 +355,71 @@ mod tests {
         }
     }
 
+    async fn build_memory_node() -> MemoryNodeImpl {
+        let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
+        let tmp_dir_path_str = tmp_dir_path.path().to_str().unwrap();
+        let config = build_config(tmp_dir_path_str);
+        let meta_store = build_readonly_meta_store(&config.etcd_cluster, &config.etcd_root_path)
+            .await
+            .unwrap();
+        MemoryNodeImpl::new(config, Arc::new(meta_store))
+    }
+
     #[tokio::test]
     async fn test_assign_partitions() {
-        let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
-        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = build_config(tmp_dir_path_str);
-            let memory_node = MemoryNodeImpl::new(config);
-            let assign_req = create_assign_partition_request("test.eth");
-            let req = Request::new(assign_req);
-            assert!(memory_node.assign_partition(req).await.is_ok());
-            assert!(memory_node.get_cell("test.eth", 3).is_none());
-            assert!(memory_node.get_cell("test.eth", 0).is_some());
-        } else {
-            panic!("should not be here");
-        }
+        let db = "db22";
+        let table = "tttt22";
+        let memory_node = build_memory_node().await;
+        let assign_req = create_assign_partition_request(table, db);
+        let req = Request::new(assign_req);
+        assert!(memory_node.assign_partition(req).await.is_ok());
+        assert!(memory_node.get_cell(db, table, 3).is_none());
+        assert!(memory_node.get_cell(db, table, 0).is_some());
     }
 
     #[tokio::test]
     async fn test_append_records_compaction() -> Result<()> {
-        let tmp_dir_path = TempDir::new("append_compaction_records").expect("create temp dir");
-        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = build_config(tmp_dir_path_str);
-            let memory_node = MemoryNodeImpl::new(config);
-            let assign_req = create_assign_partition_request("test.sol");
-            let req = Request::new(assign_req);
-            assert!(memory_node.assign_partition(req).await.is_ok());
-            assert!(memory_node.get_cell("test.sol", 3).is_none());
-            assert!(memory_node.get_cell("test.sol", 0).is_some());
-            for _ in 0..102400 {
-                let batch = gen_sample_row_batch();
-                let data = encode(&batch)?;
-                let req = Request::new(AppendRecordsRequest {
-                    table_id: "test.sol".to_string(),
-                    partition_id: 0,
-                    records: data,
-                });
-                assert!(memory_node.append_records(req).await.is_ok());
-            }
-        } else {
-            panic!("should not be here");
+        let db = "db333";
+        let table = "ttt33";
+        let memory_node = build_memory_node().await;
+        let assign_req = create_assign_partition_request(table, db);
+        let req = Request::new(assign_req);
+        assert!(memory_node.assign_partition(req).await.is_ok());
+        assert!(memory_node.get_cell(db, table, 3).is_none());
+        assert!(memory_node.get_cell(db, table, 0).is_some());
+        for _ in 0..102400 {
+            let batch = gen_sample_row_batch();
+            let data = encode(&batch)?;
+            let req = Request::new(AppendRecordsRequest {
+                table_id: table.to_string(),
+                partition_id: 0,
+                records: data,
+                db: db.to_string(),
+            });
+            assert!(memory_node.append_records(req).await.is_ok());
         }
         Ok(())
     }
 
     #[tokio::test]
     async fn test_append_records() -> Result<()> {
-        let tmp_dir_path = TempDir::new("append_records").expect("create temp dir");
-        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = build_config(tmp_dir_path_str);
-            let memory_node = MemoryNodeImpl::new(config);
-            let assign_req = create_assign_partition_request("test.btc");
-            let req = Request::new(assign_req);
-            assert!(memory_node.assign_partition(req).await.is_ok());
-            assert!(memory_node.get_cell("test.btc", 3).is_none());
-            let batch = gen_sample_row_batch();
-            let data = encode(&batch)?;
-            let req = Request::new(AppendRecordsRequest {
-                table_id: "test.btc".to_string(),
-                partition_id: 0,
-                records: data,
-            });
-            assert!(memory_node.get_cell("test.btc", 0).is_some());
-            assert!(memory_node.append_records(req).await.is_ok());
-        } else {
-            panic!("should not be here");
-        }
+        let db = "db11";
+        let table = "btc_test";
+        let memory_node = build_memory_node().await;
+        let assign_req = create_assign_partition_request(table, db);
+        let req = Request::new(assign_req);
+        assert!(memory_node.assign_partition(req).await.is_ok());
+        assert!(memory_node.get_cell(db, table, 3).is_none());
+        let batch = gen_sample_row_batch();
+        let data = encode(&batch)?;
+        let req = Request::new(AppendRecordsRequest {
+            table_id: table.to_string(),
+            partition_id: 0,
+            records: data,
+            db: db.to_string(),
+        });
+        assert!(memory_node.get_cell(db, table, 0).is_some());
+        assert!(memory_node.append_records(req).await.is_ok());
         Ok(())
     }
 
@@ -431,7 +432,6 @@ mod tests {
         RowRecordBatch {
             batch,
             schema_version: 1,
-            id: "eth.price".to_string(),
         }
     }
 
@@ -472,6 +472,7 @@ mod tests {
             schema: Some(schema),
             partition_desc: None,
             db: db.to_string(),
+            ctime: 0,
         }
     }
 }
