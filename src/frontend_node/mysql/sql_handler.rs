@@ -26,7 +26,7 @@ use sqlparser::{
     ast::{ColumnDef, SetExpr, Statement as SQLStatement},
     dialect::{keywords::Keyword, MySqlDialect},
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 uselog!(debug, info, warn);
 use crate::catalog::catalog::Catalog;
 use crate::error::{RTStoreError, Result};

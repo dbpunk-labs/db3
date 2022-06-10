@@ -17,6 +17,7 @@
 //
 //
 
+pub mod compute_node_sdk;
 pub mod memory_node_sdk;
 pub mod meta_node_sdk;
 

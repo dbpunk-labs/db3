@@ -16,15 +16,36 @@
 // limitations under the License.
 //
 
+use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_compute_proto::{FlightData, FlightDescriptor};
+use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::error::{ArrowError, Result as ArrowResult};
 use arrow::ipc::{
-    convert, size_prefixed_root_as_message, writer, writer::EncodedData, writer::IpcWriteOptions,
+    convert, reader, size_prefixed_root_as_message, writer, writer::EncodedData,
+    writer::IpcWriteOptions,
 };
+use arrow::record_batch::RecordBatch;
+use futures::Stream;
+use std::collections::HashMap;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    ops::Deref,
+};
+
 /// SchemaAsIpc represents a pairing of a `Schema` with IpcWriteOptions
 pub struct SchemaAsIpc<'a> {
     pub pair: (&'a Schema, &'a IpcWriteOptions),
+}
+
+impl<'a> SchemaAsIpc<'a> {
+    pub fn new(schema: &'a Schema, options: &'a IpcWriteOptions) -> Self {
+        SchemaAsIpc {
+            pair: (schema, options),
+        }
+    }
 }
 
 /// IpcMessage represents a `Schema` in the format expected in
@@ -33,7 +54,6 @@ pub struct SchemaAsIpc<'a> {
 pub struct IpcMessage(pub Vec<u8>);
 
 // Useful conversion functions
-
 fn flight_schema_as_encoded_data(arrow_schema: &Schema, options: &IpcWriteOptions) -> EncodedData {
     let data_gen = writer::IpcDataGenerator::default();
     data_gen.schema_to_bytes(arrow_schema, options)
@@ -44,14 +64,8 @@ fn flight_schema_as_flatbuffer(schema: &Schema, options: &IpcWriteOptions) -> Ip
     IpcMessage(encoded_data.ipc_message)
 }
 
-// Implement a bunch of useful traits for various conversions, displays,
-// etc...
-
-// Deref
-
 impl Deref for IpcMessage {
     type Target = Vec<u8>;
-
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -59,7 +73,6 @@ impl Deref for IpcMessage {
 
 impl<'a> Deref for SchemaAsIpc<'a> {
     type Target = (&'a Schema, &'a IpcWriteOptions);
-
     fn deref(&self) -> &Self::Target {
         &self.pair
     }
@@ -85,26 +98,46 @@ impl From<SchemaAsIpc<'_>> for FlightData {
     }
 }
 
-impl From<SchemaAsIpc<'_>> for SchemaResult {
-    fn from(schema_ipc: SchemaAsIpc) -> Self {
-        let IpcMessage(vals) = flight_schema_as_flatbuffer(schema_ipc.0, schema_ipc.1);
-        SchemaResult { schema: vals }
-    }
-}
-
 pub fn flight_data_from_arrow_batch(
     batch: &RecordBatch,
     options: &IpcWriteOptions,
 ) -> (Vec<FlightData>, FlightData) {
     let data_gen = writer::IpcDataGenerator::default();
     let mut dictionary_tracker = writer::DictionaryTracker::new(false);
-
     let (encoded_dictionaries, encoded_batch) = data_gen
         .encoded_batch(batch, &mut dictionary_tracker, options)
         .expect("DictionaryTracker configured above to not error on replacement");
 
     let flight_dictionaries = encoded_dictionaries.into_iter().map(Into::into).collect();
     let flight_batch = encoded_batch.into();
-
     (flight_dictionaries, flight_batch)
+}
+
+/// Convert `FlightData` (with supplied schema and dictionaries) to an arrow `RecordBatch`.
+pub fn flight_data_to_arrow_batch(
+    data: &FlightData,
+    schema: SchemaRef,
+    dictionaries_by_id: &HashMap<i64, ArrayRef>,
+) -> Result<RecordBatch> {
+    // check that the data_header is a record batch message
+    let message = arrow::ipc::root_as_message(&data.data_header[..]).map_err(|err| {
+        RTStoreError::RecordBatchCodecError(format!("fail to encode for {}", err))
+    })?;
+    message
+        .header_as_record_batch()
+        .ok_or_else(|| {
+            RTStoreError::RecordBatchCodecError(format!(
+                "fail to encode for {}",
+                "codec header error"
+            ))
+        })
+        .map(|batch| {
+            reader::read_record_batch(&data.data_body, batch, schema, dictionaries_by_id, None)
+                .map_err(|err| {
+                    RTStoreError::RecordBatchCodecError(format!(
+                        "fail to read record batch for {}",
+                        err
+                    ))
+                })
+        })?
 }

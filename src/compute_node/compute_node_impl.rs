@@ -16,6 +16,9 @@
 // limitations under the License.
 //
 
+use super::sql_engine::SQLEngine;
+use crate::catalog::catalog::Catalog;
+use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
     RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
@@ -23,11 +26,9 @@ use crate::proto::rtstore_base_proto::{
 use crate::proto::rtstore_compute_proto::compute_node_server::ComputeNode;
 use crate::proto::rtstore_compute_proto::{FlightData, QueryRequest};
 use crate::store::meta_store::MetaStore;
-
-use super::sql_engine::SQLEngine;
-use crate::catalog::catalog::Catalog;
 use crate::store::object_store::{build_credentials, S3FileSystem};
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+use futures::Stream;
 use s3::region::Region;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -78,23 +79,46 @@ impl ComputeNodeImpl {
         Ok(())
     }
 }
-
 #[tonic::async_trait]
 impl ComputeNode for ComputeNodeImpl {
-    type QueryResponseStream =
-        Pin<Box<dyn Stream<Item = Result<FlightData, Status>> + Send + Sync + 'static>>;
+    type QueryStream = Pin<
+        Box<dyn Stream<Item = std::result::Result<FlightData, Status>> + Send + Sync + 'static>,
+    >;
     async fn query(
         &self,
         request: Request<QueryRequest>,
-    ) -> std::result::Result<Response<Self::QueryResponseStream>, Status> {
+    ) -> std::result::Result<Response<Self::QueryStream>, Status> {
         let query_request = request.into_inner();
         let mut db: Option<String> = None;
         if !query_request.default_db.is_empty() {
             db = Some(query_request.default_db);
         }
+        let batches = self
+            .sql_engine
+            .execute(&query_request.sql, db)
+            .await?
+            .batch
+            .unwrap();
 
-        let resultset = self.sql_engine.execute(&query_request.sql, db).await?;
-
-        Ok(Response::new(QueryResponse {}))
+        let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
+        let schema_flight_data =
+            SchemaAsIpc::new(&batches[0].schema().clone().as_ref(), &options).into();
+        let mut flights: Vec<std::result::Result<FlightData, Status>> =
+            vec![Ok(schema_flight_data)];
+        let mut batches: Vec<std::result::Result<FlightData, Status>> = batches
+            .iter()
+            .flat_map(|batch| {
+                let (flight_dictionaries, flight_batch) =
+                    flight_data_from_arrow_batch(batch, &options);
+                flight_dictionaries
+                    .into_iter()
+                    .chain(std::iter::once(flight_batch))
+                    .map(Ok)
+            })
+            .collect();
+        // append batch vector to schema vector, so that the first message sent is the schema
+        flights.append(&mut batches);
+        let output = futures::stream::iter(flights);
+        Ok(Response::new(Box::pin(output) as Self::QueryStream))
     }
 }

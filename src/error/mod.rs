@@ -101,6 +101,8 @@ pub enum RTStoreError {
     S3AuthError,
     #[error("sql execution error for e {0}")]
     SQLEngineError(DataFusionError),
+    #[error("fail to encode or decode RecordBatch for {0}")]
+    RecordBatchCodecError(String),
 }
 
 /// convert io error to rtstore error
