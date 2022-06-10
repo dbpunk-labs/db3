@@ -25,6 +25,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use datafusion::datafusion_data_access::object_store::{
     FileMetaStream, ListEntryStream, ObjectReader, ObjectStore,
 };
+use crate::store::meta_store::MetaStore;
 use datafusion::datafusion_data_access::{FileMeta, Result as DFResult, SizedFile};
 use futures::{stream, AsyncRead};
 use s3::bucket::Bucket;

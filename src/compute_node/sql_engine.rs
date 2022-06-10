@@ -38,16 +38,18 @@ pub struct SQLResult {
 
 pub struct SQLEngine {
     catalog: Arc<Catalog>,
+    runtime: Arc<RuntimeEnv>
 }
 
 impl SQLEngine {
-    pub fn new(catalog: &Arc<Catalog>) -> Result<Self> {
-        Ok(Self {
+    pub fn new(catalog: &Arc<Catalog>,
+        runtime:&Arc<RuntimeEnv>) -> Self {
+        Self {
             catalog: catalog.clone(),
-        })
+            runtime: runtime.clone(),
+        }
     }
-
-    pub fn parse_sql(sql: &str) -> Result<(Keyword, SQLStatement)> {
+    fn parse_sql(sql: &str) -> Result<(Keyword, SQLStatement)> {
         let dialect = MySqlDialect {};
         let mut parser = InterruptibleParser::new(&dialect, sql)?;
         let keyword = parser.next_keyword()?;
@@ -71,7 +73,7 @@ impl SQLEngine {
             }
         };
         //TODO use session id to cache session context
-        let stx = SessionContext::with_config(config);
+        let stx = SessionContext::with_config_rt(config, self.runtime.clone());
         stx.register_catalog("rtstore", self.catalog.clone());
         let state = stx.state.read().clone();
         let query_planner = SqlToRel::new(&state);
