@@ -150,6 +150,37 @@ impl MetaStore {
         }
     }
 
+    pub async fn get_db(&self, db: &str) -> Result<RtStoreDatabase> {
+        let key = format!("{}/dbs/{}", self.config.root_path, db);
+        let options = GetOptions::new();
+        let mut kv_client = self.client.kv_client();
+        match kv_client.get(key.as_bytes(), Some(options)).await {
+            Ok(resp) => {
+                let mut dbs: Vec<RtStoreDatabase> = Vec::new();
+                for kv in resp.kvs() {
+                    let buf = Bytes::from(kv.value().to_vec());
+                    match RtStoreDatabase::decode(buf) {
+                        Ok(db) => dbs.push(db),
+                        Err(e) => {
+                            warn!("fail to decode table");
+                        }
+                    }
+                }
+                if dbs.is_empty() {
+                    Err(RTStoreError::StoreS3Error(
+                        "fail to get kv from etcd".to_string(),
+                    ))
+                } else {
+                    Ok(dbs[0].clone())
+                }
+            }
+            Err(e) => Err(RTStoreError::StoreS3Error(format!(
+                "fail to get kv from etcd for e {}",
+                e
+            ))),
+        }
+    }
+
     pub async fn get_dbs(&self) -> Result<Vec<RtStoreDatabase>> {
         let key = format!("{}/dbs/", self.config.root_path);
         let options = GetOptions::new().with_prefix();

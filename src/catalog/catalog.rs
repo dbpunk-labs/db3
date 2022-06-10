@@ -26,6 +26,7 @@ use crate::proto::rtstore_base_proto::{
 use crate::store::meta_store::MetaStore;
 use crate::store::object_store::build_region;
 use arrow::datatypes::{Schema, SchemaRef};
+use bytes::{Buf, Bytes};
 use chrono::offset::Utc;
 use crossbeam_skiplist_piedb::SkipMap;
 use datafusion::catalog::catalog::CatalogProvider;
@@ -36,7 +37,8 @@ use datafusion::datasource::{
     TableProvider,
 };
 use datafusion::error::Result as DFResult;
-
+use etcd_client::{EventType, GetOptions};
+use prost::Message;
 use s3::region::Region;
 
 uselog!(info, warn);
@@ -175,6 +177,7 @@ impl SchemaProvider for Database {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
     fn table_names(&self) -> Vec<String> {
         self.get_table_names()
     }
@@ -230,6 +233,55 @@ impl Catalog {
             self.dbs.get_or_insert_with(name, || database);
         }
         Ok(())
+    }
+
+    pub async fn subscribe_changes(catalog: &Arc<Self>) {
+        let local_self = catalog.clone();
+        tokio::task::spawn(async move {
+            // just subscribe table events
+            if let Ok(mut stream) = local_self.meta_store.subscribe_table_events().await {
+                while let Ok(Some(resp)) = stream.message().await {
+                    if resp.canceled() {
+                        warn!("canceled watch table event");
+                        break;
+                    }
+                    let mut new_add_tables: Vec<RtStoreTableDesc> = Vec::new();
+                    for event in resp.events() {
+                        match (event.event_type(), event.kv()) {
+                            (EventType::Put, Some(kv)) => {
+                                let buf = Bytes::from(kv.value().to_vec());
+                                match RtStoreTableDesc::decode(buf) {
+                                    Ok(table) => new_add_tables.push(table),
+                                    Err(e) => {
+                                        warn!("fail to decode table for error {}", e);
+                                    }
+                                }
+                            }
+                            (_, _) => {
+                                //TODO handle delete
+                            }
+                        }
+                    }
+                    for table_desc in new_add_tables {
+                        if let Ok(database) = local_self.get_db(&table_desc.db) {
+                            if let Err(e) = database.create_table(&table_desc, true).await {
+                                warn!("fail  to create table for error {}", e);
+                            }
+                        } else {
+                            let db_desc =
+                                local_self.meta_store.get_db(&table_desc.db).await.unwrap();
+                            let name = db_desc.db.to_string();
+                            let database = Arc::new(
+                                Database::from_db_desc(&db_desc, local_self.meta_store.clone())
+                                    .unwrap(),
+                            );
+                            database.create_table(&table_desc, true).await.unwrap();
+                            local_self.dbs.get_or_insert_with(name, || database);
+                        }
+                    }
+                }
+            }
+        });
     }
 
     pub async fn create_db(&self, name: &str, region: Region) -> Result<()> {

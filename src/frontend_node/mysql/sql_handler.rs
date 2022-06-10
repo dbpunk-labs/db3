@@ -63,7 +63,9 @@ impl SQLExecutor {
     }
 
     pub async fn init(&self) -> Result<()> {
-        self.catalog.recover().await
+        self.catalog.recover().await?;
+        Catalog::subscribe_changes(&self.catalog).await;
+        Ok(())
     }
 
     pub fn parse_sql(sql: &str) -> Result<(Keyword, SQLStatement)> {

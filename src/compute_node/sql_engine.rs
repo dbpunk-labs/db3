@@ -23,6 +23,7 @@ use crate::frontend_node::mysql::interruptible_parser::*;
 use arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrame;
 use datafusion::execution::context::SessionContext;
+use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::prelude::SessionConfig;
 use datafusion::sql::planner::SqlToRel;
 use sqlparser::{
@@ -38,12 +39,11 @@ pub struct SQLResult {
 
 pub struct SQLEngine {
     catalog: Arc<Catalog>,
-    runtime: Arc<RuntimeEnv>
+    runtime: Arc<RuntimeEnv>,
 }
 
 impl SQLEngine {
-    pub fn new(catalog: &Arc<Catalog>,
-        runtime:&Arc<RuntimeEnv>) -> Self {
+    pub fn new(catalog: &Arc<Catalog>, runtime: &Arc<RuntimeEnv>) -> Self {
         Self {
             catalog: catalog.clone(),
             runtime: runtime.clone(),
