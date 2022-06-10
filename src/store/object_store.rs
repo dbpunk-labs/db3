@@ -18,6 +18,15 @@
 
 use crate::base::strings;
 use crate::error::{RTStoreError, Result};
+use async_trait::async_trait;
+use bytes::{Buf, Bytes};
+
+use chrono::{DateTime, NaiveDateTime, Utc};
+use datafusion::datafusion_data_access::object_store::{
+    FileMetaStream, ListEntryStream, ObjectReader, ObjectStore,
+};
+use datafusion::datafusion_data_access::{FileMeta, Result as DFResult, SizedFile};
+use futures::{stream, AsyncRead};
 use s3::bucket::Bucket;
 use s3::bucket_ops::BucketConfiguration;
 use s3::command::Command;
@@ -26,18 +35,10 @@ use s3::region::Region;
 use s3::request::Reqwest as RequestImpl;
 use s3::request_trait::Request;
 use std::env;
-
-use async_trait::async_trait;
-use bytes::{Buf, Bytes};
-use chrono::{DateTime, NaiveDateTime, Utc};
-use datafusion::datafusion_data_access::object_store::{
-    FileMetaStream, ListEntryStream, ObjectReader, ObjectStore,
-};
-use datafusion::datafusion_data_access::{FileMeta, Result as DFResult, SizedFile};
-use futures::{stream, AsyncRead};
 use std::io::{Error, ErrorKind, Read};
 use std::path::Path;
 use std::sync::{mpsc, Arc};
+use std::time::Duration;
 uselog!(info, warn);
 
 const ACCESS_KEY: &str = "AWS_ACCESS_KEY_ID";
@@ -178,15 +179,23 @@ impl ObjectReader for S3FileReader {
             0 => None,
             _ => Some(start + length as u64 - 1),
         };
-        let (data, _) = self
-            .bucket
-            .get_object_range_blocking(&self.key, start, end)
-            .or_else(|e| {
-                Err(Error::new(
-                    ErrorKind::Other,
-                    format!("fail to get object range for error {}", e),
-                ))
-            })?;
+        let (tx, rx) = mpsc::channel();
+        let local_bucket = self.bucket.clone();
+        let local_key = self.key.to_string();
+        std::thread::spawn(move || {
+            let result = local_bucket
+                .get_object_range_blocking(local_key, start, end)
+                .or_else(|e| {
+                    Err(Error::new(
+                        ErrorKind::Other,
+                        format!("fail to get object range for error {}", e),
+                    ))
+                });
+            tx.send(result).unwrap();
+        });
+        let (data, _) = rx
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|err| std::io::Error::new(ErrorKind::TimedOut, err))??;
         let bytes_buf = Bytes::from(data);
         Ok(Box::new(bytes_buf.reader()))
     }
@@ -211,6 +220,7 @@ impl ObjectStore for S3FileSystem {
             key.to_string(),
         )))
     }
+
     async fn list_file(&self, url: &str) -> DFResult<FileMetaStream> {
         let (bucket, key) = strings::parse_s3_url(url).or_else(|_e| {
             Err(Error::new(
@@ -255,8 +265,15 @@ impl ObjectStore for S3FileSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion::assert_batches_eq;
+    use datafusion::datasource::listing::*;
+    use datafusion::datasource::TableProvider;
+    use datafusion::error::DataFusionError;
+    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+    use datafusion::prelude::*;
     use futures::TryStreamExt;
     use std::path::Path;
+
     #[tokio::test]
     async fn test_fs_create_bucket() -> Result<()> {
         let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
@@ -306,5 +323,63 @@ mod tests {
             panic!("no files");
         }
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sql_query() -> Result<()> {
+        let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
+        if let Region::Custom { .. } = region {
+            assert!(true);
+        } else {
+            panic!("should not be here");
+        }
+        let credentials = build_credentials(None, None)?;
+        let s3 = S3FileSystem::new(region, credentials);
+        s3.create_bucket("test4").await?;
+        let bucket_fs = s3.new_bucket_fs("test4");
+        let file_path = Path::new("thirdparty/parquet-testing/data/alltypes_plain.parquet");
+        bucket_fs
+            .put_with_file(&file_path, "t1/alltypes_plain.parquet")
+            .await?;
+        let session_config = SessionConfig::default();
+        let runtime_config = RuntimeConfig::new();
+        let runtime = RuntimeEnv::new(runtime_config)?;
+        runtime.register_object_store("s3", Arc::new(s3));
+        let ctx = SessionContext::with_config_rt(session_config, Arc::new(runtime));
+        let filename = "s3://test4/";
+        let table_url = ListingTableUrl::parse(filename)?;
+        let state = ctx.state.read().clone();
+        let config = ListingTableConfig::new(table_url)
+            .infer(&state)
+            .await
+            .map_err(map_datafusion_error_to_io_error)?;
+        let table = ListingTable::try_new(config).map_err(map_datafusion_error_to_io_error)?;
+        ctx.register_table("t1", Arc::new(table)).unwrap();
+        let batches = ctx
+            .sql("SELECT * FROM t1")
+            .await
+            .map_err(map_datafusion_error_to_io_error)?
+            .collect()
+            .await
+            .map_err(map_datafusion_error_to_io_error)?;
+        let expected = vec![
+ "+----+----------+-------------+--------------+---------+------------+-----------+------------+------------------+------------+---------------------+",
+    "| id | bool_col | tinyint_col | smallint_col | int_col | bigint_col | float_col | double_col | date_string_col  | string_col | timestamp_col       |",
+    "+----+----------+-------------+--------------+---------+------------+-----------+------------+------------------+------------+---------------------+",
+    "| 4  | true     | 0           | 0            | 0       | 0          | 0         | 0          | 30332f30312f3039 | 30         | 2009-03-01 00:00:00 |",
+    "| 5  | false    | 1           | 1            | 1       | 10         | 1.1       | 10.1       | 30332f30312f3039 | 31         | 2009-03-01 00:01:00 |",
+    "| 6  | true     | 0           | 0            | 0       | 0          | 0         | 0          | 30342f30312f3039 | 30         | 2009-04-01 00:00:00 |",
+    "| 7  | false    | 1           | 1            | 1       | 10         | 1.1       | 10.1       | 30342f30312f3039 | 31         | 2009-04-01 00:01:00 |",
+    "| 2  | true     | 0           | 0            | 0       | 0          | 0         | 0          | 30322f30312f3039 | 30         | 2009-02-01 00:00:00 |",
+    "| 3  | false    | 1           | 1            | 1       | 10         | 1.1       | 10.1       | 30322f30312f3039 | 31         | 2009-02-01 00:01:00 |",
+    "| 0  | true     | 0           | 0            | 0       | 0          | 0         | 0          | 30312f30312f3039 | 30         | 2009-01-01 00:00:00 |",
+    "| 1  | false    | 1           | 1            | 1       | 10         | 1.1       | 10.1       | 30312f30312f3039 | 31         | 2009-01-01 00:01:00 |",
+    "+----+----------+-------------+--------------+---------+------------+-----------+------------+------------------+------------+---------------------+",
+        ];
+        assert_batches_eq!(expected, &batches);
+        Ok(())
+    }
+    fn map_datafusion_error_to_io_error(err: DataFusionError) -> std::io::Error {
+        std::io::Error::new(ErrorKind::Other, err)
     }
 }

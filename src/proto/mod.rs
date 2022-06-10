@@ -27,3 +27,7 @@ pub mod rtstore_meta_proto {
 pub mod rtstore_memory_proto {
     tonic::include_proto!("rtstore_memory_proto");
 }
+
+pub mod rtstore_compute_proto {
+    tonic::include_proto!("rtstore_compute_proto");
+}

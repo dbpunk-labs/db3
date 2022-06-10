@@ -58,12 +58,7 @@ pub fn gen_s3_url(bucket: &str, prefix: &[&str], filename: &str) -> String {
 
 #[inline]
 pub fn parse_s3_url(url: &str) -> Result<(String, String)> {
-    let (_, path) = url
-        .split_once("s3://")
-        .ok_or_else(|| RTStoreError::FSInvalidFileError {
-            path: url.to_string(),
-        })?;
-    let (bucket, key) = path
+    let (bucket, key) = url
         .split_once("/")
         .ok_or_else(|| RTStoreError::FSInvalidFileError {
             path: url.to_string(),
@@ -78,14 +73,14 @@ mod tests {
     #[test]
     fn test_gen_s3_url() {
         let url = gen_s3_url("test_bk", &["test"], "test.parquet");
-        assert_eq!("s3://test_bk/test/test.parquet", &url);
+        assert_eq!("test_bk/test/test.parquet", &url);
         if let Ok((bucket, key)) = parse_s3_url(&url) {
             assert_eq!(&bucket, "test_bk");
             assert_eq!("test/test.parquet", &key);
         } else {
             panic!("should not be here");
         }
-        if let Ok((bk, _)) = parse_s3_url("s3://bucket_name") {
+        if let Ok((bk, _)) = parse_s3_url("bucket_name") {
             assert_eq!(&bk, "bucket_name");
         } else {
             panic!("should not be here");

@@ -317,7 +317,7 @@ mod tests {
         let bucket_name = "test_bk";
         let region = Region::Custom {
             region: "".to_string(),
-            endpoint: "http://127.0.0.1:9090".to_string(),
+            endpoint: "http://127.0.0.1:9000".to_string(),
         };
 
         let schema = Arc::new(Schema::empty());
@@ -379,7 +379,7 @@ mod tests {
         let bucket_name = "test_bucket";
         let region = Region::Custom {
             region: "".to_string(),
-            endpoint: "http://127.0.0.1:9090".to_string(),
+            endpoint: "http://127.0.0.1:9000".to_string(),
         };
         let local_binlog_path_prefix = "./test/binlog";
         let tmp_dir_path_prefix = "./test/tmp";

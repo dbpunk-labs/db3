@@ -28,6 +28,7 @@ use crate::proto::rtstore_memory_proto::{
 };
 use crate::store::cell_store::{CellStore, CellStoreConfig};
 use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
+use crate::store::object_store::build_credentials;
 use arc_swap::ArcSwap;
 use etcd_client::{Client, ConnectOptions, GetOptions};
 use s3::creds::Credentials;
@@ -86,14 +87,8 @@ impl MemoryNodeState {
         }
     }
 
-    fn build_storage_auth() -> Credentials {
-        Credentials::from_env_specific(
-            Some("AWS_S3_ACCESS_KEY"),
-            Some("AWS_S3_SECRET_KEY"),
-            None,
-            None,
-        )
-        .unwrap()
+    fn build_storage_auth() -> Result<Credentials> {
+        build_credentials(None, None)
     }
 
     pub async fn build_cell_store(
@@ -111,7 +106,7 @@ impl MemoryNodeState {
             for id in partition_ids {
                 //TODO table id is not safe
                 let object_path = format!("{}/{}", name, id);
-                let auth = MemoryNodeState::build_storage_auth();
+                let auth = MemoryNodeState::build_storage_auth()?;
                 let cell_log_path = format!(
                     "{}/{}/{}/{}/log/",
                     memory_node_confg.binlog_root_dir, db, name, id
@@ -438,7 +433,7 @@ mod tests {
     fn create_assign_partition_request(tname: &str, db: &str) -> AssignPartitionRequest {
         let region = StorageRegion {
             region: "".to_string(),
-            endpoint: "http://127.0.0.1:9090".to_string(),
+            endpoint: "http://127.0.0.1:9000".to_string(),
         };
 
         let storage_config = StorageBackendConfig {

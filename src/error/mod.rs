@@ -17,6 +17,7 @@
 //
 
 use arrow::error::ArrowError;
+use datafusion::error::DataFusionError;
 use parquet::errors::ParquetError;
 use s3::error::S3Error;
 use sqlparser::parser::ParserError;
@@ -98,6 +99,8 @@ pub enum RTStoreError {
     SQLParseError(String),
     #[error("fail to create credentials for s3")]
     S3AuthError,
+    #[error("sql execution error for e {0}")]
+    SQLEngineError(DataFusionError),
 }
 
 /// convert io error to rtstore error
@@ -110,6 +113,12 @@ impl From<IoError> for RTStoreError {
 impl From<ParquetError> for RTStoreError {
     fn from(error: ParquetError) -> Self {
         RTStoreError::FSParquetError(error)
+    }
+}
+
+impl From<DataFusionError> for RTStoreError {
+    fn from(err: DataFusionError) -> Self {
+        RTStoreError::SQLEngineError(err)
     }
 }
 
