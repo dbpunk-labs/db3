@@ -33,6 +33,7 @@ use s3::region::Region;
 use std::pin::Pin;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
+uselog!(info);
 
 pub struct ComputeNodeConfig {
     pub etcd_cluster: String,
@@ -93,6 +94,7 @@ impl ComputeNode for ComputeNodeImpl {
         if !query_request.default_db.is_empty() {
             db = Some(query_request.default_db);
         }
+        info!("receive sql {}", &query_request.sql);
         let batches = self
             .sql_engine
             .execute(&query_request.sql, db)

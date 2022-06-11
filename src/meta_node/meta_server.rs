@@ -155,6 +155,7 @@ impl MetaServiceImpl {
     pub async fn init(&self) -> Result<()> {
         self.catalog.recover().await?;
         let local_meta_store = self.meta_store.clone();
+        self.meta_store.add_node(&self.config.node).await?;
         let local_state = self.state.clone();
         tokio::task::spawn(async move {
             if let Ok(mut stream) = local_meta_store

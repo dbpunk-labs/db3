@@ -34,6 +34,7 @@ pub async fn build_compute_node_sdk(
         return Err(RTStoreError::MetaStoreNotFoundErr);
     }
     let addr = format!("http://{}:{}", nodes[0].ns, nodes[0].port);
+    info!("connect compute node {}", &addr);
     match compute_node_sdk::ComputeNodeSDK::connect(&addr).await {
         Ok(sdk) => Ok(sdk),
         Err(e) => Err(RTStoreError::NodeRPCError(
@@ -50,6 +51,7 @@ pub async fn build_memory_node_sdk(
         return Err(RTStoreError::MetaStoreNotFoundErr);
     }
     let addr = format!("http://{}:{}", nodes[0].ns, nodes[0].port);
+    info!("connect memory node {}", &addr);
     match memory_node_sdk::MemoryNodeSDK::connect(&addr).await {
         Ok(sdk) => Ok(sdk),
         Err(e) => Err(RTStoreError::NodeRPCError(
@@ -64,6 +66,7 @@ pub async fn build_meta_node_sdk(meta_store: &MetaStore) -> Result<meta_node_sdk
         return Err(RTStoreError::MetaStoreNotFoundErr);
     }
     let meta_addr = format!("http://{}:{}", nodes[0].ns, nodes[0].port);
+    info!("connect meta node {}", &meta_addr);
     match meta_node_sdk::MetaNodeSDK::connect(&meta_addr).await {
         Ok(sdk) => Ok(sdk),
         Err(e) => Err(RTStoreError::NodeRPCError(

@@ -193,31 +193,36 @@ impl SQLExecutor {
     }
     async fn handle_query(&self, sql: &str, db: &Option<String>) -> Result<SQLResult> {
         let db_str = db.clone().map_or("".to_string(), |v| v);
-        if let Ok(resp) = self.compute_sdk.query(sql, &db_str).await {
-            let mut stream = resp.into_inner();
-            let flight_data = stream.message().await?.unwrap();
-            // convert FlightData to a stream
-            let schema: SchemaRef = Arc::new(Schema::try_from(&flight_data)?);
-            let mut results = vec![];
-            let dictionaries_by_field = HashMap::new();
-            while let Some(flight_data) = stream.message().await? {
-                let record_batch = flight_data_to_arrow_batch(
-                    &flight_data,
-                    schema.clone(),
-                    &dictionaries_by_field,
-                )?;
-                results.push(record_batch);
+        match self.compute_sdk.query(sql, &db_str).await {
+            Ok(resp) => {
+                let mut stream = resp.into_inner();
+                let flight_data = stream.message().await?.unwrap();
+                // convert FlightData to a stream
+                let schema: SchemaRef = Arc::new(Schema::try_from(&flight_data)?);
+                let mut results = vec![];
+                let dictionaries_by_field = HashMap::new();
+                while let Some(flight_data) = stream.message().await? {
+                    let record_batch = flight_data_to_arrow_batch(
+                        &flight_data,
+                        schema.clone(),
+                        &dictionaries_by_field,
+                    )?;
+                    results.push(record_batch);
+                }
+                info!("call compute node done with schema {}", schema);
+                Ok(SQLResult {
+                    batch: Some(results),
+                    effected_rows: 0,
+                })
             }
-            Ok(SQLResult {
-                batch: Some(results),
-                effected_rows: 0,
-            })
-        } else {
-            // add error handle
-            Ok(SQLResult {
-                batch: None,
-                effected_rows: 0,
-            })
+            Err(e) => {
+                info!("fail to call compute node for e {}", e);
+                // add error handle
+                Ok(SQLResult {
+                    batch: None,
+                    effected_rows: 0,
+                })
+            }
         }
     }
 
@@ -327,11 +332,13 @@ impl SQLExecutor {
 
     fn handle_show_tables(&self, db: &Option<String>) -> Result<SQLResult> {
         let db_str = db.clone().map_or("".to_string(), |v| v);
+        info!("show table in db {}", db_str);
         let database = self.catalog.get_db(&db_str)?;
         let table_names = database.table_names();
         let schema_vec = vec![ArrowField::new("Tables", DataType::Utf8, false)];
         let mut rows: Vec<Vec<Data>> = Vec::new();
         for name in table_names {
+            info!("table {}", &name);
             let row = vec![Data::Varchar(name)];
             rows.push(row);
         }
@@ -349,7 +356,11 @@ impl SQLExecutor {
         })
     }
 
-    fn handle_show_variable(&self, variable: &Vec<Ident>, db:&Option<String>) -> Result<SQLResult> {
+    fn handle_show_variable(
+        &self,
+        variable: &Vec<Ident>,
+        db: &Option<String>,
+    ) -> Result<SQLResult> {
         let mut is_global = true;
         let first_id = &variable[0].value.to_lowercase();
         if first_id.as_str() == "session" {
@@ -427,15 +438,13 @@ impl SQLExecutor {
                 if self.is_query_system_vars(&q.body) {
                     self.handle_select_variable(&q.body)
                 } else {
-                    info!("sql go compute node");
+                    info!("sql go to compute node");
                     self.handle_query(sql, db).await
                 }
             }
             (_, _, _) => {
-
-                    info!("sql go compute node");
+                info!("sql go to compute node");
                 self.handle_query(sql, db).await
-
             }
         }
     }

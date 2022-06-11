@@ -242,8 +242,10 @@ pub fn write_batch_to_resultset<'a, W: std::io::Write + Send>(
                     }
                 }
             }
+            rw.end_row()?;
         }
     }
+    rw.finish()?;
     Ok(())
 }
 

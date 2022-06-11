@@ -263,6 +263,7 @@ impl Catalog {
                         }
                     }
                     for table_desc in new_add_tables {
+                        info!("new table {} to be added", table_desc.name);
                         if let Ok(database) = local_self.get_db(&table_desc.db) {
                             if let Err(e) = database.create_table(&table_desc, true).await {
                                 warn!("fail  to create table for error {}", e);
