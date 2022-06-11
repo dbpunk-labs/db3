@@ -18,4 +18,5 @@
 
 pub mod interruptible_parser;
 pub mod mysql_handler;
+mod mysql_vars;
 mod sql_handler;

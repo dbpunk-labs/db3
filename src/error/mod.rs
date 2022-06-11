@@ -103,6 +103,8 @@ pub enum RTStoreError {
     SQLEngineError(DataFusionError),
     #[error("fail to encode or decode RecordBatch for {0}")]
     RecordBatchCodecError(String),
+    #[error("fail to call rpc for {0}")]
+    RPCStatusError(Status),
 }
 
 /// convert io error to rtstore error
@@ -169,6 +171,12 @@ impl From<RTStoreError> for IoError {
 impl From<RTStoreError> for String {
     fn from(error: RTStoreError) -> Self {
         format!("{}", error)
+    }
+}
+
+impl From<Status> for RTStoreError {
+    fn from(err: Status) -> Self {
+        RTStoreError::RPCStatusError(err)
     }
 }
 

@@ -20,11 +20,15 @@ uselog!(debug, info, warn);
 use crate::catalog::catalog::Catalog;
 use crate::error::Result;
 use crate::frontend_node::mysql::interruptible_parser::*;
+use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrame;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::prelude::SessionConfig;
+use datafusion::logical_expr::Volatility;
+use datafusion::physical_plan::ColumnarValue;
+use datafusion::prelude::{create_udf, SessionConfig};
+use datafusion::scalar::ScalarValue;
 use datafusion::sql::planner::SqlToRel;
 use sqlparser::{
     ast::{ColumnDef, SetExpr, Statement as SQLStatement},
@@ -49,6 +53,7 @@ impl SQLEngine {
             runtime: runtime.clone(),
         }
     }
+
     fn parse_sql(sql: &str) -> Result<(Keyword, SQLStatement)> {
         let dialect = MySqlDialect {};
         let mut parser = InterruptibleParser::new(&dialect, sql)?;
@@ -59,6 +64,7 @@ impl SQLEngine {
     }
 
     pub async fn execute(&self, sql: &str, db: Option<String>) -> Result<SQLResult> {
+        info!("process sql {}", sql);
         let (_, statement) = Self::parse_sql(sql)?;
         let config = match db {
             Some(name) => {
@@ -72,8 +78,29 @@ impl SQLEngine {
                 config.with_default_catalog_and_schema("rtstore", "public")
             }
         };
+        let database_fn =
+            |_: &[ColumnarValue]| Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some("db1".to_string()))));
+        let version_fn = |_: &[ColumnarValue]| {
+            Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                "8.0.28".to_string(),
+            ))))
+        };
         //TODO use session id to cache session context
-        let stx = SessionContext::with_config_rt(config, self.runtime.clone());
+        let mut stx = SessionContext::with_config_rt(config, self.runtime.clone());
+        stx.register_udf(create_udf(
+            "version",
+            vec![],
+            Arc::new(DataType::Utf8),
+            Volatility::Immutable,
+            Arc::new(version_fn),
+        ));
+        stx.register_udf(create_udf(
+            "database",
+            vec![],
+            Arc::new(DataType::Utf8),
+            Volatility::Immutable,
+            Arc::new(database_fn),
+        ));
         stx.register_catalog("rtstore", self.catalog.clone());
         let state = stx.state.read().clone();
         let query_planner = SqlToRel::new(&state);

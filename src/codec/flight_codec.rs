@@ -141,3 +141,15 @@ pub fn flight_data_to_arrow_batch(
                 })
         })?
 }
+
+impl TryFrom<&FlightData> for Schema {
+    type Error = ArrowError;
+    fn try_from(data: &FlightData) -> ArrowResult<Self> {
+        convert::schema_from_bytes(&data.data_header[..]).map_err(|err| {
+            ArrowError::ParseError(format!(
+                "Unable to convert flight data to Arrow schema: {}",
+                err
+            ))
+        })
+    }
+}

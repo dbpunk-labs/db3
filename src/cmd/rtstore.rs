@@ -30,7 +30,7 @@ use rtstore::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType};
 use rtstore::proto::rtstore_compute_proto::compute_node_server::ComputeNodeServer;
 use rtstore::proto::rtstore_memory_proto::memory_node_server::MemoryNodeServer;
 use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
-use rtstore::sdk::{build_memory_node_sdk, build_meta_node_sdk};
+use rtstore::sdk::{build_compute_node_sdk, build_memory_node_sdk, build_meta_node_sdk};
 use rtstore::store::{
     build_meta_store, build_readonly_meta_store, meta_store::MetaStoreType,
     object_store::build_region,
@@ -108,6 +108,8 @@ enum Commands {
         etcd_root_path: String,
         #[clap(required = true)]
         ns: String,
+        #[clap(required = true)]
+        var_config_path: String,
     },
 }
 
@@ -248,34 +250,47 @@ async fn start_frontend_server(cmd: &Commands) -> Result<(), Box<dyn std::error:
         etcd_cluster,
         etcd_root_path,
         ns,
+        var_config_path,
     } = cmd
     {
+        info!("start frontend node ...");
         if let Ok(meta_store) = build_readonly_meta_store(etcd_cluster, etcd_root_path).await {
-            if let (Ok(meta_node_sdk), Ok(memory_node_sdk)) = (
+            if let (Ok(meta_node_sdk), Ok(memory_node_sdk), Ok(compute_node_sdk)) = (
                 build_meta_node_sdk(&meta_store).await,
                 build_memory_node_sdk(&meta_store).await,
+                build_compute_node_sdk(&meta_store).await,
             ) {
                 let addr = format!("{}:{}", ns, port);
                 info!("start frontend node on addr {}", addr);
                 let listener = TcpListener::bind(addr).await.unwrap();
                 let arc_store = Arc::new(meta_store);
-                let handler =
-                    mysql_handler::MySQLHandler::new(meta_node_sdk, memory_node_sdk, arc_store);
-                assert!(handler.init().await.is_ok());
-                loop {
-                    let (socket, _) = listener.accept().await.unwrap();
-                    let new_handler = handler.clone();
-                    tokio::spawn(async move {
-                        let result = AsyncMysqlIntermediary::run_on(new_handler, socket).await;
-                        match result {
-                            Ok(_) => {}
-                            Err(e) => {
-                                warn!("fail to process incoming connection with e {}", e);
+                if let Ok(handler) = mysql_handler::MySQLHandler::new(
+                    meta_node_sdk,
+                    memory_node_sdk,
+                    compute_node_sdk,
+                    arc_store,
+                    &var_config_path,
+                ) {
+                    assert!(handler.init().await.is_ok());
+                    loop {
+                        let (socket, _) = listener.accept().await.unwrap();
+                        let new_handler = handler.clone();
+                        tokio::spawn(async move {
+                            let result = AsyncMysqlIntermediary::run_on(new_handler, socket).await;
+                            match result {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    warn!("fail to process incoming connection with e {}", e);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
+                } else {
+                    info!("fail to new mysql handler");
                 }
             }
+        } else {
+            info!("fail to start frontend node");
         }
     }
     Ok(())
@@ -285,10 +300,13 @@ async fn start_frontend_server(cmd: &Commands) -> Result<(), Box<dyn std::error:
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_log();
     let args = Cli::parse();
-    match args.command {
+    if let Err(e) = match args.command {
         Commands::Meta { .. } => start_metaserver(&args.command).await,
         Commands::MemoryNode { .. } => start_memory_node(&args.command).await,
         Commands::FrontendNode { .. } => start_frontend_server(&args.command).await,
         Commands::ComputeNode { .. } => start_compute_node(&args.command).await,
+    } {
+        warn!("fail to start node for err {}", e);
     }
+    Ok(())
 }

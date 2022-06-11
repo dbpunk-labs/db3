@@ -22,6 +22,8 @@ use crate::proto::rtstore_meta_proto::{
     CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
 };
 use std::sync::Arc;
+
+use tonic::transport::Endpoint;
 use tonic::{Request, Response, Status};
 uselog!(info);
 
@@ -42,8 +44,10 @@ impl Clone for MetaNodeSDK {
 
 impl MetaNodeSDK {
     pub async fn connect(endpoint: &str) -> std::result::Result<Self, tonic::transport::Error> {
+        let rpc_endpoint = Endpoint::new(endpoint.to_string())?;
+        let channel = rpc_endpoint.connect_lazy();
         // create a new client connection
-        let client = Arc::new(MetaClient::connect(endpoint.to_string()).await?);
+        let client = Arc::new(MetaClient::new(channel));
         Ok(MetaNodeSDK {
             endpoint: endpoint.to_string(),
             client,

@@ -26,6 +26,22 @@ use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType};
 use crate::store::meta_store::MetaStore;
 uselog!(info);
 
+pub async fn build_compute_node_sdk(
+    meta_store: &MetaStore,
+) -> Result<compute_node_sdk::ComputeNodeSDK> {
+    let nodes = meta_store.get_nodes(RtStoreNodeType::KComputeNode).await?;
+    if nodes.is_empty() {
+        return Err(RTStoreError::MetaStoreNotFoundErr);
+    }
+    let addr = format!("http://{}:{}", nodes[0].ns, nodes[0].port);
+    match compute_node_sdk::ComputeNodeSDK::connect(&addr).await {
+        Ok(sdk) => Ok(sdk),
+        Err(e) => Err(RTStoreError::NodeRPCError(
+            format!("fail to connect compute node for err {}", e).to_string(),
+        )),
+    }
+}
+
 pub async fn build_memory_node_sdk(
     meta_store: &MetaStore,
 ) -> Result<memory_node_sdk::MemoryNodeSDK> {

@@ -36,7 +36,8 @@ use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
-uselog!(info, debug);
+use string_builder::Builder;
+uselog!(info, debug, warn);
 
 pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef> {
     let mut fields: Vec<ArrowField> = Vec::new();
@@ -296,6 +297,60 @@ pub fn rows_to_columns(
     }
     let record_batch = RecordBatch::try_new(schema.clone(), array_refs)?;
     Ok(record_batch)
+}
+
+pub fn schema_to_ddl_recordbatch(name: &str, schema: &SchemaRef) -> Result<RecordBatch> {
+    let output_schema = Arc::new(Schema::new(vec![
+        ArrowField::new("Table", DataType::Utf8, false),
+        ArrowField::new("Create Table", DataType::Utf8, false),
+    ]));
+    let mut builder = Builder::default();
+    builder.append(format!("create table `{}` (", name));
+    for i in 0..schema.fields().len() {
+        let f = &schema.fields()[i];
+        if i > 0 {
+            builder.append(",");
+        }
+        match f.data_type() {
+            DataType::Int8 => {
+                builder.append(format!("{} tinyint", f.name()));
+            }
+            DataType::Int16 => {
+                builder.append(format!("{} smallint", f.name()));
+            }
+            DataType::Int32 => {
+                builder.append(format!("{} int", f.name()));
+            }
+            DataType::Int64 => {
+                builder.append(format!("{} bigint", f.name()));
+            }
+            DataType::Float32 => {
+                builder.append(format!("{} float", f.name()));
+            }
+            DataType::Float64 => {
+                builder.append(format!("{} double", f.name()));
+            }
+            DataType::Utf8 => {
+                builder.append(format!("{} varchar(255)", f.name()));
+            }
+            DataType::Timestamp(_, _) => {
+                builder.append(format!("{} timestamp", f.name()));
+            }
+            _ => {
+                warn!("{:?} is unsupported", f);
+            }
+        }
+    }
+    builder.append(")");
+    let ddl = builder.string().unwrap();
+    let row = vec![Data::Varchar(name.to_string()), Data::Varchar(ddl)];
+    let rows = RowRecordBatch {
+        batch: vec![row],
+        schema_version: 0,
+    };
+    let data = LinkedList::<RowRecordBatch>::new();
+    data.push_front(rows)?;
+    rows_to_columns(&output_schema, &data)
 }
 
 #[cfg(test)]

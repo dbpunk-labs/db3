@@ -18,6 +18,7 @@
 
 use crate::error::{RTStoreError, Result};
 use etcd_client::Client;
+uselog!(info);
 pub mod cell_store;
 pub mod meta_store;
 pub mod object_store;
@@ -38,6 +39,7 @@ pub async fn build_meta_store(
             name: "etcd".to_string(),
         }),
     }?;
+    info!("connect to etcd {} done", etcd_cluster);
     let meta_store = meta_store::MetaStore::new(client, meta_store_config);
     Ok(meta_store)
 }

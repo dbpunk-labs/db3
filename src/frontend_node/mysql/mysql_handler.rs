@@ -17,7 +17,9 @@
 //
 
 use super::sql_handler::SQLExecutor;
+use crate::base::mysql_utils;
 use crate::error::Result as RtStoreResult;
+use crate::sdk::compute_node_sdk::ComputeNodeSDK;
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::sdk::meta_node_sdk::MetaNodeSDK;
 use crate::store::meta_store::MetaStore;
@@ -38,6 +40,7 @@ pub struct MySQLHandler {
     id: u32,
     salt: [u8; 20],
     sql_executor: SQLExecutor,
+    db: Option<String>,
 }
 
 impl Clone for MySQLHandler {
@@ -57,22 +60,32 @@ impl Clone for MySQLHandler {
             salt: scramble,
             id: self.id + 1,
             sql_executor: self.sql_executor.clone(),
+            db: self.db.clone(),
         }
     }
 }
 
 impl MySQLHandler {
     pub fn new(
-        sdk: MetaNodeSDK,
-        memory_node_sdk: MemoryNodeSDK,
+        meta_sdk: MetaNodeSDK,
+        memory_sdk: MemoryNodeSDK,
+        compute_sdk: ComputeNodeSDK,
         meta_store: Arc<MetaStore>,
-    ) -> Self {
-        Self {
+        var_config_path: &str,
+    ) -> Result<Self> {
+        Ok(Self {
             version: "8.0.26-rtstore".to_string(),
             id: 0,
             salt: [0 as u8; 20],
-            sql_executor: SQLExecutor::new(sdk, meta_store, memory_node_sdk),
-        }
+            sql_executor: SQLExecutor::new(
+                meta_sdk,
+                meta_store,
+                memory_sdk,
+                compute_sdk,
+                var_config_path,
+            )?,
+            db: None,
+        })
     }
     pub async fn init(&self) -> RtStoreResult<()> {
         self.sql_executor.init().await
@@ -155,10 +168,16 @@ impl<W: std::io::Write + Send> AsyncMysqlShim<W> for MySQLHandler {
         sql: &'a str,
         results: QueryResultWriter<'a, W>,
     ) -> Result<()> {
-        if let Ok(result) = self.sql_executor.execute(sql, None).await {
-            info!("execute {} ok", sql);
+        info!("execute {} ", sql);
+        if let Ok(result) = self.sql_executor.execute(sql, &self.db).await {
+            if let Some(batches) = result.batch {
+                mysql_utils::write_batch_to_resultset(&batches, results).unwrap();
+            } else {
+                results.completed(OkResponse::default())?;
+            }
+        } else {
+            results.completed(OkResponse::default())?;
         }
-        results.completed(OkResponse::default())?;
         Ok(())
     }
 
@@ -167,6 +186,8 @@ impl<W: std::io::Write + Send> AsyncMysqlShim<W> for MySQLHandler {
         database_name: &'a str,
         writer: InitWriter<'a, W>,
     ) -> Result<()> {
+        self.db = Some(database_name.to_string());
+        info!("enter db {}", database_name);
         writer.ok()
     }
 }
