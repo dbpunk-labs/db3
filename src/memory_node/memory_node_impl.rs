@@ -39,8 +39,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
 use tonic::{Request, Response, Status};
-
-uselog!(info, warn);
+uselog!(info, warn, debug);
 
 pub struct MemoryNodeConfig {
     pub binlog_root_dir: String,
@@ -232,13 +231,13 @@ impl MemoryNodeImpl {
                 };
                 if let Some(cell) = cell_opt {
                     if cell.do_l2_compaction().await.is_ok() {
-                        info!(
+                        debug!(
                             "do l2 compaction done for table {}, pid {}",
                             &local_table_id, pid
                         )
                     }
                 } else {
-                    info!(
+                    warn!(
                         "partition {} of table {} exist from compaction",
                         &local_table_id, pid
                     );

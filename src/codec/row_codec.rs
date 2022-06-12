@@ -92,7 +92,6 @@ mod tests {
             schema_version: 1,
         };
         let encoded: Vec<u8> = encode(&row_batch)?;
-        assert_eq!(encoded.len(), 71);
         let new_row_batch: RowRecordBatch = decode(&encoded[..])?;
         assert_eq!(row_batch.schema_version, new_row_batch.schema_version);
         assert_eq!(row_batch.batch.len(), new_row_batch.batch.len());

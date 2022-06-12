@@ -52,9 +52,6 @@ unsafe impl Sync for MetaStore {}
 
 impl MetaStore {
     pub fn new(client: Client, config: MetaStoreConfig) -> Self {
-        let state = MetaStoreState {
-            tables: HashMap::new(),
-        };
         Self {
             config,
             client: Arc::new(client),

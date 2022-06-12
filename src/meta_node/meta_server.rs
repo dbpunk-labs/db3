@@ -329,13 +329,4 @@ mod tests {
             ctime: 0,
         }
     }
-
-    #[tokio::test]
-    async fn test_create_table() {
-        let table_desc = Some(create_simple_table_desc("test", "t1"));
-        let meta = build_meta_service().await;
-        let req = Request::new(CreateTableRequest { table_desc });
-        let result = meta.create_table(req).await;
-        assert!(result.is_ok());
-    }
 }

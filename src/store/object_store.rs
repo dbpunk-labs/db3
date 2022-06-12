@@ -40,7 +40,7 @@ use std::io::{Error, ErrorKind, Read};
 use std::path::Path;
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
-uselog!(info, warn);
+uselog!(info, warn, debug);
 
 const ACCESS_KEY: &str = "AWS_ACCESS_KEY_ID";
 const SECRET_KEY: &str = "AWS_SECRET_ACCESS_KEY";
@@ -229,7 +229,7 @@ impl ObjectStore for S3FileSystem {
                 format!("the url {} is invalid", url),
             ))
         })?;
-        info!("list file {} in bucket {} , key {}", url, &bucket, &key);
+        debug!("list file {} in bucket {} , key {}", url, &bucket, &key);
         let bucket_req = build_bucket(&bucket, &self.region, &self.credentials);
         let objects = bucket_req
             .list(key, None)
@@ -237,7 +237,7 @@ impl ObjectStore for S3FileSystem {
             .map_err(|e| Error::new(ErrorKind::Other, format!("fail to list bucket for {}", e)))?;
         let result = stream::iter(objects.into_iter().flat_map(|s| s.contents).map(
             move |object| {
-                info!("object {}", &format!("{}/{}", &bucket, &object.key));
+                debug!("object {}", &format!("{}/{}", &bucket, &object.key));
                 let time: Option<DateTime<Utc>> =
                     match NaiveDateTime::parse_from_str(&object.last_modified, "%Y-%m-%d %H:%M:%S")
                     {
@@ -269,8 +269,10 @@ impl ObjectStore for S3FileSystem {
 mod tests {
     use super::*;
     use datafusion::assert_batches_eq;
+    use datafusion::datasource::listing::{ListingTable, ListingTableConfig, ListingTableUrl};
     use datafusion::datasource::TableProvider;
     use datafusion::error::DataFusionError;
+
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::prelude::*;
     use futures::TryStreamExt;
@@ -306,7 +308,7 @@ mod tests {
         bucket_fs
             .put_with_file(&file_path, "ttt/test_key.parquet")
             .await?;
-        let s3_path = "s3://test3/";
+        let s3_path = "test3/";
         if let Ok(stream) = s3.list_file(&s3_path).await {
             let ret: DFResult<Vec<FileMeta>> = stream.try_collect().await;
             match ret {

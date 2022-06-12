@@ -31,18 +31,20 @@ jobs:
 
       - name: Setup s3 mock environment
         run: |
-          mkdir -p ~/.aws
-          echo "[default]" > ~/.aws/credentials
-          echo "aws_access_key_id = test" >> ~/.aws/credentials
-          echo "aws_secret_access_key = test" >> ~/.aws/credentials
-          export AWS_EC2_METADATA_DISABLED=true
-          docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 10
-          aws --endpoint-url http://127.0.0.1:9090/ s3 mb s3://testbucket
+          docker run \
+          --detach \
+          --rm \
+          --publish 9000:9000 \
+          --publish 9001:9001 \
+          --volume "$(pwd)/parquet-testing:/data" \
+          --env "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" \
+          --env "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
+          quay.io/minio/minio server /data \
+          --console-address ":9001"
       - uses: actions-rs/cargo@v1
         env:
-          AWS_S3_ACCESS_KEY: test
-          AWS_S3_SECRET_KEY: test
-          AWS_S3_ENDPOINT: http://127.0.0.1:9090
+          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
           AWS_EC2_METADATA_DISABLED: true
         with:
           command: test
@@ -153,20 +155,21 @@ jobs:
           ./etcd &
       - name: Setup s3 mock environment
         run: |
-          mkdir -p ~/.aws
-          echo "[default]" > ~/.aws/credentials
-          echo "aws_access_key_id = test" >> ~/.aws/credentials
-          echo "aws_secret_access_key = test" >> ~/.aws/credentials
-          export AWS_EC2_METADATA_DISABLED=true
-          docker run -p 9090:9090 -p 9191:9191 -dt adobe/s3mock && sleep 10
-          aws --endpoint-url http://127.0.0.1:9090/ s3 mb s3://testbucket
+          docker run \
+          --detach \
+          --rm \
+          --publish 9000:9000 \
+          --publish 9001:9001 \
+          --volume "$(pwd)/parquet-testing:/data" \
+          --env "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" \
+          --env "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
+          quay.io/minio/minio server /data \
+          --console-address ":9001"
       - name: Run rust test with coverage
         run: |
-          export AWS_S3_ACCESS_KEY=test
-          export AWS_S3_SECRET_KEY=test
-          export AWS_EC2_METADATA_DISABLED=true
+          export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+          export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
           cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
-
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}

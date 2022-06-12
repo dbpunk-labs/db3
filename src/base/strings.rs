@@ -73,15 +73,12 @@ mod tests {
     #[test]
     fn test_gen_s3_url() {
         let url = gen_s3_url("test_bk", &["test"], "test.parquet");
-        assert_eq!("test_bk/test/test.parquet", &url);
-        if let Ok((bucket, key)) = parse_s3_url(&url) {
+        assert_eq!("s3://test_bk/test/test.parquet", &url);
+
+        let url2 = "test_bk/test/test.parquet";
+        if let Ok((bucket, key)) = parse_s3_url(&url2) {
             assert_eq!(&bucket, "test_bk");
             assert_eq!("test/test.parquet", &key);
-        } else {
-            panic!("should not be here");
-        }
-        if let Ok((bk, _)) = parse_s3_url("bucket_name") {
-            assert_eq!(&bk, "bucket_name");
         } else {
             panic!("should not be here");
         }

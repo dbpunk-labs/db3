@@ -171,7 +171,7 @@ impl CellStore {
         fs::create_dir_all(&config.tmp_dir_path_prefix)?;
         let s3_fs = S3FileSystem::new(config.region.clone(), config.credentials.clone());
         let bucket_fs = s3_fs.new_bucket_fs(&config.bucket_name);
-        let log_path_str = format!("{}/0000.binlog", config.local_binlog_path_prefix);
+        let log_path_str = format!("{}/00000.binlog", config.local_binlog_path_prefix);
         let log_path = Path::new(&log_path_str);
         let fs = SyncPosixFileSystem {};
         let writer = fs.open_writable_file_writer(log_path)?;
@@ -253,11 +253,6 @@ impl CellStore {
 
     pub async fn do_l2_compaction(&self) -> Result<()> {
         let local_column_memtable = self.column_memtable.load();
-        info!(
-            "column memtable size {} , l2 limit {}",
-            self.column_memtable_size.load(Ordering::Relaxed),
-            self.config.l2_rows_limit
-        );
         if self.column_memtable_size.load(Ordering::Acquire) as u32 >= self.config.l2_rows_limit {
             self.column_memtable.store(Arc::new(LinkedList::new()));
             let previous = self.column_memtable_size.swap(0, Ordering::Relaxed);
@@ -274,7 +269,7 @@ impl CellStore {
             )
             .is_ok()
             {
-                info!("dump parquet to {} done", file_path.display());
+                debug!("dump parquet to {} done", file_path.display());
                 let readable_str = strings::to_readable_num_str(
                     self.parquet_file_counter.fetch_add(1, Ordering::Relaxed) as usize,
                     8,
@@ -283,7 +278,7 @@ impl CellStore {
                     "{}/{}.gz.parquet",
                     self.config.object_key_prefix, readable_str
                 );
-                info!("plan to store file to {}", object_key);
+                debug!("plan to store file to {}", object_key);
                 self.bucket_fs
                     .put_with_file(&file_path, &object_key)
                     .await?;
@@ -305,6 +300,7 @@ mod tests {
     use arrow::datatypes::Schema;
     use arrow::datatypes::*;
 
+    use crate::store::object_store::build_credentials;
     #[test]
     fn test_invalid_config() {
         let valid_schema = Arc::new(Schema::new(vec![Field::new("c1", DataType::Int64, true)]));
@@ -370,14 +366,8 @@ mod tests {
 
     fn gen_a_normal_config() -> Result<CellStoreConfig> {
         let valid_schema = Arc::new(Schema::new(vec![Field::new("c1", DataType::Int64, true)]));
-        let auth = Credentials::from_env_specific(
-            Some("AWS_ACCESS_KEY_ID"),
-            Some("AWS_SECRET_ACCESS_KEY"),
-            None,
-            None,
-        )
-        .unwrap();
-        let bucket_name = "test_bucket";
+        let auth = build_credentials(None, None)?;
+        let bucket_name = "testbucket";
         let region = Region::Custom {
             region: "".to_string(),
             endpoint: "http://127.0.0.1:9000".to_string(),
