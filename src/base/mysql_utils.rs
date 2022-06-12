@@ -20,11 +20,11 @@ use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
-    BooleanArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
-    StringArray, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
+    Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray,
+    TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
     TimestampSecondArray,
 };
-use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
+use arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use arrow::record_batch::RecordBatch;
 use chrono::NaiveDateTime;
 use msql_srv::Column as MySQLColumn;
@@ -47,11 +47,7 @@ macro_rules! type_mapping {
     };
 }
 
-pub fn sql_to_row_batch(
-    table_full_name: &str,
-    schema: &RtStoreSchemaDesc,
-    values: &[Expr],
-) -> Result<RowRecordBatch> {
+pub fn sql_to_row_batch(schema: &RtStoreSchemaDesc, values: &[Expr]) -> Result<RowRecordBatch> {
     let mut row: Vec<Data> = Vec::new();
     for (i, item) in values.iter().enumerate().take(schema.columns.len()) {
         let column_desc = &schema.columns[i];
@@ -66,7 +62,6 @@ pub fn sql_to_row_batch(
     Ok(RowRecordBatch {
         batch: vec![row],
         schema_version: 1,
-        id: table_full_name.to_string(),
     })
 }
 
@@ -96,7 +91,7 @@ pub fn sql_value_to_data(val: &Value, store_type: &RtStoreType) -> Result<Data> 
         }
         (RtStoreType::KTimestampMillsSecond, Value::SingleQuotedString(s))
         | (RtStoreType::KTimestampMillsSecond, Value::DoubleQuotedString(s)) => {
-            let time = NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").unwrap();
+            let time = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap();
             let ts = time.timestamp() * 1000;
             Ok(Data::Timestamp(ts as u64))
         }
@@ -247,8 +242,10 @@ pub fn write_batch_to_resultset<'a, W: std::io::Write + Send>(
                     }
                 }
             }
+            rw.end_row()?;
         }
     }
+    rw.finish()?;
     Ok(())
 }
 
@@ -272,7 +269,7 @@ pub fn sql_to_table_desc(columns: &Vec<ColumnDef>) -> Result<RtStoreSchemaDesc> 
         }?;
         let mut null_allowed = true;
 
-        if column.options.len() > 0 && ColumnOption::NotNull == column.options[0].option {
+        if !column.options.is_empty() && ColumnOption::NotNull == column.options[0].option {
             null_allowed = false;
         }
         let rtstore_column = RtStoreColumnDesc {

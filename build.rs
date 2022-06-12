@@ -24,6 +24,7 @@ fn main() {
                 "proto/rtstore_base.proto",
                 "proto/rtstore_meta_node.proto",
                 "proto/rtstore_memory_node.proto",
+                "proto/rtstore_compute_node.proto",
             ],
             &["proto"],
         )

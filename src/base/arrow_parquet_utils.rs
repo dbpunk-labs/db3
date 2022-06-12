@@ -36,7 +36,8 @@ use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
-uselog!(info, debug);
+use string_builder::Builder;
+uselog!(info, debug, warn);
 
 pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef> {
     let mut fields: Vec<ArrowField> = Vec::new();
@@ -79,7 +80,7 @@ pub fn dump_recordbatch(
         .set_compression(Compression::GZIP)
         .build();
     let fd = File::create(path)?;
-    let mut writer = ArrowWriter::try_new(fd, schema.clone(), Some(properties.clone()))?;
+    let mut writer = ArrowWriter::try_new(fd, schema.clone(), Some(properties))?;
     for batch in batches.iter() {
         writer.write(batch)?;
     }
@@ -265,6 +266,31 @@ pub fn rows_to_columns(
                             end_index
                         );
                     }
+                    DataType::Timestamp(_, _) => {
+                        if builders.len() <= index {
+                            let builder = RTStoreColumnBuilder::RTStoreTimestampMillsBuilder(
+                                TimestampMillisecondBuilder::new(rows.batch.len()),
+                            );
+                            builders.push(builder);
+                        }
+                        let bsize = builders.len();
+                        let builder = &mut builders[index];
+                        if let (
+                            RTStoreColumnBuilder::RTStoreTimestampMillsBuilder(ts_builder),
+                            Data::Timestamp(s),
+                        ) = (builder, column)
+                        {
+                            ts_builder.append_value(*s as i64)?;
+                            if current_index == end_index && array_refs.len() < bsize {
+                                array_refs.push(Arc::new(ts_builder.finish()));
+                            }
+                        } else {
+                            return Err(RTStoreError::TableTypeMismatchError {
+                                left: "timestamp".to_string(),
+                                right: column.name().to_string(),
+                            });
+                        }
+                    }
                     DataType::Utf8 => {
                         if builders.len() <= index {
                             let builder = RTStoreColumnBuilder::RTStoreStrBuilder(
@@ -272,6 +298,7 @@ pub fn rows_to_columns(
                             );
                             builders.push(builder);
                         }
+                        let bsize = builders.len();
                         let builder = &mut builders[index];
                         if let (
                             RTStoreColumnBuilder::RTStoreStrBuilder(str_builder),
@@ -279,7 +306,7 @@ pub fn rows_to_columns(
                         ) = (builder, column)
                         {
                             str_builder.append_value(s)?;
-                            if r_index == rows.batch.len() - 1 {
+                            if current_index == end_index && array_refs.len() < bsize {
                                 array_refs.push(Arc::new(str_builder.finish()));
                             }
                         } else {
@@ -296,6 +323,118 @@ pub fn rows_to_columns(
     }
     let record_batch = RecordBatch::try_new(schema.clone(), array_refs)?;
     Ok(record_batch)
+}
+
+pub fn schema_to_recordbatch(schema: &SchemaRef) -> Result<RecordBatch> {
+    let output_schema = Arc::new(Schema::new(vec![
+        ArrowField::new("Field", DataType::Utf8, false),
+        ArrowField::new("Type", DataType::Utf8, false),
+        ArrowField::new("Null", DataType::Utf8, false),
+        ArrowField::new("Key", DataType::Utf8, false),
+        ArrowField::new("Default", DataType::Utf8, false),
+        ArrowField::new("Extra", DataType::Utf8, false),
+    ]));
+    let mut rows: Vec<Vec<Data>> = Vec::new();
+    for i in 0..schema.fields().len() {
+        let mut row: Vec<Data> = Vec::new();
+        let f = &schema.fields()[i];
+        row.push(Data::Varchar(f.name().clone()));
+        match f.data_type() {
+            DataType::Utf8 => {
+                row.push(Data::Varchar("varchar(255)".to_string()));
+            }
+            DataType::Int8 => {
+                row.push(Data::Varchar("tinyint".to_string()));
+            }
+            DataType::Int16 => {
+                row.push(Data::Varchar("smallint".to_string()));
+            }
+            DataType::Int32 => {
+                row.push(Data::Varchar("int".to_string()));
+            }
+            DataType::Int64 => {
+                row.push(Data::Varchar("bigint".to_string()));
+            }
+            DataType::Float32 => {
+                row.push(Data::Varchar("float".to_string()));
+            }
+            DataType::Float64 => {
+                row.push(Data::Varchar("double".to_string()));
+            }
+            DataType::Timestamp(_, _) => {
+                row.push(Data::Varchar("timestamp".to_string()));
+            }
+            _ => {
+                row.push(Data::Varchar("unknow".to_string()));
+            }
+        }
+        row.push(Data::Varchar("YES".to_string()));
+        row.push(Data::Varchar("".to_string()));
+        row.push(Data::Varchar("".to_string()));
+        row.push(Data::Varchar("".to_string()));
+        rows.push(row);
+    }
+    let rows = RowRecordBatch {
+        batch: rows,
+        schema_version: 0,
+    };
+    let data = LinkedList::<RowRecordBatch>::new();
+    data.push_front(rows)?;
+    rows_to_columns(&output_schema, &data)
+}
+
+pub fn schema_to_ddl_recordbatch(name: &str, schema: &SchemaRef) -> Result<RecordBatch> {
+    let output_schema = Arc::new(Schema::new(vec![
+        ArrowField::new("Table", DataType::Utf8, false),
+        ArrowField::new("Create Table", DataType::Utf8, false),
+    ]));
+    let mut builder = Builder::default();
+    builder.append(format!("create table `{}` (", name));
+    for i in 0..schema.fields().len() {
+        let f = &schema.fields()[i];
+        if i > 0 {
+            builder.append(",");
+        }
+        match f.data_type() {
+            DataType::Int8 => {
+                builder.append(format!("{} tinyint", f.name()));
+            }
+            DataType::Int16 => {
+                builder.append(format!("{} smallint", f.name()));
+            }
+            DataType::Int32 => {
+                builder.append(format!("{} int", f.name()));
+            }
+            DataType::Int64 => {
+                builder.append(format!("{} bigint", f.name()));
+            }
+            DataType::Float32 => {
+                builder.append(format!("{} float", f.name()));
+            }
+            DataType::Float64 => {
+                builder.append(format!("{} double", f.name()));
+            }
+            DataType::Utf8 => {
+                builder.append(format!("{} varchar(255)", f.name()));
+            }
+            DataType::Timestamp(_, _) => {
+                builder.append(format!("{} timestamp", f.name()));
+            }
+            _ => {
+                warn!("{:?} is unsupported", f);
+            }
+        }
+    }
+    builder.append(")");
+    let ddl = builder.string().unwrap();
+    let row = vec![Data::Varchar(name.to_string()), Data::Varchar(ddl)];
+    let rows = RowRecordBatch {
+        batch: vec![row],
+        schema_version: 0,
+    };
+    let data = LinkedList::<RowRecordBatch>::new();
+    data.push_front(rows)?;
+    rows_to_columns(&output_schema, &data)
 }
 
 #[cfg(test)]
@@ -403,7 +542,6 @@ mod tests {
                 let row_batch = RowRecordBatch {
                     batch,
                     schema_version: 1,
-                    id: "eth.price".to_string(),
                 };
                 let ll: LinkedList<RowRecordBatch> = LinkedList::new();
                 ll.push_front(row_batch)?;

@@ -18,25 +18,29 @@ prost-types = "0.10"
 log = "0.4.16"
 uselog-rs = "0.3.0"
 bincode = "1.1.4"
+futures = "0.3"
 clap = { version = "3.1.8", features = ["derive"] }
-arrow = { version = "12", features = ["prettyprint"] }
-parquet = { version = "12", features = ["arrow"] }
+arrow = { version = "15", features = ["prettyprint"] }
+parquet = { version = "15", features = ["arrow"] }
 crossbeam = "0.8.1"
 chrono = { version = "0.4", default-features = false }
 pretty_env_logger = "0.4.0"
 # Note datafusion must use the same version with sqlparser
-datafusion = {git = "https://github.com/piedb-dev/arrow-datafusion.git", rev = "17ead70"}
-sqlparser = {git = "https://github.com/piedb-dev/sqlparser-rs.git", rev = "22a6acf"}
+datafusion = {git = "https://github.com/rtstore/arrow-datafusion.git", rev = "7288efc"}
+sqlparser = { git = "https://github.com/rtstore/sqlparser-rs.git", rev = "41b6d01"}
 arc-swap = "1.5.0"
-crossbeam-utils = "0.7.2"
+crossbeam-skiplist_piedb = "0.8.10"
 msql-srv = { git = "https://github.com/imotai/msql-srv", rev = "ee14d86" }
 mysql = "22"
 mysql_async = "0.29.0"
-rust-s3 = "0.31"
+rust-s3 = {version="0.31", features=["tags", "tokio-native-tls", "blocking"]}
 crc32c = "0.6"
 tempdir = "0.3.5"
 etcd-client = "0.9"
 rand = "0.8.5"
+regex = "1.5.5"
+string-builder = "0.2.0"
+
 
 [[bin]]
 name = "rtstore"

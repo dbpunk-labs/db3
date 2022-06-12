@@ -16,5 +16,42 @@
 // limitations under the License.
 //
 
+use crate::error::{RTStoreError, Result};
+use etcd_client::Client;
+uselog!(info);
 pub mod cell_store;
 pub mod meta_store;
+pub mod object_store;
+
+pub async fn build_meta_store(
+    etcd_cluster: &str,
+    etcd_root_path: &str,
+    store_type: meta_store::MetaStoreType,
+) -> Result<meta_store::MetaStore> {
+    let meta_store_config = meta_store::MetaStoreConfig {
+        store_type,
+        root_path: etcd_root_path.to_string(),
+    };
+    let etcd_cluster_endpoints: Vec<&str> = etcd_cluster.split(',').collect();
+    let client = match Client::connect(etcd_cluster_endpoints, None).await {
+        Ok(client) => Ok(client),
+        Err(_) => Err(RTStoreError::NodeRPCInvalidEndpointError {
+            name: "etcd".to_string(),
+        }),
+    }?;
+    info!("connect to etcd {} done", etcd_cluster);
+    let meta_store = meta_store::MetaStore::new(client, meta_store_config);
+    Ok(meta_store)
+}
+
+pub async fn build_readonly_meta_store(
+    etcd_cluster: &str,
+    etcd_root_path: &str,
+) -> Result<meta_store::MetaStore> {
+    build_meta_store(
+        etcd_cluster,
+        etcd_root_path,
+        meta_store::MetaStoreType::ImmutableMetaStore,
+    )
+    .await
+}

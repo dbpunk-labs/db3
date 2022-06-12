@@ -28,6 +28,7 @@ use crate::proto::rtstore_memory_proto::{
 };
 use crate::store::cell_store::{CellStore, CellStoreConfig};
 use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
+use crate::store::object_store::build_credentials;
 use arc_swap::ArcSwap;
 use etcd_client::{Client, ConnectOptions, GetOptions};
 use s3::creds::Credentials;
@@ -38,8 +39,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
 use tonic::{Request, Response, Status};
-
-uselog!(info, warn);
+uselog!(info, warn, debug);
 
 pub struct MemoryNodeConfig {
     pub binlog_root_dir: String,
@@ -50,9 +50,9 @@ pub struct MemoryNodeConfig {
 }
 
 pub struct MemoryNodeState {
-    // table->partition->cell
-    cells: HashMap<String, HashMap<i32, Arc<CellStore>>>,
-    //cells_compaction_state: HashMap<String, HashMap<i32, bool>>,
+    // db->table->partition->cell
+    cells: HashMap<String, HashMap<String, HashMap<i32, Arc<CellStore>>>>,
+    // cells_compaction_state: HashMap<String, HashMap<i32, bool>>,
 }
 
 impl MemoryNodeState {
@@ -86,43 +86,36 @@ impl MemoryNodeState {
         }
     }
 
-    fn build_storage_auth() -> Credentials {
-        Credentials::from_env_specific(
-            Some("AWS_S3_ACCESS_KEY"),
-            Some("AWS_S3_SECRET_KEY"),
-            None,
-            None,
-        )
-        .unwrap()
+    fn build_storage_auth() -> Result<Credentials> {
+        build_credentials(None, None)
     }
 
     pub async fn build_cell_store(
-        table_id: &str,
         partition_ids: &[i32],
         table_desc: &RtStoreTableDesc,
         storage_config: &StorageBackendConfig,
         memory_node_confg: &MemoryNodeConfig,
     ) -> Result<Vec<(i32, Arc<CellStore>)>> {
         if let Some(rtstore_schema) = &table_desc.schema {
-            let schema = arrow_parquet_utils::table_desc_to_arrow_schema(&rtstore_schema)?;
+            let schema = arrow_parquet_utils::table_desc_to_arrow_schema(rtstore_schema)?;
             let region = MemoryNodeState::build_region(&storage_config.region)?;
+            let name = &table_desc.name;
+            let db = &table_desc.db;
             let mut cells: Vec<(i32, Arc<CellStore>)> = Vec::new();
             for id in partition_ids {
                 //TODO table id is not safe
-                //
-                let safe_table_id = table_id.replace(".", "-");
-                let object_path = format!("{}/{}", &safe_table_id, id);
-                let auth = MemoryNodeState::build_storage_auth();
+                let object_path = format!("{}/{}", name, id);
+                let auth = MemoryNodeState::build_storage_auth()?;
                 let cell_log_path = format!(
-                    "{}/{}/{}/log/",
-                    memory_node_confg.binlog_root_dir, &safe_table_id, id
+                    "{}/{}/{}/{}/log/",
+                    memory_node_confg.binlog_root_dir, db, name, id
                 );
                 let cell_tmp_path = format!(
-                    "{}/{}/{}/tmp/",
-                    memory_node_confg.tmp_store_root_dir, &safe_table_id, id
+                    "{}/{}/{}/{}/tmp/",
+                    memory_node_confg.tmp_store_root_dir, db, name, id
                 );
                 let mut cell_config = CellStoreConfig::new(
-                    &storage_config.bucket,
+                    db,
                     region.clone(),
                     &schema,
                     &cell_log_path,
@@ -145,10 +138,10 @@ impl MemoryNodeState {
         }
     }
 
-    pub fn get_cell(&self, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
-        if let Some(internal_map) = self.cells.get(table_id) {
-            if let Some(cell) = internal_map.get(&pid) {
-                Some(cell.clone())
+    pub fn get_cell(&self, db: &str, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
+        if let Some(db_map) = self.cells.get(db) {
+            if let Some(table_map) = db_map.get(table_id) {
+                table_map.get(&pid).map(|cell| cell.clone())
             } else {
                 None
             }
@@ -157,22 +150,38 @@ impl MemoryNodeState {
         }
     }
 
-    pub fn add_cell(&mut self, table_id: &str, pid: i32, cell_store: Arc<CellStore>) -> Result<()> {
-        if let Some(internal_map) = self.cells.get_mut(table_id) {
-            match internal_map.get(&pid) {
-                Some(_) => Err(RTStoreError::CellStoreExistError {
-                    tid: table_id.to_string(),
-                    pid,
-                }),
+    pub fn add_cell(
+        &mut self,
+        db: &str,
+        table_id: &str,
+        pid: i32,
+        cell_store: Arc<CellStore>,
+    ) -> Result<()> {
+        if let Some(db_map) = self.cells.get_mut(db) {
+            match db_map.get_mut(table_id) {
+                Some(table_map) => match table_map.get(&pid) {
+                    Some(_) => Err(RTStoreError::CellStoreExistError {
+                        tid: table_id.to_string(),
+                        pid,
+                    }),
+                    _ => {
+                        table_map.insert(pid, cell_store);
+                        Ok(())
+                    }
+                },
                 _ => {
-                    internal_map.insert(pid, cell_store);
+                    let mut table: HashMap<i32, Arc<CellStore>> = HashMap::new();
+                    table.insert(pid, cell_store);
+                    db_map.insert(table_id.to_string(), table);
                     Ok(())
                 }
             }
         } else {
-            let mut table: HashMap<i32, Arc<CellStore>> = HashMap::new();
-            table.insert(pid, cell_store);
-            self.cells.insert(table_id.to_string(), table);
+            let mut db_map: HashMap<String, HashMap<i32, Arc<CellStore>>> = HashMap::new();
+            let mut table_map: HashMap<i32, Arc<CellStore>> = HashMap::new();
+            table_map.insert(pid, cell_store);
+            db_map.insert(table_id.to_string(), table_map);
+            self.cells.insert(db.to_string(), db_map);
             Ok(())
         }
     }
@@ -187,69 +196,44 @@ impl Default for MemoryNodeState {
 pub struct MemoryNodeImpl {
     state: Arc<Mutex<MemoryNodeState>>,
     config: MemoryNodeConfig,
-    meta_store: ArcSwap<Option<MetaStore>>,
+    meta_store: Arc<MetaStore>,
 }
 
 impl MemoryNodeImpl {
-    pub fn new(config: MemoryNodeConfig) -> Self {
+    pub fn new(config: MemoryNodeConfig, meta_store: Arc<MetaStore>) -> Self {
         Self {
             state: Arc::new(Mutex::new(MemoryNodeState::new())),
             config,
-            meta_store: ArcSwap::from(Arc::new(None)),
+            meta_store,
         }
     }
 
-    pub async fn connect_to_meta(&self) -> Result<()> {
-        if self.config.etcd_cluster.is_empty() {
-            return Err(RTStoreError::NodeRPCInvalidEndpointError {
-                name: "etcd cluster".to_string(),
-            });
-        }
-
-        // connect to etcd
-        let endpoints: Vec<&str> = self.config.etcd_cluster.split(",").collect();
-        let etcd_client = match Client::connect(endpoints, None).await {
-            Ok(client) => Ok(client),
-            Err(e) => {
-                warn!("fail to connect etcd for err {}", e);
-                Err(RTStoreError::NodeRPCInvalidEndpointError {
-                    name: "etcd".to_string(),
-                })
-            }
-        }?;
-
-        let meta_store_config = MetaStoreConfig {
-            root_path: self.config.etcd_root_path.to_string(),
-            store_type: MetaStoreType::ImmutableMetaStore,
-        };
-
-        let meta_store = MetaStore::new(etcd_client, meta_store_config);
-        // register self to etcd
-        meta_store.add_node(&self.config.node).await?;
-        self.meta_store.store(Arc::new(Some(meta_store)));
+    pub async fn init(&self) -> Result<()> {
+        self.meta_store.add_node(&self.config.node).await?;
         Ok(())
     }
 
-    pub fn start_l2_compaction(&self, table_id: &str, pid: i32) {
+    pub fn start_l2_compaction(&self, db: &str, table_id: &str, pid: i32) {
         let local_table_id = table_id.to_string();
+        let local_db = db.to_string();
         let local_state = self.state.clone();
         // TODO avoid start compaction repeated
         tokio::task::spawn(async move {
             loop {
                 sleep(Duration::from_millis(1000 * 10)).await;
                 let cell_opt = match local_state.lock() {
-                    Ok(node_state) => node_state.get_cell(&local_table_id, pid),
+                    Ok(node_state) => node_state.get_cell(&local_db, &local_table_id, pid),
                     Err(_) => None,
                 };
                 if let Some(cell) = cell_opt {
                     if cell.do_l2_compaction().await.is_ok() {
-                        info!(
+                        debug!(
                             "do l2 compaction done for table {}, pid {}",
                             &local_table_id, pid
                         )
                     }
                 } else {
-                    info!(
+                    warn!(
                         "partition {} of table {} exist from compaction",
                         &local_table_id, pid
                     );
@@ -259,9 +243,9 @@ impl MemoryNodeImpl {
         });
     }
 
-    pub fn get_cell(&self, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
+    pub fn get_cell(&self, db: &str, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
         match self.state.lock() {
-            Ok(node_state) => node_state.get_cell(table_id, pid),
+            Ok(node_state) => node_state.get_cell(db, table_id, pid),
             Err(_) => None,
         }
     }
@@ -278,9 +262,11 @@ impl MemoryNode for MemoryNodeImpl {
         request: Request<AppendRecordsRequest>,
     ) -> std::result::Result<Response<AppendRecordsResponse>, Status> {
         let append_request = request.into_inner();
-        if let Some(cell_store) =
-            self.get_cell(&append_request.table_id, append_request.partition_id)
-        {
+        if let Some(cell_store) = self.get_cell(
+            &append_request.db,
+            &append_request.table_id,
+            append_request.partition_id,
+        ) {
             let row_batch = decode(&append_request.records)?;
             cell_store.put_records(row_batch).await?;
             Ok(Response::new(AppendRecordsResponse {}))
@@ -301,7 +287,6 @@ impl MemoryNode for MemoryNodeImpl {
             (&assign_request.table_desc, &assign_request.config)
         {
             let cells = MemoryNodeState::build_cell_store(
-                &assign_request.table_id,
                 &assign_request.partition_ids,
                 table_desc,
                 config,
@@ -312,7 +297,7 @@ impl MemoryNode for MemoryNodeImpl {
             let result = match self.state.lock() {
                 Ok(mut node_state) => {
                     for (id, cell) in cells {
-                        node_state.add_cell(&assign_request.table_id, id, cell)?;
+                        node_state.add_cell(&table_desc.db, &table_desc.name, id, cell)?;
                         cell_ids.push(id);
                     }
                     Ok(Response::new(AssignPartitionResponse {}))
@@ -323,7 +308,7 @@ impl MemoryNode for MemoryNodeImpl {
             };
             if result.is_ok() {
                 for id in cell_ids {
-                    self.start_l2_compaction(&assign_request.table_id, id);
+                    self.start_l2_compaction(&table_desc.db, &table_desc.name, id);
                 }
             }
             result
@@ -340,6 +325,7 @@ mod tests {
     use super::*;
     use crate::codec::row_codec::{encode, Data, RowRecordBatch};
     use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
+    use crate::store::build_readonly_meta_store;
     use std::thread;
     use tempdir::TempDir;
 
@@ -359,71 +345,71 @@ mod tests {
         }
     }
 
+    async fn build_memory_node() -> MemoryNodeImpl {
+        let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
+        let tmp_dir_path_str = tmp_dir_path.path().to_str().unwrap();
+        let config = build_config(tmp_dir_path_str);
+        let meta_store = build_readonly_meta_store(&config.etcd_cluster, &config.etcd_root_path)
+            .await
+            .unwrap();
+        MemoryNodeImpl::new(config, Arc::new(meta_store))
+    }
+
     #[tokio::test]
     async fn test_assign_partitions() {
-        let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
-        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = build_config(tmp_dir_path_str);
-            let memory_node = MemoryNodeImpl::new(config);
-            let assign_req = create_assign_partition_request("test.eth");
-            let req = Request::new(assign_req);
-            assert!(memory_node.assign_partition(req).await.is_ok());
-            assert!(memory_node.get_cell("test.eth", 3).is_none());
-            assert!(memory_node.get_cell("test.eth", 0).is_some());
-        } else {
-            panic!("should not be here");
-        }
+        let db = "db22";
+        let table = "tttt22";
+        let memory_node = build_memory_node().await;
+        let assign_req = create_assign_partition_request(table, db);
+        let req = Request::new(assign_req);
+        assert!(memory_node.assign_partition(req).await.is_ok());
+        assert!(memory_node.get_cell(db, table, 3).is_none());
+        assert!(memory_node.get_cell(db, table, 0).is_some());
     }
 
     #[tokio::test]
     async fn test_append_records_compaction() -> Result<()> {
-        let tmp_dir_path = TempDir::new("append_compaction_records").expect("create temp dir");
-        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = build_config(tmp_dir_path_str);
-            let memory_node = MemoryNodeImpl::new(config);
-            let assign_req = create_assign_partition_request("test.sol");
-            let req = Request::new(assign_req);
-            assert!(memory_node.assign_partition(req).await.is_ok());
-            assert!(memory_node.get_cell("test.sol", 3).is_none());
-            assert!(memory_node.get_cell("test.sol", 0).is_some());
-            for _ in 0..102400 {
-                let batch = gen_sample_row_batch();
-                let data = encode(&batch)?;
-                let req = Request::new(AppendRecordsRequest {
-                    table_id: "test.sol".to_string(),
-                    partition_id: 0,
-                    records: data,
-                });
-                assert!(memory_node.append_records(req).await.is_ok());
-            }
-        } else {
-            panic!("should not be here");
+        let db = "db333";
+        let table = "ttt33";
+        let memory_node = build_memory_node().await;
+        let assign_req = create_assign_partition_request(table, db);
+        let req = Request::new(assign_req);
+        assert!(memory_node.assign_partition(req).await.is_ok());
+        assert!(memory_node.get_cell(db, table, 3).is_none());
+        assert!(memory_node.get_cell(db, table, 0).is_some());
+        for _ in 0..102400 {
+            let batch = gen_sample_row_batch();
+            let data = encode(&batch)?;
+            let req = Request::new(AppendRecordsRequest {
+                table_id: table.to_string(),
+                partition_id: 0,
+                records: data,
+                db: db.to_string(),
+            });
+            assert!(memory_node.append_records(req).await.is_ok());
         }
         Ok(())
     }
 
     #[tokio::test]
     async fn test_append_records() -> Result<()> {
-        let tmp_dir_path = TempDir::new("append_records").expect("create temp dir");
-        if let Some(tmp_dir_path_str) = tmp_dir_path.path().to_str() {
-            let config = build_config(tmp_dir_path_str);
-            let memory_node = MemoryNodeImpl::new(config);
-            let assign_req = create_assign_partition_request("test.btc");
-            let req = Request::new(assign_req);
-            assert!(memory_node.assign_partition(req).await.is_ok());
-            assert!(memory_node.get_cell("test.btc", 3).is_none());
-            let batch = gen_sample_row_batch();
-            let data = encode(&batch)?;
-            let req = Request::new(AppendRecordsRequest {
-                table_id: "test.btc".to_string(),
-                partition_id: 0,
-                records: data,
-            });
-            assert!(memory_node.get_cell("test.btc", 0).is_some());
-            assert!(memory_node.append_records(req).await.is_ok());
-        } else {
-            panic!("should not be here");
-        }
+        let db = "db11";
+        let table = "btc_test";
+        let memory_node = build_memory_node().await;
+        let assign_req = create_assign_partition_request(table, db);
+        let req = Request::new(assign_req);
+        assert!(memory_node.assign_partition(req).await.is_ok());
+        assert!(memory_node.get_cell(db, table, 3).is_none());
+        let batch = gen_sample_row_batch();
+        let data = encode(&batch)?;
+        let req = Request::new(AppendRecordsRequest {
+            table_id: table.to_string(),
+            partition_id: 0,
+            records: data,
+            db: db.to_string(),
+        });
+        assert!(memory_node.get_cell(db, table, 0).is_some());
+        assert!(memory_node.append_records(req).await.is_ok());
         Ok(())
     }
 
@@ -436,33 +422,32 @@ mod tests {
         RowRecordBatch {
             batch,
             schema_version: 1,
-            id: "eth.price".to_string(),
         }
     }
 
-    fn create_assign_partition_request(tname: &str) -> AssignPartitionRequest {
+    fn create_assign_partition_request(tname: &str, db: &str) -> AssignPartitionRequest {
         let region = StorageRegion {
             region: "".to_string(),
-            endpoint: "http://127.0.0.1:9090".to_string(),
+            endpoint: "http://127.0.0.1:9000".to_string(),
         };
 
         let storage_config = StorageBackendConfig {
             bucket: "test_bk_1".to_string(),
             region: Some(region),
-            l1_rows_limit: 10 * 1024,
-            l2_rows_limit: 5 * 10 * 1024,
+            l1_rows_limit: 1 * 1024,
+            l2_rows_limit: 5 * 1024,
         };
-        let table_desc = create_simple_table_desc(tname);
+
+        let table_desc = create_simple_table_desc(tname, db);
         let pids: Vec<i32> = vec![0, 1, 2];
         AssignPartitionRequest {
             partition_ids: pids,
             table_desc: Some(table_desc),
-            table_id: tname.to_string(),
             config: Some(storage_config),
         }
     }
 
-    fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
+    fn create_simple_table_desc(tname: &str, db: &str) -> RtStoreTableDesc {
         let col1 = RtStoreColumnDesc {
             name: "col1".to_string(),
             ctype: RtStoreType::KBigInt as i32,
@@ -473,9 +458,11 @@ mod tests {
             version: 1,
         };
         RtStoreTableDesc {
-            names: vec![tname.to_string()],
+            name: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,
+            db: db.to_string(),
+            ctime: 0,
         }
     }
 }

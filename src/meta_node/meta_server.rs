@@ -15,71 +15,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use super::table::Table;
+use crate::catalog::catalog::Catalog;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
     RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
 };
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{
-    CreateTableRequest, CreateTableResponse, PingRequest, PingResponse,
+    CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
 };
+
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
-use arc_swap::ArcSwapOption;
 use bytes::Bytes;
 use etcd_client::{Client, ConnectOptions, EventType, GetOptions};
 use prost::Message;
 use rand::prelude::*;
+use s3::region::Region;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
-
 uselog!(debug, info, warn);
 
 pub struct MetaConfig {
     pub node: RtStoreNode,
     pub etcd_cluster: String,
     pub etcd_root_path: String,
+    // region for s3 bucket
+    pub region: Region,
 }
 
 pub struct MetaServiceState {
     // key is the id of table
-    tables: HashMap<String, Table>,
     memory_nodes: HashMap<String, Arc<MemoryNodeSDK>>,
-    table_to_nodes: HashMap<String, HashMap<i32, String>>,
 }
 
 impl MetaServiceState {
     pub fn new() -> Self {
         Self {
-            tables: HashMap::new(),
             memory_nodes: HashMap::new(),
-            table_to_nodes: HashMap::new(),
-        }
-    }
-
-    pub fn create_table(&mut self, table_desc: &RtStoreTableDesc) -> Result<()> {
-        // join the names of table desc
-        let id = Table::gen_id(table_desc)?;
-        debug!("create table with id {}", id);
-        match self.tables.get(&id) {
-            Some(_) => Err(RTStoreError::TableNamesExistError { name: id }),
-            _ => {
-                let table = Table::new(table_desc)?;
-                info!("create a new table with id {} successfully", id);
-                self.tables.insert(id, table);
-                Ok(())
-            }
-        }
-    }
-
-    pub fn get_table(&self, table_id: &str) -> Result<RtStoreTableDesc> {
-        match self.tables.get(table_id) {
-            Some(table) => Ok(table.get_table_desc().clone()),
-            _ => Err(RTStoreError::TableNotFoundError {
-                tname: table_id.to_string(),
-            }),
         }
     }
 
@@ -104,7 +78,8 @@ impl Default for MetaServiceState {
 pub struct MetaServiceImpl {
     state: Arc<Mutex<MetaServiceState>>,
     config: MetaConfig,
-    meta_store: ArcSwapOption<MetaStore>,
+    meta_store: Arc<MetaStore>,
+    catalog: Arc<Catalog>,
 }
 
 unsafe impl Send for MetaServiceImpl {}
@@ -112,36 +87,48 @@ unsafe impl Send for MetaServiceImpl {}
 unsafe impl Sync for MetaServiceImpl {}
 
 impl MetaServiceImpl {
-    pub fn new(config: MetaConfig) -> Self {
+    pub fn new(config: MetaConfig, meta_store: Arc<MetaStore>) -> Self {
         Self {
             state: Arc::new(Mutex::new(MetaServiceState::new())),
             config,
-            meta_store: ArcSwapOption::from(None),
+            meta_store: meta_store.clone(),
+            catalog: Arc::new(Catalog::new(meta_store)),
         }
     }
 
-    pub async fn assign_partitions(&self, table_id: &str, partition_range: &[i32]) -> Result<()> {
+    pub async fn assign_partitions(
+        &self,
+        table_id: &str,
+        db: &str,
+        partition_range: &[i32],
+    ) -> Result<()> {
         let memory_node_sdk = self.random_choose_a_memory_node()?;
-        let table_desc = match self.state.lock() {
-            Ok(local_state) => Ok(local_state.get_table(table_id)?),
-            Err(_) => Err(RTStoreError::BaseBusyError("fail to get lock".to_string())),
-        }?;
-        let region = StorageRegion {
-            region: "".to_string(),
-            endpoint: "http://127.0.0.1:9090".to_string(),
+        let sregion = match self.config.region {
+            Region::Custom { .. } => StorageRegion {
+                region: "".to_string(),
+                endpoint: self.config.region.endpoint(),
+            },
+            _ => StorageRegion {
+                region: format!("{}", self.config.region),
+                endpoint: "".to_string(),
+            },
         };
         let sconfig = StorageBackendConfig {
-            bucket: "/rtstore".to_string(),
-            region: Some(region),
+            bucket: format!("/{}", db),
+            region: Some(sregion),
             l1_rows_limit: 10 * 1024,
             l2_rows_limit: 5 * 10 * 1024,
         };
+        let database = self.catalog.get_db(db)?;
+        let table = database.get_table(table_id)?;
         if memory_node_sdk
-            .assign_partition(table_id, partition_range, &table_desc, &sconfig)
+            .assign_partition(partition_range, table.get_table_desc(), &sconfig)
             .await
             .is_ok()
         {
             info!("assign table {} to memory node ok", table_id);
+        } else {
+            todo!("handle error condition");
         }
         Ok(())
     }
@@ -154,120 +141,101 @@ impl MetaServiceImpl {
             let mut rng = rand::thread_rng();
             let rand_num: f64 = rng.gen();
             let index: usize = (local_state.memory_nodes.len() as f64 * rand_num) as usize;
-            let mut current_index: usize = 0;
-            for (_, sdk) in &local_state.memory_nodes {
+            for (current_index, sdk) in local_state.memory_nodes.values().enumerate() {
                 if current_index == index {
                     return Ok(sdk.clone());
                 }
-                current_index += 1;
             }
         }
-        return Err(RTStoreError::MemoryNodeNotEnoughError);
+        Err(RTStoreError::MemoryNodeNotEnoughError)
     }
 
-    pub async fn connect_to_meta(&self) -> Result<()> {
-        info!("connect to meta");
-        if self.config.etcd_cluster.is_empty() {
-            return Err(RTStoreError::NodeRPCInvalidEndpointError {
-                name: "etcd cluster".to_string(),
-            });
-        }
-        // connect to etcd
-        let endpoints: Vec<&str> = self.config.etcd_cluster.split(",").collect();
-        let etcd_client = match Client::connect(endpoints, None).await {
-            Ok(client) => Ok(client),
-            Err(e) => {
-                warn!("fail to connect etcd for err {}", e);
-                Err(RTStoreError::NodeRPCInvalidEndpointError {
-                    name: "etcd".to_string(),
-                })
-            }
-        }?;
-        let meta_store_config = MetaStoreConfig {
-            root_path: self.config.etcd_root_path.to_string(),
-            store_type: MetaStoreType::MutableMetaStore,
-        };
-        info!("register self {} to etcd", self.config.node.ns);
-        let meta_store = MetaStore::new(etcd_client, meta_store_config);
-        // register self to etcd
-        meta_store.add_node(&self.config.node).await?;
-        self.meta_store.store(Some(Arc::new(meta_store)));
-        let local_meta_store = self.meta_store.load().clone();
+    pub async fn init(&self) -> Result<()> {
+        self.catalog.recover().await?;
+        let local_meta_store = self.meta_store.clone();
+        self.meta_store.add_node(&self.config.node).await?;
         let local_state = self.state.clone();
-        if let Some(local_meta_store) = local_meta_store {
-            tokio::task::spawn(async move {
-                if let Ok(mut stream) = local_meta_store
-                    .subscribe_node_events(&RtStoreNodeType::KMemoryNode)
-                    .await
-                {
-                    while let Ok(Some(resp)) = stream.message().await {
-                        if resp.canceled() {
-                            break;
-                        }
-                        let mut new_add_nodes: Vec<RtStoreNode> = Vec::new();
-                        let mut deleted_nodes: Vec<RtStoreNode> = Vec::new();
-                        for event in resp.events() {
-                            match (event.event_type(), event.kv()) {
-                                (EventType::Put, Some(kv)) => {
-                                    let buf = Bytes::from(kv.value().to_vec());
-                                    match RtStoreNode::decode(buf) {
-                                        Ok(node) => {
-                                            if RtStoreNodeType::KMemoryNode as i32 == node.node_type
-                                            {
-                                                new_add_nodes.push(node);
-                                            }
-                                        }
-                                        Err(e) => {
-                                            warn!("fail to decode data value ");
+        tokio::task::spawn(async move {
+            if let Ok(mut stream) = local_meta_store
+                .subscribe_node_events(&RtStoreNodeType::KMemoryNode)
+                .await
+            {
+                while let Ok(Some(resp)) = stream.message().await {
+                    if resp.canceled() {
+                        break;
+                    }
+                    let mut new_add_nodes: Vec<RtStoreNode> = Vec::new();
+                    let mut deleted_nodes: Vec<RtStoreNode> = Vec::new();
+                    for event in resp.events() {
+                        match (event.event_type(), event.kv()) {
+                            (EventType::Put, Some(kv)) => {
+                                let buf = Bytes::from(kv.value().to_vec());
+                                match RtStoreNode::decode(buf) {
+                                    Ok(node) => {
+                                        if RtStoreNodeType::KMemoryNode as i32 == node.node_type {
+                                            new_add_nodes.push(node);
                                         }
                                     }
-                                }
-                                (EventType::Delete, Some(kv)) => {
-                                    let buf = Bytes::from(kv.value().to_vec());
-                                    match RtStoreNode::decode(buf) {
-                                        Ok(node) => {
-                                            if RtStoreNodeType::KMemoryNode as i32 == node.node_type
-                                            {
-                                                deleted_nodes.push(node);
-                                            }
-                                        }
-                                        Err(e) => {
-                                            warn!("fail to decode data value ");
-                                        }
+                                    Err(e) => {
+                                        warn!("fail to decode data value for err {} ", e);
                                     }
-                                }
-                                _ => {
-                                    warn!("null kv data");
                                 }
                             }
-                        }
-                        for node in new_add_nodes {
-                            match (
-                                MemoryNodeSDK::connect(&node.endpoint).await,
-                                local_state.lock(),
-                            ) {
-                                (Ok(sdk), Ok(mut state)) => {
-                                    let arc_sdk = Arc::new(sdk);
-                                    if state.add_memory_node(&node.endpoint, &arc_sdk).is_err() {
-                                        warn!("fail to connect memory node {}", &node.endpoint);
+                            (EventType::Delete, Some(kv)) => {
+                                let buf = Bytes::from(kv.value().to_vec());
+                                match RtStoreNode::decode(buf) {
+                                    Ok(node) => {
+                                        if RtStoreNodeType::KMemoryNode as i32 == node.node_type {
+                                            deleted_nodes.push(node);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("fail to decode data value for err {} ", e);
                                     }
                                 }
-                                (_, _) => warn!("fail to connect memory node {}", &node.endpoint),
                             }
-                        }
-                        for node in deleted_nodes {
-                            info!("delete node {}", node.endpoint);
+                            _ => {
+                                warn!("null kv data");
+                            }
                         }
                     }
+                    for node in new_add_nodes {
+                        match (
+                            MemoryNodeSDK::connect(&node.endpoint).await,
+                            local_state.lock(),
+                        ) {
+                            (Ok(sdk), Ok(mut state)) => {
+                                let arc_sdk = Arc::new(sdk);
+                                if state.add_memory_node(&node.endpoint, &arc_sdk).is_err() {
+                                    warn!("fail to connect memory node {}", &node.endpoint);
+                                }
+                            }
+                            (_, _) => warn!("fail to connect memory node {}", &node.endpoint),
+                        }
+                    }
+                    for node in deleted_nodes {
+                        info!("delete node {}", node.endpoint);
+                    }
                 }
-            });
-        }
+            }
+        });
         Ok(())
     }
 }
 
 #[tonic::async_trait]
 impl Meta for MetaServiceImpl {
+    async fn create_db(
+        &self,
+        request: Request<CreateDbRequest>,
+    ) -> std::result::Result<Response<CreateDbResponse>, Status> {
+        let create_db_request = request.into_inner();
+        self.catalog
+            .create_db(&create_db_request.db, self.config.region.clone())
+            .await?;
+        Ok(Response::new(CreateDbResponse {}))
+    }
+
     async fn create_table(
         &self,
         request: Request<CreateTableRequest>,
@@ -279,35 +247,19 @@ impl Meta for MetaServiceImpl {
                 err: "input is invalid for empty table description".to_string(),
             }),
         }?;
-
+        let database = self.catalog.get_db(&table_desc.db)?;
+        database.create_table(table_desc, false).await?;
+        let partitions = vec![0];
+        if let Err(e) = self
+            .assign_partitions(&table_desc.name, &table_desc.db, &partitions)
+            .await
         {
-            let mut local_state = self.state.lock().unwrap();
-            local_state.create_table(table_desc)?;
-        }
-
-        {
-            let table_full_name = Table::gen_id(table_desc)?;
-            let local_meta_store = self.meta_store.load().clone();
-            if let Some(meta_store) = local_meta_store {
-                meta_store.add_table(&table_full_name, table_desc).await?;
-            }
-            let partitions = vec![0, 1, 2];
-            if self
-                .assign_partitions(&table_full_name, &partitions)
-                .await
-                .is_err()
-            {
-                warn!("fail to assign partition for table {}", table_full_name);
-            }
+            warn!(
+                "fail to assign partition for table {} with error {}",
+                table_desc.name, e
+            );
         }
         Ok(Response::new(CreateTableResponse {}))
-    }
-
-    async fn ping(
-        &self,
-        _request: Request<PingRequest>,
-    ) -> std::result::Result<Response<PingResponse>, Status> {
-        Ok(Response::new(PingResponse {}))
     }
 }
 
@@ -315,6 +267,9 @@ impl Meta for MetaServiceImpl {
 mod tests {
     use super::*;
     use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
+    use crate::store::build_meta_store;
+    use crate::store::object_store::build_region;
+
     fn build_config() -> MetaConfig {
         let node = RtStoreNode {
             endpoint: "http://127.0.0.1:9191".to_string(),
@@ -322,25 +277,31 @@ mod tests {
             ns: "127.0.0.1".to_string(),
             port: 9191,
         };
+
         MetaConfig {
             node,
             etcd_cluster: "127.0.0.1:9191".to_string(),
             etcd_root_path: "/rtstore".to_string(),
+            region: build_region("", Some("http://127.0.0.1:9000".to_string())),
         }
     }
-    #[tokio::test]
-    async fn test_ping() {
-        let meta = MetaServiceImpl::new(build_config());
-        let req = Request::new(PingRequest {});
-        let result = meta.ping(req).await;
-        if result.is_err() {
-            panic!("should go error");
-        }
+
+    async fn build_meta_service() -> MetaServiceImpl {
+        let config = build_config();
+        let meta_store = build_meta_store(
+            &config.etcd_cluster,
+            &config.etcd_root_path,
+            MetaStoreType::MutableMetaStore,
+        )
+        .await
+        .unwrap();
+        let meta = MetaServiceImpl::new(config, Arc::new(meta_store));
+        meta
     }
 
     #[tokio::test]
     async fn test_create_table_empty_desc() {
-        let meta = MetaServiceImpl::new(build_config());
+        let meta = build_meta_service().await;
         let req = Request::new(CreateTableRequest { table_desc: None });
         let result = meta.create_table(req).await;
         if result.is_ok() {
@@ -348,7 +309,7 @@ mod tests {
         }
     }
 
-    fn create_simple_table_desc(tname: &str) -> RtStoreTableDesc {
+    fn create_simple_table_desc(db: &str, tname: &str) -> RtStoreTableDesc {
         let col1 = RtStoreColumnDesc {
             name: "col1".to_string(),
             ctype: 0,
@@ -359,18 +320,11 @@ mod tests {
             version: 1,
         };
         RtStoreTableDesc {
-            names: vec![tname.to_string()],
+            name: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,
+            db: db.to_string(),
+            ctime: 0,
         }
-    }
-
-    #[tokio::test]
-    async fn test_create_table() {
-        let table_desc = Some(create_simple_table_desc("test.t1"));
-        let meta = MetaServiceImpl::new(build_config());
-        let req = Request::new(CreateTableRequest { table_desc });
-        let result = meta.create_table(req).await;
-        assert!(result.is_ok());
     }
 }

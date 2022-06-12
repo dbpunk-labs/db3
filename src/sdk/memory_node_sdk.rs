@@ -57,7 +57,6 @@ impl MemoryNodeSDK {
 
     pub async fn assign_partition(
         &self,
-        table_id: &str,
         partition_ids: &[i32],
         table_desc: &RtStoreTableDesc,
         storage_config: &StorageBackendConfig,
@@ -66,7 +65,6 @@ impl MemoryNodeSDK {
         let assign_req = AssignPartitionRequest {
             partition_ids: partition_ids.to_vec(),
             table_desc: Some(table_desc.clone()),
-            table_id: table_id.to_string(),
             config: Some(storage_config.clone()),
         };
         let request = tonic::Request::new(assign_req);
@@ -76,6 +74,7 @@ impl MemoryNodeSDK {
 
     pub async fn append_records(
         &self,
+        db: &str,
         table_id: &str,
         partition_id: i32,
         record: &RowRecordBatch,
@@ -86,6 +85,7 @@ impl MemoryNodeSDK {
             table_id: table_id.to_string(),
             partition_id,
             records: data,
+            db: db.to_string(),
         };
         let request = tonic::Request::new(append_records_req);
         client.append_records(request).await?;

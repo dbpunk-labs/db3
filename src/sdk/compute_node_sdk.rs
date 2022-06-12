@@ -1,6 +1,6 @@
 //
 //
-// meta_node_sdk.rs
+// compute_node_sdk.rs
 // Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,25 +15,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+//
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
-use crate::proto::rtstore_meta_proto::meta_client::MetaClient;
-use crate::proto::rtstore_meta_proto::{
-    CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
-};
-use std::sync::Arc;
+use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
+use crate::proto::rtstore_compute_proto::compute_node_client::ComputeNodeClient;
+use crate::proto::rtstore_compute_proto::{FlightData, QueryRequest};
 
+use std::sync::Arc;
 use tonic::transport::Endpoint;
 use tonic::{Request, Response, Status};
-uselog!(info);
 
-pub struct MetaNodeSDK {
+pub struct ComputeNodeSDK {
     endpoint: String,
     // clone on use
-    client: Arc<MetaClient<tonic::transport::Channel>>,
+    client: Arc<ComputeNodeClient<tonic::transport::Channel>>,
 }
 
-impl Clone for MetaNodeSDK {
+impl Clone for ComputeNodeSDK {
     fn clone(&self) -> Self {
         Self {
             endpoint: self.endpoint.to_string(),
@@ -42,33 +40,28 @@ impl Clone for MetaNodeSDK {
     }
 }
 
-impl MetaNodeSDK {
+impl ComputeNodeSDK {
     pub async fn connect(endpoint: &str) -> std::result::Result<Self, tonic::transport::Error> {
+        // create a new client connection
         let rpc_endpoint = Endpoint::new(endpoint.to_string())?;
         let channel = rpc_endpoint.connect_lazy();
-        // create a new client connection
-        let client = Arc::new(MetaClient::new(channel));
-        Ok(MetaNodeSDK {
+        let client = Arc::new(ComputeNodeClient::new(channel));
+        Ok(ComputeNodeSDK {
             endpoint: endpoint.to_string(),
             client,
         })
     }
 
-    pub async fn create_db(&self, db: &str) -> std::result::Result<(), Status> {
+    pub async fn query(
+        &self,
+        sql: &str,
+        db: &str,
+    ) -> std::result::Result<Response<tonic::codec::Streaming<FlightData>>, Status> {
         let mut client = self.client.as_ref().clone();
-        let create_req = CreateDbRequest { db: db.to_string() };
-        let request = tonic::Request::new(create_req);
-        client.create_db(request).await?;
-        Ok(())
-    }
-
-    pub async fn create_table(&self, table: RtStoreTableDesc) -> std::result::Result<(), Status> {
-        let mut client = self.client.as_ref().clone();
-        let create_table_req = CreateTableRequest {
-            table_desc: Some(table),
+        let query_req = QueryRequest {
+            default_db: db.to_string(),
+            sql: sql.to_string(),
         };
-        let request = tonic::Request::new(create_table_req);
-        client.create_table(request).await?;
-        Ok(())
+        client.query(query_req).await
     }
 }
