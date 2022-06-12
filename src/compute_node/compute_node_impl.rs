@@ -102,8 +102,7 @@ impl ComputeNode for ComputeNodeImpl {
             .unwrap();
 
         let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
-        let schema_flight_data =
-            SchemaAsIpc::new(&batches[0].schema().clone().as_ref(), &options).into();
+        let schema_flight_data = SchemaAsIpc::new(&batches[0].schema().as_ref(), &options).into();
         let mut flights: Vec<std::result::Result<FlightData, Status>> =
             vec![Ok(schema_flight_data)];
         let mut batches: Vec<std::result::Result<FlightData, Status>> = batches

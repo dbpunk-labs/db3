@@ -240,7 +240,7 @@ impl CellStore {
                     self.column_memtable_size
                         .fetch_add(record_batch.num_rows() as u64, Ordering::Relaxed);
                     let local_column_memtable = self.column_memtable.load();
-                    if let Ok(_) = local_column_memtable.push_front(record_batch) {
+                    if local_column_memtable.push_front(record_batch).is_ok() {
                         debug!("compaction ok for cell store");
                     }
                 }

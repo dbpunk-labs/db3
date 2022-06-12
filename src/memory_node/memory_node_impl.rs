@@ -97,7 +97,7 @@ impl MemoryNodeState {
         memory_node_confg: &MemoryNodeConfig,
     ) -> Result<Vec<(i32, Arc<CellStore>)>> {
         if let Some(rtstore_schema) = &table_desc.schema {
-            let schema = arrow_parquet_utils::table_desc_to_arrow_schema(&rtstore_schema)?;
+            let schema = arrow_parquet_utils::table_desc_to_arrow_schema(rtstore_schema)?;
             let region = MemoryNodeState::build_region(&storage_config.region)?;
             let name = &table_desc.name;
             let db = &table_desc.db;
@@ -141,11 +141,7 @@ impl MemoryNodeState {
     pub fn get_cell(&self, db: &str, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
         if let Some(db_map) = self.cells.get(db) {
             if let Some(table_map) = db_map.get(table_id) {
-                if let Some(cell) = table_map.get(&pid) {
-                    Some(cell.clone())
-                } else {
-                    None
-                }
+                table_map.get(&pid).map(|cell| cell.clone())
             } else {
                 None
             }

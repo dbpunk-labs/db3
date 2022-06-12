@@ -91,7 +91,7 @@ pub fn sql_value_to_data(val: &Value, store_type: &RtStoreType) -> Result<Data> 
         }
         (RtStoreType::KTimestampMillsSecond, Value::SingleQuotedString(s))
         | (RtStoreType::KTimestampMillsSecond, Value::DoubleQuotedString(s)) => {
-            let time = NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").unwrap();
+            let time = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap();
             let ts = time.timestamp() * 1000;
             Ok(Data::Timestamp(ts as u64))
         }
@@ -269,7 +269,7 @@ pub fn sql_to_table_desc(columns: &Vec<ColumnDef>) -> Result<RtStoreSchemaDesc> 
         }?;
         let mut null_allowed = true;
 
-        if column.options.len() > 0 && ColumnOption::NotNull == column.options[0].option {
+        if !column.options.is_empty() && ColumnOption::NotNull == column.options[0].option {
             null_allowed = false;
         }
         let rtstore_column = RtStoreColumnDesc {

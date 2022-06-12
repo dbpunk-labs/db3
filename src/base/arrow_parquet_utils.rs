@@ -80,7 +80,7 @@ pub fn dump_recordbatch(
         .set_compression(Compression::GZIP)
         .build();
     let fd = File::create(path)?;
-    let mut writer = ArrowWriter::try_new(fd, schema.clone(), Some(properties.clone()))?;
+    let mut writer = ArrowWriter::try_new(fd, schema.clone(), Some(properties))?;
     for batch in batches.iter() {
         writer.write(batch)?;
     }

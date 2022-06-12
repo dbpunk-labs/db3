@@ -185,7 +185,7 @@ impl SchemaProvider for Database {
                 if let Ok(table_url) = ListingTableUrl::parse(&table_path) {
                     let options = ListingOptions::new(Arc::new(ParquetFormat::default()));
                     let config = ListingTableConfig::new(table_url)
-                        .with_listing_options(options.clone())
+                        .with_listing_options(options)
                         .with_schema(t.get_schema().clone());
                     if let Ok(table) = ListingTable::try_new(config) {
                         Some(Arc::new(table))

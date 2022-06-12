@@ -32,7 +32,7 @@ pub async fn build_meta_store(
         store_type,
         root_path: etcd_root_path.to_string(),
     };
-    let etcd_cluster_endpoints: Vec<&str> = etcd_cluster.split(",").collect();
+    let etcd_cluster_endpoints: Vec<&str> = etcd_cluster.split(',').collect();
     let client = match Client::connect(etcd_cluster_endpoints, None).await {
         Ok(client) => Ok(client),
         Err(_) => Err(RTStoreError::NodeRPCInvalidEndpointError {

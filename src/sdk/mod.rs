@@ -37,9 +37,10 @@ pub async fn build_compute_node_sdk(
     info!("connect compute node {}", &addr);
     match compute_node_sdk::ComputeNodeSDK::connect(&addr).await {
         Ok(sdk) => Ok(sdk),
-        Err(e) => Err(RTStoreError::NodeRPCError(
-            format!("fail to connect compute node for err {}", e).to_string(),
-        )),
+        Err(e) => Err(RTStoreError::NodeRPCError(format!(
+            "fail to connect compute node for err {}",
+            e
+        ))),
     }
 }
 
@@ -54,9 +55,10 @@ pub async fn build_memory_node_sdk(
     info!("connect memory node {}", &addr);
     match memory_node_sdk::MemoryNodeSDK::connect(&addr).await {
         Ok(sdk) => Ok(sdk),
-        Err(e) => Err(RTStoreError::NodeRPCError(
-            format!("fail to connect memory node for err {}", e).to_string(),
-        )),
+        Err(e) => Err(RTStoreError::NodeRPCError(format!(
+            "fail to connect memory node for err {}",
+            e
+        ))),
     }
 }
 
@@ -69,8 +71,9 @@ pub async fn build_meta_node_sdk(meta_store: &MetaStore) -> Result<meta_node_sdk
     info!("connect meta node {}", &meta_addr);
     match meta_node_sdk::MetaNodeSDK::connect(&meta_addr).await {
         Ok(sdk) => Ok(sdk),
-        Err(e) => Err(RTStoreError::NodeRPCError(
-            format!("fail to connect meta node for err {}", e).to_string(),
-        )),
+        Err(e) => Err(RTStoreError::NodeRPCError(format!(
+            "fail to connect meta node for err {}",
+            e
+        ))),
     }
 }

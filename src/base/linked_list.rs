@@ -105,7 +105,7 @@ impl<'a, T: 'a> Iterator for LinkedListIter<'a, T> {
 
     fn next(&mut self) -> Option<&'a T> {
         let curr_ptr = self.curr.load(Ordering::Acquire);
-        if curr_ptr == std::ptr::null_mut() {
+        if curr_ptr.is_null() {
             return None;
         }
         // SAFE: curr_ptr was checked for null

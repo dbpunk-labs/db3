@@ -130,7 +130,7 @@ async fn start_memory_node(memory_node: &Commands) -> Result<(), Box<dyn std::er
         if let Ok(meta_store) = build_readonly_meta_store(etcd_cluster, etcd_root_path).await {
             let bind_addr = format!("{}:{}", ns, port);
             let node = RtStoreNode {
-                endpoint: format!("http://{}", bind_addr).to_string(),
+                endpoint: format!("http://{}", bind_addr),
                 node_type: RtStoreNodeType::KMemoryNode as i32,
                 ns: ns.to_string(),
                 port: *port,
@@ -180,6 +180,7 @@ async fn start_compute_node(cmd: &Commands) -> Result<(), Box<dyn std::error::Er
                 ns: ns.to_string(),
                 port: *port,
             };
+
             let r = build_region("", Some(region.to_string()));
             let config = ComputeNodeConfig {
                 node,
@@ -269,7 +270,7 @@ async fn start_frontend_server(cmd: &Commands) -> Result<(), Box<dyn std::error:
                     memory_node_sdk,
                     compute_node_sdk,
                     arc_store,
-                    &var_config_path,
+                    var_config_path,
                 ) {
                     assert!(handler.init().await.is_ok());
                     loop {

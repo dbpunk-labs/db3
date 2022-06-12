@@ -141,15 +141,13 @@ impl MetaServiceImpl {
             let mut rng = rand::thread_rng();
             let rand_num: f64 = rng.gen();
             let index: usize = (local_state.memory_nodes.len() as f64 * rand_num) as usize;
-            let mut current_index: usize = 0;
-            for (_, sdk) in &local_state.memory_nodes {
+            for (current_index, sdk) in local_state.memory_nodes.values().enumerate() {
                 if current_index == index {
                     return Ok(sdk.clone());
                 }
-                current_index += 1;
             }
         }
-        return Err(RTStoreError::MemoryNodeNotEnoughError);
+        Err(RTStoreError::MemoryNodeNotEnoughError)
     }
 
     pub async fn init(&self) -> Result<()> {
@@ -179,7 +177,7 @@ impl MetaServiceImpl {
                                         }
                                     }
                                     Err(e) => {
-                                        warn!("fail to decode data value ");
+                                        warn!("fail to decode data value for err {} ", e);
                                     }
                                 }
                             }
@@ -192,7 +190,7 @@ impl MetaServiceImpl {
                                         }
                                     }
                                     Err(e) => {
-                                        warn!("fail to decode data value ");
+                                        warn!("fail to decode data value for err {} ", e);
                                     }
                                 }
                             }

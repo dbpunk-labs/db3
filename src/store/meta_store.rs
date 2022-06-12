@@ -65,7 +65,7 @@ impl MetaStore {
             let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
             if let Err(e) = db.encode(&mut buf) {
                 return Err(RTStoreError::MetaRpcCreateTableError {
-                    err: format!("encode descriptor of db {} with err {} ", db.db, e).to_string(),
+                    err: format!("encode descriptor of db {} with err {} ", db.db, e),
                 });
             }
             let buf = buf.freeze();
@@ -88,8 +88,7 @@ impl MetaStore {
                     err: format!(
                         "encode descriptor of table {} with err {} ",
                         table_desc.name, e
-                    )
-                    .to_string(),
+                    ),
                 });
             }
             let buf = buf.freeze();
@@ -106,9 +105,10 @@ impl MetaStore {
         );
         let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
         if let Err(e) = node.encode(&mut buf) {
-            return Err(RTStoreError::EtcdCodecError(
-                format!("encode descriptor  with err {} ", e).to_string(),
-            ));
+            return Err(RTStoreError::EtcdCodecError(format!(
+                "encode descriptor  with err {} ",
+                e
+            )));
         }
         let buf = buf.freeze();
         self._put(key.as_bytes(), buf.as_ref()).await
@@ -126,9 +126,10 @@ impl MetaStore {
                     match RtStoreNode::decode(buf) {
                         Ok(node) => nodes.push(node),
                         Err(e) => {
-                            return Err(RTStoreError::EtcdCodecError(
-                                format!("decode table err {}", e).to_string(),
-                            ));
+                            return Err(RTStoreError::EtcdCodecError(format!(
+                                "decode table err {}",
+                                e
+                            )));
                         }
                     }
                 }
@@ -153,7 +154,7 @@ impl MetaStore {
                     match RtStoreDatabase::decode(buf) {
                         Ok(db) => dbs.push(db),
                         Err(e) => {
-                            warn!("fail to decode table");
+                            warn!("fail to decode table for err {}", e);
                         }
                     }
                 }
@@ -184,7 +185,7 @@ impl MetaStore {
                     match RtStoreDatabase::decode(buf) {
                         Ok(db) => dbs.push(db),
                         Err(e) => {
-                            warn!("fail to decode table");
+                            warn!("fail to decode table for err {}", e);
                         }
                     }
                 }
@@ -245,7 +246,7 @@ impl MetaStore {
         let mut kv_client = self.client.kv_client();
         if let Err(e) = kv_client.put(key, value, None).await {
             Err(RTStoreError::MetaRpcCreateTableError {
-                err: format!("fail to save descriptor  with err {} ", e).to_string(),
+                err: format!("fail to save descriptor  with err {} ", e),
             })
         } else {
             Ok(())

@@ -130,7 +130,7 @@ impl SQLExecutor {
         let table = database.get_table(table_name)?;
         if let SetExpr::Values(values) = expr {
             if let Some(schema) = &table.get_table_desc().schema {
-                let row_batch = mysql_utils::sql_to_row_batch(&schema, &values.0[0])?;
+                let row_batch = mysql_utils::sql_to_row_batch(schema, &values.0[0])?;
                 //TODO add logical for partition
                 if let Err(e) = self
                     .memory_sdk
@@ -440,7 +440,7 @@ impl SQLExecutor {
                 },
                 Some(db_str),
             ) => {
-                self.handle_insert(&db_str, &table_name.0[0].value, &source.body)
+                self.handle_insert(db_str, &table_name.0[0].value, &source.body)
                     .await?;
                 Ok(SQLResult {
                     batch: None,
@@ -448,7 +448,7 @@ impl SQLExecutor {
                 })
             }
             (Keyword::DESCRIBE, SQLStatement::ExplainTable { table_name, .. }, Some(db_str)) => {
-                self.handle_desc_table(&db_str, &table_name.0[0].value)
+                self.handle_desc_table(db_str, &table_name.0[0].value)
             }
             (_, SQLStatement::Query(q), _) => {
                 if self.is_query_system_vars(&q.body) {

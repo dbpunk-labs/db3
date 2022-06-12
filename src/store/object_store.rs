@@ -82,9 +82,9 @@ pub fn build_credentials(
             Credentials::from_env()
         }
     }
-    .or_else(|e| {
+    .map_err(|e| {
         warn!("fail to create s3 credentials for error {}", e);
-        Err(RTStoreError::S3AuthError)
+        RTStoreError::S3AuthError
     })
 }
 
@@ -186,11 +186,11 @@ impl ObjectReader for S3FileReader {
         std::thread::spawn(move || {
             let result = local_bucket
                 .get_object_range_blocking(local_key, start, end)
-                .or_else(|e| {
-                    Err(Error::new(
+                .map_err(|e| {
+                    Error::new(
                         ErrorKind::Other,
                         format!("fail to get object range for error {}", e),
-                    ))
+                    )
                 });
             tx.send(result).unwrap();
         });
@@ -223,11 +223,11 @@ impl ObjectStore for S3FileSystem {
     }
 
     async fn list_file(&self, url: &str) -> DFResult<FileMetaStream> {
-        let (bucket, key) = strings::parse_s3_url(url).or_else(|_e| {
-            Err(Error::new(
+        let (bucket, key) = strings::parse_s3_url(url).map_err(|e| {
+            Error::new(
                 ErrorKind::InvalidInput,
-                format!("the url {} is invalid", url),
-            ))
+                format!("the url {} is invalid for error {}", url, e),
+            )
         })?;
         debug!("list file {} in bucket {} , key {}", url, &bucket, &key);
         let bucket_req = build_bucket(&bucket, &self.region, &self.credentials);

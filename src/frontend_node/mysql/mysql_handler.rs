@@ -76,7 +76,7 @@ impl MySQLHandler {
         Ok(Self {
             version: "8.0.26-rtstore".to_string(),
             id: 0,
-            salt: [0 as u8; 20],
+            salt: [0_u8; 20],
             sql_executor: SQLExecutor::new(
                 meta_sdk,
                 meta_store,

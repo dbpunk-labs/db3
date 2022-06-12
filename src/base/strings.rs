@@ -59,7 +59,7 @@ pub fn gen_s3_url(bucket: &str, prefix: &[&str], filename: &str) -> String {
 #[inline]
 pub fn parse_s3_url(url: &str) -> Result<(String, String)> {
     let (bucket, key) = url
-        .split_once("/")
+        .split_once('/')
         .ok_or_else(|| RTStoreError::FSInvalidFileError {
             path: url.to_string(),
         })?;
