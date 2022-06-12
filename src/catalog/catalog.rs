@@ -20,14 +20,10 @@ use super::table::Table;
 use crate::base::arrow_parquet_utils::*;
 use crate::base::time_utils;
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{
-    RtStoreDatabase, RtStoreNode, RtStoreTableDesc, StorageRegion,
-};
+use crate::proto::rtstore_base_proto::{RtStoreDatabase, RtStoreTableDesc, StorageRegion};
 use crate::store::meta_store::MetaStore;
 use crate::store::object_store::build_region;
-use arrow::datatypes::{Schema, SchemaRef};
-use bytes::{Buf, Bytes};
-use chrono::offset::Utc;
+use bytes::Bytes;
 use crossbeam_skiplist_piedb::SkipMap;
 use datafusion::catalog::catalog::CatalogProvider;
 use datafusion::catalog::schema::SchemaProvider;
@@ -37,7 +33,7 @@ use datafusion::datasource::{
     TableProvider,
 };
 use datafusion::error::Result as DFResult;
-use etcd_client::{EventType, GetOptions};
+use etcd_client::EventType;
 use prost::Message;
 use s3::region::Region;
 

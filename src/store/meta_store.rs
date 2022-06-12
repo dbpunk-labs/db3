@@ -36,10 +36,6 @@ pub enum MetaStoreType {
     MutableMetaStore,
 }
 
-struct MetaStoreState {
-    tables: HashMap<String, RtStoreTableDesc>,
-}
-
 pub struct MetaStoreConfig {
     pub store_type: MetaStoreType,
     pub root_path: String,
@@ -48,7 +44,6 @@ pub struct MetaStoreConfig {
 pub struct MetaStore {
     config: MetaStoreConfig,
     client: Arc<Client>,
-    state: Arc<Mutex<MetaStoreState>>,
 }
 
 unsafe impl Send for MetaStore {}
@@ -63,7 +58,6 @@ impl MetaStore {
         Self {
             config,
             client: Arc::new(client),
-            state: Arc::new(Mutex::new(state)),
         }
     }
 

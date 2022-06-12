@@ -16,9 +16,9 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreTableDesc, StorageRegion};
-use arrow::datatypes::{Schema, SchemaRef};
+use crate::error::Result;
+use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreTableDesc};
+use arrow::datatypes::SchemaRef;
 use crossbeam_skiplist_piedb::SkipMap;
 use std::sync::Arc;
 
