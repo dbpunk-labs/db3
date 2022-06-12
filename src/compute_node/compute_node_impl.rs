@@ -58,7 +58,6 @@ impl ComputeNodeImpl {
         config: ComputeNodeConfig,
         meta_store: Arc<MetaStore>,
     ) -> Result<ComputeNodeImpl> {
-        info!("s3 region {}", &region);
         let credentials = build_credentials(None, None)?;
         let s3 = S3FileSystem::new(region, credentials);
         let catalog = Arc::new(Catalog::new(meta_store.clone()));
@@ -95,7 +94,6 @@ impl ComputeNode for ComputeNodeImpl {
         if !query_request.default_db.is_empty() {
             db = Some(query_request.default_db);
         }
-        info!("receive sql {}", &query_request.sql);
         let batches = self
             .sql_engine
             .execute(&query_request.sql, db)

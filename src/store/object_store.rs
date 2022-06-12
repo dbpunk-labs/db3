@@ -317,7 +317,7 @@ mod tests {
                     for file in files {
                         info!("file path {}", file.path());
                     }
-                    assert_eq!(size, 2);
+                    assert_eq!(size, 1);
                 }
                 _ => {
                     panic!("no files");

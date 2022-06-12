@@ -64,7 +64,6 @@ impl SQLEngine {
     }
 
     pub async fn execute(&self, sql: &str, db: Option<String>) -> Result<SQLResult> {
-        info!("process sql {}", sql);
         let (_, statement) = Self::parse_sql(sql)?;
         let config = match db {
             Some(name) => {
