@@ -173,7 +173,11 @@ impl<W: std::io::Write + Send> AsyncMysqlShim<W> for MySQLHandler {
             if let Some(batches) = result.batch {
                 mysql_utils::write_batch_to_resultset(&batches, results).unwrap();
             } else {
-                results.completed(OkResponse::default())?;
+                let response = OkResponse {
+                    affected_rows: result.effected_rows as u64,
+                    ..Default::default()
+                };
+                results.completed(response)?;
             }
         } else {
             results.completed(OkResponse::default())?;

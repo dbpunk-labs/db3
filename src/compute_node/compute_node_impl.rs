@@ -58,6 +58,7 @@ impl ComputeNodeImpl {
         config: ComputeNodeConfig,
         meta_store: Arc<MetaStore>,
     ) -> Result<ComputeNodeImpl> {
+        info!("s3 region {}", &region);
         let credentials = build_credentials(None, None)?;
         let s3 = S3FileSystem::new(region, credentials);
         let catalog = Arc::new(Catalog::new(meta_store.clone()));

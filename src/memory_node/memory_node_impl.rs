@@ -439,8 +439,8 @@ mod tests {
         let storage_config = StorageBackendConfig {
             bucket: "test_bk_1".to_string(),
             region: Some(region),
-            l1_rows_limit: 10 * 1024,
-            l2_rows_limit: 5 * 10 * 1024,
+            l1_rows_limit: 1 * 1024,
+            l2_rows_limit: 5 * 1024,
         };
 
         let table_desc = create_simple_table_desc(tname, db);

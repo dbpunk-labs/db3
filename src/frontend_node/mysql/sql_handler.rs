@@ -132,15 +132,12 @@ impl SQLExecutor {
             if let Some(schema) = &table.get_table_desc().schema {
                 let row_batch = mysql_utils::sql_to_row_batch(&schema, &values.0[0])?;
                 //TODO add logical for partition
-                if self
+                if let Err(e) = self
                     .memory_sdk
                     .append_records(db, table_name, 0, &row_batch)
                     .await
-                    .is_err()
                 {
-                    warn!("fail to append record to table {}", table_name);
-                } else {
-                    debug!("insert into table {} ok", table_name);
+                    warn!("fail to append record to table {} for {}", table_name, e);
                 }
             }
         } else {
@@ -391,7 +388,23 @@ impl SQLExecutor {
         })
     }
 
+    fn handle_desc_table(&self, db: &str, tname: &str) -> Result<SQLResult> {
+        let database = self.catalog.get_db(db)?;
+        let table = database.get_table(tname)?;
+        let batch = arrow_parquet_utils::schema_to_recordbatch(table.get_schema())?;
+        Ok(SQLResult {
+            batch: Some(vec![batch]),
+            effected_rows: 0,
+        })
+    }
+
     pub async fn execute(&self, sql: &str, db: &Option<String>) -> Result<SQLResult> {
+        if self.direct_return_for_mysql(sql) {
+            return Ok(SQLResult {
+                batch: None,
+                effected_rows: 0,
+            });
+        }
         debug!("input sql {}", sql);
         let (keyword, statement) = Self::parse_sql(sql)?;
         match (keyword, statement, db) {
@@ -433,6 +446,9 @@ impl SQLExecutor {
                     batch: None,
                     effected_rows: 1,
                 })
+            }
+            (Keyword::DESCRIBE, SQLStatement::ExplainTable { table_name, .. }, Some(db_str)) => {
+                self.handle_desc_table(&db_str, &table_name.0[0].value)
             }
             (_, SQLStatement::Query(q), _) => {
                 if self.is_query_system_vars(&q.body) {

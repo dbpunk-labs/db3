@@ -185,7 +185,7 @@ impl SchemaProvider for Database {
     fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
         match self.get_table(name) {
             Ok(t) => {
-                let table_path = format!("s3://{}/{}/", t.get_db(), t.get_name());
+                let table_path = format!("s3://{}/{}", t.get_db(), t.get_name());
                 if let Ok(table_url) = ListingTableUrl::parse(&table_path) {
                     let options = ListingOptions::new(Arc::new(ParquetFormat::default()));
                     let config = ListingTableConfig::new(table_url)
@@ -339,4 +339,11 @@ impl CatalogProvider for Catalog {
     ) -> DFResult<Option<Arc<dyn SchemaProvider>>> {
         Ok(None)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+    use datafusion::prelude::*;
+    use futures::TryStreamExt;
 }

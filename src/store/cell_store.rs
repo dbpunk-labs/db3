@@ -253,9 +253,10 @@ impl CellStore {
 
     pub async fn do_l2_compaction(&self) -> Result<()> {
         let local_column_memtable = self.column_memtable.load();
-        debug!(
-            "column memtable size {}",
-            self.column_memtable_size.load(Ordering::Relaxed)
+        info!(
+            "column memtable size {} , l2 limit {}",
+            self.column_memtable_size.load(Ordering::Relaxed),
+            self.config.l2_rows_limit
         );
         if self.column_memtable_size.load(Ordering::Acquire) as u32 >= self.config.l2_rows_limit {
             self.column_memtable.store(Arc::new(LinkedList::new()));
@@ -273,7 +274,7 @@ impl CellStore {
             )
             .is_ok()
             {
-                debug!("dump parquet to {} done", file_path.display());
+                info!("dump parquet to {} done", file_path.display());
                 let readable_str = strings::to_readable_num_str(
                     self.parquet_file_counter.fetch_add(1, Ordering::Relaxed) as usize,
                     8,
@@ -282,7 +283,7 @@ impl CellStore {
                     "{}/{}.gz.parquet",
                     self.config.object_key_prefix, readable_str
                 );
-                debug!("plan to store file to {}", object_key);
+                info!("plan to store file to {}", object_key);
                 self.bucket_fs
                     .put_with_file(&file_path, &object_key)
                     .await?;

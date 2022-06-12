@@ -251,6 +251,16 @@ impl Meta for MetaServiceImpl {
         }?;
         let database = self.catalog.get_db(&table_desc.db)?;
         database.create_table(table_desc, false).await?;
+        let partitions = vec![0];
+        if let Err(e) = self
+            .assign_partitions(&table_desc.name, &table_desc.db, &partitions)
+            .await
+        {
+            warn!(
+                "fail to assign partition for table {} with error {}",
+                table_desc.name, e
+            );
+        }
         Ok(Response::new(CreateTableResponse {}))
     }
 }

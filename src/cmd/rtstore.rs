@@ -180,7 +180,7 @@ async fn start_compute_node(cmd: &Commands) -> Result<(), Box<dyn std::error::Er
                 ns: ns.to_string(),
                 port: *port,
             };
-            let r = build_region(&region, None);
+            let r = build_region("", Some(region.to_string()));
             let config = ComputeNodeConfig {
                 node,
                 etcd_cluster: etcd_cluster.to_string(),
@@ -223,7 +223,7 @@ async fn start_metaserver(cmd: &Commands) -> Result<(), Box<dyn std::error::Erro
                 ns: ns.to_string(),
                 port: *port,
             };
-            let r = build_region(&region, None);
+            let r = build_region("", Some(region.to_string()));
             let config = MetaConfig {
                 node,
                 etcd_cluster: etcd_cluster.to_string(),
