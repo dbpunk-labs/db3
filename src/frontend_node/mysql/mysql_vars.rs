@@ -131,7 +131,6 @@ impl MySQLVars {
             }
             rows.push(row);
         }
-
         let schema = Arc::new(Schema::new(schema_vec));
         let batch = RowRecordBatch {
             batch: rows,

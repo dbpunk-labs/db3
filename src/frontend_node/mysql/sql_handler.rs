@@ -454,12 +454,12 @@ impl SQLExecutor {
                 if self.is_query_system_vars(&q.body) {
                     self.handle_select_variable(&q.body)
                 } else {
-                    info!("sql go to compute node");
+                    debug!("sql go to compute node");
                     self.handle_query(sql, db).await
                 }
             }
             (_, _, _) => {
-                info!("sql go to compute node");
+                debug!("sql go to compute node");
                 self.handle_query(sql, db).await
             }
         }

@@ -168,7 +168,6 @@ impl<W: std::io::Write + Send> AsyncMysqlShim<W> for MySQLHandler {
         sql: &'a str,
         results: QueryResultWriter<'a, W>,
     ) -> Result<()> {
-        info!("execute {} ", sql);
         if let Ok(result) = self.sql_executor.execute(sql, &self.db).await {
             if let Some(batches) = result.batch {
                 mysql_utils::write_batch_to_resultset(&batches, results).unwrap();
