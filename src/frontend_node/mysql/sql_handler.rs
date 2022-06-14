@@ -159,6 +159,7 @@ impl SQLExecutor {
             partition_desc: None,
             db: db.to_string(),
             ctime: 0,
+            mappings: Vec::new(),
         };
         if let Err(e) = self.meta_sdk.create_table(table_desc).await {
             warn!("fail  to create table for err {}", e);
@@ -206,14 +207,14 @@ impl SQLExecutor {
                     )?;
                     results.push(record_batch);
                 }
-                info!("call compute node done with schema {}", schema);
+                debug!("call compute node done with schema {}", schema);
                 Ok(SQLResult {
                     batch: Some(results),
                     effected_rows: 0,
                 })
             }
             Err(e) => {
-                info!("fail to call compute node for e {}", e);
+                warn!("fail to call compute node with sql {} for e {}", sql, e);
                 // add error handle
                 Ok(SQLResult {
                     batch: None,

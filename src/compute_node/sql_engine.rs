@@ -77,11 +77,6 @@ impl SQLEngine {
                 config.with_default_catalog_and_schema("rtstore", "public")
             }
         };
-        let database_fn = |_: &[ColumnarValue]| {
-            Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
-                "db1".to_string(),
-            ))))
-        };
         let version_fn = |_: &[ColumnarValue]| {
             Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
                 "8.0.28".to_string(),
@@ -95,13 +90,6 @@ impl SQLEngine {
             Arc::new(DataType::Utf8),
             Volatility::Immutable,
             Arc::new(version_fn),
-        ));
-        stx.register_udf(create_udf(
-            "database",
-            vec![],
-            Arc::new(DataType::Utf8),
-            Volatility::Immutable,
-            Arc::new(database_fn),
         ));
         stx.register_catalog("rtstore", self.catalog.clone());
         let state = stx.state.read().clone();

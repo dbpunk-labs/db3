@@ -20,6 +20,15 @@ use crate::error::Result;
 use crate::proto::rtstore_base_proto::{RtStoreNode, RtStoreTableDesc};
 use arrow::datatypes::SchemaRef;
 use crossbeam_skiplist_piedb::SkipMap;
+use datafusion::datasource::{
+    file_format::parquet::ParquetFormat,
+    listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
+    TableProvider,
+};
+use datafusion::error::Result as DFResult;
+use datafusion::logical_plan::Expr;
+use datafusion::physical_plan::ExecutionPlan;
+use std::any::Any;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -40,11 +49,13 @@ impl Table {
             partition_to_nodes: Arc::new(SkipMap::new()),
         }
     }
+
     pub fn assign_partition_to_node(&self, pid: i32, node: RtStoreNode) -> Result<()> {
         self.partition_to_nodes.remove(&pid);
         self.partition_to_nodes.get_or_insert_with(pid, || node);
         Ok(())
     }
+
     #[inline]
     pub fn get_table_desc(&self) -> &RtStoreTableDesc {
         &self.desc
@@ -82,3 +93,24 @@ impl Table {
         }
     }
 }
+
+//#[async_trait]
+//impl TableProvider for Table {
+//    fn as_any(&self) -> &dyn Any {
+//        self
+//    }
+//
+//    fn schema(&self) -> SchemaRef {
+//        self.schema().clone()
+//    }
+//
+//    async fn scan(
+//        &self,
+//        ctx: &SessionState,
+//        projection: &Option<Vec<usize>>,
+//        filters: &[Expr],
+//        limit: Option<usize>,
+//    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+//    }
+//
+//}

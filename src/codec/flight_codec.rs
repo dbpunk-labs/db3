@@ -17,7 +17,7 @@
 //
 
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_compute_proto::{FlightData, FlightDescriptor};
+use crate::proto::rtstore_base_proto::{FlightData, FlightDescriptor};
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
@@ -34,7 +34,6 @@ use std::{
     fmt,
     ops::Deref,
 };
-
 /// SchemaAsIpc represents a pairing of a `Schema` with IpcWriteOptions
 pub struct SchemaAsIpc<'a> {
     pub pair: (&'a Schema, &'a IpcWriteOptions),

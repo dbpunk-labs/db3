@@ -30,7 +30,6 @@ message AssignPartitionRequest {
 }
 
 message AssignPartitionResponse {}
-
 message AppendRecordsRequest {
     string table_id = 1;
     int32 partition_id = 2;
@@ -40,10 +39,18 @@ message AppendRecordsRequest {
 
 message AppendRecordsResponse {}
 
+message FetchPartitionRequest {
+    string table_id = 1;
+    string db = 2;
+    int32 partition_id = 3;
+}
+
 // The rtstore memory node server definition.
 service MemoryNode {
     // method for assign partitions to memory node
     rpc AssignPartition (AssignPartitionRequest) returns (AssignPartitionResponse) {}
     // method for append records to cell store
     rpc AppendRecords(AppendRecordsRequest) returns (AppendRecordsResponse) {}
+    // fetch partition
+    rpc FetchPartition(FetchPartitionRequest) returns (stream rtstore_base_proto.FlightData) {}
 }

@@ -17,30 +17,33 @@
 //
 
 use crate::base::arrow_parquet_utils;
+use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::codec::row_codec::decode;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
-    RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+    FlightData, RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
 };
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
 use crate::proto::rtstore_memory_proto::{
     AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
+    FetchPartitionRequest,
 };
 use crate::store::cell_store::{CellStore, CellStoreConfig};
 use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
 use crate::store::object_store::build_credentials;
 use arc_swap::ArcSwap;
 use etcd_client::{Client, ConnectOptions, GetOptions};
+use futures::Stream;
 use s3::creds::Credentials;
 use s3::region::Region;
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
 use tonic::{Request, Response, Status};
 uselog!(info, warn, debug);
-
 pub struct MemoryNodeConfig {
     pub binlog_root_dir: String,
     pub tmp_store_root_dir: String,
@@ -257,6 +260,48 @@ unsafe impl Sync for MemoryNodeImpl {}
 
 #[tonic::async_trait]
 impl MemoryNode for MemoryNodeImpl {
+    type FetchPartitionStream = Pin<
+        Box<dyn Stream<Item = std::result::Result<FlightData, Status>> + Send + Sync + 'static>,
+    >;
+    async fn fetch_partition(
+        &self,
+        request: Request<FetchPartitionRequest>,
+    ) -> std::result::Result<Response<Self::FetchPartitionStream>, Status> {
+        let fetch_request = request.into_inner();
+        if let Some(cell_store) = self.get_cell(
+            &fetch_request.db,
+            &fetch_request.table_id,
+            fetch_request.partition_id,
+        ) {
+            let batches = cell_store.get_memory_batch_snapshot()?;
+            let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
+            let schema_flight_data =
+                SchemaAsIpc::new(&batches[0].schema().as_ref(), &options).into();
+            let mut flights: Vec<std::result::Result<FlightData, Status>> =
+                vec![Ok(schema_flight_data)];
+            let mut batches: Vec<std::result::Result<FlightData, Status>> = batches
+                .iter()
+                .flat_map(|batch| {
+                    let (flight_dictionaries, flight_batch) =
+                        flight_data_from_arrow_batch(batch, &options);
+                    flight_dictionaries
+                        .into_iter()
+                        .chain(std::iter::once(flight_batch))
+                        .map(Ok)
+                })
+                .collect();
+            // append batch vector to schema vector, so that the first message sent is the schema
+            flights.append(&mut batches);
+            let output = futures::stream::iter(flights);
+            Ok(Response::new(Box::pin(output) as Self::FetchPartitionStream))
+        } else {
+            Err(Status::from(RTStoreError::CellStoreNotFoundError {
+                tid: fetch_request.table_id.to_string(),
+                pid: fetch_request.partition_id,
+            }))
+        }
+    }
+
     async fn append_records(
         &self,
         request: Request<AppendRecordsRequest>,
@@ -463,6 +508,7 @@ mod tests {
             partition_desc: None,
             db: db.to_string(),
             ctime: 0,
+            mappings: Vec::new(),
         }
     }
 }

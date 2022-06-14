@@ -203,6 +203,19 @@ impl CellStore {
         self.row_memtable_size.load(Ordering::Relaxed)
     }
 
+    pub fn get_memory_batch_snapshot(&self) -> Result<Vec<RecordBatch>> {
+        let local_row_memtable = self.row_memtable.load();
+        let mut batches: Vec<RecordBatch> = Vec::new();
+        let batch =
+            arrow_parquet_utils::rows_to_columns(&self.config.schema, local_row_memtable.as_ref())?;
+        batches.push(batch);
+        let local_column_memtable = self.column_memtable.load();
+        for batch in local_column_memtable.iter() {
+            batches.push(batch.clone());
+        }
+        Ok(batches)
+    }
+
     pub async fn put_records(&self, records: RowRecordBatch) -> Result<()> {
         // load a row memtable reference
         let table = self.row_memtable.load();

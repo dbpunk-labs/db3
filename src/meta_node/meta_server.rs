@@ -18,13 +18,13 @@
 use crate::catalog::catalog::Catalog;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
-    RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+    PartitionToNode, RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig,
+    StorageRegion,
 };
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{
     CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
 };
-
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
 use bytes::Bytes;
@@ -126,6 +126,19 @@ impl MetaServiceImpl {
             .await
             .is_ok()
         {
+            let mut mappings: Vec<PartitionToNode> = Vec::new();
+            for pid in partition_range {
+                let node_list = vec![memory_node_sdk.endpoint().to_string()];
+                let mapping = PartitionToNode {
+                    partition_id: *pid,
+                    node_list,
+                };
+                mappings.push(mapping);
+            }
+            let mut new_table_desc = table.get_table_desc().clone();
+            new_table_desc.mappings = mappings;
+            // update meta of table
+            self.meta_store.add_table(&new_table_desc).await?;
             info!("assign table {} to memory node ok", table_id);
         } else {
             todo!("handle error condition");
@@ -235,7 +248,6 @@ impl Meta for MetaServiceImpl {
             .await?;
         Ok(Response::new(CreateDbResponse {}))
     }
-
     async fn create_table(
         &self,
         request: Request<CreateTableRequest>,
@@ -325,6 +337,7 @@ mod tests {
             partition_desc: None,
             db: db.to_string(),
             ctime: 0,
+            mappings: Vec::new(),
         }
     }
 }

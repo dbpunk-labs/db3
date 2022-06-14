@@ -324,6 +324,7 @@ mod tests {
             partition_desc: None,
             db: db.to_string(),
             ctime: 0,
+            mappings: Vec::new(),
         }
     }
 }

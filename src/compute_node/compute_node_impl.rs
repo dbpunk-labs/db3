@@ -21,10 +21,10 @@ use crate::catalog::catalog::Catalog;
 use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
-    RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+    FlightData, RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
 };
 use crate::proto::rtstore_compute_proto::compute_node_server::ComputeNode;
-use crate::proto::rtstore_compute_proto::{FlightData, QueryRequest};
+use crate::proto::rtstore_compute_proto::QueryRequest;
 use crate::store::meta_store::MetaStore;
 use crate::store::object_store::{build_credentials, S3FileSystem};
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
@@ -94,6 +94,7 @@ impl ComputeNode for ComputeNodeImpl {
         if !query_request.default_db.is_empty() {
             db = Some(query_request.default_db);
         }
+
         let batches = self
             .sql_engine
             .execute(&query_request.sql, db)

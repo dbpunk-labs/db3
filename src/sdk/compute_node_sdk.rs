@@ -17,9 +17,11 @@
 //
 //
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
+use crate::proto::rtstore_base_proto::{
+    FlightData, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+};
 use crate::proto::rtstore_compute_proto::compute_node_client::ComputeNodeClient;
-use crate::proto::rtstore_compute_proto::{FlightData, QueryRequest};
+use crate::proto::rtstore_compute_proto::QueryRequest;
 
 use std::sync::Arc;
 use tonic::transport::Endpoint;
