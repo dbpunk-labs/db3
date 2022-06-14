@@ -144,7 +144,7 @@ impl MemoryNodeState {
     pub fn get_cell(&self, db: &str, table_id: &str, pid: i32) -> Option<Arc<CellStore>> {
         if let Some(db_map) = self.cells.get(db) {
             if let Some(table_map) = db_map.get(table_id) {
-                table_map.get(&pid).map(|cell| cell.clone())
+                table_map.get(&pid).cloned()
             } else {
                 None
             }
@@ -276,7 +276,7 @@ impl MemoryNode for MemoryNodeImpl {
             let batches = cell_store.get_memory_batch_snapshot()?;
             let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
             let schema_flight_data =
-                SchemaAsIpc::new(&batches[0].schema().as_ref(), &options).into();
+                SchemaAsIpc::new(batches[0].schema().as_ref(), &options).into();
             let mut flights: Vec<std::result::Result<FlightData, Status>> =
                 vec![Ok(schema_flight_data)];
             let mut batches: Vec<std::result::Result<FlightData, Status>> = batches

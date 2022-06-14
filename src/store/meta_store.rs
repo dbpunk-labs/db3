@@ -22,11 +22,10 @@ use crate::proto::rtstore_base_proto::{
 };
 use bytes::{Bytes, BytesMut};
 use etcd_client::{
-    Client, ConnectOptions, Event, EventType, GetOptions, WatchOptions, WatchStream, Watcher,
+    Client, GetOptions, WatchOptions, WatchStream
 };
 use prost::Message;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 uselog!(info, warn);
 
 const BUFFER_SIZE: usize = 4 * 1024;
