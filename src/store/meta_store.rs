@@ -21,9 +21,7 @@ use crate::proto::rtstore_base_proto::{
     RtStoreDatabase, RtStoreNode, RtStoreNodeType, RtStoreTableDesc,
 };
 use bytes::{Bytes, BytesMut};
-use etcd_client::{
-    Client, GetOptions, WatchOptions, WatchStream
-};
+use etcd_client::{Client, GetOptions, WatchOptions, WatchStream};
 use prost::Message;
 use std::sync::Arc;
 uselog!(info, warn);

@@ -22,7 +22,7 @@ pub mod memory_node_sdk;
 pub mod meta_node_sdk;
 
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreNodeType};
+use crate::proto::rtstore_base_proto::RtStoreNodeType;
 use crate::store::meta_store::MetaStore;
 uselog!(info);
 

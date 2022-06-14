@@ -125,14 +125,12 @@ impl S3FileSystem {
 
 pub struct BucketFileSystem {
     bucket: Bucket,
-    bucket_name: String,
 }
 
 impl BucketFileSystem {
     pub fn new(bucket_name: &str, region: &Region, credentials: &Credentials) -> Self {
         Self {
             bucket: build_bucket(bucket_name, region, credentials),
-            bucket_name: bucket_name.to_string(),
         }
     }
 
