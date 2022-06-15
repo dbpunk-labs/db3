@@ -294,7 +294,7 @@ mod tests {
             node,
             etcd_cluster: "127.0.0.1:9191".to_string(),
             etcd_root_path: "/rtstore".to_string(),
-            region: build_region("", Some("http://127.0.0.1:9000".to_string())),
+            region: build_region("http://127.0.0.1:9000"),
         }
     }
 
