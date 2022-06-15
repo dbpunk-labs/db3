@@ -34,8 +34,9 @@ use sqlparser::{
     ast::{ColumnDef, SetExpr, Statement as SQLStatement},
     dialect::{keywords::Keyword, MySqlDialect},
 };
+use std::cell::RefCell;
 use std::sync::Arc;
-
+thread_local!(static DB : RefCell<String> = RefCell::new("".to_string()));
 pub struct SQLResult {
     pub batch: Option<Vec<RecordBatch>>,
     pub effected_rows: usize,
@@ -53,7 +54,6 @@ impl SQLEngine {
             runtime: runtime.clone(),
         }
     }
-
     fn parse_sql(sql: &str) -> Result<(Keyword, SQLStatement)> {
         let dialect = MySqlDialect {};
         let mut parser = InterruptibleParser::new(&dialect, sql)?;
@@ -69,6 +69,9 @@ impl SQLEngine {
             Some(name) => {
                 let config = SessionConfig::new();
                 let config = config.with_information_schema(true);
+                DB.with(|x| {
+                    *x.borrow_mut() = name.to_string();
+                });
                 config.with_default_catalog_and_schema("rtstore", name)
             }
             _ => {
@@ -77,9 +80,9 @@ impl SQLEngine {
                 config.with_default_catalog_and_schema("rtstore", "public")
             }
         };
-        let database_fn = |_: &[ColumnarValue]| {
+        let db_fn = |_: &[ColumnarValue]| {
             Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
-                "db1".to_string(),
+                DB.with(|x| x.borrow().to_string()),
             ))))
         };
         let version_fn = |_: &[ColumnarValue]| {
@@ -90,18 +93,18 @@ impl SQLEngine {
         //TODO use session id to cache session context
         let mut stx = SessionContext::with_config_rt(config, self.runtime.clone());
         stx.register_udf(create_udf(
+            "database",
+            vec![],
+            Arc::new(DataType::Utf8),
+            Volatility::Immutable,
+            Arc::new(db_fn),
+        ));
+        stx.register_udf(create_udf(
             "version",
             vec![],
             Arc::new(DataType::Utf8),
             Volatility::Immutable,
             Arc::new(version_fn),
-        ));
-        stx.register_udf(create_udf(
-            "database",
-            vec![],
-            Arc::new(DataType::Utf8),
-            Volatility::Immutable,
-            Arc::new(database_fn),
         ));
         stx.register_catalog("rtstore", self.catalog.clone());
         let state = stx.state.read().clone();

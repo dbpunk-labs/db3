@@ -21,12 +21,9 @@ use crate::proto::rtstore_base_proto::{
     RtStoreDatabase, RtStoreNode, RtStoreNodeType, RtStoreTableDesc,
 };
 use bytes::{Bytes, BytesMut};
-use etcd_client::{
-    Client, ConnectOptions, Event, EventType, GetOptions, WatchOptions, WatchStream, Watcher,
-};
+use etcd_client::{Client, GetOptions, WatchOptions, WatchStream};
 use prost::Message;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 uselog!(info, warn);
 
 const BUFFER_SIZE: usize = 4 * 1024;
@@ -324,6 +321,7 @@ mod tests {
             partition_desc: None,
             db: db.to_string(),
             ctime: 0,
+            mappings: Vec::new(),
         }
     }
 }

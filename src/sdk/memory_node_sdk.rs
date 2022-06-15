@@ -18,10 +18,13 @@
 
 use crate::codec::row_codec::{encode, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreTableDesc, StorageBackendConfig, StorageRegion};
+use crate::proto::rtstore_base_proto::{
+    FlightData, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+};
 use crate::proto::rtstore_memory_proto::memory_node_client::MemoryNodeClient;
 use crate::proto::rtstore_memory_proto::{
     AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
+    FetchPartitionRequest,
 };
 
 use std::sync::Arc;
@@ -72,6 +75,21 @@ impl MemoryNodeSDK {
         Ok(())
     }
 
+    pub async fn get_head_batch_of_partition(
+        &self,
+        db: &str,
+        table: &str,
+        partition_id: i32,
+    ) -> std::result::Result<Response<tonic::codec::Streaming<FlightData>>, Status> {
+        let mut client = self.client.as_ref().clone();
+        let fetch_req = FetchPartitionRequest {
+            table_id: table.to_string(),
+            db: db.to_string(),
+            partition_id,
+        };
+        client.fetch_partition(fetch_req).await
+    }
+
     pub async fn append_records(
         &self,
         db: &str,
@@ -90,5 +108,10 @@ impl MemoryNodeSDK {
         let request = tonic::Request::new(append_records_req);
         client.append_records(request).await?;
         Ok(())
+    }
+
+    #[inline]
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
     }
 }

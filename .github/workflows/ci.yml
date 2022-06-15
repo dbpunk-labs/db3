@@ -8,50 +8,6 @@ on:
 
 jobs:
 
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: true
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v1
-      - name: Setup etcd3
-        run: |
-          wget https://github.com/etcd-io/etcd/releases/download/v3.5.4/etcd-v3.5.4-linux-amd64.tar.gz
-          tar -zxf etcd-v3.5.4-linux-amd64.tar.gz
-          cd etcd-v3.5.4-linux-amd64
-          ./etcd &
-
-      - name: Setup s3 mock environment
-        run: |
-          docker run \
-          --detach \
-          --rm \
-          --publish 9000:9000 \
-          --publish 9001:9001 \
-          --volume "$(pwd)/parquet-testing:/data" \
-          --env "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" \
-          --env "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
-          quay.io/minio/minio server /data \
-          --console-address ":9001"
-      - uses: actions-rs/cargo@v1
-        env:
-          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
-          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-          AWS_EC2_METADATA_DISABLED: true
-        with:
-          command: test
-          args: --all-features --workspace
-
   rustfmt:
     name: Rustfmt
     runs-on: ubuntu-latest
@@ -71,26 +27,6 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v1
-      - name: Clippy check
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-targets --all-features --workspace -- -D warnings
 
   docs:
     name: Docs
@@ -113,25 +49,6 @@ jobs:
         with:
           command: doc
           args: --no-deps --document-private-items --all-features --workspace --examples
-
-  publish-dry-run:
-    name: Publish dry run
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        with:
-          command: publish
-          args: --dry-run
 
   coverage:
     name: Code coverage

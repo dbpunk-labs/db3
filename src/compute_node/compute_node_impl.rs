@@ -21,10 +21,10 @@ use crate::catalog::catalog::Catalog;
 use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
-    RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+    FlightData, RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
 };
 use crate::proto::rtstore_compute_proto::compute_node_server::ComputeNode;
-use crate::proto::rtstore_compute_proto::{FlightData, QueryRequest};
+use crate::proto::rtstore_compute_proto::QueryRequest;
 use crate::store::meta_store::MetaStore;
 use crate::store::object_store::{build_credentials, S3FileSystem};
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
@@ -94,15 +94,15 @@ impl ComputeNode for ComputeNodeImpl {
         if !query_request.default_db.is_empty() {
             db = Some(query_request.default_db);
         }
-        let batches = self
-            .sql_engine
-            .execute(&query_request.sql, db)
-            .await?
-            .batch
-            .unwrap();
-
+        let result = self.sql_engine.execute(&query_request.sql, db).await?;
+        if result.batch.is_none() {
+            let flights: Vec<std::result::Result<FlightData, Status>> = Vec::new();
+            let output = futures::stream::iter(flights);
+            return Ok(Response::new(Box::pin(output) as Self::QueryStream));
+        }
+        let batches = result.batch.unwrap();
         let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
-        let schema_flight_data = SchemaAsIpc::new(&batches[0].schema().as_ref(), &options).into();
+        let schema_flight_data = SchemaAsIpc::new(batches[0].schema().as_ref(), &options).into();
         let mut flights: Vec<std::result::Result<FlightData, Status>> =
             vec![Ok(schema_flight_data)];
         let mut batches: Vec<std::result::Result<FlightData, Status>> = batches

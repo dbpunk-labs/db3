@@ -159,6 +159,7 @@ impl SQLExecutor {
             partition_desc: None,
             db: db.to_string(),
             ctime: 0,
+            mappings: Vec::new(),
         };
         if let Err(e) = self.meta_sdk.create_table(table_desc).await {
             warn!("fail  to create table for err {}", e);
@@ -206,14 +207,14 @@ impl SQLExecutor {
                     )?;
                     results.push(record_batch);
                 }
-                info!("call compute node done with schema {}", schema);
+                debug!("call compute node done with schema {}", schema);
                 Ok(SQLResult {
                     batch: Some(results),
                     effected_rows: 0,
                 })
             }
             Err(e) => {
-                info!("fail to call compute node for e {}", e);
+                warn!("fail to call compute node with sql {} for e {}", sql, e);
                 // add error handle
                 Ok(SQLResult {
                     batch: None,
@@ -335,7 +336,6 @@ impl SQLExecutor {
         let schema_vec = vec![ArrowField::new("Tables", DataType::Utf8, false)];
         let mut rows: Vec<Vec<Data>> = Vec::new();
         for name in table_names {
-            info!("table {}", &name);
             let row = vec![Data::Varchar(name)];
             rows.push(row);
         }
@@ -391,6 +391,7 @@ impl SQLExecutor {
     fn handle_desc_table(&self, db: &str, tname: &str) -> Result<SQLResult> {
         let database = self.catalog.get_db(db)?;
         let table = database.get_table(tname)?;
+        info!("table schema len {}", table.get_schema().fields().len());
         let batch = arrow_parquet_utils::schema_to_recordbatch(table.get_schema())?;
         Ok(SQLResult {
             batch: Some(vec![batch]),

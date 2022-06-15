@@ -10,7 +10,7 @@ import random
 connection = pymysql.connect(host='127.0.0.1',
                              user='root',
                              password="xxx",
-                             database='db3',
+                             database='db1',
                              port=9292,
                              cursorclass=pymysql.cursors.DictCursor)
 with connection:
@@ -21,4 +21,6 @@ with connection:
         for i in range(10000 * 100):
             dt = datetime.fromtimestamp(ts + i)
             sql = "INSERT INTO device_signal VALUES ('%s', 'd_%d', %d);"%(dt.strftime("%Y-%m-%d %H:%M:%S"), random.randrange(1,100000), random.randrange(1, 100))
+            print(sql)
             cursor.execute(sql)
+            break

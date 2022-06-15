@@ -21,15 +21,23 @@ use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder,
-    TimestampMicrosecondBuilder, TimestampMillisecondBuilder, TimestampNanosecondBuilder,
-    UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
+    Array, ArrayRef, BooleanBuilder, Date64Array, Int16Builder, Int32Builder, Int64Builder,
+    Int8Builder, StringArray, StringBuilder, TimestampMicrosecondBuilder,
+    TimestampMillisecondBuilder, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder,
+    UInt64Array, UInt64Builder, UInt8Builder,
 };
 use arrow::datatypes::{
     DataType, Field as ArrowField, Schema, SchemaRef, TimeUnit, DECIMAL_MAX_PRECISION,
     DECIMAL_MAX_SCALE,
 };
+
+use datafusion::datasource::listing::PartitionedFile;
+
 use arrow::record_batch::RecordBatch;
+use chrono::offset::Utc;
+use chrono::TimeZone;
+use datafusion::datafusion_data_access::{FileMeta, SizedFile};
+use datafusion::scalar::ScalarValue;
 use parquet::arrow::arrow_writer::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -38,6 +46,31 @@ use std::path::Path;
 use std::sync::Arc;
 use string_builder::Builder;
 uselog!(info, debug, warn);
+
+pub fn batches_to_paths(batches: &[RecordBatch]) -> Vec<PartitionedFile> {
+    batches
+        .iter()
+        .flat_map(|batch| {
+            (0..batch.num_rows()).map(move |row| PartitionedFile {
+                file_meta: FileMeta {
+                    last_modified: None,
+                    sized_file: SizedFile {
+                        path: "".to_string(),
+                        size: batch
+                            .columns()
+                            .iter()
+                            .map(|array| array.get_array_memory_size())
+                            .sum::<usize>() as u64,
+                    },
+                },
+                partition_values: (0..batch.columns().len())
+                    .map(|col| ScalarValue::try_from_array(batch.column(col), row).unwrap())
+                    .collect(),
+                range: None,
+            })
+        })
+        .collect()
+}
 
 pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef> {
     let mut fields: Vec<ArrowField> = Vec::new();
@@ -105,11 +138,31 @@ enum RTStoreColumnBuilder {
     RTStoreTimestampMillsBuilder(TimestampMillisecondBuilder),
 }
 
+impl RTStoreColumnBuilder {
+    pub fn finish(&mut self) -> ArrayRef {
+        match self {
+            Self::RTStoreBooleanBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt8Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt8Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt16Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt16Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt16Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt32Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt32Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt64Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt64Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreStrBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreTimestampNsBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreTimestampMicrosBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreTimestampMillsBuilder(b) => Arc::new(b.finish()),
+        }
+    }
+}
+
 macro_rules! primary_type_convert {
     ($left_builder:ident, $right_builder:ident, $data_type:ident,
      $builders:ident, $index:ident, $column:ident,
-     $rows:ident, $array_refs:ident, $c_index:ident,
-     $e_index:ident) => {
+     $rows:ident) => {
         let bsize = $builders.len();
         if bsize <= $index {
             let builder =
@@ -123,9 +176,6 @@ macro_rules! primary_type_convert {
         ) = (builder, $column)
         {
             internal_builder.append_value(*internal_v)?;
-            if $c_index == $e_index && $array_refs.len() < bsize {
-                $array_refs.push(Arc::new(internal_builder.finish()));
-            }
         } else {
             return Err(RTStoreError::TableTypeMismatchError {
                 left: "$data_type".to_string(),
@@ -143,11 +193,7 @@ pub fn rows_to_columns(
         return Ok(RecordBatch::new_empty(schema.clone()));
     }
     let mut builders: Vec<RTStoreColumnBuilder> = Vec::new();
-    let mut array_refs: Vec<ArrayRef> = Vec::new();
-    let end_index = rows_batch.size();
-    let mut current_index = 0;
     for rows in rows_batch.iter() {
-        current_index += 1;
         for r_index in 0..rows.batch.len() {
             let r = &rows.batch[r_index];
             for index in 0..schema.fields().len() {
@@ -162,10 +208,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::UInt8 => {
@@ -176,10 +219,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int8 => {
@@ -190,10 +230,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int16 => {
@@ -204,10 +241,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::UInt16 => {
@@ -218,10 +252,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int32 => {
@@ -232,10 +263,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int64 => {
@@ -246,10 +274,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::UInt64 => {
@@ -260,10 +285,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Timestamp(_, _) => {
@@ -273,7 +295,6 @@ pub fn rows_to_columns(
                             );
                             builders.push(builder);
                         }
-                        let bsize = builders.len();
                         let builder = &mut builders[index];
                         if let (
                             RTStoreColumnBuilder::RTStoreTimestampMillsBuilder(ts_builder),
@@ -281,9 +302,6 @@ pub fn rows_to_columns(
                         ) = (builder, column)
                         {
                             ts_builder.append_value(*s as i64)?;
-                            if current_index == end_index && array_refs.len() < bsize {
-                                array_refs.push(Arc::new(ts_builder.finish()));
-                            }
                         } else {
                             return Err(RTStoreError::TableTypeMismatchError {
                                 left: "timestamp".to_string(),
@@ -298,7 +316,6 @@ pub fn rows_to_columns(
                             );
                             builders.push(builder);
                         }
-                        let bsize = builders.len();
                         let builder = &mut builders[index];
                         if let (
                             RTStoreColumnBuilder::RTStoreStrBuilder(str_builder),
@@ -306,9 +323,6 @@ pub fn rows_to_columns(
                         ) = (builder, column)
                         {
                             str_builder.append_value(s)?;
-                            if current_index == end_index && array_refs.len() < bsize {
-                                array_refs.push(Arc::new(str_builder.finish()));
-                            }
                         } else {
                             return Err(RTStoreError::TableTypeMismatchError {
                                 left: "utf8".to_string(),
@@ -320,6 +334,10 @@ pub fn rows_to_columns(
                 }
             }
         }
+    }
+    let mut array_refs: Vec<ArrayRef> = Vec::new();
+    for mut builder in builders {
+        array_refs.push(builder.finish());
     }
     let record_batch = RecordBatch::try_new(schema.clone(), array_refs)?;
     Ok(record_batch)
@@ -338,6 +356,7 @@ pub fn schema_to_recordbatch(schema: &SchemaRef) -> Result<RecordBatch> {
     for i in 0..schema.fields().len() {
         let mut row: Vec<Data> = Vec::new();
         let f = &schema.fields()[i];
+        info!("{} field", f);
         row.push(Data::Varchar(f.name().clone()));
         match f.data_type() {
             DataType::Utf8 => {

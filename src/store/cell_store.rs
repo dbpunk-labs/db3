@@ -25,15 +25,10 @@ use crate::store::object_store::{BucketFileSystem, S3FileSystem};
 use arc_swap::ArcSwap;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use s3::bucket::Bucket;
-use s3::bucket_ops::BucketConfiguration;
-use s3::command::Command;
 use s3::creds::Credentials;
 use s3::region::Region;
-use s3::request::Reqwest as RequestImpl;
 use std::fs;
 use std::path::Path;
-use std::str::Utf8Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tempdir::TempDir;
@@ -201,6 +196,19 @@ impl CellStore {
 
     pub fn row_memtable_size(&self) -> u64 {
         self.row_memtable_size.load(Ordering::Relaxed)
+    }
+
+    pub fn get_memory_batch_snapshot(&self) -> Result<Vec<RecordBatch>> {
+        let local_row_memtable = self.row_memtable.load();
+        let mut batches: Vec<RecordBatch> = Vec::new();
+        let batch =
+            arrow_parquet_utils::rows_to_columns(&self.config.schema, local_row_memtable.as_ref())?;
+        batches.push(batch);
+        let local_column_memtable = self.column_memtable.load();
+        for batch in local_column_memtable.iter() {
+            batches.push(batch.clone());
+        }
+        Ok(batches)
     }
 
     pub async fn put_records(&self, records: RowRecordBatch) -> Result<()> {
@@ -468,7 +476,7 @@ mod tests {
             if let Err(e) = c.do_l2_compaction().await {
                 panic!("should be ok {}", e)
             }
-            assert_eq!(10237, c.get_total_rows_in_memory());
+            assert_eq!(10119, c.get_total_rows_in_memory());
         } else {
             panic!("should be ok");
         }

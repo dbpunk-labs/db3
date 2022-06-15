@@ -45,13 +45,15 @@ uselog!(info, warn, debug);
 const ACCESS_KEY: &str = "AWS_ACCESS_KEY_ID";
 const SECRET_KEY: &str = "AWS_SECRET_ACCESS_KEY";
 #[inline]
-pub fn build_region(name: &str, endpoint: Option<String>) -> Region {
-    match endpoint {
-        Some(e) => Region::Custom {
-            region: name.to_string(),
-            endpoint: e,
-        },
-        _ => name.parse().unwrap(),
+pub fn build_region(name: &str) -> Region {
+    let r = name.parse().unwrap();
+    if let Region::Custom { .. } = r {
+        Region::Custom {
+            region: "".to_string(),
+            endpoint: name.to_string(),
+        }
+    } else {
+        r
     }
 }
 
@@ -125,14 +127,12 @@ impl S3FileSystem {
 
 pub struct BucketFileSystem {
     bucket: Bucket,
-    bucket_name: String,
 }
 
 impl BucketFileSystem {
     pub fn new(bucket_name: &str, region: &Region, credentials: &Credentials) -> Self {
         Self {
             bucket: build_bucket(bucket_name, region, credentials),
-            bucket_name: bucket_name.to_string(),
         }
     }
 
@@ -270,7 +270,6 @@ mod tests {
     use super::*;
     use datafusion::assert_batches_eq;
     use datafusion::datasource::listing::{ListingTable, ListingTableConfig, ListingTableUrl};
-    use datafusion::datasource::TableProvider;
     use datafusion::error::DataFusionError;
 
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
@@ -280,7 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fs_create_bucket() -> Result<()> {
-        let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
+        let region = build_region("http://127.0.0.1:9000");
         if let Region::Custom { .. } = region {
             assert!(true);
         } else {
@@ -288,13 +287,33 @@ mod tests {
         }
         let credentials = build_credentials(None, None)?;
         let s3 = S3FileSystem::new(region, credentials);
-        s3.create_bucket("test2").await?;
+        assert!(s3.create_bucket("test_new__").await.is_ok());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_put_file() -> Result<()> {
+        let region = build_region("http://127.0.0.1:9000");
+        if let Region::Custom { .. } = region {
+            assert!(true);
+        } else {
+            panic!("should not be here");
+        }
+        let credentials = build_credentials(None, None)?;
+        let s3 = S3FileSystem::new(region, credentials);
+        s3.create_bucket("testaddfile").await?;
+        let bucket_fs = s3.new_bucket_fs("testaddfile");
+        let file_path = Path::new("thirdparty/parquet-testing/data/repeated_no_annotation.parquet");
+        assert!(bucket_fs
+            .put_with_file(&file_path, "ttt/test_key.parquet")
+            .await
+            .is_ok());
         Ok(())
     }
 
     #[tokio::test]
     async fn simple_flow_test() -> Result<()> {
-        let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
+        let region = build_region("http://127.0.0.1:9000");
         if let Region::Custom { .. } = region {
             assert!(true);
         } else {
@@ -302,13 +321,13 @@ mod tests {
         }
         let credentials = build_credentials(None, None)?;
         let s3 = S3FileSystem::new(region, credentials);
-        s3.create_bucket("test3").await?;
-        let bucket_fs = s3.new_bucket_fs("test3");
+        s3.create_bucket("testxxxxx").await?;
+        let bucket_fs = s3.new_bucket_fs("testxxxxx");
         let file_path = Path::new("thirdparty/parquet-testing/data/repeated_no_annotation.parquet");
         bucket_fs
             .put_with_file(&file_path, "ttt/test_key.parquet")
             .await?;
-        let s3_path = "test3/";
+        let s3_path = "testxxxxx/";
         if let Ok(stream) = s3.list_file(&s3_path).await {
             let ret: DFResult<Vec<FileMeta>> = stream.try_collect().await;
             match ret {
@@ -331,7 +350,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sql_query() -> Result<()> {
-        let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
+        let region = build_region("http://127.0.0.1:9000");
         if let Region::Custom { .. } = region {
             assert!(true);
         } else {
