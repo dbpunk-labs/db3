@@ -336,7 +336,6 @@ impl SQLExecutor {
         let schema_vec = vec![ArrowField::new("Tables", DataType::Utf8, false)];
         let mut rows: Vec<Vec<Data>> = Vec::new();
         for name in table_names {
-            info!("table {}", &name);
             let row = vec![Data::Varchar(name)];
             rows.push(row);
         }
@@ -392,6 +391,7 @@ impl SQLExecutor {
     fn handle_desc_table(&self, db: &str, tname: &str) -> Result<SQLResult> {
         let database = self.catalog.get_db(db)?;
         let table = database.get_table(tname)?;
+        info!("table schema len {}", table.get_schema().fields().len());
         let batch = arrow_parquet_utils::schema_to_recordbatch(table.get_schema())?;
         Ok(SQLResult {
             batch: Some(vec![batch]),
@@ -449,9 +449,11 @@ impl SQLExecutor {
                 })
             }
             (Keyword::DESCRIBE, SQLStatement::ExplainTable { table_name, .. }, Some(db_str)) => {
+                info!("describe");
                 self.handle_desc_table(db_str, &table_name.0[0].value)
             }
             (_, SQLStatement::Query(q), _) => {
+                info!("query");
                 if self.is_query_system_vars(&q.body) {
                     self.handle_select_variable(&q.body)
                 } else {

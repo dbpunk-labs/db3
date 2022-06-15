@@ -18,6 +18,7 @@
 //
 
 uselog!(info, warn);
+use super::table_scanner::TableScannerExec;
 use crate::base::arrow_parquet_utils;
 use crate::codec::flight_codec::flight_data_to_arrow_batch;
 use crate::error::{RTStoreError, Result};
@@ -36,7 +37,10 @@ use datafusion::datasource::{
 };
 use datafusion::error::{DataFusionError, Result as DFResult};
 use datafusion::execution::context::SessionState;
-use datafusion::logical_plan::Expr;
+use datafusion::logical_plan::{combine_filters, Expr};
+use datafusion::physical_plan::project_schema;
+use datafusion::physical_plan::{empty::EmptyExec, memory::MemoryExec};
+
 use datafusion::physical_plan::{file_format::FileScanConfig, ExecutionPlan, Statistics};
 use futures::stream::{self, select, BoxStream, StreamExt};
 use std::any::Any;
@@ -114,9 +118,10 @@ impl Table {
         }
     }
 
-    async fn get_memory_records(&self) -> Result<Vec<RecordBatch>> {
+    async fn get_memory_records(&self) -> Result<(Vec<RecordBatch>, MemoryTableState)> {
         //TODO support table partition
         let sdk = self.get_node_by_partition(0).ok_or_else(|| {
+            warn!("fail to get memory node for table {} ", self.get_name());
             RTStoreError::RPCInternalError(format!(
                 "fail to get node by partition for table {}",
                 self.get_name()
@@ -143,6 +148,8 @@ impl Table {
         })?;
         let mut results = vec![];
         let dictionaries_by_field = HashMap::new();
+        let mut num_rows: usize = 0;
+        let mut total_bytes: usize = 0;
         while let Some(flight_data) = stream.message().await.map_err(|e| {
             RTStoreError::RPCInternalError(format!(
                 "fail to get iterator stream for table {} with err {}",
@@ -155,15 +162,27 @@ impl Table {
                 self.get_schema().clone(),
                 &dictionaries_by_field,
             )?;
+            num_rows += record_batch.num_rows();
+            let byte_size: usize = record_batch
+                .columns()
+                .iter()
+                .map(|array| array.get_array_memory_size())
+                .sum();
+            total_bytes += byte_size;
             results.push(record_batch);
         }
-        Ok(results)
+        Ok((
+            results,
+            MemoryTableState {
+                num_rows,
+                total_bytes,
+            },
+        ))
     }
 
     async fn list_files(
         &self,
         ctx: &SessionState,
-        record_batchs: &[RecordBatch],
         limit: Option<usize>,
     ) -> Result<(Vec<Vec<PartitionedFile>>, Statistics)> {
         //TODO cache the table path as member
@@ -176,25 +195,11 @@ impl Table {
             warn!("fail to get object store {} with err {}", &table_path, e);
             RTStoreError::TableBadUrl(table_path.to_string())
         })?;
-        let memory_files = arrow_parquet_utils::batches_to_paths(record_batchs);
-        let memory_stream = Box::pin(stream::iter(memory_files));
-        let memory_stream = memory_stream.then(|part_file| async {
-            let statistics = if self.options.collect_stat {
-                self.options
-                    .format
-                    .infer_stats(&store, self.get_schema().clone(), &part_file.file_meta)
-                    .await?
-            } else {
-                Statistics::default()
-            };
-            Ok((part_file, statistics)) as DFResult<(PartitionedFile, Statistics)>
-        });
         let stream = store.list_file(&table_path).await.map_err(|e| {
             warn!("fail to get object store {} with err {}", &table_path, e);
             RTStoreError::TableBadUrl(table_path.to_string())
         })?;
         let pin_stream = Box::pin(stream);
-        let options = ListingOptions::new(Arc::new(ParquetFormat::default()));
         let files = pin_stream.then(|file_meta| async {
             let part_file: PartitionedFile = file_meta?.into();
             let statistics = if self.options.collect_stat {
@@ -207,9 +212,8 @@ impl Table {
             };
             Ok((part_file, statistics)) as DFResult<(PartitionedFile, Statistics)>
         });
-        let all_files = select(memory_stream, files);
         let (files, statistics) =
-            get_statistics_with_limit(all_files, self.get_schema().clone(), limit)
+            get_statistics_with_limit(files, self.get_schema().clone(), limit)
                 .await
                 .map_err(|e| {
                     warn!(
@@ -219,6 +223,11 @@ impl Table {
                     );
                     RTStoreError::TableBadUrl(table_path.to_string())
                 })?;
+        info!(
+            "files size {} rows {}",
+            files.len(),
+            statistics.num_rows.unwrap()
+        );
         Ok((
             self.split_files(files, self.options.target_partitions),
             statistics,
@@ -249,7 +258,7 @@ impl TableProvider for Table {
     }
 
     fn schema(&self) -> SchemaRef {
-        self.schema().clone()
+        self.get_schema().clone()
     }
 
     fn table_type(&self) -> TableType {
@@ -263,30 +272,51 @@ impl TableProvider for Table {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let records = self.get_memory_records().await.map_err(|e| {
+        let (records, memory_state) = self.get_memory_records().await.map_err(|e| {
             DataFusionError::Internal(format!("fail to get memory records for err {}", e))
         })?;
-        let (partition_files, statistics) = self
-            .list_files(ctx, &records, limit)
+        info!("memory records size {}", records.len());
+        let (partition_files, mut statistics) = self
+            .list_files(ctx, limit)
             .await
             .map_err(|e| DataFusionError::Internal(format!("fail to list files for err {}", e)))?;
-        //TODO add table path to member variable of table
+        if partition_files.is_empty() && memory_state.num_rows == 0 {
+            let schema = self.get_schema();
+            let projected_schema = project_schema(&schema, projection.as_ref())?;
+            return Ok(Arc::new(EmptyExec::new(false, projected_schema)));
+        }
+
+        if partition_files.is_empty() && memory_state.num_rows != 0 {
+            let memory_exec =
+                MemoryExec::try_new(&[records], self.get_schema().clone(), projection.clone())?;
+            return Ok(Arc::new(memory_exec));
+        }
+
+        let new_rows = match statistics.num_rows {
+            Some(old) => Some(old + memory_state.num_rows),
+            None => Some(0),
+        };
+
+        let new_total_byte_size = match statistics.total_byte_size {
+            Some(old) => Some(old + memory_state.total_bytes),
+            None => Some(0),
+        };
+        statistics.num_rows = new_rows;
+        statistics.total_byte_size = new_total_byte_size;
         let table_path = format!("s3://{}/{}", self.get_db(), self.get_name());
         let table_url = ListingTableUrl::parse(&table_path)?;
-        self.options
-            .format
-            .create_physical_plan(
-                FileScanConfig {
-                    object_store_url: table_url.object_store(),
-                    file_schema: self.get_schema().clone(),
-                    file_groups: partition_files,
-                    statistics,
-                    projection: projection.clone(),
-                    limit,
-                    table_partition_cols: self.options.table_partition_cols.clone(),
-                },
-                filters,
-            )
-            .await
+        let predicate = combine_filters(filters);
+        let file_config = FileScanConfig {
+            object_store_url: table_url.object_store(),
+            file_schema: self.get_schema().clone(),
+            file_groups: partition_files,
+            statistics,
+            projection: projection.clone(),
+            limit,
+            table_partition_cols: self.options.table_partition_cols.clone(),
+        };
+        let exec =
+            TableScannerExec::new(file_config, self.get_schema().clone(), records, predicate)?;
+        Ok(Arc::new(exec))
     }
 }

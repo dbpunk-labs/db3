@@ -274,7 +274,9 @@ impl MemoryNode for MemoryNodeImpl {
             fetch_request.partition_id,
         ) {
             let batches = cell_store.get_memory_batch_snapshot()?;
+            info!("batch size {}", batches.len());
             let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
+            //TODO  empty check
             let schema_flight_data =
                 SchemaAsIpc::new(batches[0].schema().as_ref(), &options).into();
             let mut flights: Vec<std::result::Result<FlightData, Status>> =

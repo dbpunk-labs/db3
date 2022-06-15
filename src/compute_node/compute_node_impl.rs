@@ -94,14 +94,13 @@ impl ComputeNode for ComputeNodeImpl {
         if !query_request.default_db.is_empty() {
             db = Some(query_request.default_db);
         }
-
-        let batches = self
-            .sql_engine
-            .execute(&query_request.sql, db)
-            .await?
-            .batch
-            .unwrap();
-
+        let result = self.sql_engine.execute(&query_request.sql, db).await?;
+        if result.batch.is_none() {
+            let flights: Vec<std::result::Result<FlightData, Status>> = Vec::new();
+            let output = futures::stream::iter(flights);
+            return Ok(Response::new(Box::pin(output) as Self::QueryStream));
+        }
+        let batches = result.batch.unwrap();
         let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
         let schema_flight_data = SchemaAsIpc::new(batches[0].schema().as_ref(), &options).into();
         let mut flights: Vec<std::result::Result<FlightData, Status>> =

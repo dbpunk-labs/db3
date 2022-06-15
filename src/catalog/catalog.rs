@@ -105,14 +105,6 @@ impl Database {
     }
 
     pub async fn create_table(&self, table_desc: &RtStoreTableDesc, recover: bool) -> Result<()> {
-        // add mutex
-        if self.tables.contains_key(&table_desc.name) {
-            warn!("new table with name {} exist", &table_desc.name);
-            return Err(RTStoreError::TableNamesExistError {
-                name: table_desc.name.to_string(),
-            });
-        }
-
         let schema = match &table_desc.schema {
             Some(s) => table_desc_to_arrow_schema(s),
             _ => {
@@ -125,7 +117,7 @@ impl Database {
         let table = Arc::new(Table::new(&table_desc.clone(), schema));
         let table = self
             .tables
-            .get_or_insert_with(table_desc.name.clone(), || table)
+            .insert(table_desc.name.clone(), table)
             .value()
             .clone();
         let mut nodes: HashMap<String, MemoryNodeSDK> = HashMap::new();
@@ -200,22 +192,7 @@ impl SchemaProvider for Database {
 
     fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
         match self.get_table(name) {
-            Ok(t) => {
-                let table_path = format!("s3://{}/{}", t.get_db(), t.get_name());
-                if let Ok(table_url) = ListingTableUrl::parse(&table_path) {
-                    let options = ListingOptions::new(Arc::new(ParquetFormat::default()));
-                    let config = ListingTableConfig::new(table_url)
-                        .with_listing_options(options)
-                        .with_schema(t.get_schema().clone());
-                    if let Ok(table) = ListingTable::try_new(config) {
-                        Some(Arc::new(table))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
+            Ok(t) => Some(t.clone()),
             _ => None,
         }
     }

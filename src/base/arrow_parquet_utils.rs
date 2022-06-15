@@ -51,34 +51,19 @@ pub fn batches_to_paths(batches: &[RecordBatch]) -> Vec<PartitionedFile> {
     batches
         .iter()
         .flat_map(|batch| {
-            let key_array = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
-            let length_array = batch
-                .column(1)
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .unwrap();
-            let modified_array = batch
-                .column(2)
-                .as_any()
-                .downcast_ref::<Date64Array>()
-                .unwrap();
-
             (0..batch.num_rows()).map(move |row| PartitionedFile {
                 file_meta: FileMeta {
-                    last_modified: match modified_array.is_null(row) {
-                        false => Some(Utc.timestamp_millis(modified_array.value(row))),
-                        true => None,
-                    },
+                    last_modified: None,
                     sized_file: SizedFile {
-                        path: key_array.value(row).to_owned(),
-                        size: length_array.value(row),
+                        path: "".to_string(),
+                        size: batch
+                            .columns()
+                            .iter()
+                            .map(|array| array.get_array_memory_size())
+                            .sum::<usize>() as u64,
                     },
                 },
-                partition_values: (3..batch.columns().len())
+                partition_values: (0..batch.columns().len())
                     .map(|col| ScalarValue::try_from_array(batch.column(col), row).unwrap())
                     .collect(),
                 range: None,
@@ -153,11 +138,31 @@ enum RTStoreColumnBuilder {
     RTStoreTimestampMillsBuilder(TimestampMillisecondBuilder),
 }
 
+impl RTStoreColumnBuilder {
+    pub fn finish(&mut self) -> ArrayRef {
+        match self {
+            Self::RTStoreBooleanBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt8Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt8Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt16Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt16Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt16Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt32Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt32Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreInt64Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreUInt64Builder(b) => Arc::new(b.finish()),
+            Self::RTStoreStrBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreTimestampNsBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreTimestampMicrosBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreTimestampMillsBuilder(b) => Arc::new(b.finish()),
+        }
+    }
+}
+
 macro_rules! primary_type_convert {
     ($left_builder:ident, $right_builder:ident, $data_type:ident,
      $builders:ident, $index:ident, $column:ident,
-     $rows:ident, $array_refs:ident, $c_index:ident,
-     $e_index:ident) => {
+     $rows:ident) => {
         let bsize = $builders.len();
         if bsize <= $index {
             let builder =
@@ -171,9 +176,6 @@ macro_rules! primary_type_convert {
         ) = (builder, $column)
         {
             internal_builder.append_value(*internal_v)?;
-            if $c_index == $e_index && $array_refs.len() < bsize {
-                $array_refs.push(Arc::new(internal_builder.finish()));
-            }
         } else {
             return Err(RTStoreError::TableTypeMismatchError {
                 left: "$data_type".to_string(),
@@ -191,11 +193,7 @@ pub fn rows_to_columns(
         return Ok(RecordBatch::new_empty(schema.clone()));
     }
     let mut builders: Vec<RTStoreColumnBuilder> = Vec::new();
-    let mut array_refs: Vec<ArrayRef> = Vec::new();
-    let end_index = rows_batch.size();
-    let mut current_index = 0;
     for rows in rows_batch.iter() {
-        current_index += 1;
         for r_index in 0..rows.batch.len() {
             let r = &rows.batch[r_index];
             for index in 0..schema.fields().len() {
@@ -210,10 +208,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::UInt8 => {
@@ -224,10 +219,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int8 => {
@@ -238,10 +230,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int16 => {
@@ -252,10 +241,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::UInt16 => {
@@ -266,10 +252,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int32 => {
@@ -280,10 +263,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Int64 => {
@@ -294,10 +274,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::UInt64 => {
@@ -308,10 +285,7 @@ pub fn rows_to_columns(
                             builders,
                             index,
                             column,
-                            rows,
-                            array_refs,
-                            current_index,
-                            end_index
+                            rows
                         );
                     }
                     DataType::Timestamp(_, _) => {
@@ -329,9 +303,6 @@ pub fn rows_to_columns(
                         ) = (builder, column)
                         {
                             ts_builder.append_value(*s as i64)?;
-                            if current_index == end_index && array_refs.len() < bsize {
-                                array_refs.push(Arc::new(ts_builder.finish()));
-                            }
                         } else {
                             return Err(RTStoreError::TableTypeMismatchError {
                                 left: "timestamp".to_string(),
@@ -346,7 +317,6 @@ pub fn rows_to_columns(
                             );
                             builders.push(builder);
                         }
-                        let bsize = builders.len();
                         let builder = &mut builders[index];
                         if let (
                             RTStoreColumnBuilder::RTStoreStrBuilder(str_builder),
@@ -354,9 +324,6 @@ pub fn rows_to_columns(
                         ) = (builder, column)
                         {
                             str_builder.append_value(s)?;
-                            if current_index == end_index && array_refs.len() < bsize {
-                                array_refs.push(Arc::new(str_builder.finish()));
-                            }
                         } else {
                             return Err(RTStoreError::TableTypeMismatchError {
                                 left: "utf8".to_string(),
@@ -368,6 +335,10 @@ pub fn rows_to_columns(
                 }
             }
         }
+    }
+    let mut array_refs: Vec<ArrayRef> = Vec::new();
+    for mut builder in builders {
+        array_refs.push(builder.finish());
     }
     let record_batch = RecordBatch::try_new(schema.clone(), array_refs)?;
     Ok(record_batch)
@@ -386,6 +357,7 @@ pub fn schema_to_recordbatch(schema: &SchemaRef) -> Result<RecordBatch> {
     for i in 0..schema.fields().len() {
         let mut row: Vec<Data> = Vec::new();
         let f = &schema.fields()[i];
+        info!("{} field", f);
         row.push(Data::Varchar(f.name().clone()));
         match f.data_type() {
             DataType::Utf8 => {

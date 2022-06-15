@@ -18,3 +18,4 @@
 
 pub mod catalog;
 pub mod table;
+mod table_scanner;
