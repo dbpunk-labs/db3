@@ -45,14 +45,8 @@ uselog!(info, warn, debug);
 const ACCESS_KEY: &str = "AWS_ACCESS_KEY_ID";
 const SECRET_KEY: &str = "AWS_SECRET_ACCESS_KEY";
 #[inline]
-pub fn build_region(name: &str, endpoint: Option<String>) -> Region {
-    match endpoint {
-        Some(e) => Region::Custom {
-            region: name.to_string(),
-            endpoint: e,
-        },
-        _ => name.parse().unwrap(),
-    }
+pub fn build_region(name: &str) -> Region {
+    name.parse().unwrap()
 }
 
 #[inline]
@@ -278,7 +272,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fs_create_bucket() -> Result<()> {
-        let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
+        let region = build_region("http://127.0.0.1:9000");
         if let Region::Custom { .. } = region {
             assert!(true);
         } else {
@@ -292,7 +286,7 @@ mod tests {
 
     #[tokio::test]
     async fn simple_flow_test() -> Result<()> {
-        let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
+        let region = build_region("http://127.0.0.1:9000");
         if let Region::Custom { .. } = region {
             assert!(true);
         } else {
@@ -329,7 +323,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sql_query() -> Result<()> {
-        let region = build_region("", Some("http://127.0.0.1:9000".to_string()));
+        let region = build_region("http://127.0.0.1:9000");
         if let Region::Custom { .. } = region {
             assert!(true);
         } else {

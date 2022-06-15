@@ -21,15 +21,23 @@ use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder,
-    TimestampMicrosecondBuilder, TimestampMillisecondBuilder, TimestampNanosecondBuilder,
-    UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
+    Array, ArrayRef, BooleanBuilder, Date64Array, Int16Builder, Int32Builder, Int64Builder,
+    Int8Builder, StringArray, StringBuilder, TimestampMicrosecondBuilder,
+    TimestampMillisecondBuilder, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder,
+    UInt64Array, UInt64Builder, UInt8Builder,
 };
 use arrow::datatypes::{
     DataType, Field as ArrowField, Schema, SchemaRef, TimeUnit, DECIMAL_MAX_PRECISION,
     DECIMAL_MAX_SCALE,
 };
+
+use datafusion::datasource::listing::PartitionedFile;
+
 use arrow::record_batch::RecordBatch;
+use chrono::offset::Utc;
+use chrono::TimeZone;
+use datafusion::datafusion_data_access::{FileMeta, SizedFile};
+use datafusion::scalar::ScalarValue;
 use parquet::arrow::arrow_writer::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -38,6 +46,46 @@ use std::path::Path;
 use std::sync::Arc;
 use string_builder::Builder;
 uselog!(info, debug, warn);
+
+pub fn batches_to_paths(batches: &[RecordBatch]) -> Vec<PartitionedFile> {
+    batches
+        .iter()
+        .flat_map(|batch| {
+            let key_array = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+            let length_array = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap();
+            let modified_array = batch
+                .column(2)
+                .as_any()
+                .downcast_ref::<Date64Array>()
+                .unwrap();
+
+            (0..batch.num_rows()).map(move |row| PartitionedFile {
+                file_meta: FileMeta {
+                    last_modified: match modified_array.is_null(row) {
+                        false => Some(Utc.timestamp_millis(modified_array.value(row))),
+                        true => None,
+                    },
+                    sized_file: SizedFile {
+                        path: key_array.value(row).to_owned(),
+                        size: length_array.value(row),
+                    },
+                },
+                partition_values: (3..batch.columns().len())
+                    .map(|col| ScalarValue::try_from_array(batch.column(col), row).unwrap())
+                    .collect(),
+                range: None,
+            })
+        })
+        .collect()
+}
 
 pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef> {
     let mut fields: Vec<ArrowField> = Vec::new();

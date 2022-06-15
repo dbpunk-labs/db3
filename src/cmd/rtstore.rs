@@ -181,12 +181,13 @@ async fn start_compute_node(cmd: &Commands) -> Result<(), Box<dyn std::error::Er
                 port: *port,
             };
 
-            let r = build_region("", Some(region.to_string()));
+            let r = build_region(&region);
             let config = ComputeNodeConfig {
                 node,
                 etcd_cluster: etcd_cluster.to_string(),
                 etcd_root_path: etcd_root_path.to_string(),
             };
+
             let compute_node = ComputeNodeImpl::new(r, config, Arc::new(meta_store))?;
             compute_node.init().await.unwrap();
             info!("start compute node server on addr {}", addr);
@@ -224,7 +225,7 @@ async fn start_metaserver(cmd: &Commands) -> Result<(), Box<dyn std::error::Erro
                 ns: ns.to_string(),
                 port: *port,
             };
-            let r = build_region("", Some(region.to_string()));
+            let r = build_region(&region);
             let config = MetaConfig {
                 node,
                 etcd_cluster: etcd_cluster.to_string(),

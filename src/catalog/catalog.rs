@@ -21,6 +21,7 @@ use crate::base::arrow_parquet_utils::*;
 use crate::base::time_utils;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreDatabase, RtStoreTableDesc, StorageRegion};
+use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::store::meta_store::MetaStore;
 use crate::store::object_store::build_region;
 use bytes::Bytes;
@@ -36,6 +37,7 @@ use datafusion::error::Result as DFResult;
 use etcd_client::EventType;
 use prost::Message;
 use s3::region::Region;
+use std::collections::HashMap;
 
 uselog!(info, warn);
 use std::any::Any;
@@ -57,12 +59,7 @@ impl Database {
     pub fn from_db_desc(db_desc: &RtStoreDatabase, meta_store: Arc<MetaStore>) -> Result<Self> {
         match &db_desc.region {
             Some(r) => {
-                let mut endpoint: Option<String> = None;
-                // not custom region
-                if !r.endpoint.is_empty() {
-                    endpoint = Some(r.endpoint.to_string());
-                }
-                let region = build_region(&r.region, endpoint);
+                let region = build_region(&r.region);
                 Ok(Self {
                     db: db_desc.db.to_string(),
                     tables: Arc::new(SkipMap::new()),
@@ -126,8 +123,31 @@ impl Database {
             }
         }?;
         let table = Arc::new(Table::new(&table_desc.clone(), schema));
-        self.tables
-            .get_or_insert_with(table_desc.name.clone(), || table);
+        let table = self
+            .tables
+            .get_or_insert_with(table_desc.name.clone(), || table)
+            .value()
+            .clone();
+        let mut nodes: HashMap<String, MemoryNodeSDK> = HashMap::new();
+        for partition_node in table_desc.mappings.iter() {
+            if partition_node.node_list.is_empty() {
+                continue;
+            }
+            if !nodes.contains_key(&partition_node.node_list[0]) {
+                let node = MemoryNodeSDK::connect(&partition_node.node_list[0])
+                    .await
+                    .map_err(|e| {
+                        warn!("fail to connect to memory node for error {}", e);
+                        RTStoreError::RPCConnectError(e)
+                    })?;
+                nodes.insert(partition_node.node_list[0].to_string(), node);
+            }
+            table.assign_partition_to_node(
+                partition_node.partition_id,
+                nodes.get(&partition_node.node_list[0]).unwrap().clone(),
+            )?;
+        }
+
         if !recover {
             self.meta_store.add_table(table_desc).await?;
         }

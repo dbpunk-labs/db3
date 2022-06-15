@@ -105,6 +105,10 @@ pub enum RTStoreError {
     RecordBatchCodecError(String),
     #[error("fail to call rpc for {0}")]
     RPCStatusError(Status),
+    #[error("fail to connect to rpc node for {0}")]
+    RPCConnectError(tonic::transport::Error),
+    #[error("{0}")]
+    RPCInternalError(String),
 }
 
 /// convert io error to rtstore error
