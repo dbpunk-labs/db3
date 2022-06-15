@@ -476,7 +476,7 @@ mod tests {
             if let Err(e) = c.do_l2_compaction().await {
                 panic!("should be ok {}", e)
             }
-            assert_eq!(10237, c.get_total_rows_in_memory());
+            assert_eq!(10119, c.get_total_rows_in_memory());
         } else {
             panic!("should be ok");
         }

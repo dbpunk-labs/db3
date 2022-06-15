@@ -449,11 +449,9 @@ impl SQLExecutor {
                 })
             }
             (Keyword::DESCRIBE, SQLStatement::ExplainTable { table_name, .. }, Some(db_str)) => {
-                info!("describe");
                 self.handle_desc_table(db_str, &table_name.0[0].value)
             }
             (_, SQLStatement::Query(q), _) => {
-                info!("query");
                 if self.is_query_system_vars(&q.body) {
                     self.handle_select_variable(&q.body)
                 } else {

@@ -335,8 +335,4 @@ impl CatalogProvider for Catalog {
 }
 
 #[cfg(test)]
-mod tests {
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::prelude::*;
-    use futures::TryStreamExt;
-}
+mod tests {}

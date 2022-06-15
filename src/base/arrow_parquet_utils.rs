@@ -295,7 +295,6 @@ pub fn rows_to_columns(
                             );
                             builders.push(builder);
                         }
-                        let bsize = builders.len();
                         let builder = &mut builders[index];
                         if let (
                             RTStoreColumnBuilder::RTStoreTimestampMillsBuilder(ts_builder),
