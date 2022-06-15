@@ -34,8 +34,8 @@ use sqlparser::{
     ast::{ColumnDef, SetExpr, Statement as SQLStatement},
     dialect::{keywords::Keyword, MySqlDialect},
 };
-use std::sync::Arc;
 use std::cell::RefCell;
+use std::sync::Arc;
 thread_local!(static DB : RefCell<String> = RefCell::new("".to_string()));
 pub struct SQLResult {
     pub batch: Option<Vec<RecordBatch>>,
@@ -70,7 +70,7 @@ impl SQLEngine {
                 let config = SessionConfig::new();
                 let config = config.with_information_schema(true);
                 DB.with(|x| {
-                    *x.borrow_mut() =  name.to_string();
+                    *x.borrow_mut() = name.to_string();
                 });
                 config.with_default_catalog_and_schema("rtstore", name)
             }
@@ -82,7 +82,7 @@ impl SQLEngine {
         };
         let db_fn = |_: &[ColumnarValue]| {
             Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
-                    DB.with(|x|x.borrow().to_string())
+                DB.with(|x| x.borrow().to_string()),
             ))))
         };
         let version_fn = |_: &[ColumnarValue]| {
