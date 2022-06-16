@@ -1,17 +1,18 @@
 # rtstore
 
-[![Crates.io](https://img.shields.io/crates/v/rtstore.svg)](https://crates.io/crates/rtstore)
-[![Docs.rs](https://docs.rs/rtstore/badge.svg)](https://docs.rs/rtstore)
 [![CI](https://github.com/rtstore/rtstore/workflows/CI/badge.svg)](https://github.com/rtstore/rtstore/actions)
 [![codecov](https://codecov.io/gh/rtstore/rtstore/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/rtstore/rtstore)
 
-## Installation
+rtstore is a mysql compatible and cloud-native timeseries database for web3 data analytics
+![arc](./docs/rtstore_arch.svg)
 
-### Cargo
+## How to Build
 
-* Install the rust toolchain in order to have cargo installed by following
-  [this](https://www.rust-lang.org/tools/install) guide.
-* run `cargo install rtstore`
+```commandline
+
+git clone https://github.com/rtstore/rtstore.git
+cd rstore && cargo build
+```
 
 ## License
 Apache License, Version 2.0
@@ -23,3 +24,4 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
