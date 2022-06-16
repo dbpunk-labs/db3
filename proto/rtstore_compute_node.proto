@@ -26,6 +26,7 @@ package rtstore_compute_proto;
 message QueryRequest {
     string default_db = 1;
     string sql = 2;
+    uint32 cnn_id =3;
 }
 
 // The rtstore compute node server definition.

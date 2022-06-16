@@ -189,9 +189,9 @@ impl SQLExecutor {
         }
         Ok(())
     }
-    async fn handle_query(&self, sql: &str, db: &Option<String>) -> Result<SQLResult> {
+    async fn handle_query(&self, sql: &str, db: &Option<String>, cnn_id: u32) -> Result<SQLResult> {
         let db_str = db.clone().map_or("".to_string(), |v| v);
-        match self.compute_sdk.query(sql, &db_str).await {
+        match self.compute_sdk.query(sql, &db_str, cnn_id).await {
             Ok(resp) => {
                 let mut stream = resp.into_inner();
                 let flight_data = stream.message().await?.unwrap();
@@ -399,7 +399,7 @@ impl SQLExecutor {
         })
     }
 
-    pub async fn execute(&self, sql: &str, db: &Option<String>) -> Result<SQLResult> {
+    pub async fn execute(&self, sql: &str, db: &Option<String>, cnn_id: u32) -> Result<SQLResult> {
         if self.direct_return_for_mysql(sql) {
             return Ok(SQLResult {
                 batch: None,
@@ -456,12 +456,12 @@ impl SQLExecutor {
                     self.handle_select_variable(&q.body)
                 } else {
                     debug!("sql go to compute node");
-                    self.handle_query(sql, db).await
+                    self.handle_query(sql, db, cnn_id).await
                 }
             }
             (_, _, _) => {
                 debug!("sql go to compute node");
-                self.handle_query(sql, db).await
+                self.handle_query(sql, db, cnn_id).await
             }
         }
     }
