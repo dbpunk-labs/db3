@@ -94,7 +94,11 @@ impl ComputeNode for ComputeNodeImpl {
         if !query_request.default_db.is_empty() {
             db = Some(query_request.default_db);
         }
-        let result = self.sql_engine.execute(&query_request.sql, db).await?;
+        let cnn_id = query_request.cnn_id;
+        let result = self
+            .sql_engine
+            .execute(&query_request.sql, db, cnn_id)
+            .await?;
         if result.batch.is_none() {
             let flights: Vec<std::result::Result<FlightData, Status>> = Vec::new();
             let output = futures::stream::iter(flights);

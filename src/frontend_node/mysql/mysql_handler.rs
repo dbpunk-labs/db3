@@ -60,7 +60,7 @@ impl Clone for MySQLHandler {
             salt: scramble,
             id: self.id + 1,
             sql_executor: self.sql_executor.clone(),
-            db: self.db.clone(),
+            db: None,
         }
     }
 }
@@ -168,7 +168,7 @@ impl<W: std::io::Write + Send> AsyncMysqlShim<W> for MySQLHandler {
         sql: &'a str,
         results: QueryResultWriter<'a, W>,
     ) -> Result<()> {
-        if let Ok(result) = self.sql_executor.execute(sql, &self.db).await {
+        if let Ok(result) = self.sql_executor.execute(sql, &self.db, self.id).await {
             if let Some(batches) = result.batch {
                 mysql_utils::write_batch_to_resultset(&batches, results).unwrap();
             } else {

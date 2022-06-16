@@ -37,6 +37,7 @@ use sqlparser::{
 use std::cell::RefCell;
 use std::sync::Arc;
 thread_local!(static DB : RefCell<String> = RefCell::new("".to_string()));
+thread_local!(static ID: RefCell<u32> = RefCell::new(0));
 pub struct SQLResult {
     pub batch: Option<Vec<RecordBatch>>,
     pub effected_rows: usize,
@@ -63,7 +64,63 @@ impl SQLEngine {
         Ok((keyword, statement))
     }
 
-    pub async fn execute(&self, sql: &str, db: Option<String>) -> Result<SQLResult> {
+    fn add_function(&self, stx: &mut SessionContext) {
+        //TODO move these to frontend
+        let db_fn = |_: &[ColumnarValue]| {
+            Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                DB.with(|x| x.borrow().to_string()),
+            ))))
+        };
+        let cnn_fn = |_: &[ColumnarValue]| {
+            Ok(ColumnarValue::Scalar(ScalarValue::UInt32(Some(
+                ID.with(|x| *x.borrow()),
+            ))))
+        };
+
+        let user_fn = |_: &[ColumnarValue]| {
+            Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                "root".to_string(),
+            ))))
+        };
+        let version_fn = |_: &[ColumnarValue]| {
+            Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                "8.0.28".to_string(),
+            ))))
+        };
+        stx.register_udf(create_udf(
+            "connection_id",
+            vec![],
+            Arc::new(DataType::Int32),
+            Volatility::Immutable,
+            Arc::new(cnn_fn),
+        ));
+        stx.register_udf(create_udf(
+            "database",
+            vec![],
+            Arc::new(DataType::Utf8),
+            Volatility::Immutable,
+            Arc::new(db_fn),
+        ));
+        stx.register_udf(create_udf(
+            "user",
+            vec![],
+            Arc::new(DataType::Utf8),
+            Volatility::Immutable,
+            Arc::new(user_fn),
+        ));
+        stx.register_udf(create_udf(
+            "version",
+            vec![],
+            Arc::new(DataType::Utf8),
+            Volatility::Immutable,
+            Arc::new(version_fn),
+        ));
+    }
+
+    pub async fn execute(&self, sql: &str, db: Option<String>, id: u32) -> Result<SQLResult> {
+        ID.with(|x| {
+            *x.borrow_mut() = id;
+        });
         let (_, statement) = Self::parse_sql(sql)?;
         let config = match db {
             Some(name) => {
@@ -80,32 +137,9 @@ impl SQLEngine {
                 config.with_default_catalog_and_schema("rtstore", "public")
             }
         };
-        let db_fn = |_: &[ColumnarValue]| {
-            Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
-                DB.with(|x| x.borrow().to_string()),
-            ))))
-        };
-        let version_fn = |_: &[ColumnarValue]| {
-            Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(
-                "8.0.28".to_string(),
-            ))))
-        };
         //TODO use session id to cache session context
         let mut stx = SessionContext::with_config_rt(config, self.runtime.clone());
-        stx.register_udf(create_udf(
-            "database",
-            vec![],
-            Arc::new(DataType::Utf8),
-            Volatility::Immutable,
-            Arc::new(db_fn),
-        ));
-        stx.register_udf(create_udf(
-            "version",
-            vec![],
-            Arc::new(DataType::Utf8),
-            Volatility::Immutable,
-            Arc::new(version_fn),
-        ));
+        self.add_function(&mut stx);
         stx.register_catalog("rtstore", self.catalog.clone());
         let state = stx.state.read().clone();
         let query_planner = SqlToRel::new(&state);

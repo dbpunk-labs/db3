@@ -58,11 +58,13 @@ impl ComputeNodeSDK {
         &self,
         sql: &str,
         db: &str,
+        cnn_id: u32,
     ) -> std::result::Result<Response<tonic::codec::Streaming<FlightData>>, Status> {
         let mut client = self.client.as_ref().clone();
         let query_req = QueryRequest {
             default_db: db.to_string(),
             sql: sql.to_string(),
+            cnn_id,
         };
         client.query(query_req).await
     }
