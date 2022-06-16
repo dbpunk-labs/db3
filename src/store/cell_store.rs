@@ -120,7 +120,6 @@ impl CellStoreConfig {
     }
 }
 
-
 struct CellStoreLockData {
     // the writer of binlog
     log_writer: Box<LogWriter>,
