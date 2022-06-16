@@ -4,12 +4,16 @@
 [![codecov](https://codecov.io/gh/rtstore/rtstore/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/rtstore/rtstore)
 ![arc](./docs/rtstore_arch.svg)
 
-rtstore is a mysql compatible and (cloud + blockchain)-native timeseries database for web3 data analytics
+rtstore is a mysql compatible and (cloud + blockchain)-native timeseries database for web3 data analytics and focus on the following points
+
+* Data Transparency
+* Scalability
+* MySQL Compatible
+* Onchain Data Consistency
 
 ## How to Build
 
 ```commandline
-
 git clone https://github.com/rtstore/rtstore.git
 cd rstore && cargo build
 ```
