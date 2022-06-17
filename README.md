@@ -9,7 +9,8 @@ rtstore is a mysql compatible and (cloud + blockchain)-native timeseries databas
 * Data Transparency
 * Scalability
 * MySQL Compatible
-* Onchain Data Consistency
+* Multi Cloud
+
 
 ## How to Build
 
