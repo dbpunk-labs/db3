@@ -51,7 +51,7 @@ mysql> use db1;
 
 
 Database changed
-mysql> create table t1( col1 int, col2 varchar(10));
+mysql> create table t1( col1 int, col2 varchar(255));
 Query OK, 1 row affected (0.03 sec)
 
 mysql> insert into t1 values(10, 'hello world');
