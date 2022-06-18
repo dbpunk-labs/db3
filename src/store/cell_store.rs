@@ -235,7 +235,7 @@ impl CellStore {
                     "fail to obtain lock".to_string(),
                 ))
             }
-        }else {
+        } else {
             Ok(())
         }
     }

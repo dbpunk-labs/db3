@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/rtstore/rtstore/workflows/CI/badge.svg)](https://github.com/rtstore/rtstore/actions)
 [![codecov](https://codecov.io/gh/rtstore/rtstore/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/rtstore/rtstore)
+
 rtstore is a postgres + mysql compatible and (cloud + blockchain)-native timeseries database for web3 data analytics aiming to help developers use blockchain data out of box
 
 ## How to Build
@@ -50,7 +51,7 @@ mysql> use db1;
 
 
 Database changed
-mysql> create table t1( col1 int, col2 varchar(10));
+mysql> create table t1( col1 int, col2 varchar(255));
 Query OK, 1 row affected (0.03 sec)
 
 mysql> insert into t1 values(10, 'hello world');
@@ -76,10 +77,6 @@ mysql> describe t1;
 mysql> exit;
 ```
 
-### Linux
-```commandline
-
-```
 ## License
 Apache License, Version 2.0
    ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
