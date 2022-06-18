@@ -125,6 +125,7 @@ impl MemoryNodeState {
                     auth,
                     &cell_tmp_path,
                     &object_path,
+                    false,
                 )?;
                 cell_config.set_l1_rows_limit(storage_config.l1_rows_limit);
                 cell_config.set_l2_rows_limit(storage_config.l2_rows_limit);
