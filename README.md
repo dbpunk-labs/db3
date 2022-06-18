@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/rtstore/rtstore/workflows/CI/badge.svg)](https://github.com/rtstore/rtstore/actions)
 [![codecov](https://codecov.io/gh/rtstore/rtstore/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/rtstore/rtstore)
+
 rtstore is a postgres + mysql compatible and (cloud + blockchain)-native timeseries database for web3 data analytics aiming to help developers use blockchain data out of box
 
 ## How to Build
