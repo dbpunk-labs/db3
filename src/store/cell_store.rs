@@ -55,6 +55,7 @@ pub struct CellStoreConfig {
     tmp_dir_path_prefix: String,
     // object key prefix
     object_key_prefix: String,
+    enable_binlog: bool,
 }
 
 impl CellStoreConfig {
@@ -66,6 +67,7 @@ impl CellStoreConfig {
         credentials: Credentials,
         tmp_dir_path_prefix: &str,
         object_key_prefix: &str,
+        enable_binlog: bool,
     ) -> Result<Self> {
         if bucket_name.is_empty() {
             return Err(RTStoreError::CellStoreInvalidConfigError {
@@ -108,6 +110,7 @@ impl CellStoreConfig {
             l2_rows_limit: 10 * 1024 * 5,
             tmp_dir_path_prefix: tmp_dir_path_prefix.to_string(),
             object_key_prefix: object_key_prefix.to_string(),
+            enable_binlog,
         })
     }
 
@@ -224,12 +227,16 @@ impl CellStore {
             .fetch_add(size as u64, Ordering::Relaxed);
         self.do_l1_compaction_maybe();
         // save record to binlog
-        if let Ok(mut guard) = self.lock_data.lock() {
-            guard.log_writer.add_record(&data)
-        } else {
-            Err(RTStoreError::BaseBusyError(
-                "fail to obtain lock".to_string(),
-            ))
+        if self.config.enable_binlog {
+            if let Ok(mut guard) = self.lock_data.lock() {
+                guard.log_writer.add_record(&data)
+            } else {
+                Err(RTStoreError::BaseBusyError(
+                    "fail to obtain lock".to_string(),
+                ))
+            }
+        }else {
+            Ok(())
         }
     }
 
@@ -337,6 +344,7 @@ mod tests {
             auth.clone(),
             tmp_dir_path_prefix,
             object_key_prefix,
+            false,
         )
         .is_ok()
         {
@@ -351,6 +359,7 @@ mod tests {
             auth.clone(),
             tmp_dir_path_prefix,
             object_key_prefix,
+            false,
         )
         .is_ok()
         {
@@ -365,6 +374,7 @@ mod tests {
             auth.clone(),
             tmp_dir_path_prefix,
             object_key_prefix,
+            false,
         )
         .is_ok()
         {
@@ -391,6 +401,7 @@ mod tests {
             auth,
             tmp_dir_path_prefix,
             object_key_prefix,
+            false,
         )
     }
 
