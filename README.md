@@ -5,7 +5,7 @@
 
 rtstore is a web3 timeseries database for data analytics
 
-![arc](./docs/rtstore_arch.png)
+![arc](./docs/rtstore_arch.svg)
 
 
 ## How to Build
