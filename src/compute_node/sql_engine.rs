@@ -31,9 +31,10 @@ use datafusion::prelude::{create_udf, SessionConfig};
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::planner::SqlToRel;
 use sqlparser::{
-    ast::{ColumnDef, SetExpr, Statement as SQLStatement},
+    ast::Statement as SQLStatement,
     dialect::{keywords::Keyword, MySqlDialect},
 };
+
 use std::cell::RefCell;
 use std::sync::Arc;
 thread_local!(static DB : RefCell<String> = RefCell::new("".to_string()));

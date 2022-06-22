@@ -17,19 +17,15 @@
 //
 
 use crate::codec::row_codec::{encode, RowRecordBatch};
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{
-    FlightData, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
-};
+use crate::proto::rtstore_base_proto::{FlightData, RtStoreTableDesc, StorageBackendConfig};
 use crate::proto::rtstore_memory_proto::memory_node_client::MemoryNodeClient;
 use crate::proto::rtstore_memory_proto::{
-    AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
-    FetchPartitionRequest,
+    AppendRecordsRequest, AssignPartitionRequest, FetchPartitionRequest,
 };
 
 use std::sync::Arc;
 use tonic::transport::Endpoint;
-use tonic::{Request, Response, Status};
+use tonic::{Response, Status};
 
 pub struct MemoryNodeSDK {
     endpoint: String,

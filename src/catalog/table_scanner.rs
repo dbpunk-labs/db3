@@ -17,14 +17,12 @@
 //
 //
 
-use crate::catalog::table::Table;
 use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::error::{DataFusionError, Result};
-use datafusion::execution::context::SessionContext;
 use datafusion::execution::context::TaskContext;
 use datafusion::logical_plan::Expr;
 use datafusion::physical_plan::{

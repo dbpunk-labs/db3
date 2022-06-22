@@ -18,7 +18,7 @@
 use crate::base::{arrow_parquet_utils, linked_list::LinkedList};
 use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::Result;
-use arrow::datatypes::{DataType, Field as ArrowField, Schema, SchemaRef};
+use arrow::datatypes::{DataType, Field as ArrowField, Schema};
 use arrow::record_batch::RecordBatch;
 use std::collections::HashMap;
 use std::fs::File;

@@ -21,7 +21,7 @@ use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::codec::row_codec::decode;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
-    FlightData, RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+    FlightData, RtStoreNode, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
 };
 use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
 use crate::proto::rtstore_memory_proto::{
@@ -29,10 +29,8 @@ use crate::proto::rtstore_memory_proto::{
     FetchPartitionRequest,
 };
 use crate::store::cell_store::{CellStore, CellStoreConfig};
-use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
+use crate::store::meta_store::MetaStore;
 use crate::store::object_store::build_credentials;
-use arc_swap::ArcSwap;
-use etcd_client::{Client, ConnectOptions, GetOptions};
 use futures::Stream;
 use s3::creds::Credentials;
 use s3::region::Region;
@@ -372,7 +370,9 @@ impl MemoryNode for MemoryNodeImpl {
 mod tests {
     use super::*;
     use crate::codec::row_codec::{encode, Data, RowRecordBatch};
-    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
+    use crate::proto::rtstore_base_proto::{
+        RtStoreColumnDesc, RtStoreNodeType, RtStoreSchemaDesc, RtStoreType,
+    };
     use crate::store::build_readonly_meta_store;
     use std::thread;
     use tempdir::TempDir;

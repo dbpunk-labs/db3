@@ -15,16 +15,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
+use crate::proto::rtstore_base_proto::RtStoreTableDesc;
 use crate::proto::rtstore_meta_proto::meta_client::MetaClient;
-use crate::proto::rtstore_meta_proto::{
-    CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
-};
+use crate::proto::rtstore_meta_proto::{CreateDbRequest, CreateTableRequest};
 use std::sync::Arc;
 
 use tonic::transport::Endpoint;
-use tonic::{Request, Response, Status};
+use tonic::Status;
 uselog!(info);
 
 pub struct MetaNodeSDK {

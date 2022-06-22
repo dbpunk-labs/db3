@@ -28,11 +28,7 @@ use bytes::Bytes;
 use crossbeam_skiplist_piedb::SkipMap;
 use datafusion::catalog::catalog::CatalogProvider;
 use datafusion::catalog::schema::SchemaProvider;
-use datafusion::datasource::{
-    file_format::parquet::ParquetFormat,
-    listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
-    TableProvider,
-};
+use datafusion::datasource::TableProvider;
 use datafusion::error::Result as DFResult;
 use etcd_client::EventType;
 use prost::Message;

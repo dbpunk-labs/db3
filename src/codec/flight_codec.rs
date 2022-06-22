@@ -17,23 +17,15 @@
 //
 
 use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{FlightData, FlightDescriptor};
+use crate::proto::rtstore_base_proto::FlightData;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::{ArrowError, Result as ArrowResult};
-use arrow::ipc::{
-    convert, reader, size_prefixed_root_as_message, writer, writer::EncodedData,
-    writer::IpcWriteOptions,
-};
+use arrow::ipc::{convert, reader, writer, writer::EncodedData, writer::IpcWriteOptions};
 use arrow::record_batch::RecordBatch;
-use futures::Stream;
 use std::collections::HashMap;
-use std::{
-    convert::{TryFrom, TryInto},
-    fmt,
-    ops::Deref,
-};
+use std::{convert::TryFrom, ops::Deref};
 /// SchemaAsIpc represents a pairing of a `Schema` with IpcWriteOptions
 pub struct SchemaAsIpc<'a> {
     pub pair: (&'a Schema, &'a IpcWriteOptions),
@@ -131,13 +123,20 @@ pub fn flight_data_to_arrow_batch(
             ))
         })
         .map(|batch| {
-            reader::read_record_batch(&data.data_body, batch, schema, dictionaries_by_id, None)
-                .map_err(|err| {
-                    RTStoreError::RecordBatchCodecError(format!(
-                        "fail to read record batch for {}",
-                        err
-                    ))
-                })
+            reader::read_record_batch(
+                &data.data_body,
+                batch,
+                schema,
+                dictionaries_by_id,
+                None,
+                &message.version(),
+            )
+            .map_err(|err| {
+                RTStoreError::RecordBatchCodecError(format!(
+                    "fail to read record batch for {}",
+                    err
+                ))
+            })
         })?
 }
 

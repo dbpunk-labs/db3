@@ -19,7 +19,6 @@
 
 uselog!(info, warn);
 use super::table_scanner::TableScannerExec;
-use crate::base::arrow_parquet_utils;
 use crate::codec::flight_codec::flight_data_to_arrow_batch;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::RtStoreTableDesc;
@@ -32,7 +31,7 @@ use datafusion::datasource::TableType;
 use datafusion::datasource::{
     file_format::parquet::ParquetFormat,
     get_statistics_with_limit,
-    listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl, PartitionedFile},
+    listing::{ListingOptions, ListingTableUrl, PartitionedFile},
     TableProvider,
 };
 use datafusion::error::{DataFusionError, Result as DFResult};
@@ -42,7 +41,7 @@ use datafusion::physical_plan::project_schema;
 use datafusion::physical_plan::{empty::EmptyExec, memory::MemoryExec};
 
 use datafusion::physical_plan::{file_format::FileScanConfig, ExecutionPlan, Statistics};
-use futures::stream::{self, select, BoxStream, StreamExt};
+use futures::stream::StreamExt;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;

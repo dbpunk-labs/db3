@@ -19,10 +19,8 @@
 use super::sql_engine::SQLEngine;
 use crate::catalog::catalog::Catalog;
 use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{
-    FlightData, RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
-};
+use crate::error::Result;
+use crate::proto::rtstore_base_proto::{FlightData, RtStoreNode};
 use crate::proto::rtstore_compute_proto::compute_node_server::ComputeNode;
 use crate::proto::rtstore_compute_proto::QueryRequest;
 use crate::store::meta_store::MetaStore;
