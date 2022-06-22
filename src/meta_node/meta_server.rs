@@ -18,17 +18,16 @@
 use crate::catalog::catalog::Catalog;
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{
-    PartitionToNode, RtStoreNode, RtStoreNodeType, RtStoreTableDesc, StorageBackendConfig,
-    StorageRegion,
+    PartitionToNode, RtStoreNode, RtStoreNodeType, StorageBackendConfig, StorageRegion,
 };
 use crate::proto::rtstore_meta_proto::meta_server::Meta;
 use crate::proto::rtstore_meta_proto::{
     CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
 };
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
-use crate::store::meta_store::{MetaStore, MetaStoreConfig, MetaStoreType};
+use crate::store::meta_store::MetaStore;
 use bytes::Bytes;
-use etcd_client::{Client, ConnectOptions, EventType, GetOptions};
+use etcd_client::EventType;
 use prost::Message;
 use rand::prelude::*;
 use s3::region::Region;

@@ -21,10 +21,9 @@ use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
-    Array, ArrayRef, BooleanBuilder, Date64Array, Int16Builder, Int32Builder, Int64Builder,
-    Int8Builder, StringArray, StringBuilder, TimestampMicrosecondBuilder,
-    TimestampMillisecondBuilder, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder,
-    UInt64Array, UInt64Builder, UInt8Builder,
+    Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
+    StringBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
+    TimestampNanosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
 };
 use arrow::datatypes::{
     DataType, Field as ArrowField, Schema, SchemaRef, TimeUnit, DECIMAL_MAX_PRECISION,
@@ -34,8 +33,6 @@ use arrow::datatypes::{
 use datafusion::datasource::listing::PartitionedFile;
 
 use arrow::record_batch::RecordBatch;
-use chrono::offset::Utc;
-use chrono::TimeZone;
 use datafusion::datafusion_data_access::{FileMeta, SizedFile};
 use datafusion::scalar::ScalarValue;
 use parquet::arrow::arrow_writer::ArrowWriter;

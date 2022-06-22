@@ -21,11 +21,10 @@ use super::mysql_vars::MySQLVars;
 use crate::base::{arrow_parquet_utils, linked_list::LinkedList, mysql_utils};
 use crate::codec::flight_codec::flight_data_to_arrow_batch;
 use crate::codec::row_codec::{Data, RowRecordBatch};
-use crate::proto::rtstore_base_proto::{RtStoreNodeType, RtStoreTableDesc};
+use crate::proto::rtstore_base_proto::RtStoreTableDesc;
 use crate::store::meta_store::MetaStore;
 use arrow::datatypes::{DataType, Field as ArrowField};
 use arrow::record_batch::RecordBatch;
-use async_trait::async_trait;
 use datafusion::catalog::schema::SchemaProvider;
 use sqlparser::{
     ast::{ColumnDef, Expr, Ident, SelectItem, SetExpr, Statement as SQLStatement, UnaryOperator},
@@ -34,12 +33,11 @@ use sqlparser::{
 use std::sync::Arc;
 uselog!(debug, info, warn);
 use crate::catalog::catalog::Catalog;
-use crate::error::{RTStoreError, Result};
+use crate::error::Result;
 use crate::sdk::compute_node_sdk::ComputeNodeSDK;
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::sdk::meta_node_sdk::MetaNodeSDK;
 use arrow::datatypes::{Schema, SchemaRef};
-use parquet::record::Field;
 use regex::RegexSet;
 use std::collections::HashMap;
 

@@ -21,7 +21,6 @@ use crate::error::{RTStoreError, Result};
 use async_trait::async_trait;
 use bytes::{Buf, Bytes};
 
-use crate::store::meta_store::MetaStore;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use datafusion::datafusion_data_access::object_store::{
     FileMetaStream, ListEntryStream, ObjectReader, ObjectStore,

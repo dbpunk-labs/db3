@@ -27,8 +27,8 @@ crossbeam = "0.8.1"
 chrono = { version = "0.4", default-features = false }
 pretty_env_logger = "0.4.0"
 # Note datafusion must use the same version with sqlparser
-datafusion = {path = "./thirdparty/arrow-datafusion/datafusion/core"}
-sqlparser = { path ="./thirdparty/sqlparser-rs"}
+datafusion = {path = "./thirdparty/arrow-datafusion/datafusion/core", version="9.0.0"}
+sqlparser = {path ="./thirdparty/arrow-datafusion/thirdparty/sqlparser-rs", version="0.17.0"}
 arc-swap = "1.5.0"
 crossbeam-skiplist_piedb = "0.8.10"
 msql-srv = { path = "./thirdparty/msql-srv"}

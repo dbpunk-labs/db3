@@ -16,16 +16,13 @@
 // limitations under the License.
 //
 //
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{
-    FlightData, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
-};
+use crate::proto::rtstore_base_proto::FlightData;
 use crate::proto::rtstore_compute_proto::compute_node_client::ComputeNodeClient;
 use crate::proto::rtstore_compute_proto::QueryRequest;
 
 use std::sync::Arc;
 use tonic::transport::Endpoint;
-use tonic::{Request, Response, Status};
+use tonic::{Response, Status};
 
 pub struct ComputeNodeSDK {
     endpoint: String,
