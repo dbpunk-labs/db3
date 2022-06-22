@@ -277,8 +277,11 @@ impl Meta for MetaServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc};
+    use crate::proto::rtstore_base_proto::{
+        RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreTableDesc,
+    };
     use crate::store::build_meta_store;
+    use crate::store::meta_store::MetaStoreType;
     use crate::store::object_store::build_region;
 
     fn build_config() -> MetaConfig {

@@ -370,7 +370,9 @@ impl MemoryNode for MemoryNodeImpl {
 mod tests {
     use super::*;
     use crate::codec::row_codec::{encode, Data, RowRecordBatch};
-    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
+    use crate::proto::rtstore_base_proto::{
+        RtStoreColumnDesc, RtStoreNodeType, RtStoreSchemaDesc, RtStoreType,
+    };
     use crate::store::build_readonly_meta_store;
     use std::thread;
     use tempdir::TempDir;
