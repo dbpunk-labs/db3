@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/rtstore/rtstore/workflows/CI/badge.svg)](https://github.com/rtstore/rtstore/actions)
 [![codecov](https://codecov.io/gh/rtstore/rtstore/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/rtstore/rtstore)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/rtstore/rtstore)
+![GitHub issues](https://img.shields.io/github/issues/rtstore/rtstore)
 
 rtstore is a web3 timeseries database for data analytics
 

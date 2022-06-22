@@ -131,7 +131,8 @@ pub fn flight_data_to_arrow_batch(
             ))
         })
         .map(|batch| {
-            reader::read_record_batch(&data.data_body, batch, schema, dictionaries_by_id, None)
+            reader::read_record_batch(&data.data_body, batch, schema, dictionaries_by_id, None,
+                &message.version())
                 .map_err(|err| {
                     RTStoreError::RecordBatchCodecError(format!(
                         "fail to read record batch for {}",
