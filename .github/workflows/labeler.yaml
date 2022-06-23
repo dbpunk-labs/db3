@@ -13,4 +13,3 @@ jobs:
       with:
         repo-token: "${{ secrets.CR_PAT }}"
         configuration-path: .github/labeler.yml
-        sync-labels: true
