@@ -10,7 +10,7 @@ jobs:
     name: pr-labeler
     steps:
     - uses: actions/labeler@v4
-      env:
+      with:
         repo-token: "${{ secrets.CR_PAT }}"
         configuration-path: .github/labels.yaml
         sync-labels: true
