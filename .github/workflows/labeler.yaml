@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     name: pr-labeler
     steps:
-    - uses: srvaroa/labeler@master
+    - uses: actions/labeler@v4
       env:
-        GITHUB_TOKEN: "${{ secrets.CR_PAT }}"
+        repo-token: "${{ secrets.CR_PAT }}"
         configuration-path: .github/labels.yaml
         sync-labels: true

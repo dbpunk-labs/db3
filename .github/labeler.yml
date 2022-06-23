@@ -15,14 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
-sql:
-  - src/sql/*
+compute-node:
+  - src/compute_node/*
 
-fontend:
-  - src/fontent/*
+fontend-node:
+  - src/frontend_node/*
 
-tablet:
-  - src/tablet/*
+memory-node:
+  - src/memory_node/*
+
+meta-node:
+  - src/memory_node/*
+
+store:
+  - src/store/*
 
 development-process:
   - dev/**.*
