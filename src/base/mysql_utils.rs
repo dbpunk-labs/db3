@@ -89,6 +89,12 @@ pub fn sql_value_to_data(val: &Value, store_type: &RtStoreType) -> Result<Data> 
             let val: f64 = v.parse().unwrap();
             Ok(Data::Double(val))
         }
+        (RtStoreType::KDate, Value::SingleQuotedString(s))
+        | (RtStoreType::KDate, Value::DoubleQuotedString(s)) => {
+            let time = NaiveDateTime::parse_from_str(s, "%Y-%m-%d").unwrap();
+            let ts = time.timestamp() / (24 * 60 * 60);
+            Ok(Data::Date(ts as u32))
+        }
         (RtStoreType::KTimestampMillsSecond, Value::SingleQuotedString(s))
         | (RtStoreType::KTimestampMillsSecond, Value::DoubleQuotedString(s)) => {
             let time = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap();
@@ -136,6 +142,9 @@ pub fn record_batch_schema_to_mysql_schema(schema: &SchemaRef) -> Result<Vec<MyS
             }
             DataType::Utf8 => {
                 type_mapping!(mysql_cols, MYSQL_TYPE_STRING, field);
+            }
+            DataType::Date32 => {
+                type_mapping!(mysql_cols, MYSQL_TYPE_DATE, field);
             }
             DataType::Decimal(..) => {
                 type_mapping!(mysql_cols, MYSQL_TYPE_DECIMAL, field);

@@ -21,9 +21,9 @@ use crate::codec::row_codec::{Data, RowRecordBatch};
 use crate::error::{RTStoreError, Result};
 use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
 use arrow::array::{
-    Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
-    StringBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
-    TimestampNanosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
+    Array, ArrayRef, BooleanBuilder, Date32Builder, Int16Builder, Int32Builder, Int64Builder,
+    Int8Builder, StringBuilder, TimestampMillisecondBuilder, UInt16Builder, UInt32Builder,
+    UInt64Builder, UInt8Builder,
 };
 use arrow::datatypes::{
     DataType, Field as ArrowField, Schema, SchemaRef, TimeUnit, DECIMAL_MAX_PRECISION,
@@ -130,8 +130,7 @@ enum RTStoreColumnBuilder {
     RTStoreInt64Builder(Int64Builder),
     RTStoreUInt64Builder(UInt64Builder),
     RTStoreStrBuilder(StringBuilder),
-    RTStoreTimestampNsBuilder(TimestampNanosecondBuilder),
-    RTStoreTimestampMicrosBuilder(TimestampMicrosecondBuilder),
+    RTStoreDateBuilder(Date32Builder),
     RTStoreTimestampMillsBuilder(TimestampMillisecondBuilder),
 }
 
@@ -149,8 +148,7 @@ impl RTStoreColumnBuilder {
             Self::RTStoreInt64Builder(b) => Arc::new(b.finish()),
             Self::RTStoreUInt64Builder(b) => Arc::new(b.finish()),
             Self::RTStoreStrBuilder(b) => Arc::new(b.finish()),
-            Self::RTStoreTimestampNsBuilder(b) => Arc::new(b.finish()),
-            Self::RTStoreTimestampMicrosBuilder(b) => Arc::new(b.finish()),
+            Self::RTStoreDateBuilder(b) => Arc::new(b.finish()),
             Self::RTStoreTimestampMillsBuilder(b) => Arc::new(b.finish()),
         }
     }
@@ -284,6 +282,27 @@ pub fn rows_to_columns(
                             column,
                             rows
                         );
+                    }
+                    DataType::Date32 => {
+                        if builders.len() <= index {
+                            let builder = RTStoreColumnBuilder::RTStoreDateBuilder(
+                                Date32Builder::new(rows.batch.len()),
+                            );
+                            builders.push(builder);
+                        }
+                        let builder = &mut builders[index];
+                        if let (
+                            RTStoreColumnBuilder::RTStoreDateBuilder(date_builder),
+                            Data::Date(s),
+                        ) = (builder, column)
+                        {
+                            date_builder.append_value(*s as i32)?;
+                        } else {
+                            return Err(RTStoreError::TableTypeMismatchError {
+                                left: "date".to_string(),
+                                right: column.name().to_string(),
+                            });
+                        }
                     }
                     DataType::Timestamp(_, _) => {
                         if builders.len() <= index {
@@ -432,6 +451,9 @@ pub fn schema_to_ddl_recordbatch(name: &str, schema: &SchemaRef) -> Result<Recor
             }
             DataType::Utf8 => {
                 builder.append(format!("{} varchar(255)", f.name()));
+            }
+            DataType::Date32 => {
+                builder.append(format!("{} date", f.name()));
             }
             DataType::Timestamp(_, _) => {
                 builder.append(format!("{} timestamp", f.name()));
