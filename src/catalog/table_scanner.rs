@@ -181,7 +181,6 @@ impl ExecutionPlan for TableScannerExec {
     fn statistics(&self) -> Statistics {
         self.config.statistics.clone()
     }
-
 }
 
 impl fmt::Debug for TableScannerExec {

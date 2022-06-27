@@ -30,6 +30,9 @@ meta-node:
 store:
   - src/store/*
 
+etl-node:
+  - src/etl_node/*
+
 development-process:
   - dev/**.*
   - .github/**.*
