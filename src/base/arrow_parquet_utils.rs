@@ -396,6 +396,9 @@ pub fn schema_to_recordbatch(schema: &SchemaRef) -> Result<RecordBatch> {
             DataType::Float64 => {
                 row.push(Data::Varchar("double".to_string()));
             }
+            DataType::Date32 => {
+                row.push(Data::Varchar("date".to_string()));
+            }
             DataType::Timestamp(_, _) => {
                 row.push(Data::Varchar("timestamp".to_string()));
             }
