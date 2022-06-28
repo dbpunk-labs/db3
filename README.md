@@ -10,7 +10,11 @@ rtstore is a web3 timeseries database for data analytics
 ![arc](./docs/rtstore_arch.png)
 
 ## Status
-It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome. 
+It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
+
+## Roadmap
+
+* [2022-Q3 plan](https://github.com/rtstore/rtstore/issues/55)
 
 ## License
 Apache License, Version 2.0
