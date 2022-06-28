@@ -37,44 +37,26 @@ If the required subsection does not exist yet under **Unreleased**, create it!
 
 ## Developing
 
-### Set up
+
+### Set up ETCD
+
+please go to https://etcd.io/docs/v3.5/install/
+
+
+### Set up Object Store
+
+```
+sh tools/run_mino.sh
+```
+
+### Build and Test
 
 This is no different than other Rust projects.
 
 ```shell
-git clone https://github.com/imrtstore/rtstore-tpl
-cd rtstore-tpl
+git clone https://github.com/rtstore/rtstore
+cd rtstore
+source tools/init_aws_dev.sh
 cargo test
 ```
 
-### Useful Commands
-
-- Build and run release version:
-
-  ```shell
-  cargo build --release && cargo run --release
-  ```
-
-- Run Clippy:
-
-  ```shell
-  cargo clippy --all-targets --all-features --workspace
-  ```
-
-- Run all tests:
-
-  ```shell
-  cargo test --all-features --workspace
-  ```
-
-- Check to see if there are code formatting issues
-
-  ```shell
-  cargo fmt --all -- --check
-  ```
-
-- Format the code in the project
-
-  ```shell
-  cargo fmt --all
-  ```

@@ -109,6 +109,8 @@ pub enum RTStoreError {
     RPCConnectError(tonic::transport::Error),
     #[error("{0}")]
     RPCInternalError(String),
+    #[error("fail to parse json with error {0}")]
+    JSONParseError(serde_json::Error),
 }
 
 /// convert io error to rtstore error
@@ -121,6 +123,12 @@ impl From<IoError> for RTStoreError {
 impl From<ParquetError> for RTStoreError {
     fn from(error: ParquetError) -> Self {
         RTStoreError::FSParquetError(error)
+    }
+}
+
+impl From<serde_json::Error> for RTStoreError {
+    fn from(err: serde_json::Error) -> Self {
+        RTStoreError::JSONParseError(err)
     }
 }
 

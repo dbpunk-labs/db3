@@ -23,6 +23,7 @@ pub mod catalog;
 pub mod codec;
 pub mod compute_node;
 pub mod error;
+pub mod etl_node;
 pub mod frontend_node;
 pub mod memory_node;
 pub mod meta_node;
