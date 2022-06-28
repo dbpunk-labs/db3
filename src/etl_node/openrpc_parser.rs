@@ -16,5 +16,28 @@
 // limitations under the License.
 //
 
-use serde_json::{Deserializer, Value}
+use crate::error::Result;
+use serde_json::{Deserializer, Value};
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 
+pub fn parse_openrpc(path: &str) -> Result<Value> {
+    let file_path = Path::new(path);
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+    let value: Value = serde_json::from_reader(reader)?;
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_parse() -> Result<()> {
+        let path: &str = "./static/openrpc.json";
+        let v = parse_openrpc(path)?;
+        println!("parse {}", v["methods"][0]["name"]);
+        Ok(())
+    }
+}

@@ -15,22 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-compute-node:
+C-compute-node:
   - src/compute_node/*
 
-fontend-node:
+C-fontend-node:
   - src/frontend_node/*
 
-memory-node:
+C-memory-node:
   - src/memory_node/*
 
-meta-node:
+C-meta-node:
   - src/memory_node/*
 
 store:
   - src/store/*
 
-etl-node:
+C-etl-node:
   - src/etl_node/*
 
 development-process:
