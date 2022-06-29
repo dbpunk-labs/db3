@@ -35,7 +35,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_parse() -> Result<()> {
-        let path: &str = "./static/openrpc.json";
+        let path: &str = "./chains/openrpc.json";
         let v = parse_openrpc(path)?;
         println!("parse {}", v["methods"][0]["name"]);
         Ok(())
