@@ -1,7 +1,7 @@
 //
 //
 // mod.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,4 +23,5 @@ pub mod log;
 pub mod mysql_utils;
 pub mod slice;
 pub mod strings;
+pub mod test_base;
 pub mod time_utils;

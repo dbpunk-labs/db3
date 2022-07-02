@@ -1,7 +1,7 @@
 //
 //
 // sql_handler.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ use super::mysql_vars::MySQLVars;
 use crate::base::{arrow_parquet_utils, linked_list::LinkedList, mysql_utils};
 use crate::codec::flight_codec::flight_data_to_arrow_batch;
 use crate::codec::row_codec::{Data, RowRecordBatch};
-use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::proto::db3_base_proto::Db3TableDesc;
 use crate::store::meta_store::MetaStore;
 use arrow::datatypes::{DataType, Field as ArrowField};
 use arrow::record_batch::RecordBatch;
@@ -151,7 +151,7 @@ impl SQLExecutor {
         columns: &Vec<ColumnDef>,
     ) -> Result<()> {
         let schema_desc = mysql_utils::sql_to_table_desc(columns)?;
-        let table_desc = RtStoreTableDesc {
+        let table_desc = Db3TableDesc {
             name: table_name.to_string(),
             schema: Some(schema_desc),
             partition_desc: None,

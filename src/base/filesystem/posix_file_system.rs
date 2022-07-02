@@ -1,7 +1,7 @@
 //
 //
 // posix_file_system.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 use nix::errno::Errno;
 use nix::fcntl::{self, OFlag};
 use nix::sys::stat::Mode;
@@ -105,7 +105,7 @@ impl RawFile {
             let bytes = match pread(self.0, &mut buf[readed..], offset as i64) {
                 Ok(bytes) => bytes,
                 Err(e) if e == Errno::EAGAIN => continue,
-                Err(e) => return Err(RTStoreError::from(from_nix_error(e, "pread"))),
+                Err(e) => return Err(DB3Error::from(from_nix_error(e, "pread"))),
             };
             // EOF
             if bytes == 0 {
@@ -123,7 +123,7 @@ impl RawFile {
             let bytes = match pwrite(self.0, &content[written..], offset as i64) {
                 Ok(bytes) => bytes,
                 Err(e) if e == Errno::EAGAIN => continue,
-                Err(e) => return Err(RTStoreError::from(from_nix_error(e, "pwrite"))),
+                Err(e) => return Err(DB3Error::from(from_nix_error(e, "pwrite"))),
             };
             if bytes == 0 {
                 break;

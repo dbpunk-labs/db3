@@ -1,7 +1,7 @@
 //
 //
-// rtstore_base.proto
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// db3_base.proto
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,24 +19,24 @@
 
 syntax = "proto3";
 
-package rtstore_base_proto;
+package db3_base_proto;
 
-enum RTStoreNodeType {
+enum DB3NodeType {
     KFrontendNode = 0;
     KMetaNode = 1;
     KMemoryNode = 2;
     KComputeNode = 3;
 }
 
-message RTStoreNode {
+message DB3Node {
     string endpoint = 1;
-    RTStoreNodeType node_type = 2;
+    DB3NodeType node_type = 2;
     string ns = 3;
     int32 port = 4;
 }
 
 // the all types are supported by rtstore
-enum RTStoreType {
+enum DB3Type {
     KBool = 0;
     // int8
     KTinyInt = 1;
@@ -103,7 +103,7 @@ message PartitionToNode {
     repeated string node_list = 2;
 }
 
-message RTStorePartitionDesc {
+message DB3PartitionDesc {
     repeated string columns = 2;
     int32 partition_count = 3;
     // range merge and split strategy
@@ -112,29 +112,29 @@ message RTStorePartitionDesc {
     string range_column = 7;
 }
 
-message RTStoreColumnDesc {
+message DB3ColumnDesc {
     string name = 1;
-    RTStoreType ctype = 2;
+    DB3Type ctype = 2;
     bool null_allowed = 3;
 }
 
-message RTStoreSchemaDesc {
-    repeated RTStoreColumnDesc columns = 1;
+message DB3SchemaDesc {
+    repeated DB3ColumnDesc columns = 1;
     int32 version = 2;
 }
 
-message RTStoreTableDesc {
+message DB3TableDesc {
     // the table name is like test.dev.table1
     string name = 1;
-    RTStoreSchemaDesc schema = 2;
-    RTStorePartitionDesc partition_desc = 3;
+    DB3SchemaDesc schema = 2;
+    DB3PartitionDesc partition_desc = 3;
     string db = 4;
     // time in second
     int64 ctime = 5;
     repeated PartitionToNode mappings = 6;
 }
 
-message RTStoreDatabase {
+message DB3Database {
     string db = 1;
     // time in second
     int64 ctime = 2;

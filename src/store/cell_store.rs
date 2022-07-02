@@ -1,7 +1,7 @@
 //
 //
 // cell_store.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ use crate::base::filesystem::{FileSystem, SyncPosixFileSystem};
 use crate::base::linked_list::LinkedList;
 use crate::base::{arrow_parquet_utils, log::LogWriter, strings};
 use crate::codec::row_codec::{encode, RowRecordBatch};
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 use crate::store::object_store::{BucketFileSystem, S3FileSystem};
 use arc_swap::ArcSwap;
 use arrow::datatypes::SchemaRef;
@@ -70,32 +70,32 @@ impl CellStoreConfig {
         enable_binlog: bool,
     ) -> Result<Self> {
         if bucket_name.is_empty() {
-            return Err(RTStoreError::CellStoreInvalidConfigError {
+            return Err(DB3Error::CellStoreInvalidConfigError {
                 name: String::from("bucket_name"),
                 err: String::from("empty name"),
             });
         }
         if schema.fields().is_empty() {
-            return Err(RTStoreError::CellStoreInvalidConfigError {
+            return Err(DB3Error::CellStoreInvalidConfigError {
                 name: String::from("schema"),
                 err: String::from("empty schema"),
             });
         }
 
         if local_binlog_path_prefix.is_empty() {
-            return Err(RTStoreError::CellStoreInvalidConfigError {
+            return Err(DB3Error::CellStoreInvalidConfigError {
                 name: String::from("local_binlog_path_prefix"),
                 err: String::from("empty string"),
             });
         }
         if tmp_dir_path_prefix.is_empty() {
-            return Err(RTStoreError::CellStoreInvalidConfigError {
+            return Err(DB3Error::CellStoreInvalidConfigError {
                 name: String::from("tmp_dir_path_prefix"),
                 err: String::from("empty string"),
             });
         }
         if object_key_prefix.is_empty() {
-            return Err(RTStoreError::CellStoreInvalidConfigError {
+            return Err(DB3Error::CellStoreInvalidConfigError {
                 name: String::from("object_key_prefix"),
                 err: String::from("empty string"),
             });
@@ -231,9 +231,7 @@ impl CellStore {
             if let Ok(mut guard) = self.lock_data.lock() {
                 guard.log_writer.add_record(&data)
             } else {
-                Err(RTStoreError::BaseBusyError(
-                    "fail to obtain lock".to_string(),
-                ))
+                Err(DB3Error::BaseBusyError("fail to obtain lock".to_string()))
             }
         } else {
             Ok(())

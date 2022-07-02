@@ -1,5 +1,5 @@
 [package]
-name = "rtstore"
+name = "db3"
 version = "0.1.0"
 edition = "2021"
 
@@ -43,8 +43,8 @@ regex = "1.5.5"
 string-builder = "0.2.0"
 pg_wire = { path = "./thirdparty/pg_wire", features = ["tokio_net"] }
 [[bin]]
-name = "rtstore"
-path = "src/cmd/rtstore.rs"
+name = "db3"
+path = "src/cmd/db3.rs"
 
 
 [build-dependencies]

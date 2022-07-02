@@ -10,3 +10,6 @@
 [submodule "thirdparty/arrow-datafusion"]
 	path = thirdparty/arrow-datafusion
 	url = https://github.com/rtstore/arrow-datafusion.git
+[submodule "thirdparty/substrait"]
+	path = thirdparty/substrait
+	url = https://github.com/substrait-io/substrait.git

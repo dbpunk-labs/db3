@@ -1,7 +1,7 @@
 //
 //
 // flight_codec.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::FlightData;
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::FlightData;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
@@ -111,16 +111,12 @@ pub fn flight_data_to_arrow_batch(
     dictionaries_by_id: &HashMap<i64, ArrayRef>,
 ) -> Result<RecordBatch> {
     // check that the data_header is a record batch message
-    let message = arrow::ipc::root_as_message(&data.data_header[..]).map_err(|err| {
-        RTStoreError::RecordBatchCodecError(format!("fail to encode for {}", err))
-    })?;
+    let message = arrow::ipc::root_as_message(&data.data_header[..])
+        .map_err(|err| DB3Error::RecordBatchCodecError(format!("fail to encode for {}", err)))?;
     message
         .header_as_record_batch()
         .ok_or_else(|| {
-            RTStoreError::RecordBatchCodecError(format!(
-                "fail to encode for {}",
-                "codec header error"
-            ))
+            DB3Error::RecordBatchCodecError(format!("fail to encode for {}", "codec header error"))
         })
         .map(|batch| {
             reader::read_record_batch(
@@ -132,10 +128,7 @@ pub fn flight_data_to_arrow_batch(
                 &message.version(),
             )
             .map_err(|err| {
-                RTStoreError::RecordBatchCodecError(format!(
-                    "fail to read record batch for {}",
-                    err
-                ))
+                DB3Error::RecordBatchCodecError(format!("fail to read record batch for {}", err))
             })
         })?
 }

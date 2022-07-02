@@ -1,7 +1,7 @@
 //
 //
 // compute_node_impl.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ use super::sql_engine::SQLEngine;
 use crate::catalog::catalog::Catalog;
 use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::error::Result;
-use crate::proto::rtstore_base_proto::{FlightData, RtStoreNode};
-use crate::proto::rtstore_compute_proto::compute_node_server::ComputeNode;
-use crate::proto::rtstore_compute_proto::QueryRequest;
+use crate::proto::db3_base_proto::{Db3Node, FlightData};
+use crate::proto::db3_compute_proto::compute_node_server::ComputeNode;
+use crate::proto::db3_compute_proto::QueryRequest;
 use crate::store::meta_store::MetaStore;
 use crate::store::object_store::{build_credentials, S3FileSystem};
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
@@ -36,7 +36,7 @@ uselog!(info);
 pub struct ComputeNodeConfig {
     pub etcd_cluster: String,
     pub etcd_root_path: String,
-    pub node: RtStoreNode,
+    pub node: Db3Node,
 }
 
 pub struct ComputeNodeImpl {

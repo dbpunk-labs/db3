@@ -1,7 +1,7 @@
 //
 //
-// meta_node.proto
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// db3_memory_node.proto
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,15 +18,15 @@
 
 syntax = "proto3";
 
-import "rtstore_base.proto";
+import "db3_base.proto";
 
-package rtstore_memory_proto;
+package db3_memory_proto;
 
 message AssignPartitionRequest {
     // the id list for partitions
     repeated int32 partition_ids = 1;
-    rtstore_base_proto.RTStoreTableDesc table_desc = 2;
-    rtstore_base_proto.StorageBackendConfig config = 4;
+    db3_base_proto.DB3TableDesc table_desc = 2;
+    db3_base_proto.StorageBackendConfig config = 4;
 }
 
 message AssignPartitionResponse {}
@@ -52,5 +52,5 @@ service MemoryNode {
     // method for append records to cell store
     rpc AppendRecords(AppendRecordsRequest) returns (AppendRecordsResponse) {}
     // fetch partition
-    rpc FetchPartition(FetchPartitionRequest) returns (stream rtstore_base_proto.FlightData) {}
+    rpc FetchPartition(FetchPartitionRequest) returns (stream db3_base_proto.FlightData) {}
 }

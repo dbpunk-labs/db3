@@ -1,7 +1,7 @@
 //
 //
 // meta_node.proto
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@
 
 syntax = "proto3";
 
-import "rtstore_base.proto";
+import "db3_base.proto";
 
-package rtstore_meta_proto;
+package db3_meta_proto;
 
 message CreateDBRequest {
     string db = 1;
@@ -30,11 +30,11 @@ message CreateDBRequest {
 message CreateDBResponse {}
 
 message CreateTableRequest {
-    rtstore_base_proto.RTStoreTableDesc table_desc = 1;
+    db3_base_proto.DB3TableDesc table_desc = 1;
 }
 message CreateTableResponse {}
 
-// The rtstore meta server definition.
+// The db3 meta server definition.
 service Meta {
     // method for adding a new table
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse) {}

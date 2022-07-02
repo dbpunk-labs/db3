@@ -1,7 +1,7 @@
 //
 //
 // interruptible_parser.rs
-// Copyright (C) 2022 peasdb.ai Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 use sqlparser::ast::Statement;
 use sqlparser::dialect::Dialect;
 use sqlparser::keywords::Keyword;
@@ -57,7 +57,7 @@ impl<'a> InterruptibleParser<'a> {
                     self.keyword = Some(w.keyword);
                     Ok(cloned_kw)
                 }
-                _ => Result::Err(RTStoreError::SQLParseError(format!(
+                _ => Result::Err(DB3Error::SQLParseError(format!(
                     "fail to parse {}",
                     self.sql
                 ))),

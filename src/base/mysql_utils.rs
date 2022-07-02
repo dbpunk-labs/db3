@@ -1,7 +1,7 @@
 //
 //
 // mysql_utils.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 //
 
 use crate::codec::row_codec::{Data, RowRecordBatch};
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::{Db3ColumnDesc, Db3SchemaDesc, Db3Type};
 use arrow::array::{
     Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray,
     TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
@@ -47,11 +47,11 @@ macro_rules! type_mapping {
     };
 }
 
-pub fn sql_to_row_batch(schema: &RtStoreSchemaDesc, values: &[Expr]) -> Result<RowRecordBatch> {
+pub fn sql_to_row_batch(schema: &Db3SchemaDesc, values: &[Expr]) -> Result<RowRecordBatch> {
     let mut row: Vec<Data> = Vec::new();
     for (i, item) in values.iter().enumerate().take(schema.columns.len()) {
         let column_desc = &schema.columns[i];
-        let ctype = RtStoreType::from_i32(column_desc.ctype);
+        let ctype = Db3Type::from_i32(column_desc.ctype);
         if let (Expr::Value(v), Some(local_type)) = (item, ctype) {
             let data = sql_value_to_data(v, &local_type)?;
             row.push(data);
@@ -65,43 +65,39 @@ pub fn sql_to_row_batch(schema: &RtStoreSchemaDesc, values: &[Expr]) -> Result<R
     })
 }
 
-pub fn sql_value_to_data(val: &Value, store_type: &RtStoreType) -> Result<Data> {
+pub fn sql_value_to_data(val: &Value, store_type: &Db3Type) -> Result<Data> {
     match (store_type, val) {
-        (RtStoreType::KStringUtf8, Value::SingleQuotedString(s)) => {
-            Ok(Data::Varchar(s.to_string()))
-        }
-        (RtStoreType::KStringUtf8, Value::DoubleQuotedString(s)) => {
-            Ok(Data::Varchar(s.to_string()))
-        }
-        (RtStoreType::KBigInt, Value::Number(v, _)) => {
+        (Db3Type::KStringUtf8, Value::SingleQuotedString(s)) => Ok(Data::Varchar(s.to_string())),
+        (Db3Type::KStringUtf8, Value::DoubleQuotedString(s)) => Ok(Data::Varchar(s.to_string())),
+        (Db3Type::KBigInt, Value::Number(v, _)) => {
             let val_int: i64 = v.parse().unwrap();
             Ok(Data::Int64(val_int))
         }
-        (RtStoreType::KInt, Value::Number(v, _)) => {
+        (Db3Type::KInt, Value::Number(v, _)) => {
             let val_int: i32 = v.parse().unwrap();
             Ok(Data::Int32(val_int))
         }
-        (RtStoreType::KFloat, Value::Number(v, _)) => {
+        (Db3Type::KFloat, Value::Number(v, _)) => {
             let val: f32 = v.parse().unwrap();
             Ok(Data::Float(val))
         }
-        (RtStoreType::KDouble, Value::Number(v, _)) => {
+        (Db3Type::KDouble, Value::Number(v, _)) => {
             let val: f64 = v.parse().unwrap();
             Ok(Data::Double(val))
         }
-        (RtStoreType::KDate, Value::SingleQuotedString(s))
-        | (RtStoreType::KDate, Value::DoubleQuotedString(s)) => {
+        (Db3Type::KDate, Value::SingleQuotedString(s))
+        | (Db3Type::KDate, Value::DoubleQuotedString(s)) => {
             let time = NaiveDateTime::parse_from_str(s, "%Y-%m-%d").unwrap();
             let ts = time.timestamp() / (24 * 60 * 60);
             Ok(Data::Date(ts as u32))
         }
-        (RtStoreType::KTimestampMillsSecond, Value::SingleQuotedString(s))
-        | (RtStoreType::KTimestampMillsSecond, Value::DoubleQuotedString(s)) => {
+        (Db3Type::KTimestampMillsSecond, Value::SingleQuotedString(s))
+        | (Db3Type::KTimestampMillsSecond, Value::DoubleQuotedString(s)) => {
             let time = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap();
             let ts = time.timestamp() * 1000;
             Ok(Data::Timestamp(ts as u64))
         }
-        (_, _) => Err(RTStoreError::TableTypeMismatchError {
+        (_, _) => Err(DB3Error::TableTypeMismatchError {
             left: "left".to_string(),
             right: "right".to_string(),
         }),
@@ -150,7 +146,7 @@ pub fn record_batch_schema_to_mysql_schema(schema: &SchemaRef) -> Result<Vec<MyS
                 type_mapping!(mysql_cols, MYSQL_TYPE_DECIMAL, field);
             }
             _ => {
-                return Err(RTStoreError::TableSchemaConvertError(0));
+                return Err(DB3Error::TableSchemaConvertError(0));
             }
         }
     }
@@ -247,7 +243,7 @@ pub fn write_batch_to_resultset<'a, W: std::io::Write + Send>(
                         }
                     },
                     _ => {
-                        return Err(RTStoreError::TableSchemaConvertError(0));
+                        return Err(DB3Error::TableSchemaConvertError(0));
                     }
                 }
             }
@@ -258,22 +254,22 @@ pub fn write_batch_to_resultset<'a, W: std::io::Write + Send>(
     Ok(())
 }
 
-pub fn sql_to_table_desc(columns: &Vec<ColumnDef>) -> Result<RtStoreSchemaDesc> {
-    let mut rtstore_columns: Vec<RtStoreColumnDesc> = Vec::new();
+pub fn sql_to_table_desc(columns: &Vec<ColumnDef>) -> Result<Db3SchemaDesc> {
+    let mut db3_columns: Vec<Db3ColumnDesc> = Vec::new();
     for column in columns {
-        let rtstore_type = match column.data_type {
-            SPDataType::TinyInt(_) => Ok(RtStoreType::KTinyInt),
-            SPDataType::SmallInt(_) => Ok(RtStoreType::KSmallInt),
-            SPDataType::Int(_) => Ok(RtStoreType::KInt),
-            SPDataType::BigInt(_) => Ok(RtStoreType::KBigInt),
-            SPDataType::Float(_) => Ok(RtStoreType::KFloat),
-            SPDataType::Timestamp => Ok(RtStoreType::KTimestampMillsSecond),
-            SPDataType::Varchar(_) | SPDataType::String => Ok(RtStoreType::KStringUtf8),
-            SPDataType::Double => Ok(RtStoreType::KDouble),
-            SPDataType::Decimal(..) => Ok(RtStoreType::KDecimal),
+        let db3_type = match column.data_type {
+            SPDataType::TinyInt(_) => Ok(Db3Type::KTinyInt),
+            SPDataType::SmallInt(_) => Ok(Db3Type::KSmallInt),
+            SPDataType::Int(_) => Ok(Db3Type::KInt),
+            SPDataType::BigInt(_) => Ok(Db3Type::KBigInt),
+            SPDataType::Float(_) => Ok(Db3Type::KFloat),
+            SPDataType::Timestamp => Ok(Db3Type::KTimestampMillsSecond),
+            SPDataType::Varchar(_) | SPDataType::String => Ok(Db3Type::KStringUtf8),
+            SPDataType::Double => Ok(Db3Type::KDouble),
+            SPDataType::Decimal(..) => Ok(Db3Type::KDecimal),
             _ => {
                 warn!("{} is not supported currently", column);
-                Err(RTStoreError::TableSchemaConvertError(0))
+                Err(DB3Error::TableSchemaConvertError(0))
             }
         }?;
         let mut null_allowed = true;
@@ -281,15 +277,15 @@ pub fn sql_to_table_desc(columns: &Vec<ColumnDef>) -> Result<RtStoreSchemaDesc> 
         if !column.options.is_empty() && ColumnOption::NotNull == column.options[0].option {
             null_allowed = false;
         }
-        let rtstore_column = RtStoreColumnDesc {
+        let db3_column = Db3ColumnDesc {
             name: column.name.value.to_string(),
-            ctype: rtstore_type as i32,
+            ctype: db3_type as i32,
             null_allowed,
         };
-        rtstore_columns.push(rtstore_column);
+        db3_columns.push(db3_column);
     }
-    Ok(RtStoreSchemaDesc {
-        columns: rtstore_columns,
+    Ok(Db3SchemaDesc {
+        columns: db3_columns,
         version: 1,
     })
 }
