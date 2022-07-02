@@ -121,7 +121,7 @@ impl Table {
         //TODO support table partition
         let sdk = self.get_node_by_partition(0).ok_or_else(|| {
             warn!("fail to get memory node for table {} ", self.get_name());
-            Db3Error::RPCInternalError(format!(
+            DB3Error::RPCInternalError(format!(
                 "fail to get node by partition for table {}",
                 self.get_name()
             ))
@@ -130,7 +130,7 @@ impl Table {
             .get_head_batch_of_partition(self.get_db(), self.get_name(), 0)
             .await
             .map_err(|e| {
-                Db3Error::RPCInternalError(format!(
+                DB3Error::RPCInternalError(format!(
                     "fail to get  partition stream for table {} with err {}",
                     self.get_name(),
                     e
@@ -139,7 +139,7 @@ impl Table {
         let mut stream = resp.into_inner();
         // skip the first message
         stream.message().await.map_err(|e| {
-            Db3Error::RPCInternalError(format!(
+            DB3Error::RPCInternalError(format!(
                 "fail to get iterator stream for table {} with err {}",
                 self.get_name(),
                 e

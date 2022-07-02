@@ -67,12 +67,8 @@ pub fn sql_to_row_batch(schema: &Db3SchemaDesc, values: &[Expr]) -> Result<RowRe
 
 pub fn sql_value_to_data(val: &Value, store_type: &Db3Type) -> Result<Data> {
     match (store_type, val) {
-        (Db3Type::KStringUtf8, Value::SingleQuotedString(s)) => {
-            Ok(Data::Varchar(s.to_string()))
-        }
-        (Db3Type::KStringUtf8, Value::DoubleQuotedString(s)) => {
-            Ok(Data::Varchar(s.to_string()))
-        }
+        (Db3Type::KStringUtf8, Value::SingleQuotedString(s)) => Ok(Data::Varchar(s.to_string())),
+        (Db3Type::KStringUtf8, Value::DoubleQuotedString(s)) => Ok(Data::Varchar(s.to_string())),
         (Db3Type::KBigInt, Value::Number(v, _)) => {
             let val_int: i64 = v.parse().unwrap();
             Ok(Data::Int64(val_int))

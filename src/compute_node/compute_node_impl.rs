@@ -20,7 +20,7 @@ use super::sql_engine::SQLEngine;
 use crate::catalog::catalog::Catalog;
 use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::error::Result;
-use crate::proto::db3_base_proto::{DB3Node, FlightData};
+use crate::proto::db3_base_proto::{Db3Node, FlightData};
 use crate::proto::db3_compute_proto::compute_node_server::ComputeNode;
 use crate::proto::db3_compute_proto::QueryRequest;
 use crate::store::meta_store::MetaStore;
@@ -36,7 +36,7 @@ uselog!(info);
 pub struct ComputeNodeConfig {
     pub etcd_cluster: String,
     pub etcd_root_path: String,
-    pub node: DB3Node,
+    pub node: Db3Node,
 }
 
 pub struct ComputeNodeImpl {

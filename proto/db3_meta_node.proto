@@ -30,7 +30,7 @@ message CreateDBRequest {
 message CreateDBResponse {}
 
 message CreateTableRequest {
-    db3_base_proto.RTStoreTableDesc table_desc = 1;
+    db3_base_proto.DB3TableDesc table_desc = 1;
 }
 message CreateTableResponse {}
 

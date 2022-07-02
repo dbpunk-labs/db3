@@ -28,7 +28,7 @@ pub mod db3_memory_proto {
     tonic::include_proto!("db3_memory_proto");
 }
 
-pub mod db3e_compute_proto {
+pub mod db3_compute_proto {
     tonic::include_proto!("db3_compute_proto");
 }
 

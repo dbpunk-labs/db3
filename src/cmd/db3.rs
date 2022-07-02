@@ -26,7 +26,7 @@ use db3::compute_node::compute_node_impl::{ComputeNodeConfig, ComputeNodeImpl};
 use db3::frontend_node::mysql::mysql_handler;
 use db3::memory_node::memory_node_impl::{MemoryNodeConfig, MemoryNodeImpl};
 use db3::meta_node::meta_server::{MetaConfig, MetaServiceImpl};
-use db3::proto::db3_base_proto::{DB3Node, DB3NodeType};
+use db3::proto::db3_base_proto::{Db3Node, Db3NodeType};
 use db3::proto::db3_compute_proto::compute_node_server::ComputeNodeServer;
 use db3::proto::db3_memory_proto::memory_node_server::MemoryNodeServer;
 use db3::proto::db3_meta_proto::meta_server::MetaServer;
@@ -129,9 +129,9 @@ async fn start_memory_node(memory_node: &Commands) -> Result<(), Box<dyn std::er
     {
         if let Ok(meta_store) = build_readonly_meta_store(etcd_cluster, etcd_root_path).await {
             let bind_addr = format!("{}:{}", ns, port);
-            let node = RtStoreNode {
+            let node = Db3Node {
                 endpoint: format!("http://{}", bind_addr),
-                node_type: RtStoreNodeType::KMemoryNode as i32,
+                node_type: Db3NodeType::KMemoryNode as i32,
                 ns: ns.to_string(),
                 port: *port,
             };
@@ -174,9 +174,9 @@ async fn start_compute_node(cmd: &Commands) -> Result<(), Box<dyn std::error::Er
         .await
         {
             let addr = format!("{}:{}", ns, port);
-            let node = RtStoreNode {
+            let node = Db3Node {
                 endpoint: format!("http://{}", addr),
-                node_type: RtStoreNodeType::KComputeNode as i32,
+                node_type: Db3NodeType::KComputeNode as i32,
                 ns: ns.to_string(),
                 port: *port,
             };
@@ -219,9 +219,9 @@ async fn start_metaserver(cmd: &Commands) -> Result<(), Box<dyn std::error::Erro
         .await
         {
             let addr = format!("{}:{}", ns, port);
-            let node = RtStoreNode {
+            let node = Db3Node {
                 endpoint: format!("http://{}", addr),
-                node_type: RtStoreNodeType::KMetaNode as i32,
+                node_type: Db3NodeType::KMetaNode as i32,
                 ns: ns.to_string(),
                 port: *port,
             };

@@ -37,7 +37,7 @@ use tonic::{Request, Response, Status};
 uselog!(debug, info, warn);
 
 pub struct MetaConfig {
-    pub node: DB3Node,
+    pub node: Db3Node,
     pub etcd_cluster: String,
     pub etcd_root_path: String,
     // region for s3 bucket

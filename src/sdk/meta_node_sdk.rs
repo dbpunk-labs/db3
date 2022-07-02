@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use crate::proto::db3_base_proto::DB3TableDesc;
+use crate::proto::db3_base_proto::Db3TableDesc;
 use crate::proto::db3_meta_proto::meta_client::MetaClient;
 use crate::proto::db3_meta_proto::{CreateDbRequest, CreateTableRequest};
 use std::sync::Arc;
@@ -59,7 +59,7 @@ impl MetaNodeSDK {
         Ok(())
     }
 
-    pub async fn create_table(&self, table: DB3TableDesc) -> std::result::Result<(), Status> {
+    pub async fn create_table(&self, table: Db3TableDesc) -> std::result::Result<(), Status> {
         let mut client = self.client.as_ref().clone();
         let create_table_req = CreateTableRequest {
             table_desc: Some(table),

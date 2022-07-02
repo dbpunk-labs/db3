@@ -22,8 +22,8 @@ fn main() {
         .compile(
             &[
                 "proto/db3_base.proto",
-                "proto/db3_meta_node.proto",
                 "proto/db3_memory_node.proto",
+                "proto/db3_meta_node.proto",
                 "proto/db3_compute_node.proto",
                 "thirdparty/substrait/proto/substrait/plan.proto",
                 "thirdparty/substrait/proto/substrait/type.proto",

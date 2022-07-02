@@ -114,7 +114,7 @@ message DB3PartitionDesc {
 
 message DB3ColumnDesc {
     string name = 1;
-    RTStoreType ctype = 2;
+    DB3Type ctype = 2;
     bool null_allowed = 3;
 }
 
@@ -126,8 +126,8 @@ message DB3SchemaDesc {
 message DB3TableDesc {
     // the table name is like test.dev.table1
     string name = 1;
-    RTStoreSchemaDesc schema = 2;
-    RTStorePartitionDesc partition_desc = 3;
+    DB3SchemaDesc schema = 2;
+    DB3PartitionDesc partition_desc = 3;
     string db = 4;
     // time in second
     int64 ctime = 5;
