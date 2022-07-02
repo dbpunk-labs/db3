@@ -1,7 +1,7 @@
 //
 //
 // catalog.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@
 use super::table::Table;
 use crate::base::arrow_parquet_utils::*;
 use crate::base::time_utils;
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreDatabase, RtStoreTableDesc, StorageRegion};
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::{Db3Database, Db3TableDesc, StorageRegion};
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use crate::store::meta_store::MetaStore;
 use crate::store::object_store::build_region;
@@ -52,7 +52,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn from_db_desc(db_desc: &RtStoreDatabase, meta_store: Arc<MetaStore>) -> Result<Self> {
+    pub fn from_db_desc(db_desc: &Db3Database, meta_store: Arc<MetaStore>) -> Result<Self> {
         match &db_desc.region {
             Some(r) => {
                 let region = build_region(&r.region);
@@ -69,7 +69,7 @@ impl Database {
                     "region is required but db with name {} does not have it",
                     db_desc.db
                 );
-                Err(RTStoreError::DBInvalidInput)
+                Err(DB3Error::DBInvalidInput)
             }
         }
     }
@@ -100,12 +100,12 @@ impl Database {
         table_names
     }
 
-    pub async fn create_table(&self, table_desc: &RtStoreTableDesc, recover: bool) -> Result<()> {
+    pub async fn create_table(&self, table_desc: &Db3TableDesc, recover: bool) -> Result<()> {
         let schema = match &table_desc.schema {
             Some(s) => table_desc_to_arrow_schema(s),
             _ => {
                 warn!("table {} schema is invalid", &table_desc.name);
-                Err(RTStoreError::TableSchemaInvalidError {
+                Err(DB3Error::TableSchemaInvalidError {
                     name: table_desc.name.to_string(),
                 })
             }
@@ -126,7 +126,7 @@ impl Database {
                     .await
                     .map_err(|e| {
                         warn!("fail to connect to memory node for error {}", e);
-                        RTStoreError::RPCConnectError(e)
+                        DB3Error::RPCConnectError(e)
                     })?;
                 nodes.insert(partition_node.node_list[0].to_string(), node);
             }
@@ -146,19 +146,19 @@ impl Database {
         let table_entry = self.tables.get(table_name);
         match table_entry {
             Some(entry) => Ok(entry.value().clone()),
-            _ => Err(RTStoreError::TableNotFoundError {
+            _ => Err(DB3Error::TableNotFoundError {
                 tname: table_name.to_string(),
             }),
         }
     }
 
-    pub fn to_db_desc(&self) -> RtStoreDatabase {
+    pub fn to_db_desc(&self) -> Db3Database {
         if let Region::Custom { region, endpoint } = &self.region {
             let sregion = StorageRegion {
                 region: region.to_string(),
                 endpoint: endpoint.to_string(),
             };
-            RtStoreDatabase {
+            Db3Database {
                 db: self.db.to_string(),
                 ctime: self.ctime,
                 region: Some(sregion),
@@ -168,7 +168,7 @@ impl Database {
                 region: format!("{}", self.region),
                 endpoint: "".to_string(),
             };
-            RtStoreDatabase {
+            Db3Database {
                 db: self.db.to_string(),
                 ctime: self.ctime,
                 region: Some(sregion),
@@ -234,12 +234,12 @@ impl Catalog {
                         warn!("canceled watch table event");
                         break;
                     }
-                    let mut new_add_tables: Vec<RtStoreTableDesc> = Vec::new();
+                    let mut new_add_tables: Vec<Db3TableDesc> = Vec::new();
                     for event in resp.events() {
                         match (event.event_type(), event.kv()) {
                             (EventType::Put, Some(kv)) => {
                                 let buf = Bytes::from(kv.value().to_vec());
-                                match RtStoreTableDesc::decode(buf) {
+                                match Db3TableDesc::decode(buf) {
                                     Ok(table) => new_add_tables.push(table),
                                     Err(e) => {
                                         warn!("fail to decode table for error {}", e);
@@ -277,7 +277,7 @@ impl Catalog {
     pub async fn create_db(&self, name: &str, region: Region) -> Result<()> {
         if self.dbs.contains_key(name) {
             warn!("new database with name {} exist", name);
-            return Err(RTStoreError::DBNameExistError(name.to_string()));
+            return Err(DB3Error::DBNameExistError(name.to_string()));
         }
         let db = Database::new(name, region, self.meta_store.clone());
         let db_desc = db.to_db_desc();
@@ -292,7 +292,7 @@ impl Catalog {
         let db_entry = self.dbs.get(name);
         match db_entry {
             Some(entry) => Ok(entry.value().clone()),
-            _ => Err(RTStoreError::DBNotFoundError(name.to_string())),
+            _ => Err(DB3Error::DBNotFoundError(name.to_string())),
         }
     }
 

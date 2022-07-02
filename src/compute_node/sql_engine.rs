@@ -1,7 +1,7 @@
 //
 //
 // sql_engine.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -130,18 +130,18 @@ impl SQLEngine {
                 DB.with(|x| {
                     *x.borrow_mut() = name.to_string();
                 });
-                config.with_default_catalog_and_schema("rtstore", name)
+                config.with_default_catalog_and_schema("db3", name)
             }
             _ => {
                 let config = SessionConfig::new();
                 let config = config.with_information_schema(true);
-                config.with_default_catalog_and_schema("rtstore", "public")
+                config.with_default_catalog_and_schema("db3", "public")
             }
         };
         //TODO use session id to cache session context
         let mut stx = SessionContext::with_config_rt(config, self.runtime.clone());
         self.add_function(&mut stx);
-        stx.register_catalog("rtstore", self.catalog.clone());
+        stx.register_catalog("db3", self.catalog.clone());
         let state = stx.state.read().clone();
         let query_planner = SqlToRel::new(&state);
         let plan = query_planner.sql_statement_to_plan(statement)?;

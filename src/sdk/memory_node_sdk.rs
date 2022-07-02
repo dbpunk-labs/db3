@@ -1,7 +1,7 @@
 //
 //
 // memory_node_sdk.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@
 //
 
 use crate::codec::row_codec::{encode, RowRecordBatch};
-use crate::proto::rtstore_base_proto::{FlightData, RtStoreTableDesc, StorageBackendConfig};
-use crate::proto::rtstore_memory_proto::memory_node_client::MemoryNodeClient;
-use crate::proto::rtstore_memory_proto::{
+use crate::proto::db3_base_proto::{Db3TableDesc, FlightData, StorageBackendConfig};
+use crate::proto::db3_memory_proto::memory_node_client::MemoryNodeClient;
+use crate::proto::db3_memory_proto::{
     AppendRecordsRequest, AssignPartitionRequest, FetchPartitionRequest,
 };
 
@@ -57,7 +57,7 @@ impl MemoryNodeSDK {
     pub async fn assign_partition(
         &self,
         partition_ids: &[i32],
-        table_desc: &RtStoreTableDesc,
+        table_desc: &Db3TableDesc,
         storage_config: &StorageBackendConfig,
     ) -> std::result::Result<(), Status> {
         let mut client = self.client.as_ref().clone();

@@ -1,7 +1,7 @@
 //
 //
 // arrow_parquet_utils.rs
-// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
+// Copyright (C) 2022 db3.network Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@
 
 use crate::base::linked_list::LinkedList;
 use crate::codec::row_codec::{Data, RowRecordBatch};
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{RtStoreSchemaDesc, RtStoreType};
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::{Db3SchemaDesc, Db3Type};
 use arrow::array::{
     Array, ArrayRef, BooleanBuilder, Date32Builder, Int16Builder, Int32Builder, Int64Builder,
     Int8Builder, StringBuilder, TimestampMillisecondBuilder, UInt16Builder, UInt32Builder,
@@ -69,32 +69,32 @@ pub fn batches_to_paths(batches: &[RecordBatch]) -> Vec<PartitionedFile> {
         .collect()
 }
 
-pub fn table_desc_to_arrow_schema(desc: &RtStoreSchemaDesc) -> Result<SchemaRef> {
+pub fn table_desc_to_arrow_schema(desc: &Db3SchemaDesc) -> Result<SchemaRef> {
     let mut fields: Vec<ArrowField> = Vec::new();
     for column in &desc.columns {
-        let dt = match RtStoreType::from_i32(column.ctype) {
+        let dt = match Db3Type::from_i32(column.ctype) {
             Some(t) => match t {
-                RtStoreType::KBool => Ok(DataType::Boolean),
-                RtStoreType::KTinyInt => Ok(DataType::Int8),
-                RtStoreType::KSmallInt => Ok(DataType::Int16),
-                RtStoreType::KInt => Ok(DataType::Int32),
-                RtStoreType::KBigInt => Ok(DataType::Int64),
-                RtStoreType::KFloat => Ok(DataType::Float32),
-                RtStoreType::KDouble => Ok(DataType::Float64),
-                RtStoreType::KDate => Ok(DataType::Date32),
-                RtStoreType::KDecimal => {
+                Db3Type::KBool => Ok(DataType::Boolean),
+                Db3Type::KTinyInt => Ok(DataType::Int8),
+                Db3Type::KSmallInt => Ok(DataType::Int16),
+                Db3Type::KInt => Ok(DataType::Int32),
+                Db3Type::KBigInt => Ok(DataType::Int64),
+                Db3Type::KFloat => Ok(DataType::Float32),
+                Db3Type::KDouble => Ok(DataType::Float64),
+                Db3Type::KDate => Ok(DataType::Date32),
+                Db3Type::KDecimal => {
                     Ok(DataType::Decimal(DECIMAL_MAX_PRECISION, DECIMAL_MAX_SCALE))
                 }
-                RtStoreType::KTimestampSecond => Ok(DataType::Timestamp(TimeUnit::Second, None)),
-                RtStoreType::KTimestampMillsSecond => {
+                Db3Type::KTimestampSecond => Ok(DataType::Timestamp(TimeUnit::Second, None)),
+                Db3Type::KTimestampMillsSecond => {
                     Ok(DataType::Timestamp(TimeUnit::Millisecond, None))
                 }
-                RtStoreType::KTimestampMicroSecond => {
+                Db3Type::KTimestampMicroSecond => {
                     Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
                 }
-                RtStoreType::KStringUtf8 => Ok(DataType::Utf8),
+                Db3Type::KStringUtf8 => Ok(DataType::Utf8),
             },
-            _ => Err(RTStoreError::TableSchemaConvertError(column.ctype)),
+            _ => Err(DB3Error::TableSchemaConvertError(column.ctype)),
         }?;
         fields.push(ArrowField::new(&column.name, dt, column.null_allowed));
     }
@@ -119,37 +119,37 @@ pub fn dump_recordbatch(
 }
 
 #[allow(clippy::all)]
-enum RTStoreColumnBuilder {
-    RTStoreBooleanBuilder(BooleanBuilder),
-    RTStoreInt8Builder(Int8Builder),
-    RTStoreUInt8Builder(UInt8Builder),
-    RTStoreInt16Builder(Int16Builder),
-    RTStoreUInt16Builder(UInt16Builder),
-    RTStoreInt32Builder(Int32Builder),
-    RTStoreUInt32Builder(UInt32Builder),
-    RTStoreInt64Builder(Int64Builder),
-    RTStoreUInt64Builder(UInt64Builder),
-    RTStoreStrBuilder(StringBuilder),
-    RTStoreDateBuilder(Date32Builder),
-    RTStoreTimestampMillsBuilder(TimestampMillisecondBuilder),
+enum DB3ColumnBuilder {
+    DB3BooleanBuilder(BooleanBuilder),
+    DB3Int8Builder(Int8Builder),
+    DB3UInt8Builder(UInt8Builder),
+    DB3Int16Builder(Int16Builder),
+    DB3UInt16Builder(UInt16Builder),
+    DB3Int32Builder(Int32Builder),
+    DB3UInt32Builder(UInt32Builder),
+    DB3Int64Builder(Int64Builder),
+    DB3UInt64Builder(UInt64Builder),
+    DB3StrBuilder(StringBuilder),
+    DB3DateBuilder(Date32Builder),
+    DB3TimestampMillsBuilder(TimestampMillisecondBuilder),
 }
 
-impl RTStoreColumnBuilder {
+impl DB3ColumnBuilder {
     pub fn finish(&mut self) -> ArrayRef {
         match self {
-            Self::RTStoreBooleanBuilder(b) => Arc::new(b.finish()),
-            Self::RTStoreInt8Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreUInt8Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreInt16Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreUInt16Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreUInt16Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreInt32Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreUInt32Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreInt64Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreUInt64Builder(b) => Arc::new(b.finish()),
-            Self::RTStoreStrBuilder(b) => Arc::new(b.finish()),
-            Self::RTStoreDateBuilder(b) => Arc::new(b.finish()),
-            Self::RTStoreTimestampMillsBuilder(b) => Arc::new(b.finish()),
+            Self::DB3BooleanBuilder(b) => Arc::new(b.finish()),
+            Self::DB3Int8Builder(b) => Arc::new(b.finish()),
+            Self::DB3UInt8Builder(b) => Arc::new(b.finish()),
+            Self::DB3Int16Builder(b) => Arc::new(b.finish()),
+            Self::DB3UInt16Builder(b) => Arc::new(b.finish()),
+            Self::DB3UInt16Builder(b) => Arc::new(b.finish()),
+            Self::DB3Int32Builder(b) => Arc::new(b.finish()),
+            Self::DB3UInt32Builder(b) => Arc::new(b.finish()),
+            Self::DB3Int64Builder(b) => Arc::new(b.finish()),
+            Self::DB3UInt64Builder(b) => Arc::new(b.finish()),
+            Self::DB3StrBuilder(b) => Arc::new(b.finish()),
+            Self::DB3DateBuilder(b) => Arc::new(b.finish()),
+            Self::DB3TimestampMillsBuilder(b) => Arc::new(b.finish()),
         }
     }
 }
@@ -160,19 +160,16 @@ macro_rules! primary_type_convert {
      $rows:ident) => {
         let bsize = $builders.len();
         if bsize <= $index {
-            let builder =
-                RTStoreColumnBuilder::$left_builder($right_builder::new($rows.batch.len()));
+            let builder = DB3ColumnBuilder::$left_builder($right_builder::new($rows.batch.len()));
             $builders.push(builder);
         }
         let builder = &mut $builders[$index];
-        if let (
-            RTStoreColumnBuilder::$left_builder(internal_builder),
-            Data::$data_type(internal_v),
-        ) = (builder, $column)
+        if let (DB3ColumnBuilder::$left_builder(internal_builder), Data::$data_type(internal_v)) =
+            (builder, $column)
         {
             internal_builder.append_value(*internal_v)?;
         } else {
-            return Err(RTStoreError::TableTypeMismatchError {
+            return Err(DB3Error::TableTypeMismatchError {
                 left: "$data_type".to_string(),
                 right: $column.name().to_string(),
             });
@@ -187,7 +184,7 @@ pub fn rows_to_columns(
     if rows_batch.is_empty() {
         return Ok(RecordBatch::new_empty(schema.clone()));
     }
-    let mut builders: Vec<RTStoreColumnBuilder> = Vec::new();
+    let mut builders: Vec<DB3ColumnBuilder> = Vec::new();
     for rows in rows_batch.iter() {
         for r_index in 0..rows.batch.len() {
             let r = &rows.batch[r_index];
@@ -197,7 +194,7 @@ pub fn rows_to_columns(
                 match field.data_type() {
                     DataType::Boolean => {
                         primary_type_convert!(
-                            RTStoreBooleanBuilder,
+                            DB3BooleanBuilder,
                             BooleanBuilder,
                             Bool,
                             builders,
@@ -208,7 +205,7 @@ pub fn rows_to_columns(
                     }
                     DataType::UInt8 => {
                         primary_type_convert!(
-                            RTStoreUInt8Builder,
+                            DB3UInt8Builder,
                             UInt8Builder,
                             UInt8,
                             builders,
@@ -219,7 +216,7 @@ pub fn rows_to_columns(
                     }
                     DataType::Int8 => {
                         primary_type_convert!(
-                            RTStoreInt8Builder,
+                            DB3Int8Builder,
                             Int8Builder,
                             Int8,
                             builders,
@@ -230,7 +227,7 @@ pub fn rows_to_columns(
                     }
                     DataType::Int16 => {
                         primary_type_convert!(
-                            RTStoreInt16Builder,
+                            DB3Int16Builder,
                             Int16Builder,
                             Int16,
                             builders,
@@ -241,7 +238,7 @@ pub fn rows_to_columns(
                     }
                     DataType::UInt16 => {
                         primary_type_convert!(
-                            RTStoreUInt16Builder,
+                            DB3UInt16Builder,
                             UInt16Builder,
                             UInt16,
                             builders,
@@ -252,7 +249,7 @@ pub fn rows_to_columns(
                     }
                     DataType::Int32 => {
                         primary_type_convert!(
-                            RTStoreInt32Builder,
+                            DB3Int32Builder,
                             Int32Builder,
                             Int32,
                             builders,
@@ -263,7 +260,7 @@ pub fn rows_to_columns(
                     }
                     DataType::Int64 => {
                         primary_type_convert!(
-                            RTStoreInt64Builder,
+                            DB3Int64Builder,
                             Int64Builder,
                             Int64,
                             builders,
@@ -274,7 +271,7 @@ pub fn rows_to_columns(
                     }
                     DataType::UInt64 => {
                         primary_type_convert!(
-                            RTStoreUInt64Builder,
+                            DB3UInt64Builder,
                             UInt64Builder,
                             UInt64,
                             builders,
@@ -285,20 +282,18 @@ pub fn rows_to_columns(
                     }
                     DataType::Date32 => {
                         if builders.len() <= index {
-                            let builder = RTStoreColumnBuilder::RTStoreDateBuilder(
-                                Date32Builder::new(rows.batch.len()),
-                            );
+                            let builder = DB3ColumnBuilder::DB3DateBuilder(Date32Builder::new(
+                                rows.batch.len(),
+                            ));
                             builders.push(builder);
                         }
                         let builder = &mut builders[index];
-                        if let (
-                            RTStoreColumnBuilder::RTStoreDateBuilder(date_builder),
-                            Data::Date(s),
-                        ) = (builder, column)
+                        if let (DB3ColumnBuilder::DB3DateBuilder(date_builder), Data::Date(s)) =
+                            (builder, column)
                         {
                             date_builder.append_value(*s as i32)?;
                         } else {
-                            return Err(RTStoreError::TableTypeMismatchError {
+                            return Err(DB3Error::TableTypeMismatchError {
                                 left: "date".to_string(),
                                 right: column.name().to_string(),
                             });
@@ -306,20 +301,20 @@ pub fn rows_to_columns(
                     }
                     DataType::Timestamp(_, _) => {
                         if builders.len() <= index {
-                            let builder = RTStoreColumnBuilder::RTStoreTimestampMillsBuilder(
+                            let builder = DB3ColumnBuilder::DB3TimestampMillsBuilder(
                                 TimestampMillisecondBuilder::new(rows.batch.len()),
                             );
                             builders.push(builder);
                         }
                         let builder = &mut builders[index];
                         if let (
-                            RTStoreColumnBuilder::RTStoreTimestampMillsBuilder(ts_builder),
+                            DB3ColumnBuilder::DB3TimestampMillsBuilder(ts_builder),
                             Data::Timestamp(s),
                         ) = (builder, column)
                         {
                             ts_builder.append_value(*s as i64)?;
                         } else {
-                            return Err(RTStoreError::TableTypeMismatchError {
+                            return Err(DB3Error::TableTypeMismatchError {
                                 left: "timestamp".to_string(),
                                 right: column.name().to_string(),
                             });
@@ -327,20 +322,18 @@ pub fn rows_to_columns(
                     }
                     DataType::Utf8 => {
                         if builders.len() <= index {
-                            let builder = RTStoreColumnBuilder::RTStoreStrBuilder(
-                                StringBuilder::new(rows.batch.len()),
-                            );
+                            let builder = DB3ColumnBuilder::DB3StrBuilder(StringBuilder::new(
+                                rows.batch.len(),
+                            ));
                             builders.push(builder);
                         }
                         let builder = &mut builders[index];
-                        if let (
-                            RTStoreColumnBuilder::RTStoreStrBuilder(str_builder),
-                            Data::Varchar(s),
-                        ) = (builder, column)
+                        if let (DB3ColumnBuilder::DB3StrBuilder(str_builder), Data::Varchar(s)) =
+                            (builder, column)
                         {
                             str_builder.append_value(s)?;
                         } else {
-                            return Err(RTStoreError::TableTypeMismatchError {
+                            return Err(DB3Error::TableTypeMismatchError {
                                 left: "utf8".to_string(),
                                 right: column.name().to_string(),
                             });
@@ -482,7 +475,7 @@ pub fn schema_to_ddl_recordbatch(name: &str, schema: &SchemaRef) -> Result<Recor
 mod tests {
     use super::*;
     use crate::error::Result;
-    use crate::proto::rtstore_base_proto::RtStoreColumnDesc;
+    use crate::proto::db3_base_proto::Db3ColumnDesc;
     use arrow::array::{
         Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt64Array, UInt8Array,
     };
@@ -491,12 +484,12 @@ mod tests {
         ($func:ident, $type:ident, $target_type:ident) => {
             #[test]
             fn $func() -> Result<()> {
-                let columns = vec![RtStoreColumnDesc {
+                let columns = vec![Db3ColumnDesc {
                     name: "col1".to_string(),
-                    ctype: RtStoreType::$type as i32,
+                    ctype: Db3Type::$type as i32,
                     null_allowed: true,
                 }];
-                let schema = RtStoreSchemaDesc {
+                let schema = Db3SchemaDesc {
                     columns,
                     version: 1,
                 };
@@ -521,28 +514,28 @@ mod tests {
     #[test]
     fn test_schema_convert_complexe() -> Result<()> {
         let columns = vec![
-            RtStoreColumnDesc {
+            Db3ColumnDesc {
                 name: "col1".to_string(),
-                ctype: RtStoreType::KDecimal as i32,
+                ctype: Db3Type::KDecimal as i32,
                 null_allowed: true,
             },
-            RtStoreColumnDesc {
+            Db3ColumnDesc {
                 name: "col2".to_string(),
-                ctype: RtStoreType::KTimestampSecond as i32,
+                ctype: Db3Type::KTimestampSecond as i32,
                 null_allowed: true,
             },
-            RtStoreColumnDesc {
+            Db3ColumnDesc {
                 name: "col3".to_string(),
-                ctype: RtStoreType::KTimestampMillsSecond as i32,
+                ctype: Db3Type::KTimestampMillsSecond as i32,
                 null_allowed: true,
             },
-            RtStoreColumnDesc {
+            Db3ColumnDesc {
                 name: "col4".to_string(),
-                ctype: RtStoreType::KTimestampMicroSecond as i32,
+                ctype: Db3Type::KTimestampMicroSecond as i32,
                 null_allowed: true,
             },
         ];
-        let schema = RtStoreSchemaDesc {
+        let schema = Db3SchemaDesc {
             columns,
             version: 1,
         };

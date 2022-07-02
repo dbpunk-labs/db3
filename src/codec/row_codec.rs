@@ -1,7 +1,7 @@
 //
 //
 // row_codec.rs
-// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
+// Copyright (C) 2022 db3.network Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -66,14 +66,14 @@ pub struct RowRecordBatch {
 pub fn encode(batch: &RowRecordBatch) -> Result<Vec<u8>> {
     match bincode::serialize(batch) {
         Ok(v) => Ok(v),
-        Err(e) => Err(RTStoreError::RowCodecError(e)),
+        Err(e) => Err(DB3Error::RowCodecError(e)),
     }
 }
 
 pub fn decode(data: &[u8]) -> Result<RowRecordBatch> {
     match bincode::deserialize(data) {
         Ok(v) => Ok(v),
-        Err(e) => Err(RTStoreError::RowCodecError(e)),
+        Err(e) => Err(DB3Error::RowCodecError(e)),
     }
 }
 

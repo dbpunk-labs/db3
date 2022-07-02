@@ -1,7 +1,7 @@
 //
 //
 // meta_server.rs
-// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
+// Copyright (C) 2022 db3.network Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@
 // limitations under the License.
 //
 use crate::catalog::catalog::Catalog;
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{
-    PartitionToNode, RtStoreNode, RtStoreNodeType, StorageBackendConfig, StorageRegion,
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::{
+    Db3Node, Db3NodeType, PartitionToNode, StorageBackendConfig, StorageRegion,
 };
-use crate::proto::rtstore_meta_proto::meta_server::Meta;
-use crate::proto::rtstore_meta_proto::{
+use crate::proto::db3_meta_proto::meta_server::Meta;
+use crate::proto::db3_meta_proto::{
     CreateDbRequest, CreateDbResponse, CreateTableRequest, CreateTableResponse,
 };
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
@@ -37,7 +37,7 @@ use tonic::{Request, Response, Status};
 uselog!(debug, info, warn);
 
 pub struct MetaConfig {
-    pub node: RtStoreNode,
+    pub node: DB3Node,
     pub etcd_cluster: String,
     pub etcd_root_path: String,
     // region for s3 bucket
@@ -58,7 +58,7 @@ impl MetaServiceState {
 
     pub fn add_memory_node(&mut self, endpoint: &str, node: &Arc<MemoryNodeSDK>) -> Result<()> {
         match self.memory_nodes.get(endpoint) {
-            Some(_) => Err(RTStoreError::MemoryNodeExistError(endpoint.to_string())),
+            Some(_) => Err(DB3Error::MemoryNodeExistError(endpoint.to_string())),
             _ => {
                 self.memory_nodes.insert(endpoint.to_string(), node.clone());
                 info!("add a new memory node {}", endpoint);
@@ -148,7 +148,7 @@ impl MetaServiceImpl {
     fn random_choose_a_memory_node(&self) -> Result<Arc<MemoryNodeSDK>> {
         if let Ok(local_state) = self.state.lock() {
             if local_state.memory_nodes.is_empty() {
-                return Err(RTStoreError::MemoryNodeNotEnoughError);
+                return Err(DB3Error::MemoryNodeNotEnoughError);
             }
             let mut rng = rand::thread_rng();
             let rand_num: f64 = rng.gen();
@@ -159,7 +159,7 @@ impl MetaServiceImpl {
                 }
             }
         }
-        Err(RTStoreError::MemoryNodeNotEnoughError)
+        Err(DB3Error::MemoryNodeNotEnoughError)
     }
 
     pub async fn init(&self) -> Result<()> {
@@ -169,22 +169,22 @@ impl MetaServiceImpl {
         let local_state = self.state.clone();
         tokio::task::spawn(async move {
             if let Ok(mut stream) = local_meta_store
-                .subscribe_node_events(&RtStoreNodeType::KMemoryNode)
+                .subscribe_node_events(&Db3NodeType::KMemoryNode)
                 .await
             {
                 while let Ok(Some(resp)) = stream.message().await {
                     if resp.canceled() {
                         break;
                     }
-                    let mut new_add_nodes: Vec<RtStoreNode> = Vec::new();
-                    let mut deleted_nodes: Vec<RtStoreNode> = Vec::new();
+                    let mut new_add_nodes: Vec<Db3Node> = Vec::new();
+                    let mut deleted_nodes: Vec<Db3Node> = Vec::new();
                     for event in resp.events() {
                         match (event.event_type(), event.kv()) {
                             (EventType::Put, Some(kv)) => {
                                 let buf = Bytes::from(kv.value().to_vec());
-                                match RtStoreNode::decode(buf) {
+                                match Db3Node::decode(buf) {
                                     Ok(node) => {
-                                        if RtStoreNodeType::KMemoryNode as i32 == node.node_type {
+                                        if Db3NodeType::KMemoryNode as i32 == node.node_type {
                                             new_add_nodes.push(node);
                                         }
                                     }
@@ -195,9 +195,9 @@ impl MetaServiceImpl {
                             }
                             (EventType::Delete, Some(kv)) => {
                                 let buf = Bytes::from(kv.value().to_vec());
-                                match RtStoreNode::decode(buf) {
+                                match Db3Node::decode(buf) {
                                     Ok(node) => {
-                                        if RtStoreNodeType::KMemoryNode as i32 == node.node_type {
+                                        if Db3NodeType::KMemoryNode as i32 == node.node_type {
                                             deleted_nodes.push(node);
                                         }
                                     }
@@ -254,7 +254,7 @@ impl Meta for MetaServiceImpl {
         let create_request = request.into_inner();
         let table_desc = match &create_request.table_desc {
             Some(t) => Ok(t),
-            _ => Err(RTStoreError::MetaRpcCreateTableError {
+            _ => Err(DB3Error::MetaRpcCreateTableError {
                 err: "input is invalid for empty table description".to_string(),
             }),
         }?;
@@ -277,17 +277,15 @@ impl Meta for MetaServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::rtstore_base_proto::{
-        RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreTableDesc,
-    };
+    use crate::proto::db3_base_proto::{Db3ColumnDesc, Db3SchemaDesc, Db3TableDesc};
     use crate::store::build_meta_store;
     use crate::store::meta_store::MetaStoreType;
     use crate::store::object_store::build_region;
 
     fn build_config() -> MetaConfig {
-        let node = RtStoreNode {
+        let node = Db3Node {
             endpoint: "http://127.0.0.1:9191".to_string(),
-            node_type: RtStoreNodeType::KMetaNode as i32,
+            node_type: Db3NodeType::KMetaNode as i32,
             ns: "127.0.0.1".to_string(),
             port: 9191,
         };
@@ -323,17 +321,17 @@ mod tests {
         }
     }
 
-    fn create_simple_table_desc(db: &str, tname: &str) -> RtStoreTableDesc {
-        let col1 = RtStoreColumnDesc {
+    fn create_simple_table_desc(db: &str, tname: &str) -> Db3TableDesc {
+        let col1 = Db3ColumnDesc {
             name: "col1".to_string(),
             ctype: 0,
             null_allowed: true,
         };
-        let schema = RtStoreSchemaDesc {
+        let schema = Db3SchemaDesc {
             columns: vec![col1],
             version: 1,
         };
-        RtStoreTableDesc {
+        Db3TableDesc {
             name: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,

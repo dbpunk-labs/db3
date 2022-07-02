@@ -1,7 +1,7 @@
 //
 //
 // build.rs
-// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
+// Copyright (C) 2022 db3.network
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,12 +21,20 @@ fn main() {
         .build_server(true)
         .compile(
             &[
-                "proto/rtstore_base.proto",
-                "proto/rtstore_meta_node.proto",
-                "proto/rtstore_memory_node.proto",
-                "proto/rtstore_compute_node.proto",
+                "proto/db3_base.proto",
+                "proto/db3_meta_node.proto",
+                "proto/db3_memory_node.proto",
+                "proto/db3_compute_node.proto",
+                "thirdparty/substrait/proto/substrait/plan.proto",
+                "thirdparty/substrait/proto/substrait/type.proto",
+                "thirdparty/substrait/proto/substrait/type_expressions.proto",
+                "thirdparty/substrait/proto/substrait/parameterized_types.proto",
+                "thirdparty/substrait/proto/substrait/function.proto",
+                "thirdparty/substrait/proto/substrait/algebra.proto",
+                "thirdparty/substrait/proto/substrait/capabilities.proto",
+                "thirdparty/substrait/proto/substrait/extensions/extensions.proto",
             ],
-            &["proto"],
+            &["proto", "thirdparty/substrait/proto"],
         )
         .unwrap();
 }

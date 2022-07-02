@@ -1,7 +1,7 @@
 //
 //
 // reader.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 use super::{RecordError, RecordType, BLOCK_SIZE, HEADER_SIZE};
 use crate::base::filesystem::SequentialFileReader;
 use crate::base::slice::Slice;
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 
 pub struct LogReader {
     reader: Box<SequentialFileReader>,
@@ -64,7 +64,7 @@ impl LogReader {
                     }
                     RecordType::MiddleType => {
                         if !in_fragmented_record {
-                            return Err(RTStoreError::FSLogReaderError(format!(
+                            return Err(DB3Error::FSLogReaderError(format!(
                                 "missing start of fragmented record({})",
                                 fragment.len()
                             )));
@@ -73,7 +73,7 @@ impl LogReader {
                     }
                     RecordType::LastType => {
                         if !in_fragmented_record {
-                            return Err(RTStoreError::FSLogReaderError(format!(
+                            return Err(DB3Error::FSLogReaderError(format!(
                                 "missing start of fragmented record({})",
                                 fragment.len()
                             )));
@@ -82,7 +82,7 @@ impl LogReader {
                         return Ok(true);
                     }
                     _ => {
-                        return Err(RTStoreError::FSLogReaderError(
+                        return Err(DB3Error::FSLogReaderError(
                             "not support open recycle log".to_string(),
                         ));
                     }
@@ -125,7 +125,7 @@ impl LogReader {
             let b = (header[5] as u32) & 0xff;
             let tp = header[6];
             if tp >= RecordType::RecyclableFullType as u8 {
-                return Err(RTStoreError::FSLogReaderError(
+                return Err(DB3Error::FSLogReaderError(
                     "not support open recycle log".to_string(),
                 ));
             }
@@ -135,7 +135,7 @@ impl LogReader {
                 self.data.offset = 0;
                 self.buffer.clear();
                 if !self.eof {
-                    return Err(RTStoreError::FSLogReaderError("header error".to_string()));
+                    return Err(DB3Error::FSLogReaderError("header error".to_string()));
                 } else {
                     return Ok((fragment, RecordError::Eof as u8));
                 }
@@ -158,7 +158,7 @@ impl LogReader {
         if self.eof {
             self.data.limit = 0;
             self.data.offset = 0;
-            return Err(RTStoreError::FSIoEofError);
+            return Err(DB3Error::FSIoEofError);
         }
 
         if self.buffer.len() < BLOCK_SIZE {
@@ -175,7 +175,7 @@ impl LogReader {
                 }
                 Ok(())
             }
-            Err(_) => Err(RTStoreError::FSIoEofError),
+            Err(_) => Err(DB3Error::FSIoEofError),
         }
     }
 }

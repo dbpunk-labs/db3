@@ -1,7 +1,7 @@
 //
 //
-// rtstore.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// db3.rs
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,16 +22,16 @@ extern crate uselog_rs;
 use msql_srv::*;
 use tokio::net::TcpListener;
 
-use rtstore::compute_node::compute_node_impl::{ComputeNodeConfig, ComputeNodeImpl};
-use rtstore::frontend_node::mysql::mysql_handler;
-use rtstore::memory_node::memory_node_impl::{MemoryNodeConfig, MemoryNodeImpl};
-use rtstore::meta_node::meta_server::{MetaConfig, MetaServiceImpl};
-use rtstore::proto::rtstore_base_proto::{RtStoreNode, RtStoreNodeType};
-use rtstore::proto::rtstore_compute_proto::compute_node_server::ComputeNodeServer;
-use rtstore::proto::rtstore_memory_proto::memory_node_server::MemoryNodeServer;
-use rtstore::proto::rtstore_meta_proto::meta_server::MetaServer;
-use rtstore::sdk::{build_compute_node_sdk, build_memory_node_sdk, build_meta_node_sdk};
-use rtstore::store::{
+use db3::compute_node::compute_node_impl::{ComputeNodeConfig, ComputeNodeImpl};
+use db3::frontend_node::mysql::mysql_handler;
+use db3::memory_node::memory_node_impl::{MemoryNodeConfig, MemoryNodeImpl};
+use db3::meta_node::meta_server::{MetaConfig, MetaServiceImpl};
+use db3::proto::db3_base_proto::{DB3Node, DB3NodeType};
+use db3::proto::db3_compute_proto::compute_node_server::ComputeNodeServer;
+use db3::proto::db3_memory_proto::memory_node_server::MemoryNodeServer;
+use db3::proto::db3_meta_proto::meta_server::MetaServer;
+use db3::sdk::{build_compute_node_sdk, build_memory_node_sdk, build_meta_node_sdk};
+use db3::store::{
     build_meta_store, build_readonly_meta_store, meta_store::MetaStoreType,
     object_store::build_region,
 };
@@ -42,8 +42,8 @@ uselog!(debug, info, warn);
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[clap(name = "rtstore")]
-#[clap(about = "a table store engine for realtime ingesting and analytics", long_about = None)]
+#[clap(name = "db3")]
+#[clap(about = "a web3 timeseries database for data analytics 🚀🚀🚀", long_about = None)]
 struct Cli {
     #[clap(subcommand)]
     command: Commands,

@@ -1,7 +1,7 @@
 //
 //
 // table.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@
 uselog!(info, warn);
 use super::table_scanner::TableScannerExec;
 use crate::codec::flight_codec::flight_data_to_arrow_batch;
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::RtStoreTableDesc;
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::Db3TableDesc;
 use crate::sdk::memory_node_sdk::MemoryNodeSDK;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
@@ -53,7 +53,7 @@ pub struct MemoryTableState {
 
 #[derive(Clone)]
 pub struct Table {
-    desc: RtStoreTableDesc,
+    desc: Db3TableDesc,
     parquet_schema: SchemaRef,
     // pid -> endpoint of node
     partition_to_nodes: Arc<SkipMap<i32, MemoryNodeSDK>>,
@@ -64,7 +64,7 @@ unsafe impl Send for Table {}
 unsafe impl Sync for Table {}
 
 impl Table {
-    pub fn new(desc: &RtStoreTableDesc, schema: SchemaRef) -> Self {
+    pub fn new(desc: &Db3TableDesc, schema: SchemaRef) -> Self {
         let options = ListingOptions::new(Arc::new(ParquetFormat::default()));
         Self {
             desc: desc.clone(),
@@ -81,7 +81,7 @@ impl Table {
     }
 
     #[inline]
-    pub fn get_table_desc(&self) -> &RtStoreTableDesc {
+    pub fn get_table_desc(&self) -> &Db3TableDesc {
         &self.desc
     }
 
@@ -121,7 +121,7 @@ impl Table {
         //TODO support table partition
         let sdk = self.get_node_by_partition(0).ok_or_else(|| {
             warn!("fail to get memory node for table {} ", self.get_name());
-            RTStoreError::RPCInternalError(format!(
+            Db3Error::RPCInternalError(format!(
                 "fail to get node by partition for table {}",
                 self.get_name()
             ))
@@ -130,7 +130,7 @@ impl Table {
             .get_head_batch_of_partition(self.get_db(), self.get_name(), 0)
             .await
             .map_err(|e| {
-                RTStoreError::RPCInternalError(format!(
+                Db3Error::RPCInternalError(format!(
                     "fail to get  partition stream for table {} with err {}",
                     self.get_name(),
                     e
@@ -139,7 +139,7 @@ impl Table {
         let mut stream = resp.into_inner();
         // skip the first message
         stream.message().await.map_err(|e| {
-            RTStoreError::RPCInternalError(format!(
+            Db3Error::RPCInternalError(format!(
                 "fail to get iterator stream for table {} with err {}",
                 self.get_name(),
                 e
@@ -150,7 +150,7 @@ impl Table {
         let mut num_rows: usize = 0;
         let mut total_bytes: usize = 0;
         while let Some(flight_data) = stream.message().await.map_err(|e| {
-            RTStoreError::RPCInternalError(format!(
+            DB3Error::RPCInternalError(format!(
                 "fail to get iterator stream for table {} with err {}",
                 self.get_name(),
                 e
@@ -188,15 +188,15 @@ impl Table {
         let table_path = format!("{}/{}", self.get_db(), self.get_name());
         let table_url = ListingTableUrl::parse("s3://").map_err(|e| {
             warn!("fail to parse url {} with err {}", &table_path, e);
-            RTStoreError::TableBadUrl(table_path.to_string())
+            DB3Error::TableBadUrl(table_path.to_string())
         })?;
         let store = ctx.runtime_env.object_store(&table_url).map_err(|e| {
             warn!("fail to get object store {} with err {}", &table_path, e);
-            RTStoreError::TableBadUrl(table_path.to_string())
+            DB3Error::TableBadUrl(table_path.to_string())
         })?;
         let stream = store.list_file(&table_path).await.map_err(|e| {
             warn!("fail to get object store {} with err {}", &table_path, e);
-            RTStoreError::TableBadUrl(table_path.to_string())
+            DB3Error::TableBadUrl(table_path.to_string())
         })?;
         let pin_stream = Box::pin(stream);
         let files = pin_stream.then(|file_meta| async {
@@ -220,7 +220,7 @@ impl Table {
                         self.get_name(),
                         e
                     );
-                    RTStoreError::TableBadUrl(table_path.to_string())
+                    DB3Error::TableBadUrl(table_path.to_string())
                 })?;
         info!(
             "files size {} rows {}",

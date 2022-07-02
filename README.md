@@ -1,20 +1,20 @@
 # rtstore
 
-[![CI](https://github.com/rtstore/rtstore/workflows/CI/badge.svg)](https://github.com/rtstore/rtstore/actions)
-[![codecov](https://codecov.io/gh/rtstore/rtstore/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/rtstore/rtstore)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/w/rtstore/rtstore)
-![GitHub issues](https://img.shields.io/github/issues/rtstore/rtstore)
+[![CI](https://github.com/db3-teams/db3/workflows/CI/badge.svg)](https://github.com/db3-teams/db3/actions)
+[![codecov](https://codecov.io/gh/db3-teams/db3/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/db3-teams/db3)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
+![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 
-rtstore is a web3 timeseries database for data analytics
+db3 is a web3 timeseries database for data analytics
 
-![arc](./docs/rtstore_arch.png)
+![arc](./docs/db3_arch.png)
 
 ## Status
 It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
 
 ## Roadmap
 
-* [2022-Q3 plan](https://github.com/rtstore/rtstore/issues/55)
+* [2022-Q3 plan](https://github.com/db3-teams/db3/issues/55)
 
 ## License
 Apache License, Version 2.0

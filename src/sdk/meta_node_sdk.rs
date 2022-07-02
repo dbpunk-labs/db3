@@ -1,7 +1,7 @@
 //
 //
 // meta_node_sdk.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use crate::proto::rtstore_base_proto::RtStoreTableDesc;
-use crate::proto::rtstore_meta_proto::meta_client::MetaClient;
-use crate::proto::rtstore_meta_proto::{CreateDbRequest, CreateTableRequest};
+use crate::proto::db3_base_proto::DB3TableDesc;
+use crate::proto::db3_meta_proto::meta_client::MetaClient;
+use crate::proto::db3_meta_proto::{CreateDbRequest, CreateTableRequest};
 use std::sync::Arc;
 
 use tonic::transport::Endpoint;
@@ -59,7 +59,7 @@ impl MetaNodeSDK {
         Ok(())
     }
 
-    pub async fn create_table(&self, table: RtStoreTableDesc) -> std::result::Result<(), Status> {
+    pub async fn create_table(&self, table: DB3TableDesc) -> std::result::Result<(), Status> {
         let mut client = self.client.as_ref().clone();
         let create_table_req = CreateTableRequest {
             table_desc: Some(table),

@@ -1,7 +1,7 @@
 //
 //
 // meta_store.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,8 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{
-    RtStoreDatabase, RtStoreNode, RtStoreNodeType, RtStoreTableDesc,
-};
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::{Db3Database, Db3Node, Db3NodeType, Db3TableDesc};
 use bytes::{Bytes, BytesMut};
 use etcd_client::{Client, GetOptions, WatchOptions, WatchStream};
 use prost::Message;
@@ -55,24 +53,24 @@ impl MetaStore {
         }
     }
 
-    pub async fn add_db(&self, db: &RtStoreDatabase) -> Result<()> {
+    pub async fn add_db(&self, db: &Db3Database) -> Result<()> {
         if let MetaStoreType::MutableMetaStore = self.config.store_type {
             let key = format!("{}/dbs/{}", self.config.root_path, &db.db);
             info!("add db with key {}", &key);
             let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
             if let Err(e) = db.encode(&mut buf) {
-                return Err(RTStoreError::MetaRpcCreateTableError {
+                return Err(DB3Error::MetaRpcCreateTableError {
                     err: format!("encode descriptor of db {} with err {} ", db.db, e),
                 });
             }
             let buf = buf.freeze();
             self._put(key.as_bytes(), buf.as_ref()).await
         } else {
-            Err(RTStoreError::MetaStoreTypeMisatchErr)
+            Err(DB3Error::MetaStoreTypeMisatchErr)
         }
     }
 
-    pub async fn add_table(&self, table_desc: &RtStoreTableDesc) -> Result<()> {
+    pub async fn add_table(&self, table_desc: &Db3TableDesc) -> Result<()> {
         if let MetaStoreType::MutableMetaStore = self.config.store_type {
             let key = format!(
                 "{}/tables/{}_{}",
@@ -81,7 +79,7 @@ impl MetaStore {
             info!("add table with key {}", &key);
             let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
             if let Err(e) = table_desc.encode(&mut buf) {
-                return Err(RTStoreError::MetaRpcCreateTableError {
+                return Err(DB3Error::MetaRpcCreateTableError {
                     err: format!(
                         "encode descriptor of table {} with err {} ",
                         table_desc.name, e
@@ -91,18 +89,18 @@ impl MetaStore {
             let buf = buf.freeze();
             self._put(key.as_bytes(), buf.as_ref()).await
         } else {
-            Err(RTStoreError::MetaStoreTypeMisatchErr)
+            Err(DB3Error::MetaStoreTypeMisatchErr)
         }
     }
 
-    pub async fn add_node(&self, node: &RtStoreNode) -> Result<()> {
+    pub async fn add_node(&self, node: &Db3Node) -> Result<()> {
         let key = format!(
             "{}/nodes_{}/{}_{}",
             self.config.root_path, node.node_type as i32, node.ns, node.port
         );
         let mut buf = BytesMut::with_capacity(BUFFER_SIZE);
         if let Err(e) = node.encode(&mut buf) {
-            return Err(RTStoreError::EtcdCodecError(format!(
+            return Err(DB3Error::EtcdCodecError(format!(
                 "encode descriptor  with err {} ",
                 e
             )));
@@ -111,19 +109,19 @@ impl MetaStore {
         self._put(key.as_bytes(), buf.as_ref()).await
     }
 
-    pub async fn get_nodes(&self, node_type: RtStoreNodeType) -> Result<Vec<RtStoreNode>> {
+    pub async fn get_nodes(&self, node_type: Db3NodeType) -> Result<Vec<Db3Node>> {
         let key = format!("{}/nodes_{}/", self.config.root_path, node_type as i32);
         let options = GetOptions::new().with_prefix();
         let mut kv_client = self.client.kv_client();
         match kv_client.get(key.as_bytes(), Some(options)).await {
             Ok(resp) => {
-                let mut nodes: Vec<RtStoreNode> = Vec::new();
+                let mut nodes: Vec<Db3Node> = Vec::new();
                 for kv in resp.kvs() {
                     let buf = Bytes::from(kv.value().to_vec());
-                    match RtStoreNode::decode(buf) {
+                    match Db3Node::decode(buf) {
                         Ok(node) => nodes.push(node),
                         Err(e) => {
-                            return Err(RTStoreError::EtcdCodecError(format!(
+                            return Err(DB3Error::EtcdCodecError(format!(
                                 "decode table err {}",
                                 e
                             )));
@@ -132,23 +130,23 @@ impl MetaStore {
                 }
                 Ok(nodes)
             }
-            Err(e) => Err(RTStoreError::StoreS3Error(format!(
+            Err(e) => Err(DB3Error::StoreS3Error(format!(
                 "fail to get kv from etcd for e {}",
                 e
             ))),
         }
     }
 
-    pub async fn get_db(&self, db: &str) -> Result<RtStoreDatabase> {
+    pub async fn get_db(&self, db: &str) -> Result<Db3Database> {
         let key = format!("{}/dbs/{}", self.config.root_path, db);
         let options = GetOptions::new();
         let mut kv_client = self.client.kv_client();
         match kv_client.get(key.as_bytes(), Some(options)).await {
             Ok(resp) => {
-                let mut dbs: Vec<RtStoreDatabase> = Vec::new();
+                let mut dbs: Vec<Db3Database> = Vec::new();
                 for kv in resp.kvs() {
                     let buf = Bytes::from(kv.value().to_vec());
-                    match RtStoreDatabase::decode(buf) {
+                    match Db3Database::decode(buf) {
                         Ok(db) => dbs.push(db),
                         Err(e) => {
                             warn!("fail to decode table for err {}", e);
@@ -156,30 +154,30 @@ impl MetaStore {
                     }
                 }
                 if dbs.is_empty() {
-                    Err(RTStoreError::StoreS3Error(
+                    Err(DB3Error::StoreS3Error(
                         "fail to get kv from etcd".to_string(),
                     ))
                 } else {
                     Ok(dbs[0].clone())
                 }
             }
-            Err(e) => Err(RTStoreError::StoreS3Error(format!(
+            Err(e) => Err(DB3Error::StoreS3Error(format!(
                 "fail to get kv from etcd for e {}",
                 e
             ))),
         }
     }
 
-    pub async fn get_dbs(&self) -> Result<Vec<RtStoreDatabase>> {
+    pub async fn get_dbs(&self) -> Result<Vec<Db3Database>> {
         let key = format!("{}/dbs/", self.config.root_path);
         let options = GetOptions::new().with_prefix();
         let mut kv_client = self.client.kv_client();
         match kv_client.get(key.as_bytes(), Some(options)).await {
             Ok(resp) => {
-                let mut dbs: Vec<RtStoreDatabase> = Vec::new();
+                let mut dbs: Vec<Db3Database> = Vec::new();
                 for kv in resp.kvs() {
                     let buf = Bytes::from(kv.value().to_vec());
-                    match RtStoreDatabase::decode(buf) {
+                    match Db3Database::decode(buf) {
                         Ok(db) => dbs.push(db),
                         Err(e) => {
                             warn!("fail to decode table for err {}", e);
@@ -188,23 +186,23 @@ impl MetaStore {
                 }
                 Ok(dbs)
             }
-            Err(e) => Err(RTStoreError::StoreS3Error(format!(
+            Err(e) => Err(DB3Error::StoreS3Error(format!(
                 "fail to get kv from etcd for e {}",
                 e
             ))),
         }
     }
 
-    pub async fn get_tables(&self, db: &str) -> Result<Vec<RtStoreTableDesc>> {
+    pub async fn get_tables(&self, db: &str) -> Result<Vec<Db3TableDesc>> {
         let key = format!("{}/tables/{}_", self.config.root_path, db);
         let options = GetOptions::new().with_prefix();
         let mut kv_client = self.client.kv_client();
         match kv_client.get(key.as_bytes(), Some(options)).await {
             Ok(resp) => {
-                let mut tables: Vec<RtStoreTableDesc> = Vec::new();
+                let mut tables: Vec<Db3TableDesc> = Vec::new();
                 for kv in resp.kvs() {
                     let buf = Bytes::from(kv.value().to_vec());
-                    match RtStoreTableDesc::decode(buf) {
+                    match Db3TableDesc::decode(buf) {
                         Ok(table) => tables.push(table),
                         Err(e) => {
                             warn!("fail to decode table for error {}", e);
@@ -213,7 +211,7 @@ impl MetaStore {
                 }
                 Ok(tables)
             }
-            Err(e) => Err(RTStoreError::StoreS3Error(format!(
+            Err(e) => Err(DB3Error::StoreS3Error(format!(
                 "fail to get kv from etcd for e {}",
                 e
             ))),
@@ -230,7 +228,7 @@ impl MetaStore {
     }
 
     #[inline]
-    pub async fn subscribe_node_events(&self, node_type: &RtStoreNodeType) -> Result<WatchStream> {
+    pub async fn subscribe_node_events(&self, node_type: &Db3NodeType) -> Result<WatchStream> {
         let key = format!("{}/nodes_{}", self.config.root_path, *node_type as i32);
         let options = WatchOptions::new().with_prefix();
         let mut watch_client = self.client.watch_client();
@@ -242,7 +240,7 @@ impl MetaStore {
     async fn _put(&self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) -> Result<()> {
         let mut kv_client = self.client.kv_client();
         if let Err(e) = kv_client.put(key, value, None).await {
-            Err(RTStoreError::MetaRpcCreateTableError {
+            Err(DB3Error::MetaRpcCreateTableError {
                 err: format!("fail to save descriptor  with err {} ", e),
             })
         } else {
@@ -254,14 +252,14 @@ impl MetaStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::rtstore_base_proto::RtStoreTableDesc;
-    use crate::proto::rtstore_base_proto::{RtStoreColumnDesc, RtStoreSchemaDesc, RtStoreType};
+    use crate::proto::db3_base_proto::Db3TableDesc;
+    use crate::proto::db3_base_proto::{Db3ColumnDesc, Db3SchemaDesc, Db3Type};
     async fn create_etcd_client() -> Result<Client> {
         let endpoints: Vec<&str> = "http://localhost:2379".split(",").collect();
         if let Ok(client) = Client::connect(endpoints, None).await {
             Ok(client)
         } else {
-            Err(RTStoreError::NodeRPCInvalidEndpointError {
+            Err(DB3Error::NodeRPCInvalidEndpointError {
                 name: "etcd".to_string(),
             })
         }
@@ -276,7 +274,7 @@ mod tests {
         let client = create_etcd_client().await?;
         let config = MetaStoreConfig {
             store_type: MetaStoreType::MutableMetaStore,
-            root_path: "/rtstore_test".to_string(),
+            root_path: "/db3_test".to_string(),
         };
         Ok(MetaStore::new(client, config))
     }
@@ -292,30 +290,30 @@ mod tests {
     #[tokio::test]
     async fn test_add_node() -> Result<()> {
         let meta_store = create_meta_store().await?;
-        let rtstore_node = RtStoreNode {
+        let db3_node = Db3Node {
             endpoint: "127.0.0.1:8989".to_string(),
-            node_type: RtStoreNodeType::KComputeNode as i32,
+            node_type: Db3NodeType::KComputeNode as i32,
             ns: "127.0.0.1".to_string(),
             port: 8989,
         };
-        assert!(meta_store.add_node(&rtstore_node).await.is_ok());
-        let nodes = meta_store.get_nodes(RtStoreNodeType::KComputeNode).await?;
+        assert!(meta_store.add_node(&db3_node).await.is_ok());
+        let nodes = meta_store.get_nodes(Db3NodeType::KComputeNode).await?;
         assert_eq!(1, nodes.len());
-        assert_eq!(rtstore_node.ns, nodes[0].ns);
+        assert_eq!(db3_node.ns, nodes[0].ns);
         Ok(())
     }
 
-    fn create_simple_table_desc(db: &str, tname: &str) -> RtStoreTableDesc {
-        let col1 = RtStoreColumnDesc {
+    fn create_simple_table_desc(db: &str, tname: &str) -> Db3TableDesc {
+        let col1 = Db3ColumnDesc {
             name: "col1".to_string(),
-            ctype: RtStoreType::KBigInt as i32,
+            ctype: Db3Type::KBigInt as i32,
             null_allowed: true,
         };
-        let schema = RtStoreSchemaDesc {
+        let schema = Db3SchemaDesc {
             columns: vec![col1],
             version: 1,
         };
-        RtStoreTableDesc {
+        Db3TableDesc {
             name: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,

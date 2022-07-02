@@ -1,7 +1,7 @@
 //
 //
 // strings.rs
-// Copyright (C) 2022 rtstore.io Author imrtstore <rtstore_dev@outlook.com>
+// Copyright (C) 2022 db3.network Author imrtstore <rtstore_dev@outlook.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 uselog!(debug);
 const NUM_LABELS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const STORAGE_LABELS: [char; 7] = [' ', 'K', 'M', 'G', 'T', 'P', 'E'];
@@ -60,7 +60,7 @@ pub fn gen_s3_url(bucket: &str, prefix: &[&str], filename: &str) -> String {
 pub fn parse_s3_url(url: &str) -> Result<(String, String)> {
     let (bucket, key) = url
         .split_once('/')
-        .ok_or_else(|| RTStoreError::FSInvalidFileError {
+        .ok_or_else(|| DB3Error::FSInvalidFileError {
             path: url.to_string(),
         })?;
     Ok((bucket.to_owned(), key.to_owned()))

@@ -1,7 +1,7 @@
 //
 //
 // mod.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ use tonic::Status;
 
 /// The error system for rtstore
 #[derive(Debug, Error)]
-pub enum RTStoreError {
+pub enum DB3Error {
     #[error("db with name {0} was not found")]
     DBNotFoundError(String),
     #[error("db with name {0} exist")]
@@ -114,99 +114,101 @@ pub enum RTStoreError {
 }
 
 /// convert io error to rtstore error
-impl From<IoError> for RTStoreError {
+impl From<IoError> for DB3Error {
     fn from(error: IoError) -> Self {
-        RTStoreError::FSIoError(error)
+        DB3Error::FSIoError(error)
     }
 }
 
-impl From<ParquetError> for RTStoreError {
+impl From<ParquetError> for DB3Error {
     fn from(error: ParquetError) -> Self {
-        RTStoreError::FSParquetError(error)
+        DB3Error::FSParquetError(error)
     }
 }
 
-impl From<serde_json::Error> for RTStoreError {
+impl From<serde_json::Error> for DB3Error {
     fn from(err: serde_json::Error) -> Self {
-        RTStoreError::JSONParseError(err)
+        DB3Error::JSONParseError(err)
     }
 }
 
-impl From<DataFusionError> for RTStoreError {
+impl From<DataFusionError> for DB3Error {
     fn from(err: DataFusionError) -> Self {
-        RTStoreError::SQLEngineError(err)
+        DB3Error::SQLEngineError(err)
     }
 }
 
-impl From<ParserError> for RTStoreError {
+impl From<ParserError> for DB3Error {
     fn from(error: ParserError) -> Self {
         match error {
-            ParserError::TokenizerError(e) => RTStoreError::SQLParseError(e),
-            ParserError::ParserError(e) => RTStoreError::SQLParseError(e),
+            ParserError::TokenizerError(e) => DB3Error::SQLParseError(e),
+            ParserError::ParserError(e) => DB3Error::SQLParseError(e),
         }
     }
 }
 
-impl From<TokenizerError> for RTStoreError {
+impl From<TokenizerError> for DB3Error {
     fn from(err: TokenizerError) -> Self {
-        RTStoreError::SQLParseError(err.message)
+        DB3Error::SQLParseError(err.message)
     }
 }
 
-impl From<S3Error> for RTStoreError {
+impl From<S3Error> for DB3Error {
     fn from(error: S3Error) -> Self {
-        RTStoreError::StoreS3Error(format!("s3 error {}", error))
+        DB3Error::StoreS3Error(format!("s3 error {}", error))
     }
 }
 
-impl From<ArrowError> for RTStoreError {
+impl From<ArrowError> for DB3Error {
     fn from(error: ArrowError) -> Self {
-        RTStoreError::TableArrowError(error)
+        DB3Error::TableArrowError(error)
     }
 }
 
-impl From<etcd_client::Error> for RTStoreError {
+impl From<etcd_client::Error> for DB3Error {
     fn from(error: etcd_client::Error) -> Self {
-        RTStoreError::MetaStoreEtcdErr(error)
+        DB3Error::MetaStoreEtcdErr(error)
     }
 }
 
-impl From<RTStoreError> for IoError {
-    fn from(error: RTStoreError) -> Self {
+impl From<DB3Error> for IoError {
+    fn from(error: DB3Error) -> Self {
         match error {
-            RTStoreError::FSIoError(e) => e,
+            DB3Error::FSIoError(e) => e,
             _ => IoError::from(ErrorKind::Other),
         }
     }
 }
 
-impl From<RTStoreError> for String {
-    fn from(error: RTStoreError) -> Self {
+impl From<DB3Error> for String {
+    fn from(error: DB3Error) -> Self {
         format!("{}", error)
     }
 }
 
-impl From<Status> for RTStoreError {
+impl From<Status> for DB3Error {
     fn from(err: Status) -> Self {
-        RTStoreError::RPCStatusError(err)
+        DB3Error::RPCStatusError(err)
     }
 }
 
-impl From<RTStoreError> for Status {
-    fn from(error: RTStoreError) -> Self {
+impl From<DB3Error> for Status {
+    fn from(error: DB3Error) -> Self {
         match error {
-            RTStoreError::TableInvalidNamesError { .. }
-            | RTStoreError::TableSchemaConvertError { .. }
-            | RTStoreError::TableSchemaInvalidError { .. }
-            | RTStoreError::MetaRpcCreateTableError { .. } => Status::invalid_argument(error),
-            RTStoreError::TableNotFoundError { .. }
-            | RTStoreError::CellStoreNotFoundError { .. } => Status::not_found(error),
-            RTStoreError::TableNamesExistError { .. }
-            | RTStoreError::CellStoreExistError { .. } => Status::already_exists(error),
+            DB3Error::TableInvalidNamesError { .. }
+            | DB3Error::TableSchemaConvertError { .. }
+            | DB3Error::TableSchemaInvalidError { .. }
+            | DB3Error::MetaRpcCreateTableError { .. } => Status::invalid_argument(error),
+            DB3Error::TableNotFoundError { .. } | DB3Error::CellStoreNotFoundError { .. } => {
+                Status::not_found(error)
+            }
+            DB3Error::TableNamesExistError { .. } | DB3Error::CellStoreExistError { .. } => {
+                Status::already_exists(error)
+            }
             _ => Status::internal(error),
         }
     }
 }
 
 /// The Result for rtstore
-pub type Result<T> = std::result::Result<T, RTStoreError>;
+pub type Result<T> = std::result::Result<T, DB3Error>;

@@ -1,7 +1,7 @@
 //
 //
 // linked_list.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 // limitations under the License.
 //
 
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 
 /// the node of linkedlist
@@ -78,7 +78,7 @@ impl<V> LinkedList<V> {
                 Err(changed_head_ptr) => orig_head_ptr = changed_head_ptr,
             }
         }
-        Err(RTStoreError::BaseBusyError(
+        Err(DB3Error::BaseBusyError(
             "fail to change atomic reference".to_string(),
         ))
     }

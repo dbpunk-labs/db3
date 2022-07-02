@@ -1,7 +1,7 @@
 //
 //
 // object_store.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 //
 
 use crate::base::strings;
-use crate::error::{RTStoreError, Result};
+use crate::error::{DB3Error, Result};
 use async_trait::async_trait;
 use bytes::{Buf, Bytes};
 
@@ -85,7 +85,7 @@ pub fn build_credentials(
     }
     .map_err(|e| {
         warn!("fail to create s3 credentials for error {}", e);
-        RTStoreError::S3AuthError
+        DB3Error::S3AuthError
     })
 }
 

@@ -1,7 +1,7 @@
 //
 //
 // memory_node_impl.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,12 +19,12 @@
 use crate::base::arrow_parquet_utils;
 use crate::codec::flight_codec::{flight_data_from_arrow_batch, SchemaAsIpc};
 use crate::codec::row_codec::decode;
-use crate::error::{RTStoreError, Result};
-use crate::proto::rtstore_base_proto::{
-    FlightData, RtStoreNode, RtStoreTableDesc, StorageBackendConfig, StorageRegion,
+use crate::error::{DB3Error, Result};
+use crate::proto::db3_base_proto::{
+    Db3Node, Db3TableDesc, FlightData, StorageBackendConfig, StorageRegion,
 };
-use crate::proto::rtstore_memory_proto::memory_node_server::MemoryNode;
-use crate::proto::rtstore_memory_proto::{
+use crate::proto::db3_memory_proto::memory_node_server::MemoryNode;
+use crate::proto::db3_memory_proto::{
     AppendRecordsRequest, AppendRecordsResponse, AssignPartitionRequest, AssignPartitionResponse,
     FetchPartitionRequest,
 };
@@ -47,7 +47,7 @@ pub struct MemoryNodeConfig {
     pub tmp_store_root_dir: String,
     pub etcd_cluster: String,
     pub etcd_root_path: String,
-    pub node: RtStoreNode,
+    pub node: Db3Node,
 }
 
 pub struct MemoryNodeState {
@@ -80,7 +80,7 @@ impl MemoryNodeState {
                 })
             }
         } else {
-            Err(RTStoreError::CellStoreInvalidConfigError {
+            Err(DB3Error::CellStoreInvalidConfigError {
                 name: "storage region".to_string(),
                 err: "is null".to_string(),
             })
@@ -93,12 +93,12 @@ impl MemoryNodeState {
 
     pub async fn build_cell_store(
         partition_ids: &[i32],
-        table_desc: &RtStoreTableDesc,
+        table_desc: &Db3TableDesc,
         storage_config: &StorageBackendConfig,
         memory_node_confg: &MemoryNodeConfig,
     ) -> Result<Vec<(i32, Arc<CellStore>)>> {
-        if let Some(rtstore_schema) = &table_desc.schema {
-            let schema = arrow_parquet_utils::table_desc_to_arrow_schema(rtstore_schema)?;
+        if let Some(db3_schema) = &table_desc.schema {
+            let schema = arrow_parquet_utils::table_desc_to_arrow_schema(db3_schema)?;
             let region = MemoryNodeState::build_region(&storage_config.region)?;
             let name = &table_desc.name;
             let db = &table_desc.db;
@@ -133,7 +133,7 @@ impl MemoryNodeState {
             }
             Ok(cells)
         } else {
-            Err(RTStoreError::CellStoreInvalidConfigError {
+            Err(DB3Error::CellStoreInvalidConfigError {
                 name: "table schema".to_string(),
                 err: "is null".to_string(),
             })
@@ -162,7 +162,7 @@ impl MemoryNodeState {
         if let Some(db_map) = self.cells.get_mut(db) {
             match db_map.get_mut(table_id) {
                 Some(table_map) => match table_map.get(&pid) {
-                    Some(_) => Err(RTStoreError::CellStoreExistError {
+                    Some(_) => Err(DB3Error::CellStoreExistError {
                         tid: table_id.to_string(),
                         pid,
                     }),
@@ -296,7 +296,7 @@ impl MemoryNode for MemoryNodeImpl {
             let output = futures::stream::iter(flights);
             Ok(Response::new(Box::pin(output) as Self::FetchPartitionStream))
         } else {
-            Err(Status::from(RTStoreError::CellStoreNotFoundError {
+            Err(Status::from(DB3Error::CellStoreNotFoundError {
                 tid: fetch_request.table_id.to_string(),
                 pid: fetch_request.partition_id,
             }))
@@ -317,7 +317,7 @@ impl MemoryNode for MemoryNodeImpl {
             cell_store.put_records(row_batch).await?;
             Ok(Response::new(AppendRecordsResponse {}))
         } else {
-            Err(Status::from(RTStoreError::CellStoreNotFoundError {
+            Err(Status::from(DB3Error::CellStoreNotFoundError {
                 tid: append_request.table_id.to_string(),
                 pid: append_request.partition_id,
             }))
@@ -348,7 +348,7 @@ impl MemoryNode for MemoryNodeImpl {
                     }
                     Ok(Response::new(AssignPartitionResponse {}))
                 }
-                Err(_) => Err(Status::internal(RTStoreError::BaseBusyError(
+                Err(_) => Err(Status::internal(DB3Error::BaseBusyError(
                     "fail to get lock".to_string(),
                 ))),
             };
@@ -370,17 +370,15 @@ impl MemoryNode for MemoryNodeImpl {
 mod tests {
     use super::*;
     use crate::codec::row_codec::{encode, Data, RowRecordBatch};
-    use crate::proto::rtstore_base_proto::{
-        RtStoreColumnDesc, RtStoreNodeType, RtStoreSchemaDesc, RtStoreType,
-    };
+    use crate::proto::db3_base_proto::{Db3ColumnDesc, Db3NodeType, Db3SchemaDesc, Db3Type};
     use crate::store::build_readonly_meta_store;
     use std::thread;
     use tempdir::TempDir;
 
     fn build_config(tmp_dir_path: &str) -> MemoryNodeConfig {
-        let node = RtStoreNode {
+        let node = Db3Node {
             endpoint: "http://127.0.0.1:9191".to_string(),
-            node_type: RtStoreNodeType::KMemoryNode as i32,
+            node_type: Db3NodeType::KMemoryNode as i32,
             ns: "127.0.0.1".to_string(),
             port: 9191,
         };
@@ -495,17 +493,17 @@ mod tests {
         }
     }
 
-    fn create_simple_table_desc(tname: &str, db: &str) -> RtStoreTableDesc {
-        let col1 = RtStoreColumnDesc {
+    fn create_simple_table_desc(tname: &str, db: &str) -> Db3TableDesc {
+        let col1 = Db3ColumnDesc {
             name: "col1".to_string(),
-            ctype: RtStoreType::KBigInt as i32,
+            ctype: Db3Type::KBigInt as i32,
             null_allowed: true,
         };
-        let schema = RtStoreSchemaDesc {
+        let schema = Db3SchemaDesc {
             columns: vec![col1],
             version: 1,
         };
-        RtStoreTableDesc {
+        Db3TableDesc {
             name: tname.to_string(),
             schema: Some(schema),
             partition_desc: None,

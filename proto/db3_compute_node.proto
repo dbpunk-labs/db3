@@ -1,7 +1,7 @@
 //
 //
 // meta_node.proto
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@
 
 syntax = "proto3";
 
-import "rtstore_base.proto";
+import "db3_base.proto";
 
-package rtstore_compute_proto;
+package db3_compute_proto;
 
 message QueryRequest {
     string default_db = 1;
@@ -29,7 +29,7 @@ message QueryRequest {
     uint32 cnn_id =3;
 }
 
-// The rtstore compute node server definition.
+// The db3 compute node server definition.
 service ComputeNode {
-    rpc Query (QueryRequest) returns (stream rtstore_base_proto.FlightData) {}
+    rpc Query (QueryRequest) returns (stream db3_base_proto.FlightData) {}
 }

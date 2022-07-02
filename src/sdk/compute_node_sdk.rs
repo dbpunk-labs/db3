@@ -1,7 +1,7 @@
 //
 //
 // compute_node_sdk.rs
-// Copyright (C) 2022 rtstore.io Author imotai <codego.me@gmail.com>
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 // limitations under the License.
 //
 //
-use crate::proto::rtstore_base_proto::FlightData;
-use crate::proto::rtstore_compute_proto::compute_node_client::ComputeNodeClient;
-use crate::proto::rtstore_compute_proto::QueryRequest;
+use crate::proto::db3_base_proto::FlightData;
+use crate::proto::db3_compute_proto::compute_node_client::ComputeNodeClient;
+use crate::proto::db3_compute_proto::QueryRequest;
 
 use std::sync::Arc;
 use tonic::transport::Endpoint;
