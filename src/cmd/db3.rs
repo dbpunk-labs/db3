@@ -41,9 +41,17 @@ extern crate pretty_env_logger;
 uselog!(debug, info, warn);
 use clap::{Parser, Subcommand};
 
+const ABOUT: &str = "web3 timeseries database for data analytics 🚀🚀🚀";
+const LONG_ABOUT: &str = "
+db3 is under a very early stage. if you encounter some problems,
+please feel free to ask for help on https://github.com/db3-teams/db3/issues
+";
+const AUTHOR: &str = "db3.network";
+const VERSION: &str = "0.0.1";
+
 #[derive(Debug, Parser)]
 #[clap(name = "db3")]
-#[clap(about = "a web3 timeseries database for data analytics 🚀🚀🚀", long_about = None)]
+#[clap(author = AUTHOR, version = VERSION, about = ABOUT, long_about = LONG_ABOUT)]
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
