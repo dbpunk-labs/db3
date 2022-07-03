@@ -44,6 +44,7 @@ regex = "1.5.5"
 string-builder = "0.2.0"
 pg_wire = { path = "./thirdparty/pg_wire", features = ["tokio_net"] }
 shadow-rs = "0.11.0"
+jsonrpsee-http-client = "0.14.0"
 [[bin]]
 name = "db3"
 path = "src/cmd/db3.rs"
