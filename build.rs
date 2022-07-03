@@ -37,11 +37,5 @@ fn main() {
             &["proto", "thirdparty/substrait/proto"],
         )
         .unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn it_works() {}
+    shadow_rs::new().unwrap();
 }

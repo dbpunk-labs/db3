@@ -29,6 +29,7 @@ pretty_env_logger = "0.4.0"
 # Note datafusion must use the same version with sqlparser
 datafusion = {path = "./thirdparty/arrow-datafusion/datafusion/core", version="9.0.0"}
 sqlparser = {path ="./thirdparty/arrow-datafusion/thirdparty/sqlparser-rs", version="0.17.0"}
+timely = {path ="./thirdparty/timely-dataflow/timely", version="0.12.0"}
 arc-swap = "1.5.0"
 crossbeam-skiplist_piedb = "0.8.10"
 msql-srv = { path = "./thirdparty/msql-srv"}
@@ -42,6 +43,8 @@ rand = "0.8.5"
 regex = "1.5.5"
 string-builder = "0.2.0"
 pg_wire = { path = "./thirdparty/pg_wire", features = ["tokio_net"] }
+shadow-rs = "0.11.0"
+jsonrpsee-http-client = "0.14.0"
 [[bin]]
 name = "db3"
 path = "src/cmd/db3.rs"
@@ -49,6 +52,7 @@ path = "src/cmd/db3.rs"
 
 [build-dependencies]
 tonic-build = "0.7.2"
+shadow-rs = "0.11.0"
 
 [dev-dependencies]
 test-case = "2.0.2"

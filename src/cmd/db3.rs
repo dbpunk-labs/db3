@@ -17,6 +17,9 @@
 //
 //
 //
+use shadow_rs::shadow;
+shadow!(build);
+
 #[macro_use(uselog)]
 extern crate uselog_rs;
 use msql_srv::*;
@@ -41,9 +44,12 @@ extern crate pretty_env_logger;
 uselog!(debug, info, warn);
 use clap::{Parser, Subcommand};
 
+const ABOUT: &str = "web3 timeseries database for data analytics 🚀🚀🚀";
+const AUTHOR: &str = "db3.network";
+
 #[derive(Debug, Parser)]
 #[clap(name = "db3")]
-#[clap(about = "a web3 timeseries database for data analytics 🚀🚀🚀", long_about = None)]
+#[clap(author = AUTHOR, version = build::PKG_VERSION, about = ABOUT, long_about = None)]
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
@@ -111,6 +117,7 @@ enum Commands {
         #[clap(required = true)]
         var_config_path: String,
     },
+    Version,
 }
 
 fn setup_log() {
@@ -307,6 +314,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::MemoryNode { .. } => start_memory_node(&args.command).await,
         Commands::FrontendNode { .. } => start_frontend_server(&args.command).await,
         Commands::ComputeNode { .. } => start_compute_node(&args.command).await,
+        Commands::Version => {
+            println!("{}", build::VERSION);
+            Ok(())
+        }
     } {
         warn!("fail to start node for err {}", e);
     }
