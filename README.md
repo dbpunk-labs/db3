@@ -6,7 +6,6 @@
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 
 db3 is a web3 timeseries database for data analytics
-
 ![arc](./docs/db3_arch.png)
 
 ## Status
