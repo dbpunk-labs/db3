@@ -2,6 +2,11 @@
 name = "db3"
 version = "0.1.0"
 edition = "2021"
+description = "web3 timeseries database"
+license-file = "LICENSE"
+readme = "README.md"
+homepage = "https://db3.network"
+keywords = ["postgres", "timeseries", "database", "streaming"]
 
 [dependencies]
 nix = "0.24"
@@ -32,7 +37,7 @@ sqlparser = {path ="./thirdparty/arrow-datafusion/thirdparty/sqlparser-rs", vers
 timely = {path ="./thirdparty/timely-dataflow/timely", version="0.12.0"}
 arc-swap = "1.5.0"
 crossbeam-skiplist_piedb = "0.8.10"
-msql-srv = { path = "./thirdparty/msql-srv"}
+msql-srv = { path = "./thirdparty/msql-srv", version="0.9.6"}
 mysql = "22"
 mysql_async = "0.30.0"
 rust-s3 = {version="0.31", features=["tags", "tokio-native-tls", "blocking"]}
@@ -42,7 +47,7 @@ etcd-client = "0.9"
 rand = "0.8.5"
 regex = "1.5.5"
 string-builder = "0.2.0"
-pg_wire = { path = "./thirdparty/pg_wire", features = ["tokio_net"] }
+pg_wire = { path = "./thirdparty/pg_wire", features = ["tokio_net"] , version="0.8.1"}
 shadow-rs = "0.11.0"
 jsonrpsee-http-client = "0.14.0"
 [[bin]]
