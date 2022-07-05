@@ -15,6 +15,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
-mod openrpc_parser;
-mod stream;
+mod block_stream;
+pub use self::block_stream::*;

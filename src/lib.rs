@@ -16,6 +16,7 @@
 // limitations under the License.
 //
 
+#![feature(result_option_inspect)]
 #[macro_use(uselog)]
 extern crate uselog_rs;
 pub mod base;
