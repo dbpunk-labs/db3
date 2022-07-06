@@ -115,6 +115,8 @@ pub enum DB3Error {
     ParseNumberError(std::num::ParseIntError, String),
     #[error("fail call json rpc for error {0}")]
     JSONRpcError(jsonrpsee::core::Error),
+    #[error("fail to transform sql to plan for error {0}")]
+    SQLTransformError(String),
 }
 
 /// convert io error to rtstore error

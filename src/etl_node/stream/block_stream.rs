@@ -49,6 +49,7 @@ pub struct BlockStream {
     client: HttpClient,
     // the latest block number
     latest_block_number: Arc<AtomicU64>,
+    // the running state of stream
     running: Arc<AtomicBool>,
 }
 

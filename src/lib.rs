@@ -28,6 +28,7 @@ pub mod etl_node;
 pub mod frontend_node;
 pub mod memory_node;
 pub mod meta_node;
+pub mod parser;
 pub mod proto;
 pub mod sdk;
 pub mod store;

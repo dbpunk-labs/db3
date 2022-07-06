@@ -123,7 +123,7 @@ message DB3SchemaDesc {
     int32 version = 2;
 }
 
-message DB3TableType {
+enum DB3TableType {
     KTimeSeriesTable = 0;
     KStreamingTable = 1;
 }
