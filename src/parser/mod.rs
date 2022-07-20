@@ -42,7 +42,7 @@ mod tests {
     }
     #[test]
     fn test_parse_sql() {
-        let sql = "select t1.a['c'], t1.b, log(t1.c), t1.e + 1 from t1;select * from t3;";
+        let sql = "select t1.a, t1.b, log(t1.c), t1.e + 1 from t1;select * from t3;";
         let tree = parse_sql(sql);
         if let Some(t) = tree {
             visit_node(t.root_node(), 0);

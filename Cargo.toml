@@ -53,6 +53,7 @@ hex = "0.4.3"
 pg_wire = { path = "./thirdparty/pg_wire", features = ["tokio_net"] , version="0.8.1"}
 tree-sitter = "0.19.3"
 tree-sitter-sql =  {path="./thirdparty/tree-sitter-sql", version="0.0.2"}
+substring = "1.4.5"
 
 [[bin]]
 name = "db3"
