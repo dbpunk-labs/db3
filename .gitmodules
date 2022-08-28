@@ -16,3 +16,6 @@
 [submodule "thirdparty/timely-dataflow"]
 	path = thirdparty/timely-dataflow
 	url = https://github.com/db3-teams/timely-dataflow.git
+[submodule "thirdparty/substrate"]
+	path = thirdparty/substrate
+	url = https://github.com/db3-teams/substrate.git
