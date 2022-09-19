@@ -71,7 +71,7 @@ frame-system = { version = "4.0.0-dev", path = "../../thirdparty/substrate/frame
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", path = "../../thirdparty/substrate/frame/system/rpc/runtime-api" }
 pallet-transaction-payment = { version = "4.0.0-dev", path = "../../thirdparty/substrate/frame/transaction-payment" }
 pallet-asset-tx-payment = { version = "4.0.0-dev", path = "../../thirdparty/substrate/frame/transaction-payment/asset-tx-payment/" }
-
+pallet-im-online = { version = "4.0.0-dev", default-features = false, path = "../../thirdparty/substrate/frame/im-online" }
 pallet-sql-db = { version = "0.1.0", default-features = false, path = "../../frame/db" }
 # node-specific dependencies
 db3-runtime = { version = "0.1.0", path = "../../runtime" }
@@ -135,8 +135,8 @@ pallet-balances = { version = "4.0.0-dev", path = "../../thirdparty/substrate/fr
 [features]
 default = ["cli"]
 cli = [
-	"node-executor/wasmi-errno",
-	"node-inspect",
+	"db3-executor/wasmi-errno",
+	"db3-inspect",
 	"sc-cli",
 	"frame-benchmarking-cli",
 	"substrate-frame-cli",
