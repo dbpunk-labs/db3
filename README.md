@@ -5,8 +5,7 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 
-db3 is a web3 timeseries database for data analytics
-![arc](./docs/db3_arch.png)
+db3 is a fully decentralized database for web3
 
 ## Status
 It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
