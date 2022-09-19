@@ -22,3 +22,7 @@
 [submodule "thirdparty/jsonrpsee"]
 	path = thirdparty/jsonrpsee
 	url = https://github.com/paritytech/jsonrpsee.git
+[submodule "thirdparty/substrate"]
+	path = thirdparty/substrate
+	url = https://github.com/dbpunk-labs/substrate.git
+
