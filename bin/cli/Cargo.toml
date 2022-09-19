@@ -115,7 +115,7 @@ regex = "1.5.5"
 platforms = "2.0"
 async-std = { version = "1.11.0", features = ["attributes"] }
 soketto = "0.7.1"
-criterion = { version = "0.3.5", features = ["async_tokio"] }
+criterion = { version = "0.4.0", features = ["async_tokio"] }
 tokio = { version = "1.17.0", features = ["macros", "time", "parking_lot"] }
 wait-timeout = "0.2"
 remote-externalities = { path = "../../thirdparty/substrate/utils/frame/remote-externalities" }
