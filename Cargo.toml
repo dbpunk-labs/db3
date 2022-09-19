@@ -1,12 +1,13 @@
 [workspace]
 members = [
-"rpc",
-"primitives",
-"runtime",
-"frame/db",
-"frame/db/rpc",
-"frame/db/rpc/runtime-api",
-"bin/cli",
-"bin/executor",
-"bin/inspect",
+    "rpc",
+    "primitives",
+    "runtime",
+    "frame/db",
+    "frame/db/rpc",
+    "frame/db/rpc/runtime-api",
+    "bin/cli",
+    "bin/executor",
+    "bin/inspect",
 ]
+
