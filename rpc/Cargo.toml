@@ -11,7 +11,7 @@ repository = "https://github.com/db3-team/db3/"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-jsonrpsee = { version = "0.14.0", features = ["server"] }
+jsonrpsee = { version = "0.15.1", features = ["server"] }
 db3-primitives = { version = "0.1.0", path = "../primitives" }
 sqldb-rpc = { version = "0.1.0", path = "../frame/db/rpc/" }
 pallet-contracts-rpc = { version = "4.0.0-dev", path = "../thirdparty/substrate/frame/contracts/rpc/" }
