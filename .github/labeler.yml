@@ -15,23 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-C-compute-node:
-  - src/compute_node/*
+C-runtime:
+  - runtime/*
 
-C-frontend-node:
-  - src/frontend_node/*
+C-frame:
+  - frame/*
 
-C-memory-node:
-  - src/memory_node/*
-
-C-meta-node:
-  - src/memory_node/*
-
-store:
-  - src/store/*
-
-C-etl-node:
-  - src/etl_node/*
+C-cli:
+  - bin/*
 
 development-process:
   - dev/**.*
