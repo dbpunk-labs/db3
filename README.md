@@ -5,6 +5,7 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 
+
 db3 is a fully decentralized database for web3
 
 ## Status
