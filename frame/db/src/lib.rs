@@ -285,9 +285,7 @@ pub mod pallet {
         }
 
         #[pallet::weight(10000)]
-        pub fn create_ns(origin: OriginFor<T>, 
-            ns: Vec<u8>,
-            req_id: Vec<u8>,) -> DispatchResult {
+        pub fn create_ns(origin: OriginFor<T>, ns: Vec<u8>, req_id: Vec<u8>) -> DispatchResult {
             let owner = ensure_signed(origin)?;
             if !<NsOwners<T>>::contains_key(&owner) {
                 let bset: BoundedBTreeSet<
@@ -295,7 +293,7 @@ pub mod pallet {
                     T::MaxBlockTransactions,
                 > = BoundedBTreeSet::new();
                 <NsOwners<T>>::insert(owner.clone(), bset);
-            } 
+            }
             // add owner
             <NsOwners<T>>::mutate(&owner, |bset| {
                 let ns_name: BoundedVec<_, _> = ns
@@ -303,18 +301,16 @@ pub mod pallet {
                     .try_into()
                     .map_err(|()| Error::<T>::TooManyTransactions)
                     .unwrap();
-                
+
                 if let Some(b) = bset {
-                    if let Ok(_) = b.try_insert(ns_name) {
-                    }
+                    if let Ok(_) = b.try_insert(ns_name) {}
                 }
             });
-            Self::deposit_event(
-                Event::GeneralResultEvent{
-                    status : 0,
-                    msg : "ok".as_bytes().to_vec(),
-                    req_id: req_id
-                });
+            Self::deposit_event(Event::GeneralResultEvent {
+                status: 0,
+                msg: "ok".as_bytes().to_vec(),
+                req_id: req_id,
+            });
             Ok(())
         }
 
@@ -363,15 +359,13 @@ pub mod pallet {
                     .unwrap();
                 if let Some(b) = bmap {
                     // TODO check delegate_type
-                    if let Ok(_) = b.try_insert((ns_name, owner.clone()), delegate_type) {
-                    }
+                    if let Ok(_) = b.try_insert((ns_name, owner.clone()), delegate_type) {}
                 }
             });
-            Self::deposit_event(
-                Event::GeneralResultEvent{
-                    status : 0,
-                    msg : "ok".as_bytes().to_vec(),
-                    req_id: req_id
+            Self::deposit_event(Event::GeneralResultEvent {
+                status: 0,
+                msg: "ok".as_bytes().to_vec(),
+                req_id: req_id,
             });
             Ok(())
         }
@@ -397,28 +391,28 @@ pub mod pallet {
                             b.remove(&(ns_name, owner));
                         }
                     });
-                    Self::deposit_event(
-                        Event::GeneralResultEvent{
-                            status : 0,
-                            msg : "ok".as_bytes().to_vec(),
-                            req_id: req_id
-                        });
+                    Self::deposit_event(Event::GeneralResultEvent {
+                        status: 0,
+                        msg: "ok".as_bytes().to_vec(),
+                        req_id: req_id,
+                    });
                 } else {
-                    Self::deposit_event(
-                        Event::GeneralResultEvent{
-                        status : 0,
-                        msg : "fail to delete delegate. Delegate not exist".as_bytes().to_vec(),
-                        req_id: req_id
-                   }); 
+                    Self::deposit_event(Event::GeneralResultEvent {
+                        status: 0,
+                        msg: "fail to delete delegate. Delegate not exist"
+                            .as_bytes()
+                            .to_vec(),
+                        req_id: req_id,
+                    });
                 }
-                
             } else {
-                Self::deposit_event(
-                    Event::GeneralResultEvent{
-                    status : 0,
-                    msg : "fail to delete delegate. Not the owner of ns".as_bytes().to_vec(),
-                    req_id: req_id
-               });
+                Self::deposit_event(Event::GeneralResultEvent {
+                    status: 0,
+                    msg: "fail to delete delegate. Not the owner of ns"
+                        .as_bytes()
+                        .to_vec(),
+                    req_id: req_id,
+                });
             }
             Ok(())
         }
@@ -429,7 +423,7 @@ pub mod pallet {
             delegate: AccountIdLookupOf<T>,
             ns: Vec<u8>,
             delegate_type: u8,
-            req_id: Vec<u8>
+            req_id: Vec<u8>,
         ) -> DispatchResult {
             let owner = ensure_signed(origin)?;
             let delegate_id = T::Lookup::lookup(delegate)?;
@@ -450,25 +444,22 @@ pub mod pallet {
                         .unwrap();
                     if let Some(b) = bmap {
                         // TODO check delegate_type
-                        if let Ok(_) = b.try_insert((ns_name, owner.clone()), delegate_type) {
-                        }
+                        if let Ok(_) = b.try_insert((ns_name, owner.clone()), delegate_type) {}
                     }
                 });
-                Self::deposit_event(
-                    Event::GeneralResultEvent{
-                        status : 0,
-                        msg : "ok".as_bytes().to_vec(),
-                        req_id: req_id
-                    }
-                );
+                Self::deposit_event(Event::GeneralResultEvent {
+                    status: 0,
+                    msg: "ok".as_bytes().to_vec(),
+                    req_id: req_id,
+                });
             } else {
-                Self::deposit_event(
-                    Event::GeneralResultEvent{
-                        status : 0,
-                        msg : "fail to add delegate. Not the owner of ns".as_bytes().to_vec(),
-                        req_id: req_id
-                    }
-                );
+                Self::deposit_event(Event::GeneralResultEvent {
+                    status: 0,
+                    msg: "fail to add delegate. Not the owner of ns"
+                        .as_bytes()
+                        .to_vec(),
+                    req_id: req_id,
+                });
             }
             Ok(())
         }
@@ -511,12 +502,11 @@ pub mod pallet {
                     return Ok(());
                 }
             }
-            Self::deposit_event(
-                Event::GeneralResultEvent{
-                    status : 0,
-                    msg : "No NS Permission".as_bytes().to_vec(),
-                    req_id: req_id
-                });
+            Self::deposit_event(Event::GeneralResultEvent {
+                status: 0,
+                msg: "No NS Permission".as_bytes().to_vec(),
+                req_id: req_id,
+            });
             Ok(())
         }
 
@@ -552,12 +542,11 @@ pub mod pallet {
                 Self::deposit_event(Event::SQLQueued(data));
                 Ok(())
             } else {
-                Self::deposit_event(
-                    Event::GeneralResultEvent{
-                        status : 0,
-                        msg : "No NS Permission".as_bytes().to_vec(),
-                        req_id: req_id
-                    });
+                Self::deposit_event(Event::GeneralResultEvent {
+                    status: 0,
+                    msg: "No NS Permission".as_bytes().to_vec(),
+                    req_id: req_id,
+                });
                 Ok(())
             }
         }
@@ -728,15 +717,14 @@ pub mod pallet {
         AddDelegateOK(Vec<u8>),
         DeleteDelegateOk(Vec<u8>),
 
-        /// General result event 
+        /// General result event
         GeneralResultEvent {
             status: u32,
             msg: Vec<u8>,
-            req_id: Vec<u8>
+            req_id: Vec<u8>,
         },
         NoNsPermission,
     }
-
 
     /// Collection of transaction metadata by block number.
     #[pallet::storage]
