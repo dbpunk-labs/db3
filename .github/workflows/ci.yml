@@ -20,7 +20,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
-          components: rustfmt
+          components: rustfmt, cargo > 1.64.0
       - uses: Swatinem/rust-cache@v1
       - name: Check formatting
         uses: actions-rs/cargo@v1
