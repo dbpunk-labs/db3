@@ -73,6 +73,7 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Run rust test with coverage
         run: |
+          rustup target add wasm32-unknown-unknown
           cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:
