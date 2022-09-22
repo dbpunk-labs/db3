@@ -62,13 +62,6 @@ use sp_runtime::{
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
-/// A type alias for the balance type from this pallet's point of view.
-type BalanceOf<T> =
-    <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
-    <T as frame_system::Config>::AccountId,
->>::NegativeImbalance;
-
 // Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
 pub use weights::WeightInfo;
@@ -77,7 +70,6 @@ pub use weights::WeightInfo;
 // Setting higher limit also requires raising the allocator limit.
 pub const DEFAULT_MAX_TRANSACTION_SIZE: u32 = 8 * 1024 * 1024;
 pub const DEFAULT_MAX_BLOCK_TRANSACTIONS: u32 = 512;
-const SQL_KEY: &[u8] = b"sql_key";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct SQLInput<'a> {
@@ -191,6 +183,7 @@ pub mod pallet {
         fn on_initialize(n: T::BlockNumber) -> Weight {
             // clear the pending sql queue
             PendingSQL::<T>::kill();
+            T::DbWeight::get().reads_writes(2, 4)
         }
 
         fn on_finalize(n: T::BlockNumber) {}
@@ -541,49 +534,7 @@ pub mod pallet {
         ValueQuery,
     >;
 
-    #[pallet::genesis_config]
-    pub struct GenesisConfig<T: Config> {
-        pub byte_fee: BalanceOf<T>,
-        pub entry_fee: BalanceOf<T>,
-        pub storage_period: T::BlockNumber,
-    }
-
-    #[cfg(feature = "std")]
-    impl<T: Config> Default for GenesisConfig<T> {
-        fn default() -> Self {
-            Self {
-                byte_fee: 10u32.into(),
-                entry_fee: 1000u32.into(),
-                storage_period: sp_transaction_storage_proof::DEFAULT_STORAGE_PERIOD.into(),
-            }
-        }
-    }
-
-    #[pallet::genesis_build]
-    impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
-        fn build(&self) {
-            <ByteFee<T>>::put(&self.byte_fee);
-            <EntryFee<T>>::put(&self.entry_fee);
-            <StoragePeriod<T>>::put(&self.storage_period);
-        }
-    }
-
     impl<T: Config> Pallet<T> {
-        fn apply_fee(sender: T::AccountId, size: u32) -> DispatchResult {
-            let byte_fee = ByteFee::<T>::get().ok_or(Error::<T>::NotConfigured)?;
-            let entry_fee = EntryFee::<T>::get().ok_or(Error::<T>::NotConfigured)?;
-            let fee = byte_fee
-                .saturating_mul(size.into())
-                .saturating_add(entry_fee);
-            ensure!(
-                T::Currency::can_slash(&sender, fee),
-                Error::<T>::InsufficientFunds
-            );
-            let (credit, _) = T::Currency::slash(&sender, fee);
-            T::FeeDestination::on_unbalanced(credit);
-            Ok(())
-        }
-
         pub fn is_ns_owner(owner: T::AccountId, ns: Vec<u8>) -> bool {
             if let Ok(v) = NsOwners::<T>::try_get(&owner) {
                 let bns: BoundedVec<_, _> = ns
