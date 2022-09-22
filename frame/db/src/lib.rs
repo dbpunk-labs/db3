@@ -22,11 +22,6 @@
 
 pub mod weights;
 
-#[cfg(test)]
-mod mock;
-#[cfg(test)]
-mod tests;
-
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{
     dispatch::{Dispatchable, GetDispatchInfo},
