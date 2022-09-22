@@ -398,7 +398,7 @@ pub mod pallet {
                     });
                 } else {
                     Self::deposit_event(Event::GeneralResultEvent {
-                        status: 0,
+                        status: 1,
                         msg: "fail to delete delegate. Delegate not exist"
                             .as_bytes()
                             .to_vec(),
@@ -407,7 +407,7 @@ pub mod pallet {
                 }
             } else {
                 Self::deposit_event(Event::GeneralResultEvent {
-                    status: 0,
+                    status: 1,
                     msg: "fail to delete delegate. Not the owner of ns"
                         .as_bytes()
                         .to_vec(),
@@ -454,7 +454,7 @@ pub mod pallet {
                 });
             } else {
                 Self::deposit_event(Event::GeneralResultEvent {
-                    status: 0,
+                    status: 1,
                     msg: "fail to add delegate. Not the owner of ns"
                         .as_bytes()
                         .to_vec(),
@@ -503,7 +503,7 @@ pub mod pallet {
                 }
             }
             Self::deposit_event(Event::GeneralResultEvent {
-                status: 0,
+                status: 1,
                 msg: "No NS Permission".as_bytes().to_vec(),
                 req_id: req_id,
             });
@@ -543,7 +543,7 @@ pub mod pallet {
                 Ok(())
             } else {
                 Self::deposit_event(Event::GeneralResultEvent {
-                    status: 0,
+                    status: 1,
                     msg: "No NS Permission".as_bytes().to_vec(),
                     req_id: req_id,
                 });
