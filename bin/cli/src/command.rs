@@ -34,7 +34,7 @@ use std::sync::Arc;
 
 impl SubstrateCli for Cli {
     fn impl_name() -> String {
-        "Substrate Node".into()
+        ABOUT.into()
     }
 
     fn impl_version() -> String {
@@ -50,7 +50,7 @@ impl SubstrateCli for Cli {
     }
 
     fn support_url() -> String {
-        "https://github.com/paritytech/substrate/issues/new".into()
+        "https://github.com/dbpunk-labs/db3/issues/new".into()
     }
 
     fn copyright_start_year() -> i32 {

@@ -24,6 +24,8 @@ pub mod weights;
 
 #[cfg(test)]
 mod mock;
+#[cfg(test)]
+mod tests;
 
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{
@@ -62,6 +64,10 @@ use sp_runtime::{
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
+type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
+    <T as frame_system::Config>::AccountId,
+>>::NegativeImbalance;
+
 // Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
 pub use weights::WeightInfo;
@@ -70,6 +76,34 @@ pub use weights::WeightInfo;
 // Setting higher limit also requires raising the allocator limit.
 pub const DEFAULT_MAX_TRANSACTION_SIZE: u32 = 8 * 1024 * 1024;
 pub const DEFAULT_MAX_BLOCK_TRANSACTIONS: u32 = 512;
+const SQL_KEY: &[u8] = b"sql_key";
+
+/// State data for a stored transaction.
+#[derive(
+    Encode,
+    Decode,
+    Clone,
+    sp_runtime::RuntimeDebug,
+    PartialEq,
+    Eq,
+    scale_info::TypeInfo,
+    MaxEncodedLen,
+)]
+pub struct TransactionInfo {
+    /// Chunk trie root.
+    chunk_root: <BlakeTwo256 as Hash>::Output,
+    /// Plain hash of indexed data.
+    content_hash: <BlakeTwo256 as Hash>::Output,
+    /// Size of indexed data in bytes.
+    size: u32,
+    /// Total number of chunks added in the block with this transaction. This
+    /// is used find transaction info by block chunk index using binary search.
+    block_chunks: u32,
+}
+
+fn num_chunks(bytes: u32) -> u32 {
+    ((bytes as u64 + CHUNK_SIZE as u64 - 1) / CHUNK_SIZE as u64) as u32
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct SQLInput<'a> {
@@ -181,8 +215,9 @@ pub mod pallet {
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn on_initialize(n: T::BlockNumber) -> Weight {
-            // clear the pending sql queue
+            // Clear all pending sql
             PendingSQL::<T>::kill();
+            // 2 writes in `on_initialize` and 2 writes + 2 reads in `on_finalize`
             T::DbWeight::get().reads_writes(2, 4)
         }
 
@@ -197,9 +232,9 @@ pub mod pallet {
                 let raw_id_data = req_id.to_vec();
                 let req_id = str::from_utf8(&raw_id_data).unwrap_or("error");
                 let mut data = id.encode();
-                // combie the account id and namespace
                 data.extend(ns_raw.iter());
                 let account = hex::encode_upper(data);
+                log::info!("process sql {} offchain from acc {} ", query, account);
                 Self::run_and_send_signed_payload(query, &account, req_id).unwrap();
             }
         }
@@ -231,6 +266,7 @@ pub mod pallet {
                     .try_into()
                     .map_err(|()| Error::<T>::TooManyTransactions)
                     .unwrap();
+
                 if let Some(b) = bset {
                     if let Ok(_) = b.try_insert(ns_name) {}
                 }
@@ -484,6 +520,16 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
+        /// Stored data under specified index.
+        Stored {
+            index: u32,
+        },
+        /// Renewed data under specified index.
+        Renewed {
+            index: u32,
+        },
+        /// Storage proof was successfully checked.
+        ProofChecked,
         SQLQueued(Vec<u8>),
         SQLResult(Vec<u8>),
         AddDelegateOK(Vec<u8>),
@@ -497,6 +543,22 @@ pub mod pallet {
         },
         NoNsPermission,
     }
+
+    /// Collection of transaction metadata by block number.
+    #[pallet::storage]
+    #[pallet::getter(fn transaction_roots)]
+    pub(super) type Transactions<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::BlockNumber,
+        BoundedVec<TransactionInfo, T::MaxBlockTransactions>,
+        OptionQuery,
+    >;
+
+    /// Count indexed chunks for each block.
+    #[pallet::storage]
+    pub(super) type ChunkCount<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::BlockNumber, u32, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn table_owners)]
