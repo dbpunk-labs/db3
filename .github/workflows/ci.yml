@@ -14,11 +14,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-          profile: minimal
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
@@ -70,29 +71,9 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
-      - name: Setup etcd3
-        run: |
-          wget https://github.com/etcd-io/etcd/releases/download/v3.5.4/etcd-v3.5.4-linux-amd64.tar.gz
-          tar -zxf etcd-v3.5.4-linux-amd64.tar.gz
-          cd etcd-v3.5.4-linux-amd64
-          ./etcd &
-      - name: Setup s3 mock environment
-        run: |
-          mkdir -p /tmp/data
-          docker run \
-          --detach \
-          --rm \
-          --publish 9000:9000 \
-          --publish 9001:9001 \
-          --volume "/tmp/data:/data" \
-          --env "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" \
-          --env "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
-          quay.io/minio/minio server /data \
-          --console-address ":9001"
       - name: Run rust test with coverage
         run: |
-          export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-          export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+          rustup target add wasm32-unknown-unknown
           cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:
