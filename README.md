@@ -15,6 +15,34 @@ It's under a very early stage. if you are interested in this project, Issues, Di
 
 * [2022-Q3 plan](https://github.com/db3-teams/db3/issues/55)
 
+## Compile
+
+- Upgrade cargo
+
+```bash
+rustup default nightly
+rustup update 
+```
+
+- Check cargo version >= `cargo 1.66.0-nightly` 
+
+
+```bash
+cargo --version
+```
+
+- Compile
+
+```bash
+cargo build --release
+```
+
+- Run
+
+```bash
+./target/release/db3 --dev
+```
+
 ## License
 Apache License, Version 2.0
    ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
