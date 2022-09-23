@@ -72,29 +72,7 @@ pub use weights::WeightInfo;
 pub const DEFAULT_MAX_TRANSACTION_SIZE: u32 = 8 * 1024 * 1024;
 pub const DEFAULT_MAX_BLOCK_TRANSACTIONS: u32 = 512;
 const SQL_KEY: &[u8] = b"sql_key";
-
-/// State data for a stored transaction.
-#[derive(
-    Encode,
-    Decode,
-    Clone,
-    sp_runtime::RuntimeDebug,
-    PartialEq,
-    Eq,
-    scale_info::TypeInfo,
-    MaxEncodedLen,
-)]
-pub struct TransactionInfo {
-    /// Chunk trie root.
-    chunk_root: <BlakeTwo256 as Hash>::Output,
-    /// Plain hash of indexed data.
-    content_hash: <BlakeTwo256 as Hash>::Output,
-    /// Size of indexed data in bytes.
-    size: u32,
-    /// Total number of chunks added in the block with this transaction. This
-    /// is used find transaction info by block chunk index using binary search.
-    block_chunks: u32,
-}
+const OK_MSG: &str = "ok";
 
 fn num_chunks(bytes: u32) -> u32 {
     ((bytes as u64 + CHUNK_SIZE as u64 - 1) / CHUNK_SIZE as u64) as u32
@@ -104,6 +82,13 @@ fn num_chunks(bytes: u32) -> u32 {
 struct SQLInput<'a> {
     query: &'a str,
     account: &'a str,
+    req_id: &'a str,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct ResponseBody<'a> {
+    status: u8,
+    msg: &'a str,
     req_id: &'a str,
 }
 
@@ -240,7 +225,7 @@ pub mod pallet {
         #[pallet::weight(10000)]
         pub fn submit_result(origin: OriginFor<T>, data: InputPayload) -> DispatchResult {
             ensure_signed(origin)?;
-            Self::deposit_event(Event::SQLResult(data.data));
+            Self::deposit_event(Event::GeneralResultEvent(data.data));
             Ok(())
         }
 
@@ -266,11 +251,15 @@ pub mod pallet {
                     if let Ok(_) = b.try_insert(ns_name) {}
                 }
             });
-            Self::deposit_event(Event::GeneralResultEvent {
+
+            let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+            let body = ResponseBody {
                 status: 0,
-                msg: "ok".as_bytes().to_vec(),
-                req_id: req_id,
-            });
+                msg: OK_MSG,
+                req_id: req_id_str,
+            };
+            let data = serde_json::to_vec(&body).unwrap();
+            Self::deposit_event(Event::GeneralResultEvent(data));
             Ok(())
         }
 
@@ -322,11 +311,14 @@ pub mod pallet {
                     if let Ok(_) = b.try_insert((ns_name, owner.clone()), delegate_type) {}
                 }
             });
-            Self::deposit_event(Event::GeneralResultEvent {
+            let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+            let body = ResponseBody {
                 status: 0,
-                msg: "ok".as_bytes().to_vec(),
-                req_id: req_id,
-            });
+                msg: OK_MSG,
+                req_id: req_id_str,
+            };
+            let data = serde_json::to_vec(&body).unwrap();
+            Self::deposit_event(Event::GeneralResultEvent(data));
             Ok(())
         }
 
@@ -351,28 +343,36 @@ pub mod pallet {
                             b.remove(&(ns_name, owner));
                         }
                     });
-                    Self::deposit_event(Event::GeneralResultEvent {
+
+                    let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+                    let body = ResponseBody {
                         status: 0,
-                        msg: "ok".as_bytes().to_vec(),
-                        req_id: req_id,
-                    });
+                        msg: OK_MSG,
+                        req_id: req_id_str,
+                    };
+                    let data = serde_json::to_vec(&body).unwrap();
+                    Self::deposit_event(Event::GeneralResultEvent(data));
                 } else {
-                    Self::deposit_event(Event::GeneralResultEvent {
+                    let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+                    let msg: &str = "no ns was found";
+                    let body = ResponseBody {
                         status: 1,
-                        msg: "fail to delete delegate. Delegate not exist"
-                            .as_bytes()
-                            .to_vec(),
-                        req_id: req_id,
-                    });
+                        msg,
+                        req_id: req_id_str,
+                    };
+                    let data = serde_json::to_vec(&body).unwrap();
+                    Self::deposit_event(Event::GeneralResultEvent(data));
                 }
             } else {
-                Self::deposit_event(Event::GeneralResultEvent {
+                let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+                let msg: &str = "no permission to delete delegate";
+                let body = ResponseBody {
                     status: 1,
-                    msg: "fail to delete delegate. Not the owner of ns"
-                        .as_bytes()
-                        .to_vec(),
-                    req_id: req_id,
-                });
+                    msg,
+                    req_id: req_id_str,
+                };
+                let data = serde_json::to_vec(&body).unwrap();
+                Self::deposit_event(Event::GeneralResultEvent(data));
             }
             Ok(())
         }
@@ -407,19 +407,25 @@ pub mod pallet {
                         if let Ok(_) = b.try_insert((ns_name, owner.clone()), delegate_type) {}
                     }
                 });
-                Self::deposit_event(Event::GeneralResultEvent {
+
+                let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+                let body = ResponseBody {
                     status: 0,
-                    msg: "ok".as_bytes().to_vec(),
-                    req_id: req_id,
-                });
+                    msg: OK_MSG,
+                    req_id: req_id_str,
+                };
+                let data = serde_json::to_vec(&body).unwrap();
+                Self::deposit_event(Event::GeneralResultEvent(data));
             } else {
-                Self::deposit_event(Event::GeneralResultEvent {
+                let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+                let msg: &str = "no permission to add delegate";
+                let body = ResponseBody {
                     status: 1,
-                    msg: "fail to add delegate. Not the owner of ns"
-                        .as_bytes()
-                        .to_vec(),
-                    req_id: req_id,
-                });
+                    msg,
+                    req_id: req_id_str,
+                };
+                let data = serde_json::to_vec(&body).unwrap();
+                Self::deposit_event(Event::GeneralResultEvent(data));
             }
             Ok(())
         }
@@ -458,15 +464,18 @@ pub mod pallet {
                             .map_err(|_| Error::<T>::TooManyTransactions)?;
                         Ok(())
                     })?;
-                    Self::deposit_event(Event::SQLQueued(data));
                     return Ok(());
                 }
             }
-            Self::deposit_event(Event::GeneralResultEvent {
+            let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+            let msg: &str = "no permission to run sql";
+            let body = ResponseBody {
                 status: 1,
-                msg: "No NS Permission".as_bytes().to_vec(),
-                req_id: req_id,
-            });
+                msg,
+                req_id: req_id_str,
+            };
+            let data = serde_json::to_vec(&body).unwrap();
+            Self::deposit_event(Event::GeneralResultEvent(data));
             Ok(())
         }
 
@@ -499,14 +508,17 @@ pub mod pallet {
                         .map_err(|_| Error::<T>::TooManyTransactions)?;
                     Ok(())
                 })?;
-                Self::deposit_event(Event::SQLQueued(data));
                 Ok(())
             } else {
-                Self::deposit_event(Event::GeneralResultEvent {
+                let req_id_str = str::from_utf8(&req_id).unwrap_or("error");
+                let msg: &str = "no permission to run sql";
+                let body = ResponseBody {
                     status: 1,
-                    msg: "No NS Permission".as_bytes().to_vec(),
-                    req_id: req_id,
-                });
+                    msg,
+                    req_id: req_id_str,
+                };
+                let data = serde_json::to_vec(&body).unwrap();
+                Self::deposit_event(Event::GeneralResultEvent(data));
                 Ok(())
             }
         }
@@ -529,31 +541,10 @@ pub mod pallet {
         SQLResult(Vec<u8>),
         AddDelegateOK(Vec<u8>),
         DeleteDelegateOk(Vec<u8>),
-
         /// General result event
-        GeneralResultEvent {
-            status: u32,
-            msg: Vec<u8>,
-            req_id: Vec<u8>,
-        },
+        GeneralResultEvent(Vec<u8>),
         NoNsPermission,
     }
-
-    /// Collection of transaction metadata by block number.
-    #[pallet::storage]
-    #[pallet::getter(fn transaction_roots)]
-    pub(super) type Transactions<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        T::BlockNumber,
-        BoundedVec<TransactionInfo, T::MaxBlockTransactions>,
-        OptionQuery,
-    >;
-
-    /// Count indexed chunks for each block.
-    #[pallet::storage]
-    pub(super) type ChunkCount<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::BlockNumber, u32, ValueQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn table_owners)]
@@ -655,7 +646,6 @@ pub mod pallet {
         ) -> Result<(), &'static str> {
             let data =
                 Self::run_remote_sql(query, account, req_id).map_err(|_| "Failed to run sql")?;
-            log::info!("process sql {} successully", query);
             let signer = Signer::<T, T::AuthorityId>::all_accounts();
             if !signer.can_sign() {
                 return Err(
