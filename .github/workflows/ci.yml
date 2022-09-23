@@ -74,9 +74,4 @@ jobs:
       - name: Run rust test with coverage
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{secrets.COV_TOKEN}}
-          directory: .
-          flags: rust
+          cargo build --release
