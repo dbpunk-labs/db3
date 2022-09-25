@@ -12,7 +12,7 @@ db3 is a fully decentralized database for web3
 It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
 
 ## How it works
-[![arch](./docs/arch.svg)]
+![arch](./docs/arch.svg)
 ## Roadmap
 
 ## Compile
