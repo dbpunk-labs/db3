@@ -5,15 +5,15 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 
-
-db3 is a fully decentralized database for web3
+db3 is a fully decentralized database for web3 
 
 ## Status
+
 It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
 
+## How it works
+[![arch](./docs/arch.svg)]
 ## Roadmap
-
-* [2022-Q3 plan](https://github.com/db3-teams/db3/issues/55)
 
 ## Compile
 
