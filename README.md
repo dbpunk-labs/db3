@@ -8,11 +8,22 @@
 
 db3 is a fully decentralized database network which has the following key features
 
-* Account Based Data Permission Model
-* ANSI SQL Compatible
-* Programable Data Virtual Machine(DVM)
-* Horizontally scaling out
-* Global Replication
+1. **Account Based Data Permission Model**
+   
+    Users can grant read and write permissions to dapp. Of course,users can also revoke permissions
+
+2. **ANSI SQL Compatible**
+   
+    Dapp developers can use sql to access db3 just like using mysql in web2
+3. **Programable Data Virtual Machine(DVM)**
+    
+    Dapp developers can develop data processing contracts and deploy it to db3 just like developing data backend in web2
+4. **Horizontally scaling out**
+
+   Scale horizontally using sharding chains
+5. **Global Replication**
+
+   Every sharding chain is replicated globally
 
 # Status
 
