@@ -18,7 +18,12 @@
 
 //! Substrate Node CLI
 
-#![warn(missing_docs)]
-fn main() -> sc_cli::Result<()> {
-    db3::run()
+use std::thread;
+
+#[actix_web::main]
+async fn main() {
+    thread::spawn(move || {
+        db3::run().unwrap();
+    });
+    db3_storage::start_server().await;
 }

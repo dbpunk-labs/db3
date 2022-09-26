@@ -21,6 +21,8 @@ required-features = ["cli"]
 
 [dependencies]
 # third-party dependencies
+
+actix-web = "4.1.0"
 clap = { version = "3.1.18", features = ["derive"], optional = true }
 codec = { package = "parity-scale-codec", version = "3.0.0" }
 serde = { version = "1.0.136", features = ["derive"] }
@@ -78,6 +80,7 @@ db3-runtime = { version = "0.1.0", path = "../../runtime" }
 db3-rpc = { version = "0.1.0", path = "../../rpc" }
 db3-primitives = { version = "0.1.0", path = "../../primitives" }
 db3-executor = { version = "0.1.0", path = "../executor" }
+db3-storage = { version = "0.1.0", path = "../../storage" }
 
 # CLI-specific dependencies
 sc-cli = { version = "0.10.0-dev", optional = true, path = "../../thirdparty/substrate/client/cli" }

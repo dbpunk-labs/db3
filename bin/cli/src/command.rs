@@ -84,7 +84,6 @@ impl SubstrateCli for Cli {
 /// Parse command line arguments into service configuration.
 pub fn run() -> Result<()> {
     let cli = Cli::from_args();
-
     match &cli.subcommand {
         None => {
             let runner = cli.create_runner(&cli.run)?;
@@ -95,12 +94,10 @@ pub fn run() -> Result<()> {
         }
         Some(Subcommand::Inspect(cmd)) => {
             let runner = cli.create_runner(cmd)?;
-
             runner.sync_run(|config| cmd.run::<Block, RuntimeApi, ExecutorDispatch>(config))
         }
         Some(Subcommand::Benchmark(cmd)) => {
             let runner = cli.create_runner(cmd)?;
-
             runner.sync_run(|config| {
                 // This switch needs to be in the client, since the client decides
                 // which sub-commands it wants to support.
