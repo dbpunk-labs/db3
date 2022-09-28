@@ -57,13 +57,10 @@ cargo build --release
 ./target/release/db3 --dev
 ```
 
-# Permission Model
+# Desigin
 
-![permission](./docs/permission.svg)
-
-# Architecture
-
-![arch](./docs/arch.svg)
+* [account model](./docs/account_model.md)
+* [architecture](./docs/architecture.md)
 
 # License
 Apache License, Version 2.0
