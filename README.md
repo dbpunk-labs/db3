@@ -57,6 +57,10 @@ cargo build --release
 ./target/release/db3 --dev
 ```
 
+# Permission Model
+
+![permission](./docs/permission.svg)
+
 # Architecture
 
 ![arch](./docs/arch.svg)
