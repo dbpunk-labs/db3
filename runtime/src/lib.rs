@@ -1933,21 +1933,20 @@ impl_runtime_apis! {
         }
     }
 
-    impl sqldb_rpc_runtime_api::DBAccountApi<Block, AccountId> for Runtime {
+    // impl sqldb_rpc_runtime_api::DBAccountApi<Block, AccountId> for Runtime {
 
-        fn is_ns_owner(origin: AccountId,
-                          tname:Vec<u8>) -> bool {
-            SQLDB::is_ns_owner(origin, tname)
-        }
+    //     fn is_ns_owner(origin: AccountId,
+    //                       tname:Vec<u8>) -> bool {
+    //         SQLDB::is_ns_owner(origin, tname)
+    //     }
 
-        fn list_delegates(origin: AccountId) -> Vec<(AccountId, Vec<u8>, u8)> {
-            SQLDB::list_delegates(origin)
-        }
-    }
+    //     fn list_delegates(origin: AccountId) -> Vec<(AccountId, Vec<u8>, u8)> {
+    //         SQLDB::list_delegates(origin)
+    //     }
+    // }
 
     impl pallet_contracts_rpc_runtime_api::ContractsApi<
-        Block, AccountId, Balance, BlockNumber, Hash,
-    >
+        Block, AccountId, Balance, BlockNumber, Hash>
         for Runtime
     {
         fn call(
