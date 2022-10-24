@@ -6,15 +6,13 @@ use std::{
 };
 
 use bytes::BytesMut;
+use tendermint_abci::codec::MAX_VARINT_LENGTH;
+use tendermint_abci::{codec, Application, Error};
 use tendermint_proto::abci::{
     Event, EventAttribute, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
     ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo, ResponseQuery,
 };
 use tracing::{debug, info};
-use tendermint_abci::{
-    Application, Error, codec
-};
-use tendermint_abci::codec::MAX_VARINT_LENGTH;
 
 /// In-memory, hashmap-backed key/value store ABCI application.
 ///
@@ -260,14 +258,14 @@ impl KeyValueStoreDriver {
             match cmd {
                 Command::GetInfo { result_tx } => {
                     channel_send(&result_tx, (self.height, self.app_hash.clone()))?
-                },
+                }
                 Command::Get { key, result_tx } => {
                     debug!("Getting value for \"{}\"", key);
                     channel_send(
                         &result_tx,
                         (self.height, self.store.get(&key).map(Clone::clone)),
                     )?;
-                },
+                }
                 Command::Set {
                     key,
                     value,
@@ -275,7 +273,7 @@ impl KeyValueStoreDriver {
                 } => {
                     debug!("Setting \"{}\" = \"{}\"", key, value);
                     channel_send(&result_tx, self.store.insert(key, value))?;
-                },
+                }
                 Command::Commit { result_tx } => self.commit(result_tx)?,
             }
         }

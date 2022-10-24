@@ -3,9 +3,9 @@
 mod kvstore_app_integration {
     use std::thread;
 
+    use db3_kvstore::KeyValueStoreApp;
     use tendermint_abci::{ClientBuilder, ServerBuilder};
     use tendermint_proto::abci::{RequestDeliverTx, RequestQuery};
-    use db3_kvstore::KeyValueStoreApp;
 
     #[test]
     fn happy_path() {

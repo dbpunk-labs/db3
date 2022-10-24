@@ -1,8 +1,8 @@
 //! In-memory key/value store application for Tendermint.
 
-use structopt::StructOpt;
 use db3_kvstore::KeyValueStoreApp;
-use tendermint_abci::{ServerBuilder};
+use structopt::StructOpt;
+use tendermint_abci::ServerBuilder;
 use tracing_subscriber::filter::LevelFilter;
 
 #[derive(Debug, StructOpt)]
