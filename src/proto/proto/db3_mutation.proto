@@ -1,0 +1,49 @@
+//
+//
+// db3_mutation.proto
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+
+syntax = "proto3";
+import "db3_base.proto";
+package db3_mutation_proto;
+
+message KVPair {
+    // the key of value
+    bytes key = 1;
+    // the value
+    bytes value = 2;
+}
+
+message Mutation {
+    // the namespace of kv pairs
+    bytes ns = 1;
+    // the all data to be written to db3
+    repeated KVPair kv_pairs = 2;
+    // replay attack protection
+    int64 nonce = 3;
+    // the chain id of db3
+    db3_base_proto.ChainId chain_id = 4;
+    // the chain role of db3
+    db3_base_proto.ChainRole chain_role = 5;
+}
+
+message WriteRequest {
+    bytes signature = 1;
+    // the protobuf binary format
+    bytes mutation = 2;
+    bytes public_key = 3;
+}
