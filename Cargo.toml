@@ -9,6 +9,7 @@ members = [
     "bin/cli",
     "bin/executor",
     "bin/inspect",
-    "storage"
+    "storage",
+    "kvstore"
 ]
 
