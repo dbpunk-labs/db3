@@ -6,8 +6,11 @@ use std::{
 };
 
 use bytes::BytesMut;
+use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use fastcrypto::secp256k1::{Secp256k1PublicKey, Secp256k1PublicKeyBytes, Secp256k1Signature};
 use fastcrypto::traits::ToFromBytes;
+use hex;
+use prost::Message;
 use signature::{Signature, Signer, Verifier};
 use tendermint_abci::codec::MAX_VARINT_LENGTH;
 use tendermint_abci::{codec, Application, Error};
@@ -16,59 +19,12 @@ use tendermint_proto::abci::{
     ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo, ResponseQuery,
 };
 use tracing::{debug, info};
-use db3_proto::db3_mutation_proto::{WriteRequest, Mutation};
-use prost::Message;
-use hex;
 /// In-memory, hashmap-backed key/value store ABCI application.
 ///
 /// This structure effectively just serves as a handle to the actual key/value
 /// store - the [`KeyValueStoreDriver`].
 ///
-/// ## Example
-/// ```rust
-/// use db3_kvstore::KeyValueStoreApp;
-/// use tendermint_abci::{ServerBuilder, ClientBuilder};
-/// use tendermint_proto::abci::{RequestEcho, RequestDeliverTx, RequestQuery};
-///
-/// // Create our key/value store application
-/// let (app, driver) = KeyValueStoreApp::new();
-/// // Create our server, binding it to TCP port 26658 on localhost and
-/// // supplying it with our key/value store application
-/// let server = ServerBuilder::default().bind("127.0.0.1:26658", app).unwrap();
-/// let server_addr = server.local_addr();
-///
-/// // We want the driver and the server to run in the background while we
-/// // interact with them via the client in the foreground
-/// std::thread::spawn(move || driver.run());
-/// std::thread::spawn(move || server.listen());
-///
-/// let mut client = ClientBuilder::default().connect(server_addr).unwrap();
-/// let res = client
-///     .echo(RequestEcho {
-///         message: "Hello ABCI!".to_string(),
-///     })
-///     .unwrap();
-/// assert_eq!(res.message, "Hello ABCI!");
-///
-/// // Deliver a transaction and then commit the transaction
-/// client
-///     .deliver_tx(RequestDeliverTx {
-///         tx: "test-key=test-value".as_bytes().to_owned(),
-///     })
-///     .unwrap();
-/// client.commit().unwrap();
-///
-/// // We should be able to query for the data we just delivered above
-/// let res = client
-///     .query(RequestQuery {
-///         data: "test-key".as_bytes().to_owned(),
-///         path: "".to_string(),
-///         height: 0,
-///         prove: false,
-///     })
-///     .unwrap();
-/// assert_eq!(res.value, "test-value".as_bytes().to_owned());
-/// ```
+
 #[derive(Debug, Clone)]
 pub struct KeyValueStoreApp {
     cmd_tx: Sender<Command>,
@@ -173,6 +129,7 @@ impl Application for KeyValueStoreApp {
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
         let tx = String::from_utf8(request.tx).unwrap();
+        println!("check tx {}", tx);
         let buf = hex::decode(tx).unwrap();
         let request = WriteRequest::decode(buf.as_ref()).unwrap();
         let signature =
@@ -206,6 +163,7 @@ impl Application for KeyValueStoreApp {
     }
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
         let tx = String::from_utf8(request.tx).unwrap();
+        println!("deliver tx {}", tx);
         let buf = hex::decode(tx).unwrap();
         let request = WriteRequest::decode(buf.as_ref()).unwrap();
         let mutation = Mutation::decode(request.mutation.as_ref()).unwrap();

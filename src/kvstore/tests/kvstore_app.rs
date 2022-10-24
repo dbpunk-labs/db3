@@ -3,21 +3,20 @@
 mod kvstore_app_integration {
     use std::thread;
 
-    use prost::Message;
-    use rand::SeedableRng;
-    use rand::rngs::StdRng;
-    use db3_kvstore::KeyValueStoreApp;
-    use tendermint_abci::{ClientBuilder, ServerBuilder};
-    use tendermint_proto::abci::{RequestDeliverTx, RequestQuery};
     use bytes::{Bytes, BytesMut};
+    use db3_kvstore::KeyValueStoreApp;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, WriteRequest};
-    use fastcrypto::secp256k1::Secp256k1Signature;
     use fastcrypto::secp256k1::Secp256k1KeyPair;
+    use fastcrypto::secp256k1::Secp256k1Signature;
     use fastcrypto::traits::KeyPair;
     use fastcrypto::traits::Signer;
     use hex;
-
+    use prost::Message;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    use tendermint_abci::{ClientBuilder, ServerBuilder};
+    use tendermint_proto::abci::{RequestDeliverTx, RequestQuery};
 
     #[test]
     fn happy_path() {
@@ -47,6 +46,7 @@ mod kvstore_app_integration {
         request.encode(&mut buf);
         let buf = buf.freeze();
         let mutation_encoded = hex::encode_upper(buf.as_ref());
+        println!("{}", mutation_encoded);
         let (app, driver) = KeyValueStoreApp::new();
         let server = ServerBuilder::default().bind("127.0.0.1:0", app).unwrap();
         let server_addr = server.local_addr();
@@ -55,7 +55,7 @@ mod kvstore_app_integration {
         let mut client = ClientBuilder::default().connect(server_addr).unwrap();
         client
             .deliver_tx(RequestDeliverTx {
-                tx: mutation_encoded.into()
+                tx: mutation_encoded.into(),
             })
             .unwrap();
         client.commit().unwrap();
