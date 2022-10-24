@@ -2,7 +2,7 @@
 name = "db3-proto"
 version = "0.1.0"
 edition = "2021"
-authors = ["jack wang <javawang@db3.network>"]
+authors = ["jack wang <jackwang@db3.network>"]
 description = "proto module of db3"
 homepage = "https://db3.network"
 repository = "https://github.com/db3-teams/db3"
