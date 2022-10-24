@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "src/crypto",
-    "src/proto"
+    "src/proto",
+    "src/kvstore"
 ]
