@@ -4,8 +4,8 @@ Mutation is the `transaction` of db3 and the insert and update operations will b
 
 ## The features of Mutation
 
-* batch kv insert
-* batch kv update
+* batch insert kv pairs
+* batch update kv pairs
 * support namespace
 
 ## The problems that Mutation will solve
