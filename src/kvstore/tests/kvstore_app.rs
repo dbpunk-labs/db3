@@ -32,6 +32,8 @@ mod kvstore_app_integration {
             nonce: 1,
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
+            gas_price:1,
+            start_gas:2
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
         mutation.encode(&mut buf);

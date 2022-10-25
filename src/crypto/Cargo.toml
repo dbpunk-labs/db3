@@ -9,8 +9,10 @@ repository = "https://github.com/db3-teams/db3"
 keywords = ["database", "web3", "db3"]
 
 [dependencies]
-fastcrypto="0.1.3"
 db3-proto={path="../proto", version="0.1.0"}
+db3-error={path="../error", version="0.1.0"}
+
+fastcrypto="0.1.3"
 prost = "0.10"
 prost-types = "0.10"
 rand = "0.8.5"

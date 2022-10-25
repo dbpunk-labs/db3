@@ -1,28 +1,6 @@
-[submodule "thirdparty/parquet-testing"]
-	path = thirdparty/parquet-testing
-	url = https://github.com/apache/parquet-testing.git
 [submodule "thirdparty/pg_wire"]
 	path = thirdparty/pg_wire
 	url = https://github.com/rtstore/pg_wire.git
 [submodule "thirdparty/msql-srv"]
 	path = thirdparty/msql-srv
 	url = https://github.com/imotai/msql-srv.git
-[submodule "thirdparty/arrow-datafusion"]
-	path = thirdparty/arrow-datafusion
-	url = https://github.com/rtstore/arrow-datafusion.git
-[submodule "thirdparty/substrait"]
-	path = thirdparty/substrait
-	url = https://github.com/substrait-io/substrait.git
-[submodule "thirdparty/timely-dataflow"]
-	path = thirdparty/timely-dataflow
-	url = https://github.com/db3-teams/timely-dataflow.git
-[submodule "thirdparty/tree-sitter-sql"]
-	path = thirdparty/tree-sitter-sql
-	url = https://github.com/m-novikov/tree-sitter-sql.git
-[submodule "thirdparty/jsonrpsee"]
-	path = thirdparty/jsonrpsee
-	url = https://github.com/paritytech/jsonrpsee.git
-[submodule "thirdparty/substrate"]
-	path = thirdparty/substrate
-	url = https://github.com/dbpunk-labs/substrate.git
-
