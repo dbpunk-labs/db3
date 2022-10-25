@@ -1,0 +1,11 @@
+[package]
+name = "db3-error"
+version = "0.1.0"
+edition = "2021"
+authors = ["jack wang <jackwang@db3.network>"]
+description = "error module of db3"
+homepage = "https://db3.network"
+repository = "https://github.com/db3-teams/db3"
+keywords = ["database", "web3", "db3"]
+[dependencies]
+thiserror = "1.0.30"

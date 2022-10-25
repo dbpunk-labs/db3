@@ -58,12 +58,12 @@ mod tests {
     use bytes::Bytes;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
-    use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::hash::Keccak256;
+    use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
+    use fastcrypto::Verifier;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
-    use fastcrypto::Verifier;
     #[test]
     fn test_sign() -> Result<()> {
         let mut rng = StdRng::from_seed([0; 32]);
