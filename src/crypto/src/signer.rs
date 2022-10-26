@@ -17,10 +17,9 @@
 //
 
 use bytes::BytesMut;
-use db3_error::Result;
+use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1Signature};
-
 use fastcrypto::traits::KeyPair;
 use fastcrypto::traits::Signer;
 use prost::Message;
@@ -40,7 +39,8 @@ impl MutationSigner {
     // sign mutation
     pub fn sign(&self, mutation: &Mutation) -> Result<WriteRequest> {
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        mutation.encode(&mut buf);
+        mutation.encode(&mut buf).map_err(|e|DB3Error::SignError(format!(
+                        "{}", e)))?;
         let buf = buf.freeze();
         let signature: Secp256k1Signature = self.kp.sign(buf.as_ref());
         let request = WriteRequest {
@@ -55,10 +55,8 @@ impl MutationSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bytes::Bytes;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
-    use fastcrypto::hash::Keccak256;
     use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
     use fastcrypto::Verifier;

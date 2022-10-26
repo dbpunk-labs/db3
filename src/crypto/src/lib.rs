@@ -16,4 +16,5 @@
 // limitations under the License.
 //
 
+pub mod address;
 pub mod signer;

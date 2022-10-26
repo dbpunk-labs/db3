@@ -17,19 +17,30 @@
 //
 
 use ethereum_types::Address;
+use fastcrypto::hash::HashFunction;
+use fastcrypto::hash::Keccak256;
 use fastcrypto::secp256k1::Secp256k1PublicKey;
 
-pub fn get_address_from_pk(pk:&Secp256k1PublicKey)->Address {
-    let public_key = pk.public_key.to_encoded_point(/* compress = */ false);
-    let public_key = public_key.as_bytes();
-    let hash = Keccak256::digest(&public_key[1..]);
-    Address::from_slice(&hash[12..])
+pub fn get_address_from_pk(pk: &Secp256k1PublicKey) -> Address {
+    let hash = Keccak256::digest(&pk.as_ref()[1..]);
+    Address::from_slice(&hash.as_ref()[12..])
 }
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	#[test]
-	fn it_works() {
-	}
+    use super::*;
+    use fastcrypto::traits::ToFromBytes;
+    use hex;
+    #[test]
+    fn test_get_address_from_pk() {
+        let pk = Secp256k1PublicKey::from_bytes(
+            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            "0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2",
+             format!("{:?}", get_address_from_pk(&pk))
+        );
+    }
 }
