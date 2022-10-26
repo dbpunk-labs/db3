@@ -44,7 +44,8 @@ Linux:
 ```shell
 wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
 ```
-`add tendermint to PATH`
+
+and `add tendermint to your PATH`
 
 - Build
 
