@@ -39,8 +39,9 @@ impl MutationSigner {
     // sign mutation
     pub fn sign(&self, mutation: &Mutation) -> Result<WriteRequest> {
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        mutation.encode(&mut buf).map_err(|e|DB3Error::SignError(format!(
-                        "{}", e)))?;
+        mutation
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::SignError(format!("{}", e)))?;
         let buf = buf.freeze();
         let signature: Secp256k1Signature = self.kp.sign(buf.as_ref());
         let request = WriteRequest {

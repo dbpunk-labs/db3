@@ -40,7 +40,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             "0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2",
-             format!("{:?}", get_address_from_pk(&pk))
+            format!("{:?}", get_address_from_pk(&pk))
         );
     }
 }
