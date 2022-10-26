@@ -29,32 +29,32 @@ db3 is a fully decentralized database network which has the following key featur
 
 It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
 
-# Compile
+# Localnet
 
-- Upgrade cargo
+- Install Tendermint
+https://github.com/tendermint/tendermint/releases/tag/v0.34.22
+
+> v0.34.22
+
+MacOS:
+```shell
+wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_darwin_amd64.tar.gz
+```
+Linux:
+```shell
+wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
+```
+`add tendermint to PATH`
+
+- Build
 
 ```bash
-rustup default nightly
-rustup update 
+cargo build --features binary
 ```
-
-- Check cargo version >= `cargo 1.66.0-nightly` 
-
-
-```bash
-cargo --version
-```
-
-- Compile
-
-```bash
-cargo build --release
-```
-
 - Run
 
 ```bash
-./target/release/db3 --dev
+cd tools && sh start_localnet.sh
 ```
 
 # Desigin

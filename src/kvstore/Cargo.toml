@@ -7,7 +7,6 @@ edition = "2021"
 name = "db3-kvstore"
 path = "src/main.rs"
 required-features = [ "binary"]
-
 [features]
 default = []
 client = []
