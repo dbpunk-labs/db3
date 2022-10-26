@@ -1,6 +1,5 @@
 //
-//
-// lib.rs
+// account_id.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +14,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum DB3Error {
-    #[error("fail to sign a message with error {0}")]
-    SignError(String),
-    #[error("fail to verify the request with error {0}")]
-    VerifyFailed(String),
+use super::address;
+use ethereum_types::Address;
+use fastcrypto::secp256k1::Secp256k1PublicKey;
+
+// it's ethereum compatiable account id
+pub struct AccountId {
+    pub addr: Address,
+    pub pk: Secp256k1PublicKey,
 }
 
-pub type Result<T> = std::result::Result<T, DB3Error>;
+impl AccountId {
+    pub fn new(pk: Secp256k1PublicKey) -> Self {
+        let addr = address::get_address_from_pk(&pk);
+        Self { addr, pk }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn it_works() {}
+}

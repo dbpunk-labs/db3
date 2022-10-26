@@ -6,17 +6,15 @@ use std::{
 };
 
 use bytes::BytesMut;
+use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
-use fastcrypto::secp256k1::{Secp256k1PublicKey, Secp256k1PublicKeyBytes, Secp256k1Signature};
-use fastcrypto::traits::ToFromBytes;
 use hex;
 use prost::Message;
-use signature::{Signature, Signer, Verifier};
 use tendermint_abci::codec::MAX_VARINT_LENGTH;
 use tendermint_abci::{codec, Application, Error};
 use tendermint_proto::abci::{
-    Event, EventAttribute, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
-    ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo, ResponseQuery,
+    Event, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery, ResponseCheckTx,
+    ResponseCommit, ResponseDeliverTx, ResponseInfo, ResponseQuery,
 };
 use tracing::{debug, info};
 /// In-memory, hashmap-backed key/value store ABCI application.
@@ -129,15 +127,11 @@ impl Application for KeyValueStoreApp {
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
         let tx = String::from_utf8(request.tx).unwrap();
-        println!("check tx {}", tx);
         let buf = hex::decode(tx).unwrap();
         let request = WriteRequest::decode(buf.as_ref()).unwrap();
-        let signature =
-            <Secp256k1Signature as ToFromBytes>::from_bytes(request.signature.as_ref()).unwrap();
-        let public_key =
-            <Secp256k1PublicKey as ToFromBytes>::from_bytes(request.public_key.as_ref()).unwrap();
-        match public_key.verify(request.mutation.as_ref(), &signature) {
-            Ok(()) => ResponseCheckTx {
+        let account_id = verifier::MutationVerifier::verify(&request);
+        match account_id {
+            Ok(_) => ResponseCheckTx {
                 code: 0,
                 data: vec![],
                 log: "".to_string(),

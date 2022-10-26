@@ -26,6 +26,7 @@ tracing = { version = "0.1", default-features = false }
 flex-error = { version = "0.4.4", default-features = false }
 structopt = { version = "0.3", optional = true, default-features = false }
 db3-proto={path="../proto", version="0.1.0"}
+db3-crypto={path="../crypto", version="0.1.0"}
 prost = "0.10"
 prost-types = "0.10"
 tracing-subscriber = { version = "0.2", optional = true, default-features = false }
