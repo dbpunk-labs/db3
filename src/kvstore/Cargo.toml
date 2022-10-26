@@ -1,0 +1,35 @@
+[package]
+name = "db3-kvstore"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "db3-kvstore"
+path = "src/main.rs"
+required-features = [ "binary"]
+[features]
+default = []
+client = []
+echo-app = []
+kvstore-app = []
+binary = [
+    "structopt",
+    "tracing-subscriber/fmt",
+]
+
+[dependencies]
+bytes = { version = "1.0", default-features = false }
+tendermint-abci = {version = "0.25.0", git = "https://github.com/dbpunk-labs/tendermint-rs.git", branch = "release/v0.25.0"}
+tendermint-proto = {version = "0.25.0", git = "https://github.com/dbpunk-labs/tendermint-rs.git", branch = "release/v0.25.0"}
+tracing = { version = "0.1", default-features = false }
+flex-error = { version = "0.4.4", default-features = false }
+structopt = { version = "0.3", optional = true, default-features = false }
+db3-proto={path="../proto", version="0.1.0"}
+db3-crypto={path="../crypto", version="0.1.0"}
+prost = "0.10"
+prost-types = "0.10"
+tracing-subscriber = { version = "0.2", optional = true, default-features = false }
+fastcrypto="0.1.3"
+signature = { version = "1.6.4", features = ["rand-preview"] }
+hex = "0.4.3"
+rand = "0.8.5"
