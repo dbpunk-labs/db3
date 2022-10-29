@@ -96,6 +96,9 @@ mod tests {
         let bk = BillKey(address, 9);
         let bk_encoded_key3 = bk.encode()?;
         assert!(bk_encoded_key3.cmp(&bk_encoded_key2) == std::cmp::Ordering::Less);
+        let bk_decoded = BillKey::decode(bk_encoded_key3.as_ref())?;
+        assert_eq!(bk_decoded.0, bk.0);
+        assert_eq!(bk_decoded.1, bk.1);
         Ok(())
     }
 }

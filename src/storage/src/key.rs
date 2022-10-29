@@ -73,5 +73,8 @@ mod tests {
         let key = Key(addr, ns.as_bytes(), k.as_bytes());
         let key_encoded = key.encode();
         assert!(key_encoded.is_ok());
+        let key_decoded = Key::decode(key_encoded.as_ref().unwrap(), ns.as_bytes());
+        assert!(key_decoded.is_ok());
+        assert_eq!(key_decoded.unwrap().0, addr);
     }
 }
