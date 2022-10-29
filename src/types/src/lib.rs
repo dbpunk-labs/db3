@@ -27,9 +27,10 @@ pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
     Ok(())
 }
 
+pub mod bill;
+
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn it_works() {}

@@ -15,31 +15,27 @@
 // limitations under the License.
 //
 
-use ethereum_types::Address as AccountAddress;
-use db3_error::Result;
-use byteorder::{BigEndian, WriteBytesExt};
 use super::ensure_len_eq;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use db3_error::{DB3Error, Result};
+use ethereum_types::Address as AccountAddress;
+use ethereum_types::H160;
+use std::mem::size_of;
 
+const BILL: &str = "BILL";
 
-const BILL:&str = "BILL";
-#[derive(
-  Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize
-)]
 pub enum BillType {
     MutationBill {
         service_fee: u64,
         mutation_id: u64,
-    }
+    },
     QueryBill {
         service_fee: u64,
         session_id: u64,
         service_addr: AccountAddress,
-    }
+    },
 }
 
-#[derive(
-  Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize
-)]
 pub struct Bill {
     /// the type of bill
     bill_type: BillType,
@@ -52,32 +48,54 @@ pub struct Bill {
 
 /// billkey = address + BILL + u64
 pub struct BillKey(AccountAddress, u64);
-const Bill_Key_Size = AccountAddress.len_bytes() + BILL.length() + size_of(u64);
+const BILL_KEY_SIZE: usize = H160::len_bytes() + BILL.len() + 8;
 
 impl BillKey {
-    pub fn encode(&self)->Result<Vec<u8>> {
+    pub fn encode(&self) -> Result<Vec<u8>> {
         let mut encoded_key = self.0.as_ref().to_vec();
         encoded_key.extend_from_slice(BILL.as_bytes());
-        encoded_key.write_u64::<BigEndian>(self.1).map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
+        encoded_key
+            .write_u64::<BigEndian>(self.1)
+            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
         Ok(encoded_key)
     }
-    pub fn decode(&self, data:&[u8])->Result<Self> {
-        ensure_len_eq(data.len(), Bill_Key_Size)?;
-        let addr = AccountAddress::from(&data[..AccountAddress::len_bytes()]);
-        let start_offset = AccountAddress::len_bytes() + BILL.len();
-        let id = (&data[start_offset..]).read_u64::<BigEndian>().map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
+    pub fn decode(&self, data: &[u8]) -> Result<Self> {
+        ensure_len_eq(data, BILL_KEY_SIZE)
+            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
+        let data_slice: &[u8; H160::len_bytes()] = &data[..H160::len_bytes()]
+            .try_into()
+            .expect("slice with incorrect length");
+        let addr = AccountAddress::from(data_slice);
+        let start_offset = H160::len_bytes() + BILL.len();
+        let id = (&data[start_offset..])
+            .read_u64::<BigEndian>()
+            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
         Ok(Self(addr, id))
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-	use super::*;
-
-	#[test]
-	fn it_billkey_encode() {
-
-
-	}
+    use super::*;
+    use db3_crypto::address;
+    use fastcrypto::secp256k1::Secp256k1PublicKey;
+    use fastcrypto::traits::ToFromBytes;
+    use hex;
+    use std::cmp::Ordering;
+    #[test]
+    fn it_billkey_encode() -> Result<()> {
+        let pk = Secp256k1PublicKey::from_bytes(
+            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
+                .unwrap(),
+        )
+        .unwrap();
+        let address = address::get_address_from_pk(&pk.pubkey);
+        let bk = BillKey(address, 10);
+        let bk_encoded_key1 = bk.encode()?;
+        let address = address::get_address_from_pk(&pk.pubkey);
+        let bk = BillKey(address, 11);
+        let bk_encoded_key2 = bk.encode()?;
+        assert!(bk_encoded_key2.cmp(&bk_encoded_key1) == std::cmp::Ordering::Greater);
+        Ok(())
+    }
 }

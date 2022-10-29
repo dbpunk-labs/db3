@@ -60,7 +60,7 @@ mod tests {
             value: "value1".as_bytes().to_vec(),
             action: MutationAction::InsertKv.into(),
         };
-        let mut mutation = Mutation {
+        let mutation = Mutation {
             ns: "my_twitter".as_bytes().to_vec(),
             kv_pairs: vec![kv],
             nonce: 1,

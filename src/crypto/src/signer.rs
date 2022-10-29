@@ -57,10 +57,7 @@ mod tests {
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
-    use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::KeyPair;
-    use fastcrypto::traits::ToFromBytes;
-    use fastcrypto::Verifier;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     #[test]
