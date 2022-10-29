@@ -1,0 +1,14 @@
+[package]
+name = "db3-types"
+version = "0.1.0"
+edition = "2021"
+description = "types module of db3"
+homepage = "https://db3.network"
+repository = "https://github.com/db3-teams/db3"
+keywords = ["database", "web3", "db3"]
+
+[dependencies]
+db3-proto={ path ="../proto" }
+db3-error={ path = "../error" }
+byteorder = "1.4.3"
+anyhow = "1.0.66"

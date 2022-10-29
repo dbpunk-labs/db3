@@ -1,6 +1,5 @@
 //
-//
-// lib.rs
+// address.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +14,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum DB3Error {
-    #[error("fail to sign a message with error {0}")]
-    SignError(String),
-    #[error("fail to verify the request with error {0}")]
-    VerifyFailed(String),
-    #[error("fail to codec key with error {0}")]
-    KeyCodecError(String),
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn it_works() {
+	}
 }
-
-pub type Result<T> = std::result::Result<T, DB3Error>;

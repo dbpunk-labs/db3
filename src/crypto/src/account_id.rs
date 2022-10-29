@@ -17,16 +17,16 @@
 
 use super::address;
 use ethereum_types::Address;
-use fastcrypto::secp256k1::Secp256k1PublicKey;
+use rust_secp256k1::PublicKey;
 
 // it's ethereum compatiable account id
 pub struct AccountId {
     pub addr: Address,
-    pub pk: Secp256k1PublicKey,
+    pub pk: PublicKey,
 }
 
 impl AccountId {
-    pub fn new(pk: Secp256k1PublicKey) -> Self {
+    pub fn new(pk: PublicKey) -> Self {
         let addr = address::get_address_from_pk(&pk);
         Self { addr, pk }
     }

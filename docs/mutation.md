@@ -6,6 +6,7 @@ Mutation is the `transaction` of db3 and the insert and update operations will b
 
 * batch insert kv pairs
 * batch update kv pairs
+* batch delete kv pairs
 * support namespace
 
 ## The problems that Mutation will solve
@@ -37,8 +38,8 @@ enum ChainId {
 ```protobuf=
 
 enum MutationAction {
-    Insert_Action = 0; // this action will fail if the key exists
-    Update_Action = 1; // this action will fail if the key does not exist
+    Insert_Action = 0;
+    Delete_Action = 1;
 }
 
 message KVPair {
@@ -75,40 +76,6 @@ message WriteRequest {
 }
 ```
 
-## 通过签名与验证方式实现身份认证
-
-
-db3使用[fastcrypto](https://github.com/MystenLabs/fastcrypto/)库来实现身份认证，
-![sign](./images/db3-sign.png)
-
-```rust
-let kv = KvPair{
-            key:"k1".as_bytes().to_vec(),
-            value:"value1".as_bytes().to_vec(),
- };  
-let mutation = Mutation {
-    ns: "my_twitter".as_bytes().to_vec(),
-    kv_pairs:vec![kv],
-    nonce:1,
-    chain_id:ChainId::MainNet.into(),
-    chain_role:ChainRole::StorageShardChain.into(),
-};  
-let mut buf = BytesMut::with_capacity(1024 * 4); 
-mutation.encode(&mut buf);
-let buf = buf.freeze();
-let signature: Secp256k1Signature = kp.sign(buf.as_ref());
-let request = WriteRequest {
-    signature: signature.as_ref().to_vec(),
-    mutation:buf.as_ref().to_vec(),
-    public_key: kp.public().as_ref().to_vec()
-};  
-let mut buf = BytesMut::with_capacity(1024 * 4); 
-request.encode(&mut buf);
-let buf = buf.freeze();
-println!("request 0x{}",hex::encode(buf.as_ref()));
-```
-output
-```shell
-0x0a41c5286f85fd7916d1c87a69bd9fa1d7c119b1aa265891e58a05cf609535e4d7e243d18e76048494e226e890d89b516a8d91f57a3be34b30663819dc502679315600121e0a0a6d795f74776974746572120c0a026b31120676616c7565311801280a1a2102337cca2171fdbfcfd657fa59881f46269f1e590b5ffab6023686c7ad2ecc2c1c
-```
+## Sign Mutation
+![flow of sign](./images/db3_sign_mutation.png)
 

@@ -20,7 +20,6 @@ use bytes::BytesMut;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1Signature};
-use fastcrypto::traits::KeyPair;
 use fastcrypto::traits::Signer;
 use prost::Message;
 
@@ -47,7 +46,6 @@ impl MutationSigner {
         let request = WriteRequest {
             signature: signature.as_ref().to_vec(),
             mutation: buf.to_vec(),
-            public_key: self.kp.public().as_ref().to_vec(),
         };
         Ok(request)
     }
@@ -57,8 +55,10 @@ impl MutationSigner {
 mod tests {
     use super::*;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use db3_proto::db3_mutation_proto::KvPair;
+    use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
+    use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::secp256k1::Secp256k1PublicKey;
+    use fastcrypto::traits::KeyPair;
     use fastcrypto::traits::ToFromBytes;
     use fastcrypto::Verifier;
     use rand::rngs::StdRng;
@@ -70,6 +70,7 @@ mod tests {
         let kv = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
         };
         let mutation = Mutation {
             ns: "my_twitter".as_bytes().to_vec(),
@@ -78,17 +79,10 @@ mod tests {
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
             gas_price: 1,
-            start_gas: 10,
+            gas: 10,
         };
         let signer = MutationSigner::new(kp);
-        let request = signer.sign(&mutation)?;
-        let signature =
-            <Secp256k1Signature as ToFromBytes>::from_bytes(request.signature.as_ref()).unwrap();
-        let public_key =
-            <Secp256k1PublicKey as ToFromBytes>::from_bytes(request.public_key.as_ref()).unwrap();
-        if let Err(_) = public_key.verify(request.mutation.as_ref(), &signature) {
-            assert!(false)
-        }
+        signer.sign(&mutation)?;
         Ok(())
     }
 }

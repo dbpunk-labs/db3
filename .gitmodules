@@ -4,3 +4,6 @@
 [submodule "thirdparty/msql-srv"]
 	path = thirdparty/msql-srv
 	url = https://github.com/imotai/msql-srv.git
+[submodule "thirdparty/merk"]
+	path = thirdparty/merk
+	url = https://github.com/nomic-io/merk.git

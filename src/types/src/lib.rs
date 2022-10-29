@@ -1,5 +1,4 @@
 //
-//
 // lib.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
@@ -15,16 +14,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum DB3Error {
-    #[error("fail to sign a message with error {0}")]
-    SignError(String),
-    #[error("fail to verify the request with error {0}")]
-    VerifyFailed(String),
-    #[error("fail to codec key with error {0}")]
-    KeyCodecError(String),
+use anyhow::{ensure, Result};
+
+pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
+    ensure!(
+        data.len() == len,
+        "Unexpected data len {}, expected {}.",
+        data.len(),
+        len,
+    );
+    Ok(())
 }
 
-pub type Result<T> = std::result::Result<T, DB3Error>;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {}
+}
