@@ -27,6 +27,7 @@ pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
     Ok(())
 }
 
+pub mod account;
 pub mod bill;
 
 #[cfg(test)]

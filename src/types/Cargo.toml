@@ -11,6 +11,7 @@ keywords = ["database", "web3", "db3"]
 db3-proto={ path ="../proto" }
 db3-error={ path = "../error" }
 db3-crypto={ path = "../crypto" }
+db3-base={ path = "../base" }
 byteorder = "1.4.3"
 anyhow = "1.0.66"
 hex = "0.4.3"

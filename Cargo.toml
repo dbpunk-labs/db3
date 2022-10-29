@@ -3,5 +3,7 @@ members = [
     "src/crypto",
     "src/proto",
     "src/error",
-    "src/types"
+    "src/types",
+    "src/base",
+    "src/storage",
 ]

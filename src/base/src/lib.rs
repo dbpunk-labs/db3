@@ -1,5 +1,5 @@
 //
-// account_id.rs
+// lib.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,26 +15,7 @@
 // limitations under the License.
 //
 
-use db3_base::get_address_from_pk;
-use ethereum_types::Address;
-use rust_secp256k1::PublicKey;
-
-// it's ethereum compatiable account id
-pub struct AccountId {
-    pub addr: Address,
-    pub pk: PublicKey,
-}
-
-impl AccountId {
-    pub fn new(pk: PublicKey) -> Self {
-        let addr = get_address_from_pk(&pk);
-        Self { addr, pk }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
-}
+mod get_address;
+pub use get_address::get_address_from_pk;
+mod test_base;
+pub use test_base::{get_a_static_address, get_static_pk};

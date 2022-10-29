@@ -17,6 +17,5 @@
 //
 
 pub mod account_id;
-pub mod address;
 pub mod signer;
 pub mod verifier;

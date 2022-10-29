@@ -1,15 +1,15 @@
 [package]
-name = "storage"
+name = "db3-base"
 version = "0.1.0"
 edition = "2021"
 authors = ["jack wang <jackwang@db3.network>"]
-description = "storage module of db3"
+description = "base module of db3"
 homepage = "https://db3.network"
 repository = "https://github.com/db3-teams/db3"
 keywords = ["database", "web3", "db3"]
+
 [dependencies]
 ethereum-types = { version = "0.13.1", default-features = false }
-db3-base={ path = "../base" }
-db3-proto={ path ="../proto" }
-db3-error={ path = "../error" }
-
+hex = "0.4.3"
+rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["recovery", "rand-std", "bitcoin_hashes", "global-context"] }
+fastcrypto="0.1.3"

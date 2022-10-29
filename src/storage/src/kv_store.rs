@@ -1,5 +1,5 @@
 //
-// account_id.rs
+// kv_store.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,26 +15,34 @@
 // limitations under the License.
 //
 
-use db3_base::get_address_from_pk;
-use ethereum_types::Address;
-use rust_secp256k1::PublicKey;
+use merk::Merk;
+use std::sync::Arc;
+use db3_proto::db3_mutation::Mutation;
+use ethereum_types::Address as AccountAddress;
 
-// it's ethereum compatiable account id
-pub struct AccountId {
-    pub addr: Address,
-    pub pk: PublicKey,
+
+pub struct KvStore {
+    db: Arc<Merk>,
 }
 
-impl AccountId {
-    pub fn new(pk: PublicKey) -> Self {
-        let addr = get_address_from_pk(&pk);
-        Self { addr, pk }
+impl KvStore {
+
+    pub fn new(db:Arc<Merk>) -> Self {
+        Self {
+            db
+        }
+    }
+
+    pub apply(&self, account_addr:&AccountAddress,
+                     mutation:&Mutation)->Result<()> {
+
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    #[test]
-    fn it_works() {}
+	use super::*;
+	#[test]
+	fn it_works() {
+	}
 }

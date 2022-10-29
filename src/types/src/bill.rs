@@ -19,9 +19,6 @@ use super::ensure_len_eq;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use db3_error::{DB3Error, Result};
 use ethereum_types::Address as AccountAddress;
-use ethereum_types::H160;
-use std::mem::size_of;
-
 const BILL: &str = "BILL";
 
 pub enum BillType {
@@ -48,7 +45,7 @@ pub struct Bill {
 
 /// billkey = address + BILL + u64
 pub struct BillKey(AccountAddress, u64);
-const BILL_KEY_SIZE: usize = H160::len_bytes() + BILL.len() + 8;
+const BILL_KEY_SIZE: usize = AccountAddress::len_bytes() + BILL.len() + 8;
 
 impl BillKey {
     pub fn encode(&self) -> Result<Vec<u8>> {
@@ -59,14 +56,14 @@ impl BillKey {
             .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
         Ok(encoded_key)
     }
-    pub fn decode(&self, data: &[u8]) -> Result<Self> {
+    pub fn decode(data: &[u8]) -> Result<Self> {
         ensure_len_eq(data, BILL_KEY_SIZE)
             .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        let data_slice: &[u8; H160::len_bytes()] = &data[..H160::len_bytes()]
+        let data_slice: &[u8; AccountAddress::len_bytes()] = &data[..AccountAddress::len_bytes()]
             .try_into()
             .expect("slice with incorrect length");
         let addr = AccountAddress::from(data_slice);
-        let start_offset = H160::len_bytes() + BILL.len();
+        let start_offset = AccountAddress::len_bytes() + BILL.len();
         let id = (&data[start_offset..])
             .read_u64::<BigEndian>()
             .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
@@ -77,11 +74,10 @@ impl BillKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_crypto::address;
+    use db3_base::get_address_from_pk;
     use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
     use hex;
-    use std::cmp::Ordering;
     #[test]
     fn it_billkey_encode() -> Result<()> {
         let pk = Secp256k1PublicKey::from_bytes(
@@ -89,13 +85,17 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let address = address::get_address_from_pk(&pk.pubkey);
+        let address = get_address_from_pk(&pk.pubkey);
         let bk = BillKey(address, 10);
         let bk_encoded_key1 = bk.encode()?;
-        let address = address::get_address_from_pk(&pk.pubkey);
+        let address = get_address_from_pk(&pk.pubkey);
         let bk = BillKey(address, 11);
         let bk_encoded_key2 = bk.encode()?;
         assert!(bk_encoded_key2.cmp(&bk_encoded_key1) == std::cmp::Ordering::Greater);
+        let address = get_address_from_pk(&pk.pubkey);
+        let bk = BillKey(address, 9);
+        let bk_encoded_key3 = bk.encode()?;
+        assert!(bk_encoded_key3.cmp(&bk_encoded_key2) == std::cmp::Ordering::Less);
         Ok(())
     }
 }
