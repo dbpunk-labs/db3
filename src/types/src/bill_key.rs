@@ -1,5 +1,5 @@
 //
-// bill.rs
+// bill_key.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,30 +21,8 @@ use db3_error::{DB3Error, Result};
 use ethereum_types::Address as AccountAddress;
 const BILL: &str = "BILL";
 
-pub enum BillType {
-    MutationBill {
-        service_fee: u64,
-        mutation_id: u64,
-    },
-    QueryBill {
-        service_fee: u64,
-        session_id: u64,
-        service_addr: AccountAddress,
-    },
-}
-
-pub struct Bill {
-    /// the type of bill
-    bill_type: BillType,
-    block_heght: u64,
-    gas_fee: u64,
-    /// the time of generating the bill
-    ctime: u64,
-    bill_id: u64,
-}
-
 /// billkey = address + BILL + u64
-pub struct BillKey(AccountAddress, u64);
+pub struct BillKey(pub AccountAddress, pub u64);
 const BILL_KEY_SIZE: usize = AccountAddress::len_bytes() + BILL.len() + 8;
 
 impl BillKey {

@@ -28,7 +28,7 @@ pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
 }
 
 pub mod account;
-pub mod bill;
+pub mod bill_key;
 pub mod coin;
 pub mod cost;
 

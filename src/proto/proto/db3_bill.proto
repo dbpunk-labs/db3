@@ -1,5 +1,6 @@
 //
-// lib.rs
+//
+// db3_bill.proto
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,12 +16,21 @@
 // limitations under the License.
 //
 
-pub mod bill_store;
-pub mod key;
-pub mod kv_store;
-#[cfg(test)]
-mod tests {
+syntax = "proto3";
+import "db3_base.proto";
+package db3_bill_proto;
 
-    #[test]
-    fn it_works() {}
+
+enum BillType {
+    BillForMutation = 0;
+    BillForQuery = 1;
+}
+
+message Bill {
+    uint64 gas_fee = 1;
+    uint64 block_height = 2;
+    uint64 bill_id = 3;
+    BillType bill_type = 4;
+    uint64 time = 5;
+    bytes bill_target_id = 6;
 }

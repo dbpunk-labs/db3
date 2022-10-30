@@ -21,8 +21,7 @@ use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_types::cost;
 use ethereum_types::Address as AccountAddress;
 use merk::{BatchEntry, Merk, Op};
-use std::sync::{Arc, Mutex};
-
+use std::pin::Pin;
 pub struct KvStore {}
 
 impl KvStore {
@@ -46,7 +45,11 @@ impl KvStore {
         }
     }
 
-    pub fn apply(db: &mut Merk, account_addr: &AccountAddress, mutation: &Mutation) -> Result<u64> {
+    pub fn apply(
+        db: Pin<&mut Merk>,
+        account_addr: &AccountAddress,
+        mutation: &Mutation,
+    ) -> Result<u64> {
         let ns = mutation.ns.as_ref();
         //TODO avoid copying operation
         let mut ordered_kv_pairs = mutation.kv_pairs.to_vec();
@@ -57,8 +60,11 @@ impl KvStore {
             entries.push(batch_entry);
         }
         let gas = cost::estimate_gas(mutation);
-        db.apply(&entries, &[])
-            .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+        unsafe {
+            Pin::get_unchecked_mut(db)
+                .apply(&entries, &[])
+                .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+        }
         Ok(gas)
     }
 }
@@ -68,12 +74,14 @@ mod tests {
     use super::*;
     use db3_base::get_a_static_address;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use std::thread;
+    use std::boxed::Box;
+    use tempdir::TempDir;
     #[test]
     fn it_apply_mutation() {
-        let path = thread::current().name().unwrap().to_owned();
+        let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
         let addr = get_a_static_address();
-        let mut merk = Merk::open(path).unwrap();
+        let mut merk = Merk::open(tmp_dir_path).unwrap();
+        let mut db = Box::pin(merk);
         let kv1 = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
@@ -93,7 +101,8 @@ mod tests {
             gas_price: 1,
             gas: 10,
         };
-        let result = KvStore::apply(&mut merk, &addr, &mutation);
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result = KvStore::apply(db_m, &addr, &mutation);
         assert!(result.is_ok());
     }
 }

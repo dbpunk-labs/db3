@@ -19,7 +19,11 @@
 fn main() {
     tonic_build::configure()
         .compile(
-            &["proto/db3_base.proto", "proto/db3_mutation.proto"],
+            &[
+                "proto/db3_base.proto",
+                "proto/db3_mutation.proto",
+                "proto/db3_bill.proto",
+            ],
             &["proto"],
         )
         .unwrap();

@@ -27,6 +27,8 @@ pub enum DB3Error {
     KeyCodecError(String),
     #[error("fail to apply mutation with error {0}")]
     ApplyMutationError(String),
+    #[error("fail to apply bill with error {0}")]
+    ApplyBillError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

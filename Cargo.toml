@@ -6,4 +6,5 @@ members = [
     "src/types",
     "src/base",
     "src/storage",
+    "src/app"
 ]

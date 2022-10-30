@@ -1,5 +1,5 @@
 [package]
-name = "storage"
+name = "db3-storage"
 version = "0.1.0"
 edition = "2021"
 authors = ["jack wang <jackwang@db3.network>"]
@@ -15,3 +15,7 @@ db3-error={ path = "../error" }
 db3-types={ path = "../types" }
 merk = {version= "2.0.0", path = "../../thirdparty/merk"}
 hex = "0.4.3"
+bytes = "1"
+prost = "0.10"
+prost-types = "0.10"
+tempdir = "0.3.7"
