@@ -15,34 +15,92 @@
 // limitations under the License.
 //
 
-use merk::Merk;
-use std::sync::Arc;
-use db3_proto::db3_mutation::Mutation;
+use super::key::Key;
+use db3_error::{DB3Error, Result};
+use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use ethereum_types::Address as AccountAddress;
-
+use hex;
+use merk::{BatchEntry, Merk, Op};
+use std::sync::{Arc, Mutex};
 
 pub struct KvStore {
-    db: Arc<Merk>,
+    db: Arc<Mutex<Merk>>,
 }
 
 impl KvStore {
+    pub fn new(db: Arc<Mutex<Merk>>) -> Self {
+        Self { db }
+    }
 
-    pub fn new(db:Arc<Merk>) -> Self {
-        Self {
-            db
+    fn convert(kp: &KvPair, account_addr: &AccountAddress, ns: &[u8]) -> Result<BatchEntry> {
+        let key = Key(*account_addr, ns, kp.key.as_ref());
+        let encoded_key = key.encode()?;
+        let action = MutationAction::from_i32(kp.action);
+        match action {
+            Some(MutationAction::InsertKv) => {
+                //TODO avoid copying operation
+                Ok((encoded_key, Op::Put(kp.value.to_vec())))
+            }
+            Some(MutationAction::DeleteKv) => Ok((encoded_key, Op::Delete)),
+            None => Err(DB3Error::ApplyMutationError(
+                "invalid action type".to_string(),
+            )),
         }
     }
 
-    pub apply(&self, account_addr:&AccountAddress,
-                     mutation:&Mutation)->Result<()> {
-
+    pub fn apply(&self, account_addr: &AccountAddress, mutation: &Mutation) -> Result<()> {
+        let ns = mutation.ns.as_ref();
+        //TODO avoid copying operation
+        let mut ordered_kv_pairs = mutation.kv_pairs.to_vec();
+        ordered_kv_pairs.sort_by(|a, b| a.key.cmp(&b.key));
+        let mut entries: Vec<BatchEntry> = Vec::new();
+        for kv in ordered_kv_pairs {
+            let batch_entry = Self::convert(&kv, account_addr, ns)?;
+            entries.push(batch_entry);
+        }
+        match self.db.lock() {
+            Ok(mut mdb) => {
+                mdb.apply(&entries, &[])
+                    .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+            }
+            Err(_) => {}
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	#[test]
-	fn it_works() {
-	}
+    use super::*;
+    use db3_base::get_a_static_address;
+    use db3_proto::db3_base_proto::{ChainId, ChainRole};
+    use std::thread;
+    #[test]
+    fn it_apply_mutation() {
+        let path = thread::current().name().unwrap().to_owned();
+        let addr = get_a_static_address();
+        let merk = Merk::open(path).unwrap();
+        let kvstore = KvStore::new(Arc::new(Mutex::new(merk)));
+        let kv1 = KvPair {
+            key: "k1".as_bytes().to_vec(),
+            value: "value1".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let kv2 = KvPair {
+            key: "k2".as_bytes().to_vec(),
+            value: "value1".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let mutation = Mutation {
+            ns: "my_twitter".as_bytes().to_vec(),
+            kv_pairs: vec![kv1, kv2],
+            nonce: 1,
+            chain_id: ChainId::MainNet.into(),
+            chain_role: ChainRole::StorageShardChain.into(),
+            gas_price: 1,
+            gas: 10,
+        };
+        let result = kvstore.apply(&addr, &mutation);
+        assert!(result.is_ok());
+    }
 }

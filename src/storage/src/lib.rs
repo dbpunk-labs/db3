@@ -16,6 +16,7 @@
 //
 
 mod key;
+mod kv_store;
 #[cfg(test)]
 mod tests {
 

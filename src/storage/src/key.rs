@@ -13,17 +13,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
 use db3_error::{DB3Error, Result};
 use ethereum_types::Address as AccountAddress;
 const NAMESPACE: &str = "_NAMESPACE_";
-const MAX_USE_KEY_LEN: usize = 16;
-const MAX_NAMESPACE_LEN: usize = 8;
+const MAX_USE_KEY_LEN: usize = 32;
+const MAX_NAMESPACE_LEN: usize = 16;
 const MIN_KEY_TOTAL_LEN: usize = AccountAddress::len_bytes() + NAMESPACE.len();
 
 /// account_address + NAMESPACE + ns  + user_key
-pub struct Key<'a>(AccountAddress, &'a [u8], &'a [u8]);
+pub struct Key<'a>(pub AccountAddress, pub &'a [u8], pub &'a [u8]);
 
 impl<'a> Key<'a> {
     ///
@@ -77,4 +76,23 @@ mod tests {
         assert!(key_decoded.is_ok());
         assert_eq!(key_decoded.unwrap().0, addr);
     }
+
+    #[test]
+    fn it_key_serde_cmp() -> Result<()> {
+        let addr = get_a_static_address();
+        let ns: &str = "ns1";
+        let k: &str = "k1";
+        let key = Key(addr, ns.as_bytes(), k.as_bytes());
+        let key_encoded1 = key.encode()?;
+        let ns: &str = "ns1";
+        let k: &str = "k2";
+        let key = Key(addr, ns.as_bytes(), k.as_bytes());
+        let key_encoded2 = key.encode()?;
+        assert!(key_encoded1.cmp(&key_encoded1) == std::cmp::Ordering::Equal);
+        assert!(key_encoded1.cmp(&key_encoded2) == std::cmp::Ordering::Less);
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_kv() {}
 }
