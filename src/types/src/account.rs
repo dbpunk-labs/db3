@@ -26,6 +26,8 @@ pub struct Account {
     /// reward for validator
     total_reward: u64,
     total_storage_usage: u64,
+    nonce: u64,
+    next_bill_id: u64,
 }
 
 pub struct AccountKey(AccountAddress);

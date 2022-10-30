@@ -12,5 +12,6 @@ ethereum-types = { version = "0.13.1", default-features = false }
 db3-base={ path = "../base" }
 db3-proto={ path ="../proto" }
 db3-error={ path = "../error" }
-merk = "2.0.0"
+db3-types={ path = "../types" }
+merk = {version= "2.0.0", path = "../../thirdparty/merk"}
 hex = "0.4.3"

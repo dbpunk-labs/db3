@@ -1,5 +1,5 @@
 //
-// lib.rs
+// coin.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,25 +15,14 @@
 // limitations under the License.
 //
 
-use anyhow::{ensure, Result};
-
-pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
-    ensure!(
-        data.len() == len,
-        "Unexpected data len {}, expected {}.",
-        data.len(),
-        len,
-    );
-    Ok(())
+pub enum Coin {
+    DB3(u64),
+    TAI(u64), // 10^6 tai = 1 db3
 }
-
-pub mod account;
-pub mod bill;
-pub mod coin;
-pub mod cost;
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn it_works() {}

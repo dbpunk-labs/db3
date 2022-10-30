@@ -1,5 +1,5 @@
 //
-// lib.rs
+// bill_store.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,26 +15,12 @@
 // limitations under the License.
 //
 
-use anyhow::{ensure, Result};
-
-pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
-    ensure!(
-        data.len() == len,
-        "Unexpected data len {}, expected {}.",
-        data.len(),
-        len,
-    );
-    Ok(())
-}
-
-pub mod account;
-pub mod bill;
-pub mod coin;
-pub mod cost;
 
 #[cfg(test)]
 mod tests {
+	use super::*;
 
-    #[test]
-    fn it_works() {}
+	#[test]
+	fn it_works() {
+	}
 }

@@ -18,18 +18,16 @@
 use super::key::Key;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
+use db3_types::cost;
 use ethereum_types::Address as AccountAddress;
-use hex;
 use merk::{BatchEntry, Merk, Op};
 use std::sync::{Arc, Mutex};
 
-pub struct KvStore {
-    db: Arc<Mutex<Merk>>,
-}
+pub struct KvStore {}
 
 impl KvStore {
-    pub fn new(db: Arc<Mutex<Merk>>) -> Self {
-        Self { db }
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn convert(kp: &KvPair, account_addr: &AccountAddress, ns: &[u8]) -> Result<BatchEntry> {
@@ -48,7 +46,7 @@ impl KvStore {
         }
     }
 
-    pub fn apply(&self, account_addr: &AccountAddress, mutation: &Mutation) -> Result<()> {
+    pub fn apply(db: &mut Merk, account_addr: &AccountAddress, mutation: &Mutation) -> Result<u64> {
         let ns = mutation.ns.as_ref();
         //TODO avoid copying operation
         let mut ordered_kv_pairs = mutation.kv_pairs.to_vec();
@@ -58,14 +56,10 @@ impl KvStore {
             let batch_entry = Self::convert(&kv, account_addr, ns)?;
             entries.push(batch_entry);
         }
-        match self.db.lock() {
-            Ok(mut mdb) => {
-                mdb.apply(&entries, &[])
-                    .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
-            }
-            Err(_) => {}
-        }
-        Ok(())
+        let gas = cost::estimate_gas(mutation);
+        db.apply(&entries, &[])
+            .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+        Ok(gas)
     }
 }
 
@@ -79,8 +73,7 @@ mod tests {
     fn it_apply_mutation() {
         let path = thread::current().name().unwrap().to_owned();
         let addr = get_a_static_address();
-        let merk = Merk::open(path).unwrap();
-        let kvstore = KvStore::new(Arc::new(Mutex::new(merk)));
+        let mut merk = Merk::open(path).unwrap();
         let kv1 = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
@@ -100,7 +93,7 @@ mod tests {
             gas_price: 1,
             gas: 10,
         };
-        let result = kvstore.apply(&addr, &mutation);
+        let result = KvStore::apply(&mut merk, &addr, &mutation);
         assert!(result.is_ok());
     }
 }
