@@ -21,9 +21,9 @@ use super::account_id::AccountId;
 use super::signer::MutationSigner;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::WriteRequest;
-use fastcrypto::secp256k1::{Secp256k1PublicKey, Secp256k1Signature};
+use fastcrypto::secp256k1::Secp256k1Signature;
 use fastcrypto::traits::ToFromBytes;
-use fastcrypto::Verifier;
+use rust_secp256k1::Message;
 
 pub struct MutationVerifier {}
 
@@ -31,12 +31,14 @@ impl MutationVerifier {
     pub fn verify(request: &WriteRequest) -> Result<AccountId> {
         let signature = <Secp256k1Signature as ToFromBytes>::from_bytes(request.signature.as_ref())
             .map_err(|e| DB3Error::VerifyFailed(format!("{}", e)))?;
-        let pk = <Secp256k1PublicKey as ToFromBytes>::from_bytes(request.public_key.as_ref())
-            .map_err(|e| DB3Error::VerifyFailed(format!("{}", e)))?;
-        if let Err(_) = pk.verify(request.mutation.as_ref(), &signature) {
-            return Err(DB3Error::VerifyFailed("invalid signature".to_string()));
+        let message = Message::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(
+            request.mutation.as_ref(),
+        );
+        if let Ok(rpk) = signature.sig.recover(&message) {
+            Ok(AccountId::new(rpk))
+        } else {
+            Err(DB3Error::VerifyFailed("invalid signature".to_string()))
         }
-        Ok(AccountId::new(pk))
     }
 }
 
@@ -44,7 +46,7 @@ impl MutationVerifier {
 mod tests {
     use super::*;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use db3_proto::db3_mutation_proto::{KvPair, Mutation};
+    use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::traits::KeyPair;
     use rand::rngs::StdRng;
@@ -56,6 +58,7 @@ mod tests {
         let kv = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
         };
         let mutation = Mutation {
             ns: "my_twitter".as_bytes().to_vec(),
@@ -64,12 +67,15 @@ mod tests {
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
             gas_price: 1,
-            start_gas: 10,
+            gas: 10,
         };
         let signer = MutationSigner::new(kp);
         let request = signer.sign(&mutation)?;
         let account_id = MutationVerifier::verify(&request);
-        assert!(account_id.is_ok());
+        if let Err(e) = account_id {
+            println!("{}", e);
+            assert!(false);
+        }
         Ok(())
     }
 }

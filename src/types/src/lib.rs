@@ -1,5 +1,5 @@
 //
-// account_id.rs
+// lib.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,22 +15,22 @@
 // limitations under the License.
 //
 
-use db3_base::get_address_from_pk;
-use ethereum_types::Address;
-use rust_secp256k1::PublicKey;
+use anyhow::{ensure, Result};
 
-// it's ethereum compatiable account id
-pub struct AccountId {
-    pub addr: Address,
-    pub pk: PublicKey,
+pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
+    ensure!(
+        data.len() == len,
+        "Unexpected data len {}, expected {}.",
+        data.len(),
+        len,
+    );
+    Ok(())
 }
 
-impl AccountId {
-    pub fn new(pk: PublicKey) -> Self {
-        let addr = get_address_from_pk(&pk);
-        Self { addr, pk }
-    }
-}
+pub mod account;
+pub mod bill_key;
+pub mod coin;
+pub mod cost;
 
 #[cfg(test)]
 mod tests {

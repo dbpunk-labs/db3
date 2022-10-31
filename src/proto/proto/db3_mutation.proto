@@ -16,16 +16,21 @@
 // limitations under the License.
 //
 
-
 syntax = "proto3";
 import "db3_base.proto";
 package db3_mutation_proto;
+
+enum MutationAction {
+    InsertKv=0;
+    DeleteKv=1;
+}
 
 message KVPair {
     // the key of value
     bytes key = 1;
     // the value
     bytes value = 2;
+    MutationAction action = 3;
 }
 
 message Mutation {
@@ -33,7 +38,7 @@ message Mutation {
     bytes ns = 1;
     // the all data to be written to db3
     repeated KVPair kv_pairs = 2;
-    // replay attack protection
+    // the counter of account
     uint64 nonce = 3;
     // the chain id of db3
     db3_base_proto.ChainId chain_id = 4;
@@ -41,12 +46,11 @@ message Mutation {
     db3_base_proto.ChainRole chain_role = 5;
     uint64 gas_price = 6;
     // the predicted gas
-    uint64 start_gas = 7;
+    uint64 gas = 7;
 }
 
 message WriteRequest {
     bytes signature = 1;
     // the protobuf binary format
     bytes mutation = 2;
-    bytes public_key = 3;
 }

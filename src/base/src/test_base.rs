@@ -1,5 +1,5 @@
 //
-// account_id.rs
+// test_base.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,26 +15,22 @@
 // limitations under the License.
 //
 
-use db3_base::get_address_from_pk;
-use ethereum_types::Address;
+use super::get_address_from_pk;
+use ethereum_types::Address as AccountAddress;
+use fastcrypto::secp256k1::Secp256k1PublicKey;
+use fastcrypto::traits::ToFromBytes;
+use hex;
 use rust_secp256k1::PublicKey;
 
-// it's ethereum compatiable account id
-pub struct AccountId {
-    pub addr: Address,
-    pub pk: PublicKey,
+pub fn get_static_pk() -> PublicKey {
+    let pk = Secp256k1PublicKey::from_bytes(
+        &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138").unwrap(),
+    )
+    .unwrap();
+    pk.pubkey
 }
 
-impl AccountId {
-    pub fn new(pk: PublicKey) -> Self {
-        let addr = get_address_from_pk(&pk);
-        Self { addr, pk }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
+pub fn get_a_static_address() -> AccountAddress {
+    let pk = get_static_pk();
+    get_address_from_pk(&pk)
 }

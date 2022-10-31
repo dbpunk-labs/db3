@@ -2,6 +2,9 @@
 members = [
     "src/crypto",
     "src/proto",
-    "src/kvstore",
     "src/error",
+    "src/types",
+    "src/base",
+    "src/storage",
+    "src/app"
 ]

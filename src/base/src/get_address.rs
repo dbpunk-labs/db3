@@ -1,6 +1,5 @@
 //
-//
-// address.rs
+// get_address.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,16 +18,17 @@
 use ethereum_types::Address;
 use fastcrypto::hash::HashFunction;
 use fastcrypto::hash::Keccak256;
-use fastcrypto::secp256k1::Secp256k1PublicKey;
+use rust_secp256k1::PublicKey;
 
-pub fn get_address_from_pk(pk: &Secp256k1PublicKey) -> Address {
-    let hash = Keccak256::digest(&pk.as_ref()[1..]);
+pub fn get_address_from_pk(pk: &PublicKey) -> Address {
+    let hash = Keccak256::digest(&pk.serialize()[1..]);
     Address::from_slice(&hash.as_ref()[12..])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
     use hex;
     #[test]
@@ -40,7 +40,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             "0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2",
-            format!("{:?}", get_address_from_pk(&pk))
+            format!("{:?}", get_address_from_pk(&pk.pubkey))
         );
     }
 }

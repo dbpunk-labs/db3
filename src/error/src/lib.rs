@@ -23,6 +23,12 @@ pub enum DB3Error {
     SignError(String),
     #[error("fail to verify the request with error {0}")]
     VerifyFailed(String),
+    #[error("fail to codec key with error {0}")]
+    KeyCodecError(String),
+    #[error("fail to apply mutation with error {0}")]
+    ApplyMutationError(String),
+    #[error("fail to apply bill with error {0}")]
+    ApplyBillError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
