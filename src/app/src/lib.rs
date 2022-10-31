@@ -9,15 +9,10 @@ use bytes::BytesMut;
 use db3_crypto::verifier;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
+use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
 use db3_storage::kv_store::KvStore;
-use db3_types::cost;
-/// In-memory, hashmap-backed key/value store ABCI application.
-///
-/// This structure effectively just serves as a handle to the actual key/value
-/// store - the [`KeyValueStoreDriver`].
-///
-///
+use db3_types::{cost, gas};
 use ethereum_types::Address as AccountAddress;
 use hex;
 use merk::Merk;
@@ -25,6 +20,7 @@ use prost::Message;
 use rust_secp256k1::Message as HashMessage;
 use std::boxed::Box;
 use std::pin::Pin;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use tendermint_abci::codec::MAX_VARINT_LENGTH;
 use tendermint_abci::{codec, Application, Error};
@@ -34,16 +30,22 @@ use tendermint_proto::abci::{
     ResponseQuery,
 };
 use tracing::{debug, info};
+use tracing::{span, Level};
 
 pub struct InternalState {
     last_block_height: i64,
     last_block_app_hash: Vec<u8>,
     db: Pin<Box<Merk>>,
-    pending_mutation: Vec<(AccountAddress, Mutation)>,
-    tmp_id: u64,
-    pending_bills: Vec<(AccountAddress, Bill)>,
+    pending_mutation: Vec<(AccountAddress, Mutation, Bill)>,
+    current_block_time: u64,
     current_block_height: i64,
     current_block_app_hash: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NodeState {
+    total_storage_bytes: Arc<AtomicU64>,
+    total_mutations: Arc<AtomicU64>,
 }
 
 impl std::fmt::Debug for InternalState {
@@ -55,6 +57,7 @@ impl std::fmt::Debug for InternalState {
 #[derive(Debug, Clone)]
 pub struct KeyValueStoreApp {
     state: Arc<Mutex<Pin<Box<InternalState>>>>,
+    node_state: Arc<NodeState>,
 }
 
 impl KeyValueStoreApp {
@@ -66,11 +69,14 @@ impl KeyValueStoreApp {
                 last_block_app_hash: vec![],
                 db: Box::pin(merk),
                 pending_mutation: Vec::new(),
-                tmp_id: 0,
-                pending_bills: Vec::new(),
                 current_block_height: 0,
                 current_block_app_hash: vec![],
+                current_block_time: 0,
             }))),
+            node_state: Arc::new(NodeState {
+                total_storage_bytes: Arc::new(AtomicU64::new(0)),
+                total_mutations: Arc::new(AtomicU64::new(0)),
+            }),
         }
     }
 }
@@ -104,6 +110,9 @@ impl Application for KeyValueStoreApp {
             Ok(mut s) => {
                 if let Some(header) = request.header {
                     s.current_block_height = header.height;
+                    if let Some(time) = header.time {
+                        s.current_block_time = time.seconds as u64;
+                    }
                 }
             }
             Err(_) => todo!(),
@@ -120,6 +129,7 @@ impl Application for KeyValueStoreApp {
         let buf = hex::decode(tx).unwrap();
         let request = WriteRequest::decode(buf.as_ref()).unwrap();
         let account_id = verifier::MutationVerifier::verify(&request);
+
         match account_id {
             Ok(_) => ResponseCheckTx {
                 code: 0,
@@ -147,30 +157,29 @@ impl Application for KeyValueStoreApp {
     }
 
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
+        //TODO match the hash fucntion with tendermint
+        let mutation_id = HashMessage::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(
+            request.tx.as_ref(),
+        );
         let tx = String::from_utf8(request.tx).unwrap();
         let buf = hex::decode(tx).unwrap();
-        let request = WriteRequest::decode(buf.as_ref()).unwrap();
-        let account_id = verifier::MutationVerifier::verify(&request).unwrap();
-        let mutation = Mutation::decode(request.mutation.as_ref()).unwrap();
-        let mutation_id = HashMessage::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(
-            request.mutation.as_ref(),
-        );
+        let wrequest = WriteRequest::decode(buf.as_ref()).unwrap();
+        let account_id = verifier::MutationVerifier::verify(&wrequest).unwrap();
+        let mutation = Mutation::decode(wrequest.mutation.as_ref()).unwrap();
+
         //TODO check nonce
         match self.state.lock() {
             Ok(mut s) => {
-                // add mu
                 let gas_fee = cost::estimate_gas(&mutation);
-                s.pending_mutation.push((account_id.addr, mutation));
-                s.tmp_id = s.tmp_id + 1;
                 let bill = Bill {
-                    gas_fee,
+                    gas_fee: Some(gas_fee),
                     block_height: s.current_block_height as u64,
-                    bill_id: s.tmp_id,
+                    bill_id: s.current_block_time,
                     bill_type: BillType::BillForMutation.into(),
-                    time: 0,
+                    time: s.current_block_time,
                     bill_target_id: mutation_id.as_ref().to_vec(),
                 };
-                s.pending_bills.push((account_id.addr, bill));
+                s.pending_mutation.push((account_id.addr, mutation, bill));
             }
             Err(_) => {}
         }
@@ -192,25 +201,43 @@ impl Application for KeyValueStoreApp {
     fn commit(&self) -> ResponseCommit {
         match self.state.lock() {
             Ok(mut s) => {
-                let mutations = &s.pending_mutation.to_vec();
-                let bills = &s.pending_bills.to_vec();
-                for (addr, mutation) in mutations {
+                let span = span!(Level::INFO, "commit").entered();
+                let mutations: Vec<_> = s.pending_mutation.drain(..).collect();
+                for (addr, mutation, bill) in mutations {
                     let db: Pin<&mut Merk> = Pin::as_mut(&mut s.db);
-                    KvStore::apply(db, &addr, &mutation).unwrap();
+                    let result = KvStore::apply(db, &addr, &mutation);
+                    if let Ok((_gas, bytes)) = result {
+                        //TODO compare gas with bill's
+                        let db: Pin<&mut Merk> = Pin::as_mut(&mut s.db);
+                        BillStore::apply(db, &addr, &bill).unwrap();
+                        let account = AccountStore::get_account(s.db.as_ref(), &addr);
+                        if let Ok(Some(mut a)) = account {
+                            let new_total_bills = match a.total_bills {
+                                Some(t) => gas::gas_add(&t, &bill.gas_fee.unwrap()),
+                                None => bill.gas_fee.unwrap(),
+                            };
+                            a.total_bills = Some(new_total_bills);
+                            a.total_storage_in_bytes = a.total_storage_in_bytes + bytes as u64;
+                            a.total_mutation_count = a.total_mutation_count + 1;
+                            let db: Pin<&mut Merk> = Pin::as_mut(&mut s.db);
+                            AccountStore::apply(db, &addr, &a).unwrap();
+                        }
+                        self.node_state
+                            .total_mutations
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        self.node_state
+                            .total_storage_bytes
+                            .fetch_add(bytes as u64, std::sync::atomic::Ordering::Relaxed);
+                    }
                 }
-                for (addr, bill) in bills {
-                    let db: Pin<&mut Merk> = Pin::as_mut(&mut s.db);
-                    BillStore::apply(db, &addr, &bill).unwrap();
-                }
-                s.pending_mutation.clear();
-                s.pending_bills.clear();
                 s.last_block_app_hash = s.db.root_hash().to_vec();
                 s.current_block_app_hash = vec![];
                 s.last_block_height = s.current_block_height;
                 s.current_block_height = 0;
+                span.exit();
                 ResponseCommit {
                     data: s.last_block_app_hash.to_vec(),
-                    retain_height: s.last_block_height,
+                    retain_height: 0,
                 }
             }
             Err(_) => {

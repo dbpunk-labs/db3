@@ -1,5 +1,6 @@
 //
-// lib.rs
+//
+// db3_account.proto
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,27 +15,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+syntax = "proto3";
+import "db3_base.proto";
+package db3_account_proto;
 
-use anyhow::{ensure, Result};
-
-pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
-    ensure!(
-        data.len() == len,
-        "Unexpected data len {}, expected {}.",
-        data.len(),
-        len,
-    );
-    Ok(())
-}
-
-pub mod account_key;
-pub mod bill_key;
-pub mod cost;
-pub mod gas;
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
+message Account {
+    db3_base_proto.Units total_bills = 1;
+    uint64 total_storage_in_bytes = 2;
+    uint64 total_mutation_count = 3;
+    uint64 total_query_session_count = 4;
+    db3_base_proto.Units credits = 5;
+    uint64 nonce = 6;
+    uint64 bill_next_id = 7;
 }

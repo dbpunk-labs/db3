@@ -44,7 +44,7 @@ message Mutation {
     db3_base_proto.ChainId chain_id = 4;
     // the chain role of db3
     db3_base_proto.ChainRole chain_role = 5;
-    uint64 gas_price = 6;
+    db3_base_proto.Units gas_price = 6;
     // the predicted gas
     uint64 gas = 7;
 }

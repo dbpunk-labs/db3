@@ -66,7 +66,7 @@ mod tests {
             nonce: 1,
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
-            gas_price: 1,
+            gas_price: None,
             gas: 10,
         };
         let signer = MutationSigner::new(kp);

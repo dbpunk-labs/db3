@@ -1,5 +1,5 @@
 //
-// account.rs
+// account_key.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,17 +20,7 @@ use ethereum_types::Address as AccountAddress;
 
 const ACCOUNT_ID: &str = "_ACCOUNT_";
 
-pub struct Account {
-    /// bill for mutation and query
-    total_bill: u64,
-    /// reward for validator
-    total_reward: u64,
-    total_storage_usage: u64,
-    nonce: u64,
-    next_bill_id: u64,
-}
-
-pub struct AccountKey(AccountAddress);
+pub struct AccountKey(pub AccountAddress);
 const ACCOUNT_KEY_SIZE: usize = AccountAddress::len_bytes() + ACCOUNT_ID.len();
 
 impl AccountKey {
@@ -39,7 +29,6 @@ impl AccountKey {
         encoded_key.extend_from_slice(ACCOUNT_ID.as_bytes());
         Ok(encoded_key)
     }
-
     pub fn decode(data: &[u8]) -> Result<Self> {
         ensure_len_eq(data, ACCOUNT_KEY_SIZE)
             .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;

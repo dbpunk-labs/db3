@@ -27,7 +27,7 @@ enum BillType {
 }
 
 message Bill {
-    uint64 gas_fee = 1;
+    db3_base_proto.Units gas_fee = 1;
     uint64 block_height = 2;
     uint64 bill_id = 3;
     BillType bill_type = 4;

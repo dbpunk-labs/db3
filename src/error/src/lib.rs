@@ -29,6 +29,12 @@ pub enum DB3Error {
     ApplyMutationError(String),
     #[error("fail to apply bill with error {0}")]
     ApplyBillError(String),
+    #[error("fail to apply account with error {0}")]
+    ApplyAccountError(String),
+    #[error("fail to query account with error {0}")]
+    GetAccountError(String),
+    #[error("out of gas with error {0}")]
+    OutOfGasError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

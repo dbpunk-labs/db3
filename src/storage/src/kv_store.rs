@@ -17,6 +17,7 @@
 
 use super::key::Key;
 use db3_error::{DB3Error, Result};
+use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_types::cost;
 use ethereum_types::Address as AccountAddress;
@@ -29,16 +30,21 @@ impl KvStore {
         Self {}
     }
 
-    fn convert(kp: &KvPair, account_addr: &AccountAddress, ns: &[u8]) -> Result<BatchEntry> {
+    fn convert(
+        kp: &KvPair,
+        account_addr: &AccountAddress,
+        ns: &[u8],
+    ) -> Result<(BatchEntry, usize)> {
         let key = Key(*account_addr, ns, kp.key.as_ref());
         let encoded_key = key.encode()?;
         let action = MutationAction::from_i32(kp.action);
         match action {
             Some(MutationAction::InsertKv) => {
                 //TODO avoid copying operation
-                Ok((encoded_key, Op::Put(kp.value.to_vec())))
+                let total_in_bytes = encoded_key.len() + kp.value.len();
+                Ok(((encoded_key, Op::Put(kp.value.to_vec())), total_in_bytes))
             }
-            Some(MutationAction::DeleteKv) => Ok((encoded_key, Op::Delete)),
+            Some(MutationAction::DeleteKv) => Ok(((encoded_key, Op::Delete), 0)),
             None => Err(DB3Error::ApplyMutationError(
                 "invalid action type".to_string(),
             )),
@@ -49,14 +55,16 @@ impl KvStore {
         db: Pin<&mut Merk>,
         account_addr: &AccountAddress,
         mutation: &Mutation,
-    ) -> Result<u64> {
+    ) -> Result<(Units, usize)> {
         let ns = mutation.ns.as_ref();
         //TODO avoid copying operation
         let mut ordered_kv_pairs = mutation.kv_pairs.to_vec();
         ordered_kv_pairs.sort_by(|a, b| a.key.cmp(&b.key));
         let mut entries: Vec<BatchEntry> = Vec::new();
+        let mut total_in_bytes: usize = 0;
         for kv in ordered_kv_pairs {
-            let batch_entry = Self::convert(&kv, account_addr, ns)?;
+            let (batch_entry, bytes) = Self::convert(&kv, account_addr, ns)?;
+            total_in_bytes += bytes;
             entries.push(batch_entry);
         }
         let gas = cost::estimate_gas(mutation);
@@ -65,7 +73,7 @@ impl KvStore {
                 .apply(&entries, &[])
                 .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
         }
-        Ok(gas)
+        Ok((gas, total_in_bytes))
     }
 }
 
@@ -98,7 +106,7 @@ mod tests {
             nonce: 1,
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
-            gas_price: 1,
+            gas_price: None,
             gas: 10,
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);

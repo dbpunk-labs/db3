@@ -23,6 +23,7 @@ fn main() {
                 "proto/db3_base.proto",
                 "proto/db3_mutation.proto",
                 "proto/db3_bill.proto",
+                "proto/db3_account.proto",
             ],
             &["proto"],
         )

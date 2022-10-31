@@ -38,7 +38,7 @@ fn main() {
         LevelFilter::INFO
     };
     tracing_subscriber::fmt().with_max_level(log_level).init();
-    let mut merk = Merk::open(opt.db_path).unwrap();
+    let merk = Merk::open(opt.db_path).unwrap();
     let app = KeyValueStoreApp::new(merk);
     let server = ServerBuilder::new(opt.read_buf_size)
         .bind(format!("{}:{}", opt.host, opt.port), app)
