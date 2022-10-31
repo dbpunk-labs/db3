@@ -83,7 +83,9 @@ mod kvstore_app_integration {
 
         let res = client
             .query(RequestQuery {
-                data: "0dce49e41905e6c0c5091adcedee2dee524a3b06".as_bytes().to_owned(),
+                data: "0dce49e41905e6c0c5091adcedee2dee524a3b06"
+                    .as_bytes()
+                    .to_owned(),
                 path: "bill".to_string(),
                 height: 0,
                 prove: false,
@@ -183,10 +185,11 @@ mod kvstore_app_integration {
             .unwrap();
         assert_eq!(res.value, "v3".as_bytes().to_owned());
 
-
         let res = client
             .query(RequestQuery {
-                data: "0dce49e41905e6c0c5091adcedee2dee524a3b06".as_bytes().to_owned(),
+                data: "0dce49e41905e6c0c5091adcedee2dee524a3b06"
+                    .as_bytes()
+                    .to_owned(),
                 path: "bill".to_string(),
                 height: 0,
                 prove: false,

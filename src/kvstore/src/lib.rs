@@ -6,6 +6,7 @@ use std::{
 };
 
 use bytes::BytesMut;
+use db3_crypto::account_id::AccountId;
 use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use hex;
@@ -17,7 +18,6 @@ use tendermint_proto::abci::{
     ResponseCommit, ResponseDeliverTx, ResponseInfo, ResponseQuery,
 };
 use tracing::{debug, info};
-use db3_crypto::account_id::AccountId;
 
 pub const UNIT_CONST: i64 = 1;
 
@@ -37,7 +37,6 @@ impl KeyValueStoreApp {
         let (cmd_tx, cmd_rx) = channel();
         (Self { cmd_tx }, KeyValueStoreDriver::new(cmd_rx))
     }
-
 
     /// Attempt to retrieve the bill associated with the given addr.
     pub fn get_bill(&self, addr: String) -> Result<(i64, Option<i64>), Error> {
@@ -70,9 +69,9 @@ impl KeyValueStoreApp {
     /// Optionally returns any pre-existing value associated with the given
     /// key.
     pub fn set<K, V>(&self, addr: &str, key: K, value: V) -> Result<Option<String>, Error>
-        where
-            K: AsRef<str>,
-            V: AsRef<str>,
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
     {
         let (result_tx, result_rx) = channel();
         channel_send(
@@ -115,7 +114,6 @@ impl Application for KeyValueStoreApp {
     fn query(&self, request: RequestQuery) -> ResponseQuery {
         let formatted_paht = request.path.to_lowercase();
         let tokens = formatted_paht.split('/').collect::<Vec<&str>>();
-
 
         if tokens.len() > 0 && tokens[0] == "bill" {
             // query bill
@@ -347,7 +345,10 @@ impl KeyValueStoreDriver {
         // As in the Go-based key/value store, simply encode the number of
         // items as the "app hash"
         let mut app_hash = BytesMut::with_capacity(MAX_VARINT_LENGTH);
-        codec::encode_varint(self.store.len() as u64 + self.account_bill.len() as u64, &mut app_hash);
+        codec::encode_varint(
+            self.store.len() as u64 + self.account_bill.len() as u64,
+            &mut app_hash,
+        );
         self.app_hash = app_hash.to_vec();
         self.height += 1;
         channel_send(&result_tx, (self.height, self.app_hash.clone()))
