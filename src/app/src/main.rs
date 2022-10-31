@@ -11,7 +11,6 @@ struct Opt {
     /// Bind the TCP server to this host.
     #[structopt(short, long, default_value = "127.0.0.1")]
     host: String,
-
     /// Bind the TCP server to this port.
     #[structopt(short, long, default_value = "26658")]
     port: u16,
@@ -19,7 +18,6 @@ struct Opt {
     /// connection.
     #[structopt(short, long, default_value = "1048576")]
     read_buf_size: usize,
-
     /// Increase output logging verbosity to DEBUG level.
     #[structopt(short, long)]
     verbose: bool,

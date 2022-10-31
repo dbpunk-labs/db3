@@ -33,3 +33,4 @@ rand = "0.8.5"
 rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["recovery", "rand-std", "bitcoin_hashes", "global-context"] }
 merk = {version= "2.0.0", path = "../../thirdparty/merk"}
 ethereum-types = { version = "0.13.1", default-features = false }
+tempdir = "0.3.7"
