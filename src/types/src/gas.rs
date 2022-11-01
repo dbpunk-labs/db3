@@ -45,6 +45,13 @@ pub fn gas_add(left: &Units, right: &Units) -> Units {
     }
 }
 
+pub fn gas_in_tai(input: &Units) -> u64 {
+    if input.utype == UnitType::Db3 as i32 {
+        return (input.amount * SHIFT[1]) as u64;
+    }
+    return input.amount as u64;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

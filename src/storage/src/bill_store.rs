@@ -26,8 +26,8 @@ use std::pin::Pin;
 pub struct BillStore {}
 
 impl BillStore {
-    pub fn apply(db: Pin<&mut Merk>, account_addr: &AccountAddress, bill: &Bill) -> Result<()> {
-        let key = BillKey(*account_addr, bill.bill_id);
+    pub fn apply(db: Pin<&mut Merk>, bill: &Bill) -> Result<()> {
+        let key = BillKey(bill.block_height, bill.bill_id);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024);
         bill.encode(&mut buf)
@@ -50,7 +50,10 @@ mod tests {
     use db3_base::get_a_static_address;
     use db3_proto::db3_base_proto::{UnitType, Units};
     use db3_proto::db3_bill_proto::BillType;
+    use merk::proofs::query::Query;
+    use merk::proofs::{Decoder, Node, Op};
     use std::boxed::Box;
+    use std::ops::Range;
     use tempdir::TempDir;
     #[test]
     fn it_apply_bill() {
@@ -69,9 +72,61 @@ mod tests {
             bill_type: BillType::BillForMutation.into(),
             time: 111,
             bill_target_id: target_id.as_bytes().to_vec(),
+            query_addr: vec![],
+            owner: addr.as_bytes().to_vec(),
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = BillStore::apply(db_m, &addr, &bill);
+        let result = BillStore::apply(db_m, &bill);
+
         assert!(result.is_ok());
+        let bill = Bill {
+            gas_fee: Some(Units {
+                utype: UnitType::Db3.into(),
+                amount: 1,
+            }),
+            block_height: 11,
+            bill_id: 1,
+            bill_type: BillType::BillForMutation.into(),
+            time: 111,
+            bill_target_id: target_id.as_bytes().to_vec(),
+            query_addr: vec![],
+            owner: addr.as_bytes().to_vec(),
+        };
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result = BillStore::apply(db_m, &bill);
+        assert!(result.is_ok());
+
+        let skey = BillKey(11, 0).encode().unwrap();
+        let ekey = BillKey(11, 200).encode().unwrap();
+        let mut query = Query::new();
+        let range = Range {
+            start: skey,
+            end: ekey,
+        };
+        query.insert_range(range);
+        let result = db.as_ref().prove(query);
+        if let Ok(r) = result {
+            let mut decoder = Decoder::new(r.as_ref());
+            loop {
+                if let Some(Ok(op)) = decoder.next() {
+                    match op {
+                        Op::Push(Node::KV(k, v)) => {
+                            println!("k {:?} v {:?}", k, v);
+                        }
+                        Op::Push(Node::KVHash(h)) => {
+                            println!("kvhash {:?}", h);
+                        }
+                        Op::Push(Node::Hash(h)) => {
+                            println!("hash {:?}", h);
+                        }
+                        _ => {
+                            println!("other");
+                        }
+                    }
+                    continue;
+                }
+                break;
+            }
+        }
     }
 }

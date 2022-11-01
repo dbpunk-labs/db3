@@ -4,6 +4,7 @@ mod kvstore_app_integration {
     use std::thread;
 
     use bytes::{Bytes, BytesMut};
+    use db3_base::get_address_from_pk;
     use db3_kvstore::KeyValueStoreApp;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction, WriteRequest};
@@ -20,8 +21,8 @@ mod kvstore_app_integration {
     use tendermint_abci::{ClientBuilder, ServerBuilder};
     use tendermint_proto::abci::{RequestDeliverTx, RequestQuery};
     #[test]
-    fn happy_path() {
-        let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
+    fn test_commit() {
+        let tmp_dir_path = TempDir::new("test_commit").expect("create temp dir");
         let mut rng = StdRng::from_seed([0; 32]);
         let mut merk = Merk::open(tmp_dir_path).unwrap();
         let kp = Secp256k1KeyPair::generate(&mut rng);
@@ -47,11 +48,13 @@ mod kvstore_app_integration {
             signature: signature.as_ref().to_vec(),
             mutation: buf.as_ref().to_vec(),
         };
+        let addr = get_address_from_pk(&kp.name.pubkey);
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf);
         let buf = buf.freeze();
         let mutation_encoded = hex::encode_upper(buf.as_ref());
-        println!("{}", mutation_encoded);
+        let addr_str = hex::encode_upper(addr.as_bytes());
+        println!("addr {}", addr_str);
         let app = KeyValueStoreApp::new(merk);
         let server = ServerBuilder::default().bind("127.0.0.1:0", app).unwrap();
         let server_addr = server.local_addr();
@@ -63,5 +66,15 @@ mod kvstore_app_integration {
             })
             .unwrap();
         client.commit().unwrap();
+        let query = RequestQuery {
+            data: addr_str.as_bytes().to_vec(),
+            path: "account".to_string(),
+            height: 0,
+            prove: false,
+        };
+        let response = client.query(query).unwrap();
+        assert_eq!(0, response.code);
+        let json_data = String::from_utf8(response.value).unwrap();
+        println!("{}", json_data);
     }
 }

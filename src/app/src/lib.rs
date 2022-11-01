@@ -18,6 +18,7 @@ use hex;
 use merk::Merk;
 use prost::Message;
 use rust_secp256k1::Message as HashMessage;
+use serde_json::json;
 use std::boxed::Box;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU64;
@@ -83,10 +84,6 @@ impl KeyValueStoreApp {
 
 impl Application for KeyValueStoreApp {
     fn info(&self, request: RequestInfo) -> ResponseInfo {
-        debug!(
-            "Got info request. Tendermint version: {}; Block version: {}; P2P version: {}",
-            request.version, request.block_version, request.p2p_version
-        );
         match self.state.lock() {
             Ok(s) => ResponseInfo {
                 data: "db3".to_string(),
@@ -121,7 +118,52 @@ impl Application for KeyValueStoreApp {
     }
 
     fn query(&self, request: RequestQuery) -> ResponseQuery {
-        Default::default()
+        match request.path.as_ref() {
+            "node" => {
+                let node_status = json!({
+                        "total_mutations": self.node_state.total_mutations.load(std::sync::atomic::Ordering::Relaxed),
+                        "total_storage_bytes": self.node_state.total_storage_bytes.load(std::sync::atomic::Ordering::Relaxed),
+                });
+                ResponseQuery {
+                    code: 0,
+                    log: "".to_string(),
+                    info: "".to_string(),
+                    index: 0,
+                    key: vec![],
+                    value: node_status.to_string().as_bytes().to_vec(),
+                    proof_ops: None,
+                    height: 0,
+                    codespace: "".to_string(),
+                }
+            }
+            "account" => {
+                let addr_str = String::from_utf8(request.data).unwrap();
+                let buf = hex::decode(addr_str).unwrap();
+                let addr = AccountAddress::from_slice(buf.as_ref());
+                match self.state.lock() {
+                    Ok(s) => {
+                        let account = AccountStore::get_account(s.db.as_ref(), &addr);
+                        if let Ok(Some(a)) = account {
+                            let content = serde_json::to_string(&a).unwrap();
+                            return ResponseQuery {
+                                code: 0,
+                                log: "".to_string(),
+                                info: "".to_string(),
+                                index: 0,
+                                key: vec![],
+                                value: content.into_bytes().into(),
+                                proof_ops: None,
+                                height: s.last_block_height,
+                                codespace: "".to_string(),
+                            };
+                        }
+                    }
+                    Err(_) => todo!(),
+                }
+                Default::default()
+            }
+            _ => Default::default(),
+        }
     }
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
@@ -129,7 +171,6 @@ impl Application for KeyValueStoreApp {
         let buf = hex::decode(tx).unwrap();
         let request = WriteRequest::decode(buf.as_ref()).unwrap();
         let account_id = verifier::MutationVerifier::verify(&request);
-
         match account_id {
             Ok(_) => ResponseCheckTx {
                 code: 0,
@@ -178,6 +219,8 @@ impl Application for KeyValueStoreApp {
                     bill_type: BillType::BillForMutation.into(),
                     time: s.current_block_time,
                     bill_target_id: mutation_id.as_ref().to_vec(),
+                    owner: account_id.addr.as_bytes().to_vec(),
+                    query_addr: vec![],
                 };
                 s.pending_mutation.push((account_id.addr, mutation, bill));
             }
@@ -209,7 +252,7 @@ impl Application for KeyValueStoreApp {
                     if let Ok((_gas, bytes)) = result {
                         //TODO compare gas with bill's
                         let db: Pin<&mut Merk> = Pin::as_mut(&mut s.db);
-                        BillStore::apply(db, &addr, &bill).unwrap();
+                        BillStore::apply(db, &bill).unwrap();
                         let account = AccountStore::get_account(s.db.as_ref(), &addr);
                         if let Ok(Some(mut a)) = account {
                             let new_total_bills = match a.total_bills {
