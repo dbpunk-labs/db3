@@ -41,3 +41,9 @@ message Bill {
     // service address
     bytes query_addr = 9;
 }
+
+message BillQueryRequest {
+    uint64 block_height = 1;
+    uint64 start_id = 2;
+    uint64 end_id = 3;
+}

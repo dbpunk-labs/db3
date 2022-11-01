@@ -20,9 +20,13 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_bill_proto::Bill;
 use db3_types::bill_key::BillKey;
 use ethereum_types::Address as AccountAddress;
+use merk::proofs::{query::Query, Op as ProofOp};
 use merk::{BatchEntry, Merk, Op};
 use prost::Message;
+use std::collections::LinkedList;
+use std::ops::Range;
 use std::pin::Pin;
+
 pub struct BillStore {}
 
 impl BillStore {
@@ -42,6 +46,21 @@ impl BillStore {
         }
         Ok(())
     }
+
+    pub fn scan(db: Pin<&Merk>, height: u64, start: u64, end: u64) -> Result<LinkedList<ProofOp>> {
+        let skey = BillKey(height, start);
+        let ekey = BillKey(height, end);
+        let range = Range {
+            start: skey.encode()?,
+            end: ekey.encode()?,
+        };
+        let mut query = Query::new();
+        query.insert_range(range);
+        let ops = db
+            .execute_query(query)
+            .map_err(|e| DB3Error::BillQueryError(format!("{}", e)))?;
+        Ok(ops)
+    }
 }
 
 #[cfg(test)]
@@ -50,10 +69,8 @@ mod tests {
     use db3_base::get_a_static_address;
     use db3_proto::db3_base_proto::{UnitType, Units};
     use db3_proto::db3_bill_proto::BillType;
-    use merk::proofs::query::Query;
-    use merk::proofs::{Decoder, Node, Op};
+    use merk::proofs::{Decoder, Node};
     use std::boxed::Box;
-    use std::ops::Range;
     use tempdir::TempDir;
     #[test]
     fn it_apply_bill() {
@@ -110,13 +127,13 @@ mod tests {
             loop {
                 if let Some(Ok(op)) = decoder.next() {
                     match op {
-                        Op::Push(Node::KV(k, v)) => {
+                        ProofOp::Push(Node::KV(k, v)) => {
                             println!("k {:?} v {:?}", k, v);
                         }
-                        Op::Push(Node::KVHash(h)) => {
+                        ProofOp::Push(Node::KVHash(h)) => {
                             println!("kvhash {:?}", h);
                         }
-                        Op::Push(Node::Hash(h)) => {
+                        ProofOp::Push(Node::Hash(h)) => {
                             println!("hash {:?}", h);
                         }
                         _ => {

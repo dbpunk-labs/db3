@@ -7,7 +7,8 @@ use std::{
 
 use bytes::BytesMut;
 use db3_crypto::verifier;
-use db3_proto::db3_bill_proto::{Bill, BillType};
+use db3_error::DB3Error;
+use db3_proto::db3_bill_proto::{Bill, BillQueryRequest, BillType};
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
@@ -15,7 +16,7 @@ use db3_storage::kv_store::KvStore;
 use db3_types::{cost, gas};
 use ethereum_types::Address as AccountAddress;
 use hex;
-use merk::Merk;
+use merk::{proofs::encode_into, Merk};
 use prost::Message;
 use rust_secp256k1::Message as HashMessage;
 use serde_json::json;
@@ -134,6 +135,60 @@ impl Application for KeyValueStoreApp {
                     proof_ops: None,
                     height: 0,
                     codespace: "".to_string(),
+                }
+            }
+            "bill" => {
+                if let Ok(bq) = BillQueryRequest::decode(request.data.as_ref()) {
+                    let bills_result = match self.state.lock() {
+                        Ok(s) => {
+                            BillStore::scan(
+                                s.db.as_ref(),
+                                bq.block_height,
+                                bq.start_id,
+                                bq.end_id,
+                            )
+                        }
+                        Err(_) => Err(DB3Error::StateLockBusyError),
+                    };
+                    if let Ok(bills) = bills_result {
+                        let mut buf = Vec::with_capacity(128);
+                        encode_into(bills.iter(), &mut buf);
+                        return ResponseQuery {
+                            code: 0,
+                            log: "".to_string(),
+                            info: "".to_string(),
+                            index: 0,
+                            key: vec![],
+                            value: buf,
+                            proof_ops: None,
+                            height: bq.block_height as i64,
+                            codespace: "".to_string(),
+                        };
+                    } else {
+                        return ResponseQuery {
+                            code: 1,
+                            log: "".to_string(),
+                            info: "bad bill query format".to_string(),
+                            index: 0,
+                            key: vec![],
+                            value: vec![],
+                            proof_ops: None,
+                            height: 0,
+                            codespace: "".to_string(),
+                        };
+                    }
+                } else {
+                    return ResponseQuery {
+                        code: 1,
+                        log: "".to_string(),
+                        info: "".to_string(),
+                        index: 0,
+                        key: vec![],
+                        value: vec![],
+                        proof_ops: None,
+                        height: 0,
+                        codespace: "".to_string(),
+                    };
                 }
             }
             "account" => {

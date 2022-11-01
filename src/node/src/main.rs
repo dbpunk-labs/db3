@@ -1,6 +1,6 @@
 //! In-memory key/value store application for Tendermint.
 
-use db3_kvstore::KeyValueStoreApp;
+use db3_node::KeyValueStoreApp;
 use merk::Merk;
 use structopt::StructOpt;
 use tendermint_abci::ServerBuilder;

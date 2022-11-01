@@ -53,7 +53,7 @@ mod kvstore_app_integration {
         request.encode(&mut buf);
         let buf = buf.freeze();
         let mutation_encoded = hex::encode_upper(buf.as_ref());
-        let addr_str = hex::encode_upper(addr.as_bytes());
+        let addr_str = hex::encode(addr.as_bytes());
         println!("addr {}", addr_str);
         let app = KeyValueStoreApp::new(merk);
         let server = ServerBuilder::default().bind("127.0.0.1:0", app).unwrap();

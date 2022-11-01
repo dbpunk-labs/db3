@@ -1,16 +1,11 @@
 [package]
-name = "db3-kvstore"
+name = "db3-node"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
 name = "db3"
 path = "src/main.rs"
-[features]
-default = []
-client = []
-echo-app = []
-kvstore-app = []
 
 [dependencies]
 bytes = { version = "1.0", default-features = false }
@@ -23,6 +18,7 @@ db3-crypto={path="../crypto", version="0.1.0"}
 db3-storage={path="../storage", version="0.1.0"}
 db3-types={path="../types", version="0.1.0"}
 db3-base={path="../base", version="0.1.0"}
+db3-error={path="../error", version="0.1.0"}
 prost = "0.10"
 prost-types = "0.10"
 tracing = "0.1"

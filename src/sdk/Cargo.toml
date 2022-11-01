@@ -1,0 +1,20 @@
+[package]
+name = "db3-sdk"
+version = "0.1.0"
+edition = "2021"
+authors = ["jack wang <jackwang@db3.network>"]
+description = "sdk module of db3"
+homepage = "https://db3.network"
+repository = "https://github.com/db3-teams/db3"
+keywords = ["database", "web3", "db3"]
+
+[dependencies]
+tendermint-rpc = {version = "0.25.0", git = "https://github.com/dbpunk-labs/tendermint-rs.git", branch = "release/v0.25.0", features=["http-client"]}
+tendermint = {version = "0.25.0", git = "https://github.com/dbpunk-labs/tendermint-rs.git", branch = "release/v0.25.0"}
+db3-proto={path="../proto", version="0.1.0"}
+db3-error={path="../error", version="0.1.0"}
+prost = "0.10"
+prost-types = "0.10"
+bytes = { version = "1.0", default-features = false }
+merk = {version= "2.0.0", path = "../../thirdparty/merk"}
+
