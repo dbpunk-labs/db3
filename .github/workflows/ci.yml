@@ -69,9 +69,20 @@ jobs:
           override: true
           components: rustfmt,llvm-tools-preview
       - uses: Swatinem/rust-cache@v1
+      - name: Setup test env
+        run: |
+          cargo build
+          cd tools
+          wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
+          tar -zxf tendermint_0.34.22_linux_amd64.tar.gz
+          sh start_localnet.sh >tm.log 2>&1 &
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
       - name: Run rust test with coverage
         run: |
-          rustup target add wasm32-unknown-unknown
-          cargo build --release
+          cargo llvm-cov nextest --lcov --output-path lcov.info --no-fail-fast
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{secrets.COV_TOKEN}}
+          directory: .
+          flags: rust

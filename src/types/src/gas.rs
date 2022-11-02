@@ -33,12 +33,11 @@ pub fn gas_cmp(left: &Units, right: &Units) -> std::cmp::Ordering {
 }
 
 pub fn gas_add(left: &Units, right: &Units) -> Units {
-    let mut amount: i64 = 0;
-    let mut utype: UnitType = UnitType::Tai;
+    let utype: UnitType = UnitType::Tai;
     let left_index = (left.utype as i32 - UnitType::Db3 as i32) as usize;
-    amount = left.amount * REVERSE_SHIFT[left_index];
+    let amount = left.amount * REVERSE_SHIFT[left_index];
     let right_index = (right.utype as i32 - UnitType::Db3 as i32) as usize;
-    amount = amount + right.amount * REVERSE_SHIFT[right_index];
+    let amount = amount + right.amount * REVERSE_SHIFT[right_index];
     Units {
         utype: utype.into(),
         amount,

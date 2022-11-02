@@ -5,7 +5,7 @@ mod kvstore_app_integration {
 
     use bytes::{Bytes, BytesMut};
     use db3_base::get_address_from_pk;
-    use db3_kvstore::KeyValueStoreApp;
+    use db3_node::KeyValueStoreApp;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction, WriteRequest};
     use fastcrypto::secp256k1::Secp256k1KeyPair;

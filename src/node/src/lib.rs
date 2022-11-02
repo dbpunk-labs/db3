@@ -141,12 +141,7 @@ impl Application for KeyValueStoreApp {
                 if let Ok(bq) = BillQueryRequest::decode(request.data.as_ref()) {
                     let bills_result = match self.state.lock() {
                         Ok(s) => {
-                            BillStore::scan(
-                                s.db.as_ref(),
-                                bq.block_height,
-                                bq.start_id,
-                                bq.end_id,
-                            )
+                            BillStore::scan(s.db.as_ref(), bq.block_height, bq.start_id, bq.end_id)
                         }
                         Err(_) => Err(DB3Error::StateLockBusyError),
                     };

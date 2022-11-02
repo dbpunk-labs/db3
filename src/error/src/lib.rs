@@ -29,6 +29,8 @@ pub enum DB3Error {
     KeyCodecError(String),
     #[error("fail to apply mutation with error {0}")]
     ApplyMutationError(String),
+    #[error("fail to submit mutation with error {0}")]
+    SubmitMutationError(String),
     #[error("fail to apply bill with error {0}")]
     ApplyBillError(String),
     #[error("fail to query bill with error {0}")]

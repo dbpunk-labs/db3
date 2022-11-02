@@ -16,6 +16,7 @@
 //
 
 mod bill_sdk;
+mod mutation_sdk;
 #[cfg(test)]
 mod tests {
     use super::*;

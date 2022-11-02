@@ -39,7 +39,7 @@ impl BillSDK {
             start_id: start,
             end_id: end,
         };
-        let mut buf = BytesMut::with_capacity(1024);
+        let mut buf = BytesMut::with_capacity(1024 * 8);
         request
             .encode(&mut buf)
             .map_err(|e| DB3Error::BillSDKError(format!("{}", e)))?;
@@ -74,14 +74,20 @@ impl BillSDK {
         }
         Ok(bills)
     }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    #[test]
-    fn it_works() {
-
+    use super::BillSDK;
+    use super::HttpClient;
+    #[tokio::test]
+    async fn it_get_bills() {
+        let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
+        let sdk = BillSDK::new(client);
+        let result = sdk.get_bills_by_block(1, 0, 10).await;
+        assert!(result.is_ok());
+        if let Ok(bills) = result {
+            assert_eq!(0, bills.len());
+        }
     }
 }
