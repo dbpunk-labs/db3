@@ -58,28 +58,39 @@ mod tests {
     use fastcrypto::traits::KeyPair;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use std::{thread, time};
     #[tokio::test]
     async fn it_submit_mutation() {
         let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let signer = MutationSigner::new(kp);
-        let kv = KvPair {
-            key: "k1".as_bytes().to_vec(),
-            value: "value1".as_bytes().to_vec(),
-            action: MutationAction::InsertKv.into(),
-        };
-        let mutation = Mutation {
-            ns: "my_twitter".as_bytes().to_vec(),
-            kv_pairs: vec![kv],
-            nonce: 1,
-            chain_id: ChainId::MainNet.into(),
-            chain_role: ChainRole::StorageShardChain.into(),
-            gas_price: None,
-            gas: 10,
-        };
         let sdk = MutationSDK::new(client, signer);
-        let result = sdk.submit_mutation(&mutation).await;
-        assert!(result.is_ok());
+        let mut count = 11;
+        loop {
+            let kv = KvPair {
+                key:format!("k{}", count).as_bytes().to_vec(),
+                value: "value1".as_bytes().to_vec(),
+                action: MutationAction::InsertKv.into(),
+            };
+            let mutation = Mutation {
+                ns: "my_twitter".as_bytes().to_vec(),
+                kv_pairs: vec![kv],
+                nonce: 1,
+                chain_id: ChainId::MainNet.into(),
+                chain_role: ChainRole::StorageShardChain.into(),
+                gas_price: None,
+                gas: 10,
+            };
+            let result = sdk.submit_mutation(&mutation).await;
+            assert!(result.is_ok());
+            let ten_millis = time::Duration::from_millis(1000);
+            let now = time::Instant::now();
+            thread::sleep(ten_millis);
+            count = count +1;
+            if count > 20 {
+                break;
+            }
+        }
     }
 }

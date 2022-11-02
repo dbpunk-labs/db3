@@ -18,74 +18,57 @@
 use bytes::BytesMut;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_bill_proto::{Bill, BillQueryRequest};
-use merk::proofs::{Decoder, Node, Op as ProofOp};
-use prost::Message;
-use std::str::FromStr;
-use tendermint::{abci::Path, block::Height};
-use tendermint_rpc::{Client, HttpClient};
+use db3_proto::db3_node_proto::{
+    storage_node_client::StorageNodeClient, QueryBillRequest, QueryBillResponse,
+};
+use std::sync::Arc;
+use tonic::Status;
 
 #[derive(Debug, Clone)]
 pub struct BillSDK {
-    client: HttpClient,
+    client: Arc<StorageNodeClient<tonic::transport::Channel>>,
 }
 
 impl BillSDK {
-    pub fn new(client: HttpClient) -> Self {
+    pub fn new(client: Arc<StorageNodeClient<tonic::transport::Channel>>) -> Self {
         Self { client }
     }
 
-    pub async fn get_bills_by_block(&self, height: u64, start: u64, end: u64) -> Result<Vec<Bill>> {
-        let request = BillQueryRequest {
-            block_height: height,
+    pub async fn get_bills_by_block(
+        &self,
+        height: u64,
+        start: u64,
+        end: u64,
+    ) -> std::result::Result<Vec<Bill>, Status> {
+        let mut client = self.client.as_ref().clone();
+        let q_req = QueryBillRequest {
+            height,
             start_id: start,
             end_id: end,
         };
-        let mut buf = BytesMut::with_capacity(1024 * 8);
-        request
-            .encode(&mut buf)
-            .map_err(|e| DB3Error::BillSDKError(format!("{}", e)))?;
-        let buf = buf.freeze();
-        let path = Path::from_str("bill").map_err(|e| DB3Error::BillSDKError(format!("{}", e)))?;
-        let result = self
-            .client
-            .abci_query(
-                Some(path),
-                buf.as_ref(),
-                Some(Height::from(height as u32)),
-                false,
-            )
-            .await
-            .map_err(|e| DB3Error::BillSDKError(format!("{}", e)))?;
-        let mut decoder = Decoder::new(result.value.as_ref());
-        let mut bills: Vec<Bill> = Vec::new();
-        loop {
-            let item = decoder.next();
-            if let Some(Ok(op)) = item {
-                match op {
-                    ProofOp::Push(Node::KV(_, v)) => {
-                        if let Ok(b) = Bill::decode(v.as_ref()) {
-                            bills.push(b);
-                        }
-                    }
-                    _ => {}
-                }
-                continue;
-            }
-            break;
-        }
-        Ok(bills)
+        let request = tonic::Request::new(q_req);
+        let response = client.query_bill(request).await?.into_inner();
+        Ok(response.bills)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::BillSDK;
-    use super::HttpClient;
+    use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
+    use std::sync::Arc;
+    use tonic::transport::Endpoint;
     #[tokio::test]
     async fn it_get_bills() {
-        let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
         let sdk = BillSDK::new(client);
         let result = sdk.get_bills_by_block(1, 0, 10).await;
+        if let Err(ref e) = result {
+            println!("{}", e);
+        }
         assert!(result.is_ok());
         if let Ok(bills) = result {
             assert_eq!(0, bills.len());

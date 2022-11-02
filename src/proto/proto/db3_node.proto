@@ -17,6 +17,7 @@
 //
 syntax = "proto3";
 import "db3_bill.proto";
+import "db3_mutation.proto";
 package db3_node_proto;
 
 message QueryBillRequest {
@@ -29,7 +30,42 @@ message QueryBillResponse {
     repeated db3_bill_proto.Bill bills = 1;
 }
 
+message Range {
+    bytes start = 1;
+    bytes end = 2;
+}
+
+message BatchRangeKey {
+    bytes ns = 1;
+    repeated Range range = 2;
+    int32 session = 3;
+}
+
+message BatchGetKey {
+    bytes ns = 1;
+    repeated bytes keys = 2;
+    int32 session = 3;
+}
+
+message BatchGetValue {
+    repeated db3_mutation_proto.KVPair values = 1;
+    int32 session = 2;
+}
+
+message GetKeyRequest {
+    bytes batch_get = 1;
+    bytes signature = 2;
+}
+
+message GetKeyResponse {
+    // the validator sign
+    bytes signature = 1;
+    bytes batch_get_values = 2;
+}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
+    // method for querying kv data
+    rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
 }

@@ -104,7 +104,6 @@ impl AuthStorage {
     }
 
     pub fn begin_block(&mut self, height: u64, time: u64) {
-        info!("change current block height to {}, time {}", height, time);
         self.current_block_state.block_time = time;
         self.current_block_state.block_height = height as i64;
         self.current_block_state.bill_id_counter = 0;

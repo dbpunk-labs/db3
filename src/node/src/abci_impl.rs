@@ -26,10 +26,11 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use tendermint_abci::Application;
 use tendermint_proto::abci::{
-    RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
+    Event, RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
     ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
     ResponseQuery,
 };
+use tracing::info;
 use tracing::{span, Level};
 #[derive(Clone)]
 pub struct NodeState {
@@ -53,6 +54,10 @@ impl AbciImpl {
                 total_mutations: Arc::new(AtomicU64::new(0)),
             }),
         }
+    }
+    #[inline]
+    pub fn get_node_state(&self) -> &Arc<NodeState> {
+        &self.node_state
     }
 }
 
@@ -136,7 +141,19 @@ impl Application for AbciImpl {
             }
             Err(_) => todo!(),
         }
-        Default::default()
+		ResponseDeliverTx {
+            code: 0,
+            data: vec![],
+            log: "".to_string(),
+            info: "".to_string(),
+            gas_wanted: 0,
+            gas_used: 0,
+            events: vec![Event {
+                r#type: "deliver".to_string(),
+                attributes: vec![],
+            }],
+            codespace: "".to_string(),
+        }
     }
 
     fn commit(&self) -> ResponseCommit {
@@ -154,7 +171,7 @@ impl Application for AbciImpl {
             Ok(mut s) => {
                 let span = span!(Level::INFO, "commit").entered();
                 for item in pending_mutation {
-                    if let Ok((gas, total_bytes)) = s.apply_mutation(&item.0, &item.1, &item.2) {
+                    if let Ok((_gas, total_bytes)) = s.apply_mutation(&item.0, &item.1, &item.2) {
                         self.node_state
                             .total_mutations
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
