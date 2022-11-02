@@ -74,7 +74,8 @@ async fn main() {
     let storage_node = StorageNodeImpl::new(store);
     info!("start db3 storage node on public addr {}", addr);
     Server::builder()
-        .add_service(StorageNodeServer::new(storage_node))
+        .accept_http1(true)
+        .add_service(tonic_web::enable(StorageNodeServer::new(storage_node)))
         .serve(addr.parse().unwrap())
         .await
         .unwrap();

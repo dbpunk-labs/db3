@@ -9,11 +9,10 @@ repository = "https://github.com/db3-teams/db3"
 keywords = ["database", "web3","db3"]
 
 [dependencies]
-tonic = "0.7.2"
 prost = "0.10"
 prost-types = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
+tonic = "0.7.2"
 [build-dependencies]
 tonic-build = "0.7.2"

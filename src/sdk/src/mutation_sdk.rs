@@ -20,7 +20,6 @@ use db3_crypto::signer::MutationSigner;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::Mutation;
 use prost::Message;
-use tendermint::block::Height;
 use tendermint_rpc::{Client, HttpClient};
 
 pub struct MutationSDK {

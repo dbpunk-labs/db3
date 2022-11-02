@@ -24,9 +24,9 @@ use rust_secp256k1::Message as HashMessage;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use tendermint_abci::{codec, Application, Error};
+use tendermint_abci::Application;
 use tendermint_proto::abci::{
-    Event, RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
+    RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
     ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
     ResponseQuery,
 };
@@ -57,7 +57,7 @@ impl AbciImpl {
 }
 
 impl Application for AbciImpl {
-    fn info(&self, request: RequestInfo) -> ResponseInfo {
+    fn info(&self, _request: RequestInfo) -> ResponseInfo {
         // the store must be ready when using it
         match self.store.lock() {
             Ok(s) => ResponseInfo {
@@ -88,7 +88,7 @@ impl Application for AbciImpl {
         Default::default()
     }
 
-    fn query(&self, request: RequestQuery) -> ResponseQuery {
+    fn query(&self, _request: RequestQuery) -> ResponseQuery {
         Default::default()
     }
 
