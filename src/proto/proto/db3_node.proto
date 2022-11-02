@@ -16,6 +16,20 @@
 // limitations under the License.
 //
 syntax = "proto3";
-import "db3_base.proto";
+import "db3_bill.proto";
 package db3_node_proto;
 
+message QueryBillRequest {
+    uint64 height = 1;
+    uint64 start_id = 2;
+    uint64 end_id = 3;
+}
+
+message QueryBillResponse {
+    repeated db3_bill_proto.Bill bills = 1;
+}
+
+service StorageNode {
+    // method for querying bills by height
+    rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
+}

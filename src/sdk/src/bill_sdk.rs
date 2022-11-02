@@ -24,6 +24,7 @@ use std::str::FromStr;
 use tendermint::{abci::Path, block::Height};
 use tendermint_rpc::{Client, HttpClient};
 
+#[derive(Debug, Clone)]
 pub struct BillSDK {
     client: HttpClient,
 }

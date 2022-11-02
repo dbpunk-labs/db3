@@ -41,3 +41,4 @@ enum ChainId {
     TestNet = 10;
     DevNet = 20;
 }
+
