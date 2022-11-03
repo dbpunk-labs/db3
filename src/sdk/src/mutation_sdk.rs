@@ -85,11 +85,11 @@ mod tests {
             };
             let result = sdk.submit_mutation(&mutation).await;
             assert!(result.is_ok());
-            let ten_millis = time::Duration::from_millis(2000);
+            let ten_millis = time::Duration::from_millis(1000);
             let now = time::Instant::now();
             thread::sleep(ten_millis);
             count = count + 1;
-            if count > 200000 {
+            if count > 2 {
                 break;
             }
         }
