@@ -60,6 +60,8 @@ mod tests {
             gas_price: None,
             gas: 10,
         };
-        estimate_gas(&mutation);
+        let units = estimate_gas(&mutation);
+        assert_eq!(1, units.utype);
+        assert_eq!(2800, units.amount);
     }
 }

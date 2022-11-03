@@ -41,7 +41,7 @@ pub enum DB3Error {
     GetAccountError(String),
     #[error("out of gas with error {0}")]
     OutOfGasError(String),
-    #[error("bill sdk with {0}")]
+    #[error("fail to call bill sdk with error {0}")]
     BillSDKError(String),
     #[error("hash codec error")]
     HashCodecError,
