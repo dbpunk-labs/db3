@@ -69,7 +69,7 @@ mod tests {
         let mut count = 11;
         loop {
             let kv = KvPair {
-                key:format!("k{}", count).as_bytes().to_vec(),
+                key: format!("k{}", count).as_bytes().to_vec(),
                 value: "value1".as_bytes().to_vec(),
                 action: MutationAction::InsertKv.into(),
             };
@@ -87,7 +87,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             let now = time::Instant::now();
             thread::sleep(ten_millis);
-            count = count +1;
+            count = count + 1;
             if count > 20 {
                 break;
             }

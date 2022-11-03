@@ -15,7 +15,6 @@
 // limitations under the License.
 //
 
-
 use std::{error, fmt};
 
 use serde::{Deserialize, Serialize};
@@ -150,4 +149,3 @@ impl Default for Response {
         }
     }
 }
-

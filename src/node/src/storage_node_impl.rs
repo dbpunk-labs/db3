@@ -17,7 +17,8 @@
 
 use super::auth_storage::AuthStorage;
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, QueryBillRequest, QueryBillResponse, GetKeyRequest, GetKeyResponse
+    storage_node_server::StorageNode, GetKeyRequest, GetKeyResponse, QueryBillRequest,
+    QueryBillResponse,
 };
 use std::boxed::Box;
 use std::pin::Pin;
@@ -51,8 +52,10 @@ impl StorageNode for StorageNodeImpl {
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
-    async fn get_key(&self,
-                     request: Request<GetKeyRequest>) -> std::result::Result<Response<GetKeyResponse>, Status>  {
+    async fn get_key(
+        &self,
+        request: Request<GetKeyRequest>,
+    ) -> std::result::Result<Response<GetKeyResponse>, Status> {
         todo!();
     }
 }

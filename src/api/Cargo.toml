@@ -23,4 +23,9 @@ db3-error={ path = "../error" }
 db3-base={ path = "../base" }
 db3-sdk={ path = "../sdk" }
 actix-web = "4.1.0"
+actix-cors = "0.6"
 tonic = "0.7.2"
+pretty_env_logger = "0.4.0"
+uselog-rs = "0.3.0"
+log = "0.4"
+hex = "0.4.3"
