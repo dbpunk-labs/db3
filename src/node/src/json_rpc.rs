@@ -15,11 +15,9 @@
 // limitations under the License.
 //
 
-use std::{error, fmt};
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
+use std::{error, fmt};
 pub static JSONRPC_VERSION: &str = "2.0";
 
 /// When a rpc call encounters an error, the Response Object MUST contain the

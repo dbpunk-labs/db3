@@ -1,5 +1,5 @@
 //
-// lib.rs
+// hash_util.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +13,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-pub mod abci_impl;
-pub mod auth_storage;
-mod hash_util;
-mod json_rpc;
-pub mod json_rpc_impl;
-pub mod storage_node_impl;
+use db3_error::{DB3Error, Result};
+use subtle_encoding::base64;
+use tendermint_rpc::abci::transaction::{Hash, HASH_LENGTH};
+
+#[warn(dead_code)]
+pub fn base64_to_byte(data: &str) -> Result<Hash> {
+    let decoded = base64::decode(data).map_err(|_| DB3Error::HashCodecError)?;
+    if decoded.len() != HASH_LENGTH {
+        return Err(DB3Error::HashCodecError);
+    }
+    let mut decoded_bytes = [0u8; HASH_LENGTH];
+    decoded_bytes.copy_from_slice(decoded.as_ref());
+    Ok(Hash::new(decoded_bytes))
+}

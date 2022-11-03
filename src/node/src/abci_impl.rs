@@ -16,6 +16,7 @@
 //
 
 use super::auth_storage::{AuthStorage, Hash};
+use bytes::Bytes;
 use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use ethereum_types::Address as AccountAddress;
@@ -70,7 +71,7 @@ impl Application for AbciImpl {
                 version: "0.1.0".to_string(),
                 app_version: 1,
                 last_block_height: s.get_last_block_state().block_height,
-                last_block_app_hash: s.get_last_block_state().abci_hash.to_vec(),
+                last_block_app_hash: Bytes::copy_from_slice(&s.get_last_block_state().abci_hash),
             },
             Err(_) => todo!(),
         }
@@ -103,7 +104,7 @@ impl Application for AbciImpl {
         match account_id {
             Ok(_) => ResponseCheckTx {
                 code: 0,
-                data: vec![],
+                data: Bytes::new(),
                 log: "".to_string(),
                 info: "".to_string(),
                 gas_wanted: 1,
@@ -114,7 +115,7 @@ impl Application for AbciImpl {
             },
             Err(_) => ResponseCheckTx {
                 code: 1,
-                data: vec![],
+                data: Bytes::new(),
                 log: "".to_string(),
                 info: "".to_string(),
                 gas_wanted: 1,
@@ -125,6 +126,7 @@ impl Application for AbciImpl {
             },
         }
     }
+
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
         //TODO match the hash fucntion with tendermint
         let mutation_id = HashMessage::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(
@@ -143,7 +145,7 @@ impl Application for AbciImpl {
         }
         ResponseDeliverTx {
             code: 0,
-            data: vec![],
+            data: Bytes::new(),
             log: "".to_string(),
             info: "".to_string(),
             gas_wanted: 0,
@@ -185,7 +187,7 @@ impl Application for AbciImpl {
                 let hash = s.commit();
                 span.exit();
                 ResponseCommit {
-                    data: hash.to_vec(),
+                    data: Bytes::copy_from_slice(&hash),
                     retain_height: 0,
                 }
             }

@@ -43,6 +43,8 @@ pub enum DB3Error {
     OutOfGasError(String),
     #[error("bill sdk with {0}")]
     BillSDKError(String),
+    #[error("hash codec error")]
+    HashCodecError,
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

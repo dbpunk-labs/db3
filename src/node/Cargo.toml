@@ -9,8 +9,13 @@ path = "src/main.rs"
 
 [dependencies]
 bytes = { version = "1.0", default-features = false }
-tendermint-abci = {version = "0.25.0", git = "https://github.com/dbpunk-labs/tendermint-rs.git", branch = "release/v0.25.0"}
-tendermint-proto = {version = "0.25.0", git = "https://github.com/dbpunk-labs/tendermint-rs.git", branch = "release/v0.25.0"}
+tendermint-abci = "0.26.0"
+tendermint-proto = "0.26.0"
+tendermint-rpc = {version = "0.26.0",  features=["http-client"]}
+tendermint = "0.26.0"
+actix-web = "4.1.0"
+actix-cors = "0.6"
+futures-util = "0.3.25"
 flex-error = { version = "0.4.4", default-features = false }
 db3-proto={path="../proto", version="0.1.0"}
 db3-crypto={path="../crypto", version="0.1.0"}
@@ -36,5 +41,7 @@ prost = "0.10"
 prost-types = "0.10"
 tokio = { version = "1.17.0", features = ["full"] }
 clap = { version = "3.1.8", features = ["derive"] }
+subtle-encoding = { version = "0.5", default-features = false, features = ["bech32-preview"] }
+
 [build-dependencies]
 tonic-build = "0.7.2"

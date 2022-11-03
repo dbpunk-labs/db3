@@ -66,11 +66,11 @@ mod tests {
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let signer = MutationSigner::new(kp);
         let sdk = MutationSDK::new(client, signer);
-        let mut count = 11;
+        let mut count = 1;
         loop {
             let kv = KvPair {
                 key: format!("k{}", count).as_bytes().to_vec(),
-                value: "value1".as_bytes().to_vec(),
+                value: format!("value{}", count).as_bytes().to_vec(),
                 action: MutationAction::InsertKv.into(),
             };
             let mutation = Mutation {
@@ -88,7 +88,7 @@ mod tests {
             let now = time::Instant::now();
             thread::sleep(ten_millis);
             count = count + 1;
-            if count > 20 {
+            if count > 200000 {
                 break;
             }
         }
