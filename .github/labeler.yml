@@ -15,14 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-C-runtime:
-  - runtime/*
-
-C-frame:
-  - frame/*
-
-C-cli:
-  - bin/*
+S-kv:
+  - src/storage/*
 
 development-process:
   - dev/**.*
