@@ -149,6 +149,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         "bills" => handle_bills(&context, request.id, request.params).await,
         "latest_blocks" => handle_latestblocks(&context, request.id, request.params).await,
         "block" => handle_block(&context, request.id, request.params).await,
+        "mutation" => handle_mutation(&context, request.id, request.params).await,
         _ => todo!(),
     };
     let r = match response {
