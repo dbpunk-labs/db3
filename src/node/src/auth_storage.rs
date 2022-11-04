@@ -15,22 +15,20 @@
 // limitations under the License.
 //
 
-use db3_error::{DB3Error, Result};
+use db3_error::Result;
 use db3_proto::db3_base_proto::Units;
-use db3_proto::db3_bill_proto::{Bill, BillQueryRequest, BillType};
-use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
-use db3_storage::account_store::AccountStore;
+use db3_proto::db3_bill_proto::{Bill, BillType};
+use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
+use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue};
 use db3_storage::bill_store::BillStore;
+use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
-use db3_types::{cost, gas};
 use ethereum_types::Address as AccountAddress;
-use merk::proofs::{Decoder, Node, Op as ProofOp};
-use merk::{proofs::encode_into, Merk};
+use merk::proofs::{Node, Op as ProofOp};
+use merk::Merk;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-use tracing::{debug, info};
 
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
@@ -85,6 +83,34 @@ impl AuthStorage {
     #[inline]
     pub fn get_last_block_state(&self) -> &BlockState {
         &self.last_block_state
+    }
+
+    pub fn batch_get(
+        &self,
+        addr: &AccountAddress,
+        batch_get_keys: &BatchGetKey,
+    ) -> Result<BatchGetValue> {
+        let proofs_ops = KvStore::batch_get(self.db.as_ref(), addr, batch_get_keys)?;
+        let ns = batch_get_keys.ns.as_ref();
+        let mut kv_pairs: Vec<KvPair> = Vec::new();
+        for op in proofs_ops {
+            match op {
+                ProofOp::Push(Node::KV(k, v)) => {
+                    let new_key = Key::decode(k.as_ref(), ns)?;
+                    kv_pairs.push(KvPair {
+                        key: new_key.2.to_owned(),
+                        value: v,
+                        action: MutationAction::Nonce.into(),
+                    });
+                }
+                _ => {}
+            }
+        }
+        Ok(BatchGetValue {
+            values: kv_pairs.to_owned(),
+            session: batch_get_keys.session,
+            ns: ns.to_vec(),
+        })
     }
 
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {

@@ -16,25 +16,32 @@
 //
 
 use bytes::BytesMut;
-use db3_crypto::signer::MutationSigner;
+use db3_crypto::signer::Db3Signer;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_proto::Mutation;
+use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use prost::Message;
 use tendermint_rpc::{Client, HttpClient};
 
 pub struct MutationSDK {
     client: HttpClient,
-    signer: MutationSigner,
+    signer: Db3Signer,
 }
 
 impl MutationSDK {
-    pub fn new(client: HttpClient, signer: MutationSigner) -> Self {
+    pub fn new(client: HttpClient, signer: Db3Signer) -> Self {
         Self { client, signer }
     }
 
     pub async fn submit_mutation(&self, mutation: &Mutation) -> Result<()> {
         //TODO update gas and nonce
-        let request = self.signer.sign(&mutation)?;
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        mutation.encode(&mut mbuf);
+        let mbuf = mbuf.freeze();
+        let signature = self.signer.sign(mbuf.as_ref())?;
+        let request = WriteRequest {
+            signature,
+            mutation: mbuf.as_ref().to_vec().to_owned(),
+        };
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf);
         let buf = buf.freeze();
@@ -48,10 +55,10 @@ impl MutationSDK {
 
 #[cfg(test)]
 mod tests {
+    use super::Db3Signer;
     use super::HttpClient;
     use super::Mutation;
     use super::MutationSDK;
-    use super::MutationSigner;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
@@ -61,11 +68,11 @@ mod tests {
     use std::{thread, time};
     #[tokio::test]
     async fn it_submit_mutation() {
-        //let client = HttpClient::new("https://devnet.db3.network").unwrap();
-        let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
+        let client = HttpClient::new("https://devnet.db3.network").unwrap();
+        //let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
-        let signer = MutationSigner::new(kp);
+        let signer = Db3Signer::new(kp);
         let sdk = MutationSDK::new(client, signer);
         let mut count = 1;
         loop {
@@ -89,7 +96,7 @@ mod tests {
             let now = time::Instant::now();
             thread::sleep(ten_millis);
             count = count + 1;
-            if count > 2 {
+            if count > 4 {
                 break;
             }
         }

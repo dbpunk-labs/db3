@@ -50,6 +50,7 @@ message BatchGetKey {
 message BatchGetValue {
     repeated db3_mutation_proto.KVPair values = 1;
     int32 session = 2;
+    bytes ns = 3;
 }
 
 message GetKeyRequest {
@@ -58,9 +59,9 @@ message GetKeyRequest {
 }
 
 message GetKeyResponse {
-    // the validator sign
+    // TODO the validator sign
     bytes signature = 1;
-    bytes batch_get_values = 2;
+    BatchGetValue batch_get_values = 2;
 }
 
 service StorageNode {

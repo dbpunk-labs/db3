@@ -15,8 +15,8 @@
 // limitations under the License.
 //
 
-pub mod bill_sdk;
 pub mod mutation_sdk;
+pub mod store_sdk;
 #[cfg(test)]
 mod tests {
     use super::*;

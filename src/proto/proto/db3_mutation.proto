@@ -23,6 +23,7 @@ package db3_mutation_proto;
 enum MutationAction {
     InsertKv=0;
     DeleteKv=1;
+    Nonce= 2;
 }
 
 message KVPair {

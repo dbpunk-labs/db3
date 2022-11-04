@@ -18,7 +18,6 @@
 use super::ensure_len_eq;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use db3_error::{DB3Error, Result};
-use ethereum_types::Address as AccountAddress;
 //TODO add shard id
 const BLOCK_BILL: &str = "BLOCK_BILL";
 

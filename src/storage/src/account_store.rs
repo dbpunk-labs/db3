@@ -21,7 +21,7 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_types::account_key::AccountKey;
 use ethereum_types::Address as AccountAddress;
-use merk::{BatchEntry, Merk, Op};
+use merk::{Merk, Op};
 use prost::Message;
 use std::pin::Pin;
 

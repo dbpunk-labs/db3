@@ -31,7 +31,6 @@ use tendermint_proto::abci::{
     ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
     ResponseQuery,
 };
-use tracing::info;
 use tracing::{span, Level};
 #[derive(Clone)]
 pub struct NodeState {
@@ -100,7 +99,8 @@ impl Application for AbciImpl {
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
         let request = WriteRequest::decode(request.tx.as_ref()).unwrap();
-        let account_id = verifier::MutationVerifier::verify(&request);
+        let account_id =
+            verifier::Verifier::verify(request.mutation.as_ref(), request.signature.as_ref());
         match account_id {
             Ok(_) => ResponseCheckTx {
                 code: 0,
@@ -133,7 +133,9 @@ impl Application for AbciImpl {
             request.tx.as_ref(),
         );
         let wrequest = WriteRequest::decode(request.tx.as_ref()).unwrap();
-        let account_id = verifier::MutationVerifier::verify(&wrequest).unwrap();
+        let account_id =
+            verifier::Verifier::verify(wrequest.mutation.as_ref(), wrequest.signature.as_ref())
+                .unwrap();
         let mutation = Mutation::decode(wrequest.mutation.as_ref()).unwrap();
         //TODO check nonce
         match self.pending_mutation.lock() {

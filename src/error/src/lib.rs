@@ -45,6 +45,8 @@ pub enum DB3Error {
     BillSDKError(String),
     #[error("hash codec error")]
     HashCodecError,
+    #[error("fail to query kv error {0}")]
+    QueryKvError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

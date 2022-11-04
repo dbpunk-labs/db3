@@ -16,48 +16,39 @@
 // limitations under the License.
 //
 
-use bytes::BytesMut;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1Signature};
 use fastcrypto::traits::Signer;
-use prost::Message;
 
-pub struct MutationSigner {
+pub struct Db3Signer {
     kp: Secp256k1KeyPair,
 }
 
 //
-// Mutationsigner is used in sdk
+// Signer is used in sdk
 //
-impl MutationSigner {
+impl Db3Signer {
     pub fn new(kp: Secp256k1KeyPair) -> Self {
         Self { kp }
     }
 
-    // sign mutation
-    pub fn sign(&self, mutation: &Mutation) -> Result<WriteRequest> {
-        let mut buf = BytesMut::with_capacity(1024 * 8);
-        mutation
-            .encode(&mut buf)
-            .map_err(|e| DB3Error::SignError(format!("{}", e)))?;
-        let buf = buf.freeze();
-        let signature: Secp256k1Signature = self.kp.sign(buf.as_ref());
-        let request = WriteRequest {
-            signature: signature.as_ref().to_vec(),
-            mutation: buf.to_vec(),
-        };
-        Ok(request)
+    // sign msg
+    pub fn sign(&self, msg: &[u8]) -> Result<Vec<u8>> {
+        let signature: Secp256k1Signature = self.kp.sign(msg);
+        Ok(signature.as_ref().to_vec())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::BytesMut;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
+    use db3_proto::db3_mutation_proto::Mutation;
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::traits::KeyPair;
+    use prost::Message;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     #[test]
@@ -78,8 +69,14 @@ mod tests {
             gas_price: None,
             gas: 10,
         };
-        let signer = MutationSigner::new(kp);
-        signer.sign(&mutation)?;
+        let mut buf = BytesMut::with_capacity(1024 * 8);
+        mutation
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::SignError(format!("{}", e)))?;
+        let buf = buf.freeze();
+        let signer = Db3Signer::new(kp);
+        let result = signer.sign(buf.as_ref());
+        assert!(result.is_ok());
         Ok(())
     }
 }

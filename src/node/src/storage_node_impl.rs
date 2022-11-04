@@ -16,10 +16,12 @@
 //
 
 use super::auth_storage::AuthStorage;
+use db3_crypto::verifier::Verifier;
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, GetKeyRequest, GetKeyResponse, QueryBillRequest,
+    storage_node_server::StorageNode, BatchGetKey, GetKeyRequest, GetKeyResponse, QueryBillRequest,
     QueryBillResponse,
 };
+use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -52,11 +54,28 @@ impl StorageNode for StorageNodeImpl {
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
+
     async fn get_key(
         &self,
         request: Request<GetKeyRequest>,
     ) -> std::result::Result<Response<GetKeyResponse>, Status> {
-        todo!();
+        let r = request.into_inner();
+        let account_id = Verifier::verify(r.batch_get.as_ref(), r.signature.as_ref())
+            .map_err(|e| Status::internal(format!("{}", e)))?;
+        let batch_get_key = BatchGetKey::decode(r.batch_get.as_ref())
+            .map_err(|_| Status::internal("fail to decode batch get key".to_string()))?;
+        match self.store.lock() {
+            Ok(s) => {
+                let values = s
+                    .batch_get(&account_id.addr, &batch_get_key)
+                    .map_err(|e| Status::internal(format!("{}", e)))?;
+                Ok(Response::new(GetKeyResponse {
+                    signature: vec![],
+                    batch_get_values: Some(values.to_owned()),
+                }))
+            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
+        }
     }
 }
 

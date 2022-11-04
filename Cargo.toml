@@ -8,4 +8,5 @@ members = [
     "src/storage",
     "src/node",
     "src/sdk",
+    "src/cmd",
 ]

@@ -17,13 +17,11 @@
 use super::auth_storage::AuthStorage;
 use super::hash_util;
 use super::json_rpc;
-use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer};
+use actix_web::{web, Error, HttpResponse};
 use bytes::Bytes;
-use db3_proto::db3_base_proto::{ChainId, ChainRole, Units};
+use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::Bill;
-use db3_proto::db3_mutation_proto::{Mutation, MutationAction, WriteRequest};
-use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-use futures_util::FutureExt as _;
+use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use hex;
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -37,7 +35,7 @@ use std::{
 };
 use subtle_encoding::base64;
 use tendermint::Hash as TMHash;
-use tendermint_rpc::{serializers, Client, HttpClient, Id};
+use tendermint_rpc::{Client, HttpClient, Id};
 
 type ArcAuthStorage = Arc<Mutex<Pin<Box<AuthStorage>>>>;
 fn bills_to_value(bills: &Vec<Bill>) -> Value {
@@ -276,31 +274,38 @@ async fn handle_bills(
 async fn handle_latestblocks(
     context: &Context,
     id: Value,
-    params: Vec<Value>,
+    _params: Vec<Value>,
 ) -> Result<ResponseWrapper, json_rpc::ErrorData> {
     let response = context.client.status().await;
-    if let Ok(status) = response {
-        let max_height = status.sync_info.latest_block_height.value();
-        let min_height = max_height - 20;
-        let block_chain_response = context
-            .client
-            .blockchain(min_height as u32, max_height as u32)
-            .await;
-        let external_id = match id {
-            Value::Number(n) => Id::Num(n.as_i64().unwrap()),
-            Value::String(s) => Id::Str(s),
-            _ => todo!(),
-        };
-        if let Ok(r) = block_chain_response {
-            let wrapper = Wrapper {
-                jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
-                result: Some(r),
-                id: external_id,
+    match response {
+        Ok(status) => {
+            let max_height = status.sync_info.latest_block_height.value();
+            let min_height = max_height - 10;
+            let block_chain_response = context
+                .client
+                .blockchain(min_height as u32, max_height as u32)
+                .await;
+            let external_id = match id {
+                Value::Number(n) => Id::Num(n.as_i64().unwrap()),
+                Value::String(s) => Id::Str(s),
+                _ => todo!(),
             };
-            return Ok(ResponseWrapper::External(
-                serde_json::to_string(&wrapper).unwrap(),
-            ));
+            if let Ok(r) = block_chain_response {
+                let wrapper = Wrapper {
+                    jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
+                    result: Some(r),
+                    id: external_id,
+                };
+                return Ok(ResponseWrapper::External(
+                    serde_json::to_string(&wrapper).unwrap(),
+                ));
+            }else {
+                Err(json_rpc::ErrorData::std(-32601))
+            }
+        }
+        Err(e) => {
+            let err = format!("{}", e);
+            Err(json_rpc::ErrorData::new(-32601, err.as_str()))
         }
     }
-    Err(json_rpc::ErrorData::std(-32601))
 }
