@@ -16,7 +16,7 @@ db3-sdk={ path = "../sdk" }
 db3-proto={ path = "../proto" }
 ethereum-types = { version = "0.13.1", default-features = false }
 fastcrypto="0.1.3"
-prost = "0.10"
+prost = "0.11"
 prost-types = "0.10"
 rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["recovery", "rand-std", "bitcoin_hashes", "global-context"] }
 rand = "0.8.5"
