@@ -99,6 +99,7 @@ mod tests {
     use rand::SeedableRng;
     use std::sync::Arc;
     use tonic::transport::Endpoint;
+    #[ignore]
     #[tokio::test]
     async fn it_get_bills() {
         let mut rng = StdRng::from_seed([0; 32]);

@@ -299,7 +299,7 @@ async fn handle_latestblocks(
                 return Ok(ResponseWrapper::External(
                     serde_json::to_string(&wrapper).unwrap(),
                 ));
-            }else {
+            } else {
                 Err(json_rpc::ErrorData::std(-32601))
             }
         }
