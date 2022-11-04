@@ -54,7 +54,7 @@ jobs:
           args: --no-deps --document-private-items --all-features --workspace --examples
 
   coverage:
-    name: Code coverage
+    name: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -76,13 +76,7 @@ jobs:
           wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
           tar -zxf tendermint_0.34.22_linux_amd64.tar.gz
           sh start_localnet.sh >tm.log 2>&1 &
-      - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
-      - name: Run rust test with coverage
+      - name: Run rust test
         run: |
-          cargo llvm-cov nextest --workspace --exclude merk --lcov --output-path lcov.info --no-fail-fast
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{secrets.COV_TOKEN}}
-          directory: .
-          flags: rust
+          cargo nextest run --workspace --exclude merk
