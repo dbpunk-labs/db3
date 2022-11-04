@@ -67,7 +67,7 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
-          components: rustfmt,llvm-tools-preview
+          components: rustfmt
       - uses: Swatinem/rust-cache@v1
       - name: Setup test env
         run: |
