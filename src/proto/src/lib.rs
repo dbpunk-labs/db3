@@ -26,3 +26,9 @@ pub mod db3_mutation_proto {
 pub mod db3_bill_proto {
     tonic::include_proto!("db3_bill_proto");
 }
+pub mod db3_account_proto {
+    tonic::include_proto!("db3_account_proto");
+}
+pub mod db3_node_proto {
+    tonic::include_proto!("db3_node_proto");
+}

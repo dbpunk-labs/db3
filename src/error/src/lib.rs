@@ -19,6 +19,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DB3Error {
+    #[error("fail to require lock from state")]
+    StateLockBusyError,
     #[error("fail to sign a message with error {0}")]
     SignError(String),
     #[error("fail to verify the request with error {0}")]
@@ -27,8 +29,24 @@ pub enum DB3Error {
     KeyCodecError(String),
     #[error("fail to apply mutation with error {0}")]
     ApplyMutationError(String),
+    #[error("fail to submit mutation with error {0}")]
+    SubmitMutationError(String),
     #[error("fail to apply bill with error {0}")]
     ApplyBillError(String),
+    #[error("fail to query bill with error {0}")]
+    BillQueryError(String),
+    #[error("fail to apply account with error {0}")]
+    ApplyAccountError(String),
+    #[error("fail to query account with error {0}")]
+    GetAccountError(String),
+    #[error("out of gas with error {0}")]
+    OutOfGasError(String),
+    #[error("fail to call bill sdk with error {0}")]
+    BillSDKError(String),
+    #[error("hash codec error")]
+    HashCodecError,
+    #[error("fail to query kv error {0}")]
+    QueryKvError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

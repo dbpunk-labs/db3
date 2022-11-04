@@ -14,12 +14,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
 
 const COMPUTAION_GAS_PRICE: u64 = 1000; // unit in tai
 const STORAGE_GAS_PRICE: u64 = 100; // unit in tai
 
-pub fn estimate_gas(mutation: &Mutation) -> u64 {
+pub fn estimate_gas(mutation: &Mutation) -> Units {
     let mut gas: u64 = 0;
     gas += mutation.kv_pairs.len() as u64 * COMPUTAION_GAS_PRICE;
     for kv in &mutation.kv_pairs {
@@ -32,7 +33,10 @@ pub fn estimate_gas(mutation: &Mutation) -> u64 {
             _ => {}
         }
     }
-    gas
+    Units {
+        utype: UnitType::Tai.into(),
+        amount: gas as i64,
+    }
 }
 
 #[cfg(test)]
@@ -53,9 +57,11 @@ mod tests {
             nonce: 1,
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
-            gas_price: 1,
+            gas_price: None,
             gas: 10,
         };
-        let gas = estimate_gas(&mutation);
+        let units = estimate_gas(&mutation);
+        assert_eq!(1, units.utype);
+        assert_eq!(2800, units.amount);
     }
 }

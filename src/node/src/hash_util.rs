@@ -1,5 +1,5 @@
 //
-// lib.rs
+// hash_util.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,28 +13,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-use anyhow::{ensure, Result};
+use db3_error::{DB3Error, Result};
+use subtle_encoding::base64;
+use tendermint_rpc::abci::transaction::{Hash, HASH_LENGTH};
 
-pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
-    ensure!(
-        data.len() == len,
-        "Unexpected data len {}, expected {}.",
-        data.len(),
-        len,
-    );
-    Ok(())
-}
-
-pub mod account_key;
-pub mod bill_key;
-pub mod cost;
-pub mod gas;
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
+#[warn(dead_code)]
+pub fn base64_to_byte(data: &str) -> Result<Hash> {
+    let decoded = base64::decode(data).map_err(|_| DB3Error::HashCodecError)?;
+    if decoded.len() != HASH_LENGTH {
+        return Err(DB3Error::HashCodecError);
+    }
+    let mut decoded_bytes = [0u8; HASH_LENGTH];
+    decoded_bytes.copy_from_slice(decoded.as_ref());
+    Ok(Hash::new(decoded_bytes))
 }

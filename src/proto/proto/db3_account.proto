@@ -1,6 +1,6 @@
 //
 //
-// db3_bill.proto
+// db3_account.proto
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,35 +15,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
 syntax = "proto3";
 import "db3_base.proto";
-package db3_bill_proto;
+package db3_account_proto;
 
-enum BillType {
-    BillForMutation = 0;
-    BillForQuery = 1;
-}
-
-message Bill {
-    db3_base_proto.Units gas_fee = 1;
-    uint64 block_height = 2;
-    // bill
-    uint64 bill_id = 3;
-    // query session or mutation
-    BillType bill_type = 4;
-    // time on block created
-    uint64 time = 5;
-    // mutation id or query session id
-    bytes bill_target_id = 6;
-    // owner address
-    bytes owner = 8;
-    // service address
-    bytes query_addr = 9;
-}
-
-message BillQueryRequest {
-    uint64 block_height = 1;
-    uint64 start_id = 2;
-    uint64 end_id = 3;
+message Account {
+    db3_base_proto.Units total_bills = 1;
+    uint64 total_storage_in_bytes = 2;
+    uint64 total_mutation_count = 3;
+    uint64 total_query_session_count = 4;
+    db3_base_proto.Units credits = 5;
+    uint64 nonce = 6;
+    uint64 bill_next_id = 7;
 }

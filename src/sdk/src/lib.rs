@@ -15,25 +15,11 @@
 // limitations under the License.
 //
 
-use anyhow::{ensure, Result};
-
-pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
-    ensure!(
-        data.len() == len,
-        "Unexpected data len {}, expected {}.",
-        data.len(),
-        len,
-    );
-    Ok(())
-}
-
-pub mod account_key;
-pub mod bill_key;
-pub mod cost;
-pub mod gas;
-
+pub mod mutation_sdk;
+pub mod store_sdk;
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn it_works() {}

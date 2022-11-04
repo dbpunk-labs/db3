@@ -1,5 +1,5 @@
 //
-// coin.rs
+// node_config.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,15 +15,14 @@
 // limitations under the License.
 //
 
-pub enum Coin {
-    DB3(u64),
-    TAI(u64), // 10^6 tai = 1 db3
+pub struct ChainInitConfig {
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+	use super::*;
 
-    #[test]
-    fn it_works() {}
+	#[test]
+	fn it_works() {
+	}
 }

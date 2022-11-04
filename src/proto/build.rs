@@ -18,11 +18,15 @@
 
 fn main() {
     tonic_build::configure()
+        .build_server(true)
+        .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
         .compile(
             &[
                 "proto/db3_base.proto",
                 "proto/db3_mutation.proto",
                 "proto/db3_bill.proto",
+                "proto/db3_account.proto",
+                "proto/db3_node.proto",
             ],
             &["proto"],
         )

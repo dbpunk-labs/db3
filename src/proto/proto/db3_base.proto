@@ -20,6 +20,16 @@
 syntax = "proto3";
 package db3_base_proto;
 
+enum UnitType {
+    DB3 = 0;
+    TAI = 1; // 10^6 TAI = 1 DB3
+}
+
+message Units {
+    UnitType utype = 1;
+    int64 amount = 2;
+}
+
 enum ChainRole {
     SettlementChain = 0;
     StorageShardChain = 10;
@@ -31,3 +41,4 @@ enum ChainId {
     TestNet = 10;
     DevNet = 20;
 }
+

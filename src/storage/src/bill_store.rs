@@ -20,14 +20,18 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_bill_proto::Bill;
 use db3_types::bill_key::BillKey;
 use ethereum_types::Address as AccountAddress;
+use merk::proofs::{query::Query, Op as ProofOp};
 use merk::{BatchEntry, Merk, Op};
 use prost::Message;
+use std::collections::LinkedList;
+use std::ops::Range;
 use std::pin::Pin;
+
 pub struct BillStore {}
 
 impl BillStore {
-    pub fn apply(db: Pin<&mut Merk>, account_addr: &AccountAddress, bill: &Bill) -> Result<()> {
-        let key = BillKey(*account_addr, bill.bill_id);
+    pub fn apply(db: Pin<&mut Merk>, bill: &Bill) -> Result<()> {
+        let key = BillKey(bill.block_height, bill.bill_id);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024);
         bill.encode(&mut buf)
@@ -42,13 +46,30 @@ impl BillStore {
         }
         Ok(())
     }
+
+    pub fn scan(db: Pin<&Merk>, height: u64, start: u64, end: u64) -> Result<LinkedList<ProofOp>> {
+        let skey = BillKey(height, start);
+        let ekey = BillKey(height, end);
+        let range = Range {
+            start: skey.encode()?,
+            end: ekey.encode()?,
+        };
+        let mut query = Query::new();
+        query.insert_range(range);
+        let ops = db
+            .execute_query(query)
+            .map_err(|e| DB3Error::BillQueryError(format!("{}", e)))?;
+        Ok(ops)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use db3_base::get_a_static_address;
+    use db3_proto::db3_base_proto::{UnitType, Units};
     use db3_proto::db3_bill_proto::BillType;
+    use merk::proofs::{Decoder, Node};
     use std::boxed::Box;
     use tempdir::TempDir;
     #[test]
@@ -59,15 +80,70 @@ mod tests {
         let mut db = Box::pin(merk);
         let target_id: &str = "id";
         let bill = Bill {
-            gas_fee: 1000,
+            gas_fee: Some(Units {
+                utype: UnitType::Db3.into(),
+                amount: 1,
+            }),
             block_height: 11,
             bill_id: 111,
             bill_type: BillType::BillForMutation.into(),
             time: 111,
             bill_target_id: target_id.as_bytes().to_vec(),
+            query_addr: vec![],
+            owner: addr.as_bytes().to_vec(),
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = BillStore::apply(db_m, &addr, &bill);
+        let result = BillStore::apply(db_m, &bill);
+
         assert!(result.is_ok());
+        let bill = Bill {
+            gas_fee: Some(Units {
+                utype: UnitType::Db3.into(),
+                amount: 1,
+            }),
+            block_height: 11,
+            bill_id: 1,
+            bill_type: BillType::BillForMutation.into(),
+            time: 111,
+            bill_target_id: target_id.as_bytes().to_vec(),
+            query_addr: vec![],
+            owner: addr.as_bytes().to_vec(),
+        };
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result = BillStore::apply(db_m, &bill);
+        assert!(result.is_ok());
+
+        let skey = BillKey(11, 0).encode().unwrap();
+        let ekey = BillKey(11, 200).encode().unwrap();
+        let mut query = Query::new();
+        let range = Range {
+            start: skey,
+            end: ekey,
+        };
+        query.insert_range(range);
+        let result = db.as_ref().prove(query);
+        if let Ok(r) = result {
+            let mut decoder = Decoder::new(r.as_ref());
+            loop {
+                if let Some(Ok(op)) = decoder.next() {
+                    match op {
+                        ProofOp::Push(Node::KV(k, v)) => {
+                            println!("k {:?} v {:?}", k, v);
+                        }
+                        ProofOp::Push(Node::KVHash(h)) => {
+                            println!("kvhash {:?}", h);
+                        }
+                        ProofOp::Push(Node::Hash(h)) => {
+                            println!("hash {:?}", h);
+                        }
+                        _ => {
+                            println!("other");
+                        }
+                    }
+                    continue;
+                }
+                break;
+            }
+        }
     }
 }

@@ -54,7 +54,7 @@ jobs:
           args: --no-deps --document-private-items --all-features --workspace --examples
 
   coverage:
-    name: Code coverage
+    name: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -67,11 +67,16 @@ jobs:
           toolchain: nightly
           profile: minimal
           override: true
-          components: rustfmt,llvm-tools-preview
+          components: rustfmt
       - uses: Swatinem/rust-cache@v1
-      - uses: taiki-e/install-action@cargo-llvm-cov
-      - uses: taiki-e/install-action@nextest
-      - name: Run rust test with coverage
+      - name: Setup test env
         run: |
-          rustup target add wasm32-unknown-unknown
-          cargo build --release
+          cargo build
+          cd tools
+          wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
+          tar -zxf tendermint_0.34.22_linux_amd64.tar.gz
+          sh start_localnet.sh >tm.log 2>&1 &
+      - uses: taiki-e/install-action@nextest
+      - name: Run rust test
+        run: |
+          cargo nextest run --workspace --exclude merk

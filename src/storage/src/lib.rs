@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 
+pub mod account_store;
 pub mod bill_store;
 pub mod key;
 pub mod kv_store;
