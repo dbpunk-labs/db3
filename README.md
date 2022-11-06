@@ -5,8 +5,6 @@
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 [![Discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/9JfH4UXyQR)
 
-[![asciicast](https://asciinema.org/a/liAqQnSGNFGfiuP80Ic8QHCWy.svg)](https://asciinema.org/a/liAqQnSGNFGfiuP80Ic8QHCWy?t=8)
-
 # Quick Start 
 
 ```
