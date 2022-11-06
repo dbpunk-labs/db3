@@ -108,7 +108,13 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
             println!("{}", HELP);
             return;
         }
-        "account" => {}
+        "account" => {
+            let kp = get_key_pair(false).unwrap();
+            let addr = get_address_from_pk(&kp.public().pubkey);
+            let account = store_sdk.get_account(&addr).unwrap();
+            show_account(&account);
+            return;
+        }
         "range" | "blocks" => {
             println!("to be provided");
             return;
