@@ -67,7 +67,7 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
     }
 }
 
-pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
+pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str) {
     let parts: Vec<&str> = cmd.split(" ").collect();
     if parts.len() < 3 {
         println!("no enough command, eg put n1 k1 v1 k2 v2 k3 v3");
@@ -77,6 +77,15 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
     let ns = parts[1];
     let mut pairs: Vec<KvPair> = Vec::new();
     match cmd {
+        "restart_session" => {
+            if let Ok((old_session_info, new_session_id)) = store_sdk.restart_session().await {
+                println!("close session {} and restart with session_id {}",
+                         old_session_info, new_session_id)
+            } else {
+                println!("empty set");
+            }
+            return;
+        }
         "get" => {
             let mut keys: Vec<Vec<u8>> = Vec::new();
             for i in 2..parts.len() {

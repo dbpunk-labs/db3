@@ -220,7 +220,7 @@ async fn start_shell(cmd: Commands) {
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let store_sdk = StoreSDK::new(client, signer);
+        let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
         stdout().flush().unwrap();
         let stdin = io::stdin();
@@ -228,7 +228,7 @@ async fn start_shell(cmd: Commands) {
             match line {
                 Err(_) => break, // with ^Z
                 Ok(s) => {
-                    db3_cmd::process_cmd(&sdk, &store_sdk, s.as_str()).await;
+                    db3_cmd::process_cmd(&sdk, &mut store_sdk, s.as_str()).await;
                     print!(">");
                     stdout().flush().unwrap();
                 }

@@ -17,6 +17,8 @@
 
 pub mod mutation_sdk;
 pub mod store_sdk;
+pub mod session_sdk;
+
 #[cfg(test)]
 mod tests {
     use super::*;

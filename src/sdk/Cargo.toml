@@ -21,6 +21,7 @@ prost = "0.10"
 prost-types = "0.10"
 tendermint-rpc = {version = "0.26.0",  features=["http-client"]}
 tendermint = "0.26.0"
+chrono = "0.4.22"
 
 [dev-dependencies]
 rand = "0.8.5"

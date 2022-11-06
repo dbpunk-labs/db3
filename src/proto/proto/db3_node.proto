@@ -63,10 +63,22 @@ message GetKeyResponse {
     bytes signature = 1;
     BatchGetValue batch_get_values = 2;
 }
-
+message QuerySessionInfo {
+    int32 session = 1;
+    int32 session_query_count = 2;
+}
+message RestartSessionRequest {
+    bytes query_session_info = 1;
+    bytes signature = 2;
+}
+message RestartSessionResponse {
+    int32 session = 3;
+}
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
     // method for querying kv data
     rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
+    // method for restart query session
+    rpc RestartQuerySession(RestartSessionRequest) returns (RestartSessionResponse) {}
 }
