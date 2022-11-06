@@ -19,3 +19,4 @@ mod get_address;
 pub use get_address::get_address_from_pk;
 mod test_base;
 pub use test_base::{get_a_static_address, get_static_pk};
+pub mod strings;

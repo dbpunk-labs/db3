@@ -18,6 +18,7 @@
 syntax = "proto3";
 import "db3_bill.proto";
 import "db3_mutation.proto";
+import "db3_account.proto";
 package db3_node_proto;
 
 message QueryBillRequest {
@@ -64,9 +65,16 @@ message GetKeyResponse {
     BatchGetValue batch_get_values = 2;
 }
 
+message GetAccountRequest {
+    // the hex encoded string
+    string addr = 1;
+}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
     // method for querying kv data
     rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
+    // method for querying account
+    rpc GetAccount(GetAccountRequest) returns (db3_account_proto.Account) {}
 }

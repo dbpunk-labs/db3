@@ -15,7 +15,8 @@
 // limitations under the License.
 //
 
-use db3_base::get_address_from_pk;
+use db3_base::{get_address_from_pk, strings};
+use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_sdk::mutation_sdk::MutationSDK;
@@ -77,10 +78,28 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
     }
 }
 
+fn show_account(account: &Account) {
+    println!(
+        "{0: <10} | {1: <10} | {2: <10} | {3: <10} | {4: <10}",
+        "total_bills", "total_storage", "mutations", "querys", "credits"
+    );
+    let inner_account = account.clone();
+    let bills = inner_account.total_bills;
+    let credits = inner_account.credits;
+    println!(
+        "{0: <10} | {1: <10} | {2: <10} | {3: <10} | {4: <10}",
+        strings::units_to_readable_num_str(&bills.unwrap()),
+        strings::bytes_to_readable_num_str(account.total_storage_in_bytes),
+        account.total_mutation_count,
+        account.total_query_session_count,
+        strings::units_to_readable_num_str(&credits.unwrap())
+    )
+}
+
 pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
     let parts: Vec<&str> = cmd.split(" ").collect();
     if parts.len() < 1 {
-        println!("no enough command, e.g. put n1 k1 v1 k2 v2 k3 v3");
+        println!("{}", HELP);
         return;
     }
     let cmd = parts[0];
@@ -89,10 +108,12 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
             println!("{}", HELP);
             return;
         }
-        "account" | "range" | "blocks" => {
+        "account" => {}
+        "range" | "blocks" => {
             println!("to be provided");
             return;
         }
+        _ => {}
     }
     if parts.len() < 3 {
         println!("no enough command, e.g. put n1 k1 v1 k2 v2 k3 v3");
