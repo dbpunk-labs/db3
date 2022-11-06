@@ -15,5 +15,5 @@ db3-base={ path = "../base" }
 byteorder = "1.4.3"
 anyhow = "1.0.66"
 hex = "0.4.3"
-ethereum-types = { version = "0.13.1", default-features = false }
+ethereum-types = { version = "0.14.0", default-features = false }
 fastcrypto="0.1.3"

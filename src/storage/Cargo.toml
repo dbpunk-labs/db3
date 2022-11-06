@@ -8,7 +8,7 @@ homepage = "https://db3.network"
 repository = "https://github.com/db3-teams/db3"
 keywords = ["database", "web3", "db3"]
 [dependencies]
-ethereum-types = { version = "0.13.1", default-features = false }
+ethereum-types = { version = "0.14.0", default-features = false }
 db3-base={ path = "../base" }
 db3-proto={ path ="../proto" }
 db3-error={ path = "../error" }

@@ -22,7 +22,7 @@ prost-types = "0.10"
 tendermint-rpc = {version = "0.26.0",  features=["http-client"]}
 tendermint = "0.26.0"
 
-ethereum-types = { version = "0.13.1", default-features = false }
+ethereum-types = { version = "0.14.0", default-features = false }
 [dev-dependencies]
 rand = "0.8.5"
 fastcrypto="0.1.3"
