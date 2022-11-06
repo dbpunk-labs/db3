@@ -53,7 +53,7 @@ impl AccountStore {
         Ok(())
     }
 
-    pub fn get_account(db: Pin<&Merk>, account_addr: &AccountAddress) -> Result<Option<Account>> {
+    pub fn get_account(db: Pin<&Merk>, account_addr: &AccountAddress) -> Result<Account> {
         let key = AccountKey(*account_addr);
         let encoded_key = key.encode()?;
         //TODO verify the result
@@ -62,12 +62,12 @@ impl AccountStore {
             .map_err(|e| DB3Error::GetAccountError(format!("{}", e)))?;
         if let Some(v) = values {
             match Account::decode(v.as_ref()) {
-                Ok(a) => Ok(Some(a)),
+                Ok(a) => Ok(a),
                 Err(e) => Err(DB3Error::GetAccountError(format!("{}", e))),
             }
         } else {
             //TODO assign 10 db3 credits
-            Ok(Some(Account {
+            Ok(Account {
                 total_bills: Some(Units {
                     utype: UnitType::Tai.into(),
                     amount: 0,
@@ -81,10 +81,11 @@ impl AccountStore {
                 }),
                 nonce: 0,
                 bill_next_id: 0,
-            }))
+            })
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,7 +118,7 @@ mod tests {
         assert!(result.is_ok());
         let account_ret = AccountStore::get_account(db.as_ref(), &addr);
         assert!(account_ret.is_ok());
-        if let Ok(Some(a)) = account_ret {
+        if let Ok(a) = account_ret {
             assert_eq!(a.total_bills, account.total_bills);
         } else {
             assert!(false);

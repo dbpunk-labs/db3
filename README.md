@@ -29,35 +29,6 @@ db3 is a fully decentralized database network which has the following key featur
 
 It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
 
-# Localnet
-
-- Install Tendermint
-https://github.com/tendermint/tendermint/releases/tag/v0.34.22
-
-> v0.34.22
-
-MacOS:
-```shell
-wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_darwin_amd64.tar.gz
-```
-Linux:
-```shell
-wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
-```
-
-and `add tendermint to your PATH`
-
-- Build
-
-```bash
-cargo build --features binary
-```
-- Run
-
-```bash
-cd tools && sh start_localnet.sh
-```
-
 # Desigin
 
 * [account model](./docs/account_model.md)

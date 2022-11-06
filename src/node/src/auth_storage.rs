@@ -16,13 +16,16 @@
 //
 
 use db3_error::Result;
+use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue};
+use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
 use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
+use db3_types::gas;
 use ethereum_types::Address as AccountAddress;
 use merk::proofs::{Node, Op as ProofOp};
 use merk::Merk;
@@ -113,6 +116,10 @@ impl AuthStorage {
         })
     }
 
+    pub fn get_account(&self, addr: &AccountAddress) -> Result<Account> {
+        AccountStore::get_account(self.db.as_ref(), addr)
+    }
+
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {
         let proofs_ops = BillStore::scan(self.db.as_ref(), height, start_id, end_id)?;
         let mut bills: Vec<Bill> = Vec::new();
@@ -141,8 +148,13 @@ impl AuthStorage {
         mutation_id: &Hash,
         mutation: &Mutation,
     ) -> Result<(Units, u64)> {
+        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         let (gas_fee, total_bytes) = KvStore::apply(db, &addr, &mutation)?;
+        let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
+        account.total_bills = Some(accumulate_gas);
+        account.total_mutation_count = account.total_mutation_count + 1;
+        account.total_storage_in_bytes = account.total_storage_in_bytes + total_bytes as u64;
         self.current_block_state.bill_id_counter = self.current_block_state.bill_id_counter + 1;
         let bill = Bill {
             gas_fee: Some(gas_fee.clone()),
@@ -156,6 +168,8 @@ impl AuthStorage {
         };
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         BillStore::apply(db, &bill)?;
+        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+        AccountStore::apply(db, &addr, &account)?;
         Ok((gas_fee, total_bytes as u64))
     }
 

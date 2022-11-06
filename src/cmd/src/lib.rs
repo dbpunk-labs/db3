@@ -30,6 +30,16 @@ use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const HELP: &str = r#"the help of db3 command
+help    show all command
+put     write pairs of key and value to db3 e.g. put ns1 key1 value1 key2 values
+del     delete key from db3                 e.g. del ns1 key1 key2
+get     get value from db3                  e.g. get ns1 key1 key2
+range   get a range from db3                e.g. range ns1 start_key end_key
+account get balance of current account
+blocks  get latest blocks
+"#;
+
 fn current_seconds() -> u64 {
     match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs(),
@@ -69,11 +79,26 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
 
 pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
     let parts: Vec<&str> = cmd.split(" ").collect();
-    if parts.len() < 3 {
-        println!("no enough command, eg put n1 k1 v1 k2 v2 k3 v3");
+    if parts.len() < 1 {
+        println!("no enough command, e.g. put n1 k1 v1 k2 v2 k3 v3");
         return;
     }
     let cmd = parts[0];
+    match cmd {
+        "help" => {
+            println!("{}", HELP);
+            return;
+        }
+        "account" | "range" | "blocks" => {
+            println!("to be provided");
+            return;
+        }
+    }
+    if parts.len() < 3 {
+        println!("no enough command, e.g. put n1 k1 v1 k2 v2 k3 v3");
+        return;
+    }
+
     let ns = parts[1];
     let mut pairs: Vec<KvPair> = Vec::new();
     match cmd {
@@ -97,7 +122,7 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
         }
         "put" => {
             if parts.len() < 4 {
-                println!("no enough command, eg put n1 k1 v1 k2 v2 k3 v3");
+                println!("no enough command, e.g. put n1 k1 v1 k2 v2 k3 v3");
                 return;
             }
             for i in 1..parts.len() / 2 {
