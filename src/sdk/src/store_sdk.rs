@@ -101,7 +101,7 @@ impl StoreSDK {
             };
             let request = tonic::Request::new(q_req);
             let response = client.query_bill(request).await?.into_inner();
-            self.session.increate_query(1);
+            self.session.increase_query(1);
             Ok(response.bills)
         } else {
             return Err(Status::permission_denied(
@@ -160,7 +160,7 @@ impl StoreSDK {
             let mut client = self.client.as_ref().clone();
             let response = client.get_key(request).await?.into_inner();
             // TODO(cj): batch keys query should be count as a query or multi queries?
-            self.session.increate_query(1);
+            self.session.increase_query(1);
             Ok(response.batch_get_values)
         } else {
             return Err(Status::permission_denied(

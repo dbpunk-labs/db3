@@ -81,14 +81,14 @@ impl SessionManager {
         self.status = SessionStatus::READY;
         self.id += 1;
     }
-    pub fn increate_query(&mut self, count: i32) {
+    pub fn increase_query(&mut self, count: i32) {
         self.query_count += count;
     }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use std::{thread, time};
     #[test]
     fn test_new_session() {
         let session = SessionManager::new();
@@ -101,4 +101,33 @@ mod tests {
         session.check_session_status();
         assert_eq!(SessionStatus::RUNNING, session.status);
     }
+
+    #[test]
+    fn query_exceed_limit_session_blocked() {
+        let mut session = SessionManager::new();
+        assert_eq!(SessionStatus::READY, session.status);
+        session.check_session_status();
+        assert_eq!(SessionStatus::RUNNING, session.status);
+        session.increase_query(DEFAULT_SESSION_QUERY_LIMIT + 1);
+        session.check_session_status();
+        assert_eq!(SessionStatus::BLOCKED, session.status);
+    }
+    #[ignore]
+    #[test]
+    fn query_session_timeout_blocked() {
+        let mut session = SessionManager::new();
+        assert_eq!(SessionStatus::READY, session.status);
+        session.check_session_status();
+        assert_eq!(SessionStatus::RUNNING, session.status);
+        session.increase_query( 1);
+        session.check_session_status();
+        assert_eq!(SessionStatus::RUNNING, session.status);
+        let duration = time::Duration::from_secs((DEFAULT_SESSION_PERIOD+1) as u64);
+        thread::sleep(duration);
+        session.check_session_status();
+        assert_eq!(SessionStatus::BLOCKED, session.status);
+        session.reset_session();
+        assert_eq!(SessionStatus::READY, session.status);
+    }
+
 }

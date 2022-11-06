@@ -42,6 +42,9 @@ get     get value from db3                  e.g. get ns1 key1 key2
 range   get a range from db3                e.g. range ns1 start_key end_key
 account get balance of current account
 blocks  get latest blocks
+session info        get session info    e.g session info
+session restart     restart session             e.g session restart
+
 "#;
 
 fn current_seconds() -> u64 {

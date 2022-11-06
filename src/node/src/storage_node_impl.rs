@@ -134,7 +134,7 @@ impl StorageNode for StorageNodeImpl {
                                 .batch_get(&account_id.addr, &batch_get_key)
                                 .map_err(|e| Status::internal(format!("{}", e)))?;
 
-                            session.increate_query(1);
+                            session.increase_query(1);
                             Ok(Response::new(GetKeyResponse {
                                 signature: vec![],
                                 batch_get_values: Some(values.to_owned()),
