@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 
+use crate::session_sdk::{SessionManager, SessionStatus};
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
 use db3_error::{DB3Error, Result};
@@ -22,16 +23,13 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::{Bill, BillQueryRequest};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, GetAccountRequest,
-    GetKeyRequest, GetKeyResponse, QueryBillRequest, QueryBillResponse,
-    QuerySessionInfo, RestartSessionRequest, RestartSessionResponse, GetSessionInfoRequest,
-    GetSessionInfoResponse
+    GetKeyRequest, GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse, QueryBillRequest,
+    QueryBillResponse, QuerySessionInfo, RestartSessionRequest, RestartSessionResponse,
 };
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
 use tonic::Status;
-use crate::session_sdk::{SessionManager, SessionStatus};
-
 
 pub struct StoreSDK {
     client: Arc<StorageNodeClient<tonic::transport::Channel>>,
@@ -44,7 +42,11 @@ impl StoreSDK {
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
         signer: Db3Signer,
     ) -> Self {
-        Self { client, signer, session : SessionManager::new() }
+        Self {
+            client,
+            signer,
+            session: SessionManager::new(),
+        }
     }
 
     pub async fn restart_session(&mut self) -> std::result::Result<(String, i32), Status> {
@@ -52,7 +54,7 @@ impl StoreSDK {
             Ok(_) => {
                 let query_session_info = QuerySessionInfo {
                     session: self.session.get_session_id(),
-                    session_query_count: self.session.get_session_query_count()
+                    session_query_count: self.session.get_session_query_count(),
                 };
                 let mut buf = BytesMut::with_capacity(1024 * 8);
                 query_session_info
@@ -76,9 +78,7 @@ impl StoreSDK {
                 self.session = SessionManager::create_session(response.session);
                 Ok((old_session_info, response.session))
             }
-            Err(e) => {
-                Err(Status::internal(format!("{}", e)))
-            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
 
@@ -104,7 +104,9 @@ impl StoreSDK {
             self.session.increate_query(1);
             Ok(response.bills)
         } else {
-            return Err(Status::permission_denied("Fail to query bill in this session. Please restart query session"));
+            return Err(Status::permission_denied(
+                "Fail to query bill in this session. Please restart query session",
+            ));
         }
     }
 
@@ -117,7 +119,10 @@ impl StoreSDK {
         let account = client.get_account(request).await?.into_inner();
         Ok(account)
     }
-    pub async fn get_session_info(&self, addr: &AccountAddress) -> std::result::Result<(String, i32), Status> {
+    pub async fn get_session_info(
+        &self,
+        addr: &AccountAddress,
+    ) -> std::result::Result<(String, i32), Status> {
         let r = GetSessionInfoRequest {
             addr: format!("{:?}", addr),
         };
@@ -125,7 +130,6 @@ impl StoreSDK {
         let mut client = self.client.as_ref().clone();
         let response = client.get_session_info(request).await?.into_inner();
         Ok((format!("{:?}", response), response.id))
-
     }
     pub async fn batch_get(
         &mut self,
@@ -159,7 +163,9 @@ impl StoreSDK {
             self.session.increate_query(1);
             Ok(response.batch_get_values)
         } else {
-            return Err(Status::permission_denied("Fail to query bill in this session. Please restart query session"));
+            return Err(Status::permission_denied(
+                "Fail to query bill in this session. Please restart query session",
+            ));
         }
     }
 }
@@ -168,6 +174,7 @@ impl StoreSDK {
 mod tests {
     use super::Db3Signer;
     use super::StoreSDK;
+    use super::*;
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::traits::KeyPair;
@@ -175,8 +182,6 @@ mod tests {
     use rand::SeedableRng;
     use std::sync::Arc;
     use tonic::transport::Endpoint;
-    use super::*;
-
 
     #[ignore]
     #[tokio::test]

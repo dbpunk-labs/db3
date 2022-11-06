@@ -28,10 +28,10 @@ pub struct SessionManager {
     id: i32,
     start_time: i64,
     query_count: i32,
-    status: SessionStatus
+    status: SessionStatus,
 }
 // default session timeout 60s
-pub const DEFAULT_SESSION_PERIOD : i64 = 60;
+pub const DEFAULT_SESSION_PERIOD: i64 = 60;
 // default session limit
 pub const DEFAULT_SESSION_QUERY_LIMIT: i32 = 100;
 
@@ -41,7 +41,7 @@ impl SessionManager {
     }
     pub fn create_session(id: i32) -> Self {
         SessionManager {
-            id: id,
+            id,
             start_time: Utc::now().timestamp(),
             query_count: 0,
             status: SessionStatus::READY,
@@ -72,8 +72,7 @@ impl SessionManager {
                     self.status = SessionStatus::BLOCKED;
                 }
             }
-            SessionStatus::BLOCKED => {
-            }
+            SessionStatus::BLOCKED => {}
         }
         &self.status
     }

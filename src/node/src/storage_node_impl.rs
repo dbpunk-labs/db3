@@ -16,42 +16,41 @@
 //
 
 use super::auth_storage::AuthStorage;
+use db3_crypto::account_id::AccountId;
 use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BatchGetKey, GetAccountRequest, GetKeyRequest,
-    GetKeyResponse, QueryBillRequest, QueryBillResponse, RestartSessionRequest, RestartSessionResponse,
-    GetSessionInfoRequest, GetSessionInfoResponse,
+    GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse, QueryBillRequest,
+    QueryBillResponse, RestartSessionRequest, RestartSessionResponse,
 };
+use db3_sdk::session_sdk::{SessionManager, SessionStatus};
 use ethereum_types::Address as AccountAddress;
+use ethereum_types::Address;
 use prost::Message;
 use std::boxed::Box;
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
-use std::collections::HashMap;
-use db3_crypto::account_id::AccountId;
-use ethereum_types::Address;
-use db3_sdk::session_sdk::{SessionManager, SessionStatus};
 
 pub struct StorageNodeImpl {
     store: Arc<Mutex<Pin<Box<AuthStorage>>>>,
-    sessions: Arc<Mutex<Pin<Box<HashMap<Address, SessionManager>>>>>
+    sessions: Arc<Mutex<Pin<Box<HashMap<Address, SessionManager>>>>>,
 }
 
 impl StorageNodeImpl {
     pub fn new(store: Arc<Mutex<Pin<Box<AuthStorage>>>>) -> Self {
         Self {
             store,
-            sessions: Arc::new(Mutex::new(Box::pin(HashMap::new())))
+            sessions: Arc::new(Mutex::new(Box::pin(HashMap::new()))),
         }
     }
 }
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeImpl {
-
     async fn restart_query_session(
         &self,
         request: Request<RestartSessionRequest>,
@@ -78,22 +77,21 @@ impl StorageNode for StorageNodeImpl {
                     }
                     _ => {
                         // no need to apply query session bill
-                        sess_map.insert(account_id.addr, SessionManager::new()).unwrap().get_session_id()
+                        sess_map
+                            .insert(account_id.addr, SessionManager::new())
+                            .unwrap()
+                            .get_session_id()
                     }
                 };
 
-                Ok(Response::new(RestartSessionResponse{
+                Ok(Response::new(RestartSessionResponse {
                     // session id --> i64
-                    session: session_id
+                    session: session_id,
                 }))
             }
-            Err(e) => {
-                Err(Status::internal(format!("{}", e)))
-            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
-
-
 
     async fn query_bill(
         &self,
@@ -126,8 +124,10 @@ impl StorageNode for StorageNodeImpl {
                 }
                 let session = sess_map.get_mut(&account_id.addr).unwrap();
                 if let SessionStatus::RUNNING = session.check_session_status() {
-                    let batch_get_key = BatchGetKey::decode(r.batch_get.as_ref())
-                        .map_err(|_| Status::internal("fail to decode batch get key".to_string()))?;
+                    let batch_get_key =
+                        BatchGetKey::decode(r.batch_get.as_ref()).map_err(|_| {
+                            Status::internal("fail to decode batch get key".to_string())
+                        })?;
                     match self.store.lock() {
                         Ok(s) => {
                             let values = s
@@ -143,9 +143,10 @@ impl StorageNode for StorageNodeImpl {
                         Err(e) => Err(Status::internal(format!("{}", e))),
                     }
                 } else {
-                    return Err(Status::permission_denied("Fail to query bill in this session. Please restart query session"));
+                    return Err(Status::permission_denied(
+                        "Fail to query bill in this session. Please restart query session",
+                    ));
                 }
-
             }
             Err(e) => {
                 return Err(Status::internal(format!("{}", e)));
@@ -183,15 +184,13 @@ impl StorageNode for StorageNodeImpl {
                         id: sess.get_session_id(),
                         start_time: sess.get_start_time(),
                         query_count: sess.get_session_query_count(),
-                        status: format!("{:?}",sess.check_session_status())
+                        status: format!("{:?}", sess.check_session_status()),
                     }))
                 } else {
                     Err(Status::not_found("not found query session"))
                 }
             }
-            Err(e) => {
-                Err(Status::internal(format!("{}", e)))
-            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
 }

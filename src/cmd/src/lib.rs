@@ -133,7 +133,8 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str)
                 "info" => {
                     let kp = get_key_pair(false).unwrap();
                     let addr = get_address_from_pk(&kp.public().pubkey);
-                    if let Ok((session_info, session_id)) = store_sdk.get_session_info(&addr).await {
+                    if let Ok((session_info, session_id)) = store_sdk.get_session_info(&addr).await
+                    {
                         println!("{}", session_info)
                     } else {
                         println!("empty set");
@@ -141,9 +142,13 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str)
                     return;
                 }
                 "restart" => {
-                    if let Ok((old_session_info, new_session_id)) = store_sdk.restart_session().await {
-                        println!("close session {} and restart with session_id {}",
-                                 old_session_info, new_session_id)
+                    if let Ok((old_session_info, new_session_id)) =
+                        store_sdk.restart_session().await
+                    {
+                        println!(
+                            "close session {} and restart with session_id {}",
+                            old_session_info, new_session_id
+                        )
                     } else {
                         println!("empty set");
                     }
