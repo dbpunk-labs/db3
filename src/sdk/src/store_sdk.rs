@@ -23,7 +23,8 @@ use db3_proto::db3_bill_proto::{Bill, BillQueryRequest};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, GetAccountRequest,
     GetKeyRequest, GetKeyResponse, QueryBillRequest, QueryBillResponse,
-    QuerySessionInfo, RestartSessionRequest, RestartSessionResponse
+    QuerySessionInfo, RestartSessionRequest, RestartSessionResponse, GetSessionInfoRequest,
+    GetSessionInfoResponse
 };
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
@@ -116,7 +117,16 @@ impl StoreSDK {
         let account = client.get_account(request).await?.into_inner();
         Ok(account)
     }
+    pub async fn get_session_info(&self, addr: &AccountAddress) -> std::result::Result<(String, i32), Status> {
+        let r = GetSessionInfoRequest {
+            addr: format!("{:?}", addr),
+        };
+        let request = tonic::Request::new(r);
+        let mut client = self.client.as_ref().clone();
+        let response = client.get_session_info(request).await?.into_inner();
+        Ok((format!("{:?}", response), response.id))
 
+    }
     pub async fn batch_get(
         &mut self,
         ns: &[u8],

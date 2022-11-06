@@ -20,7 +20,8 @@ use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BatchGetKey, GetAccountRequest, GetKeyRequest,
-    GetKeyResponse, QueryBillRequest, QueryBillResponse, RestartSessionRequest, RestartSessionResponse
+    GetKeyResponse, QueryBillRequest, QueryBillResponse, RestartSessionRequest, RestartSessionResponse,
+    GetSessionInfoRequest, GetSessionInfoResponse,
 };
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
@@ -91,6 +92,8 @@ impl StorageNode for StorageNodeImpl {
             }
         }
     }
+
+
 
     async fn query_bill(
         &self,
@@ -164,6 +167,31 @@ impl StorageNode for StorageNodeImpl {
                 Ok(Response::new(account))
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
+        }
+    }
+    async fn get_session_info(
+        &self,
+        request: Request<GetSessionInfoRequest>,
+    ) -> std::result::Result<Response<GetSessionInfoResponse>, Status> {
+        let r = request.into_inner();
+        let addr = AccountAddress::from_str(r.addr.as_str())
+            .map_err(|e| Status::internal(format!("{}", e)))?;
+        match self.sessions.lock() {
+            Ok(mut sess_map) => {
+                if let Some(mut sess) = sess_map.get_mut(&addr) {
+                    Ok(Response::new(GetSessionInfoResponse {
+                        id: sess.get_session_id(),
+                        start_time: sess.get_start_time(),
+                        query_count: sess.get_session_query_count(),
+                        status: format!("{:?}",sess.check_session_status())
+                    }))
+                } else {
+                    Err(Status::not_found("not found query session"))
+                }
+            }
+            Err(e) => {
+                Err(Status::internal(format!("{}", e)))
+            }
         }
     }
 }

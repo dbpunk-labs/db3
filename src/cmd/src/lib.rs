@@ -123,6 +123,35 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str)
             show_account(&account);
             return;
         }
+        "session" => {
+            if parts.len() < 2 {
+                println!("no enough command, e.g. session info | session restart");
+                return;
+            }
+            let op = parts[1];
+            match op {
+                "info" => {
+                    let kp = get_key_pair(false).unwrap();
+                    let addr = get_address_from_pk(&kp.public().pubkey);
+                    if let Ok((session_info, session_id)) = store_sdk.get_session_info(&addr).await {
+                        println!("{}", session_info)
+                    } else {
+                        println!("empty set");
+                    }
+                    return;
+                }
+                "restart" => {
+                    if let Ok((old_session_info, new_session_id)) = store_sdk.restart_session().await {
+                        println!("close session {} and restart with session_id {}",
+                                 old_session_info, new_session_id)
+                    } else {
+                        println!("empty set");
+                    }
+                    return;
+                }
+                _ => {}
+            }
+        }
         "range" | "blocks" => {
             println!("to be provided");
             return;
@@ -137,15 +166,6 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str)
     let ns = parts[1];
     let mut pairs: Vec<KvPair> = Vec::new();
     match cmd {
-        "restart_session" => {
-            if let Ok((old_session_info, new_session_id)) = store_sdk.restart_session().await {
-                println!("close session {} and restart with session_id {}",
-                         old_session_info, new_session_id)
-            } else {
-                println!("empty set");
-            }
-            return;
-        }
         "get" => {
             let mut keys: Vec<Vec<u8>> = Vec::new();
             for i in 2..parts.len() {

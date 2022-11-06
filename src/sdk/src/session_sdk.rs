@@ -31,7 +31,7 @@ pub struct SessionManager {
     status: SessionStatus
 }
 // default session timeout 60s
-pub const DEFAULT_SESSION_PERIOD : i64 = 60000;
+pub const DEFAULT_SESSION_PERIOD : i64 = 60;
 // default session limit
 pub const DEFAULT_SESSION_QUERY_LIMIT: i32 = 100;
 
@@ -49,6 +49,9 @@ impl SessionManager {
     }
     pub fn get_session_id(&self) -> i32 {
         self.id
+    }
+    pub fn get_start_time(&self) -> i64 {
+        self.start_time
     }
     pub fn get_session_query_count(&self) -> i32 {
         self.query_count
