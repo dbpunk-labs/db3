@@ -30,6 +30,9 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
+#[macro_use]
+extern crate prettytable;
+use prettytable::{format, Table};
 
 const HELP: &str = r#"the help of db3 command
 help    show all command
@@ -79,21 +82,26 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
 }
 
 fn show_account(account: &Account) {
-    println!(
-        "{0: <10} | {1: <10} | {2: <10} | {3: <10} | {4: <10}",
-        "total_bills", "total_storage", "mutations", "querys", "credits"
-    );
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+    table.add_row(row![
+        "total bills",
+        "total storage",
+        "mutation",
+        "querys",
+        "credits"
+    ]);
     let inner_account = account.clone();
     let bills = inner_account.total_bills;
     let credits = inner_account.credits;
-    println!(
-        "{0: <10} | {1: <10} | {2: <10} | {3: <10} | {4: <10}",
+    table.add_row(row![
         strings::units_to_readable_num_str(&bills.unwrap()),
         strings::bytes_to_readable_num_str(account.total_storage_in_bytes),
         account.total_mutation_count,
         account.total_query_session_count,
         strings::units_to_readable_num_str(&credits.unwrap())
-    )
+    ]);
+    table.printstd();
 }
 
 pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
@@ -111,7 +119,7 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
         "account" => {
             let kp = get_key_pair(false).unwrap();
             let addr = get_address_from_pk(&kp.public().pubkey);
-            let account = store_sdk.get_account(&addr).unwrap();
+            let account = store_sdk.get_account(&addr).await.unwrap();
             show_account(&account);
             return;
         }
