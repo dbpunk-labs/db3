@@ -8,7 +8,7 @@ homepage = "https://db3.network"
 repository = "https://github.com/db3-teams/db3"
 keywords = ["database", "web3", "db3"]
 [dependencies]
-ethereum-types = { version = "0.13.1", default-features = false }
+ethereum-types = { version = "0.14.0", default-features = false }
 db3-base={ path = "../base" }
 db3-proto={ path ="../proto" }
 db3-error={ path = "../error" }
@@ -17,5 +17,5 @@ merk = {version= "2.0.0", path = "../../thirdparty/merk"}
 hex = "0.4.3"
 bytes = "1"
 prost = "0.10"
-prost-types = "0.10"
+prost-types = "0.11"
 tempdir = "0.3.7"

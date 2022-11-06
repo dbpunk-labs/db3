@@ -18,11 +18,12 @@ tokio = { version = "1.17.0", features = ["full"] }
 tonic = "0.7.2"
 tonic-web = "0.3.0"
 prost = "0.10"
-prost-types = "0.10"
+prost-types = "0.11"
 tendermint-rpc = {version = "0.26.0",  features=["http-client"]}
 tendermint = "0.26.0"
 chrono = "0.4.22"
 
+ethereum-types = { version = "0.14.0", default-features = false }
 [dev-dependencies]
 rand = "0.8.5"
 fastcrypto="0.1.3"

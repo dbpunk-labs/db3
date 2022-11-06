@@ -22,7 +22,7 @@ use bytes::Bytes;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
-use hex;
+use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -46,7 +46,8 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
         let base64_bytes = base64::encode(&bill.bill_target_id);
         let base64_string = String::from_utf8(base64_bytes).unwrap();
         new_bill.insert("bill_target_id".to_string(), Value::from(base64_string));
-        new_bill.insert("owner".to_string(), Value::from(hex::encode(&bill.owner)));
+        let addr = AccountAddress::from_slice(bill.owner.as_ref());
+        new_bill.insert("owner".to_string(), Value::from(format!("{:?}", addr)));
         new_bill.insert("time".to_string(), Value::from(bill.time));
         new_bill.insert("block_height".to_string(), Value::from(bill.block_height));
         new_bill.insert("bill_type".to_string(), Value::from(bill.bill_type));
@@ -148,6 +149,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         "latest_blocks" => handle_latestblocks(&context, request.id, request.params).await,
         "block" => handle_block(&context, request.id, request.params).await,
         "mutation" => handle_mutation(&context, request.id, request.params).await,
+        "account" => handle_account(&context, request.id, request.params).await,
         _ => todo!(),
     };
     let r = match response {
@@ -170,6 +172,42 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         ResponseWrapper::External(e) => {
             Ok(HttpResponse::Ok().content_type("application/json").body(e))
         }
+    }
+}
+
+async fn handle_account(
+    context: &Context,
+    id: Value,
+    params: Vec<Value>,
+) -> Result<ResponseWrapper, json_rpc::ErrorData> {
+    if params.len() == 0 {
+        let err = "invalid parameters";
+        Err(json_rpc::ErrorData::new(-32601, err))
+    } else {
+        if let Value::String(s) = &params[0] {
+            if let Ok(addr) = AccountAddress::from_str(s.as_str()) {
+                let account = match context.store.lock() {
+                    Ok(s) => s.get_account(&addr),
+                    _ => todo!(),
+                }
+                .map_err(|_| json_rpc::ErrorData::new(-32601, "fail to get account"))?;
+                let external_id = match id {
+                    Value::Number(n) => Id::Num(n.as_i64().unwrap()),
+                    Value::String(s) => Id::Str(s),
+                    _ => todo!(),
+                };
+                let wrapper = Wrapper {
+                    jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
+                    result: Some(account),
+                    id: external_id,
+                };
+                return Ok(ResponseWrapper::External(
+                    serde_json::to_string(&wrapper).unwrap(),
+                ));
+            }
+        }
+        let err = "invalid parameters";
+        Err(json_rpc::ErrorData::new(-32601, err))
     }
 }
 

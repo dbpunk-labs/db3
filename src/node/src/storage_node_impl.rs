@@ -17,13 +17,16 @@
 
 use super::auth_storage::AuthStorage;
 use db3_crypto::verifier::Verifier;
+use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, BatchGetKey, GetKeyRequest, GetKeyResponse, QueryBillRequest,
-    QueryBillResponse, RestartSessionRequest, RestartSessionResponse
+    storage_node_server::StorageNode, BatchGetKey, GetAccountRequest, GetKeyRequest,
+    GetKeyResponse, QueryBillRequest, QueryBillResponse, RestartSessionRequest, RestartSessionResponse
 };
+use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tonic::{Request, Response, Status};
 use std::collections::HashMap;
@@ -145,7 +148,23 @@ impl StorageNode for StorageNodeImpl {
                 return Err(Status::internal(format!("{}", e)));
             }
         }
-
+    }
+    async fn get_account(
+        &self,
+        request: Request<GetAccountRequest>,
+    ) -> std::result::Result<Response<Account>, Status> {
+        let r = request.into_inner();
+        let addr = AccountAddress::from_str(r.addr.as_str())
+            .map_err(|e| Status::internal(format!("{}", e)))?;
+        match self.store.lock() {
+            Ok(s) => {
+                let account = s
+                    .get_account(&addr)
+                    .map_err(|e| Status::internal(format!("{}", e)))?;
+                Ok(Response::new(account))
+            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
+        }
     }
 }
 

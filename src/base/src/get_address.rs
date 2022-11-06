@@ -31,6 +31,7 @@ mod tests {
     use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
     use hex;
+    use std::str::FromStr;
     #[test]
     fn test_get_address_from_pk() {
         let pk = Secp256k1PublicKey::from_bytes(
@@ -42,5 +43,7 @@ mod tests {
             "0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2",
             format!("{:?}", get_address_from_pk(&pk.pubkey))
         );
+        let addr = Address::from_str("0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2");
+        assert_eq!(addr.unwrap(), get_address_from_pk(&pk.pubkey));
     }
 }

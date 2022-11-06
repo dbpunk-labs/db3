@@ -18,6 +18,7 @@
 syntax = "proto3";
 import "db3_bill.proto";
 import "db3_mutation.proto";
+import "db3_account.proto";
 package db3_node_proto;
 
 message QueryBillRequest {
@@ -74,6 +75,13 @@ message RestartSessionRequest {
 message RestartSessionResponse {
     int32 session = 3;
 }
+
+message GetAccountRequest {
+    // the hex encoded string
+    string addr = 1;
+}
+
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
@@ -81,4 +89,6 @@ service StorageNode {
     rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
     // method for restart query session
     rpc RestartQuerySession(RestartSessionRequest) returns (RestartSessionResponse) {}
+    // method for querying account
+    rpc GetAccount(GetAccountRequest) returns (db3_account_proto.Account) {}
 }

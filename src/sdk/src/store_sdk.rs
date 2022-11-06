@@ -18,12 +18,14 @@
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
 use db3_error::{DB3Error, Result};
+use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::{Bill, BillQueryRequest};
 use db3_proto::db3_node_proto::{
-    storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, GetKeyRequest,
-    GetKeyResponse, QueryBillRequest, QueryBillResponse,
+    storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, GetAccountRequest,
+    GetKeyRequest, GetKeyResponse, QueryBillRequest, QueryBillResponse,
     QuerySessionInfo, RestartSessionRequest, RestartSessionResponse
 };
+use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
 use tonic::Status;
@@ -103,6 +105,16 @@ impl StoreSDK {
         } else {
             return Err(Status::permission_denied("Fail to query bill in this session. Please restart query session"));
         }
+    }
+
+    pub async fn get_account(&self, addr: &AccountAddress) -> std::result::Result<Account, Status> {
+        let r = GetAccountRequest {
+            addr: format!("{:?}", addr),
+        };
+        let request = tonic::Request::new(r);
+        let mut client = self.client.as_ref().clone();
+        let account = client.get_account(request).await?.into_inner();
+        Ok(account)
     }
 
     pub async fn batch_get(
