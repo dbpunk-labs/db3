@@ -4,6 +4,8 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 
+[![asciicast](https://asciinema.org/a/liAqQnSGNFGfiuP80Ic8QHCWy.svg)](https://asciinema.org/a/liAqQnSGNFGfiuP80Ic8QHCWy?t=8)
+
 # What is DB3?
 
 db3 is a fully decentralized database network which has the following key features
@@ -28,35 +30,6 @@ db3 is a fully decentralized database network which has the following key featur
 # Status
 
 It's under a very early stage. if you are interested in this project, Issues, Discussions or PRs are welcome.
-
-# Localnet
-
-- Install Tendermint
-https://github.com/tendermint/tendermint/releases/tag/v0.34.22
-
-> v0.34.22
-
-MacOS:
-```shell
-wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_darwin_amd64.tar.gz
-```
-Linux:
-```shell
-wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
-```
-
-and `add tendermint to your PATH`
-
-- Build
-
-```bash
-cargo build --features binary
-```
-- Run
-
-```bash
-cd tools && sh start_localnet.sh
-```
 
 # Desigin
 

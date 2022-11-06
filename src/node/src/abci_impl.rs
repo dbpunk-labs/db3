@@ -75,6 +75,7 @@ impl Application for AbciImpl {
             Err(_) => todo!(),
         }
     }
+
     fn begin_block(&self, request: RequestBeginBlock) -> ResponseBeginBlock {
         match self.store.lock() {
             Ok(mut s) => {

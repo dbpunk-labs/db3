@@ -69,8 +69,8 @@ mod tests {
     #[ignore]
     #[tokio::test]
     async fn it_submit_mutation() {
-        //let client = HttpClient::new("https://devnet.db3.network").unwrap();
-        let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
+        let client = HttpClient::new("https://devnet.db3.network").unwrap();
+        //let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let signer = Db3Signer::new(kp);
@@ -85,7 +85,7 @@ mod tests {
             let mutation = Mutation {
                 ns: "my_twitter".as_bytes().to_vec(),
                 kv_pairs: vec![kv],
-                nonce: 1,
+                nonce: 111,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,

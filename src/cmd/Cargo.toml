@@ -20,3 +20,4 @@ prost = "0.10"
 prost-types = "0.10"
 rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["recovery", "rand-std", "bitcoin_hashes", "global-context"] }
 rand = "0.8.5"
+prettytable-rs = "^0.9"
