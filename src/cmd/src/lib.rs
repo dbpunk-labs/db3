@@ -53,7 +53,7 @@ fn current_seconds() -> u64 {
 
 pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
     if warning {
-        println!("WARNING, db3 will generate private and save it to ~/.db3/key");
+        println!("WARNING, db3 will generate private key and save it to ~/.db3/key");
     }
     let user_dir: &str = "~/.db3";
     let user_key: &str = "~/.db3/key";
@@ -86,7 +86,7 @@ fn show_account(account: &Account) {
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
     table.add_row(row![
         "total bills",
-        "total storage",
+        "storage used",
         "mutation",
         "querys",
         "credits"

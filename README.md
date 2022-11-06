@@ -4,6 +4,8 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
 
+[![asciicast](https://asciinema.org/a/liAqQnSGNFGfiuP80Ic8QHCWy.svg)](https://asciinema.org/a/liAqQnSGNFGfiuP80Ic8QHCWy?t=8)
+
 # What is DB3?
 
 db3 is a fully decentralized database network which has the following key features
