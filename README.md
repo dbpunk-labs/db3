@@ -1,4 +1,5 @@
 
+![db3_logo](./docs/images/db3_logo.png)
 [![CI](https://github.com/db3-teams/db3/workflows/CI/badge.svg)](https://github.com/db3-teams/db3/actions)
 [![codecov](https://codecov.io/gh/db3-teams/db3/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/db3-teams/db3)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
@@ -7,7 +8,11 @@
 ![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=social)
 ![Discord](https://img.shields.io/discord/1025017851179962408)
 
-# Quick Start 
+# What's DB3
+
+DB3 is a SQL compatible and data processing programmable decentralized database network
+
+# Getting Started
 
 ## Build
 
