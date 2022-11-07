@@ -23,16 +23,18 @@ use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue};
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
+use db3_storage::commit_store::CommitStore;
 use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
 use db3_types::gas;
 use ethereum_types::Address as AccountAddress;
+use hex;
 use merk::proofs::{Node, Op as ProofOp};
 use merk::Merk;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
-
+use tracing::info;
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
 
@@ -81,6 +83,25 @@ impl AuthStorage {
             current_block_state: BlockState::new(),
             db: Box::pin(merk),
         }
+    }
+
+    pub fn init(&mut self) -> Result<()> {
+        if let Ok(Some(height)) = self.get_latest_height() {
+            self.last_block_state.block_height = height as i64;
+            self.last_block_state.abci_hash = self.db.root_hash().clone();
+            info!(
+                "recover state with height {} and hash {}",
+                height,
+                hex::encode_upper(self.last_block_state.abci_hash)
+            );
+        } else {
+            info!("a new node started");
+        }
+        Ok(())
+    }
+
+    pub fn get_latest_height(&self) -> Result<Option<u64>> {
+        CommitStore::get_applied_height(self.db.as_ref())
     }
 
     #[inline]
@@ -174,12 +195,18 @@ impl AuthStorage {
     }
 
     /// return the root hash
-    pub fn commit(&mut self) -> Hash {
+    pub fn commit(&mut self) -> Result<Hash> {
+        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+        CommitStore::apply(db, self.current_block_state.block_height as u64)?;
         let hash = self.db.root_hash().clone();
         self.current_block_state.abci_hash = hash.clone();
         self.last_block_state = self.current_block_state.clone();
         self.current_block_state.reset();
-        hash
+        Ok(hash)
+    }
+
+    pub fn root_hash(&self) -> Hash {
+        self.last_block_state.abci_hash.clone()
     }
 }
 

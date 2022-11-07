@@ -63,14 +63,14 @@ mod tests {
     use super::HttpClient;
     use super::Mutation;
     use super::MutationSDK;
-    use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
+    use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::traits::KeyPair;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     use std::{thread, time};
-    #[ignore]
+    //#[ignore]
     #[tokio::test]
     async fn it_submit_mutation() {
         let client = HttpClient::new("https://devnet.db3.network").unwrap();

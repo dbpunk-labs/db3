@@ -75,7 +75,7 @@ mod tests {
     fn it_apply_bill() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
         let addr = get_a_static_address();
-        let mut merk = Merk::open(tmp_dir_path).unwrap();
+        let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let target_id: &str = "id";
         let bill = Bill {

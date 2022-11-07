@@ -96,7 +96,7 @@ mod tests {
     fn it_apply_account() {
         let tmp_dir_path = TempDir::new("apply_account").expect("create temp dir");
         let addr = get_a_static_address();
-        let mut merk = Merk::open(tmp_dir_path).unwrap();
+        let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let account = Account {
             total_bills: Some(Units {

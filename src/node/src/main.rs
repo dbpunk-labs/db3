@@ -187,6 +187,12 @@ async fn start_node(cmd: Commands) {
         info!("{}", ABOUT);
         let merk = Merk::open(&db_path).unwrap();
         let store = Arc::new(Mutex::new(Box::pin(AuthStorage::new(merk))));
+        match store.lock() {
+            Ok(mut s) => {
+                s.init().unwrap();
+            }
+            _ => todo!(),
+        }
         //TODO recover storage
         let store_for_abci = store.clone();
         let _node_state = start_abci_service(abci_port, read_buf_size, store_for_abci);

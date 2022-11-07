@@ -38,11 +38,3 @@ pub fn units_to_readable_num_str(units: &Units) -> String {
         format!("{} db3", units.amount)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {}
-}
