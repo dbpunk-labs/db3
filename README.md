@@ -6,7 +6,7 @@
 ![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=social)
 ![Discord](https://img.shields.io/discord/1025017851179962408)
 
-# Quick Start 
+# Getting Started
 
 ## Build
 
