@@ -63,7 +63,7 @@ mod tests {
     use super::HttpClient;
     use super::Mutation;
     use super::MutationSDK;
-    use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
+    use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::traits::KeyPair;

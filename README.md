@@ -8,14 +8,28 @@
 
 # Quick Start 
 
+## Build
+
 ```
+# install rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# change toolchain to nightly
+rustup default nightly
+# install cmake on mac os
+brew install cmake
+# or
+# install cmake on ubuntu
+sudo apt install cmake
+
 # build db3
 git clone https://github.com/dbpunk-labs/db3.git
-cd db3 & cargo build
+cd db3 & git submodule init & cargo build
+```
+## Run Localnet
 
+```
 # run localnet
-cd tool && sh start_localnet.sh
-
+cd tools && sh start_localnet.sh
 # open another terminal , enter db3 dir and run db3 shell
 ./target/debug/db3 shell  --public-grpc-url http://127.0.0.1:26659
 
