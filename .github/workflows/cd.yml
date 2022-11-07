@@ -52,8 +52,8 @@ jobs:
             tar -zxf tendermint.tar.gz
           fi
           if [[ ${{ matrix.job.target }} == x86_64-apple-darwin ]]; then
-            wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
-            mv tendermint_0.34.22_linux_amd64.tar.gz tendermint.tar.gz
+            wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_darwin_amd64.tar.gz
+            mv tendermint_0.34.22_darwin_amd64.tar.gz tendermint.tar.gz
             tar -zxf tendermint.tar.gz
           fi
           RELEASE_NAME=db3-${GITHUB_REF/refs\/tags\//}-${{ matrix.job.os-name }}-${{ matrix.job.architecture }}
