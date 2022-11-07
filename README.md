@@ -3,7 +3,9 @@
 [![codecov](https://codecov.io/gh/db3-teams/db3/branch/main/graph/badge.svg?token=A2P47OWC5H)](https://codecov.io/gh/db3-teams/db3)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
-[![Discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/9JfH4UXyQR)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3)
+![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=social)
+![Discord](https://img.shields.io/discord/1025017851179962408)
 
 # Quick Start 
 

@@ -64,11 +64,6 @@ impl ErrorData {
             _ => panic!("Undefined pre-defined error codes"),
         }
     }
-
-    /// Prints out the value as JSON string.
-    pub fn dump(&self) -> String {
-        serde_json::to_string(self).expect("Should never failed")
-    }
 }
 
 impl error::Error for ErrorData {}
@@ -97,13 +92,6 @@ pub struct Request {
     /// not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD
     /// NOT contain fractional parts.
     pub id: Value,
-}
-
-impl Request {
-    /// Prints out the value as JSON string.
-    pub fn dump(&self) -> String {
-        serde_json::to_string(self).expect("Should never failed")
-    }
 }
 
 /// When a rpc call is made, the Server MUST reply with a Response, except for in the case of Notifications. The

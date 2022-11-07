@@ -17,12 +17,11 @@
 
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
-use db3_error::{DB3Error, Result};
 use db3_proto::db3_account_proto::Account;
-use db3_proto::db3_bill_proto::{Bill, BillQueryRequest};
+use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, GetAccountRequest,
-    GetKeyRequest, GetKeyResponse, QueryBillRequest, QueryBillResponse,
+    GetKeyRequest, QueryBillRequest,
 };
 use ethereum_types::Address as AccountAddress;
 use prost::Message;

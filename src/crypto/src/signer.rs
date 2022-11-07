@@ -16,7 +16,7 @@
 // limitations under the License.
 //
 
-use db3_error::{DB3Error, Result};
+use db3_error::Result;
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1Signature};
 use fastcrypto::traits::Signer;
 
