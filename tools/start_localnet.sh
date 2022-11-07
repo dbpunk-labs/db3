@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/base
 #
 # start_localnet.sh
 
@@ -18,10 +18,11 @@ else
         exit 1
     fi
     tar -zxf tendermint.tar.gz
+    ./tendermint init
 fi
 
 killall -s 9 db3
 ../target/debug/db3 node >>db3.log 2>&1  &
 sleep 1
-tendermint start >>tm.log 2>&1 &
+./tendermint start
 
