@@ -19,7 +19,6 @@ pub mod mutation_sdk;
 pub mod store_sdk;
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn it_works() {}

@@ -35,7 +35,9 @@ impl MutationSDK {
     pub async fn submit_mutation(&self, mutation: &Mutation) -> Result<()> {
         //TODO update gas and nonce
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
-        mutation.encode(&mut mbuf);
+        mutation
+            .encode(&mut mbuf)
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?;
         let mbuf = mbuf.freeze();
         let signature = self.signer.sign(mbuf.as_ref())?;
         let request = WriteRequest {
@@ -43,7 +45,9 @@ impl MutationSDK {
             mutation: mbuf.as_ref().to_vec().to_owned(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
-        request.encode(&mut buf);
+        request
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?;
         let buf = buf.freeze();
         self.client
             .broadcast_tx_async(buf.as_ref().to_vec().into())
