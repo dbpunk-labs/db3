@@ -70,7 +70,7 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     use std::{thread, time};
-    #[ignore]
+    //#[ignore]
     #[tokio::test]
     async fn it_submit_mutation() {
         let client = HttpClient::new("https://devnet.db3.network").unwrap();
@@ -89,7 +89,7 @@ mod tests {
             let mutation = Mutation {
                 ns: "my_twitter".as_bytes().to_vec(),
                 kv_pairs: vec![kv],
-                nonce: 111,
+                nonce: 11000,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,
@@ -100,7 +100,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             thread::sleep(ten_millis);
             count = count + 1;
-            if count > 10000 {
+            if count > 1000000000 {
                 break;
             }
         }
