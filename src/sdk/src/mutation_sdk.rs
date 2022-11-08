@@ -70,7 +70,7 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     use std::{thread, time};
-    //#[ignore]
+    #[ignore]
     #[tokio::test]
     async fn it_submit_mutation() {
         let client = HttpClient::new("https://devnet.db3.network").unwrap();
