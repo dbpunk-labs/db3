@@ -34,7 +34,7 @@ cd db3 & git submodule init & cargo build
 
 ```
 # run localnet
-cd tools && base start_localnet.sh
+cd tools && bash start_localnet.sh
 # open another terminal , enter db3 dir and run db3 shell
 ./target/debug/db3 shell
 
