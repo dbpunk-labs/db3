@@ -16,7 +16,7 @@
 // limitations under the License.
 //
 
-use db3_error::{DB3Error, Result};
+use db3_error::Result;
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1Signature};
 use fastcrypto::traits::Signer;
 
@@ -43,6 +43,7 @@ impl Db3Signer {
 mod tests {
     use super::*;
     use bytes::BytesMut;
+    use db3_error::DB3Error;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::Mutation;
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};

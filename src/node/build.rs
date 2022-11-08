@@ -1,5 +1,5 @@
 //
-// lib.rs
+// build.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,6 @@
 // limitations under the License.
 //
 
-pub mod account_store;
-pub mod bill_store;
-pub mod commit_store;
-pub mod key;
-pub mod kv_store;
+fn main() {
+    shadow_rs::new().unwrap();
+}

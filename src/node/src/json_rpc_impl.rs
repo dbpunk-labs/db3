@@ -35,7 +35,7 @@ use std::{
 };
 use subtle_encoding::base64;
 use tendermint::Hash as TMHash;
-use tendermint_rpc::{Client, HttpClient, Id};
+use tendermint_rpc::{Client, HttpClient, Id, Paging};
 
 type ArcAuthStorage = Arc<Mutex<Pin<Box<AuthStorage>>>>;
 fn bills_to_value(bills: &Vec<Bill>) -> Value {
@@ -150,6 +150,8 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         "block" => handle_block(&context, request.id, request.params).await,
         "mutation" => handle_mutation(&context, request.id, request.params).await,
         "account" => handle_account(&context, request.id, request.params).await,
+        "net_info" => handle_netinfo(&context, request.id, request.params).await,
+        "validators" => handle_validators(&context, request.id, request.params).await,
         _ => todo!(),
     };
     let r = match response {
@@ -173,6 +175,65 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
             Ok(HttpResponse::Ok().content_type("application/json").body(e))
         }
     }
+}
+
+async fn handle_validators(
+    context: &Context,
+    id: Value,
+    params: Vec<Value>,
+) -> Result<ResponseWrapper, json_rpc::ErrorData> {
+    if params.len() == 0 {
+        let err = "invalid parameters";
+        Err(json_rpc::ErrorData::new(-32602, err))
+    } else {
+        if let Value::Number(n) = &params[0] {
+            let height = n.as_u64().unwrap() as u32;
+            let response = context
+                .client
+                .validators(height, Paging::All)
+                .await
+                .map_err(|e| json_rpc::ErrorData::new(-32603, format!("{}", e).as_str()))?;
+            let external_id = match id {
+                Value::Number(n) => Id::Num(n.as_i64().unwrap()),
+                Value::String(s) => Id::Str(s),
+                _ => todo!(),
+            };
+            let wrapper = Wrapper {
+                jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
+                result: Some(response),
+                id: external_id,
+            };
+            return Ok(ResponseWrapper::External(
+                serde_json::to_string(&wrapper).unwrap(),
+            ));
+        }
+        Err(json_rpc::ErrorData::std(-32602))
+    }
+}
+
+async fn handle_netinfo(
+    context: &Context,
+    id: Value,
+    _params: Vec<Value>,
+) -> Result<ResponseWrapper, json_rpc::ErrorData> {
+    let response = context
+        .client
+        .net_info()
+        .await
+        .map_err(|e| json_rpc::ErrorData::new(-32603, format!("{}", e).as_str()))?;
+    let external_id = match id {
+        Value::Number(n) => Id::Num(n.as_i64().unwrap()),
+        Value::String(s) => Id::Str(s),
+        _ => todo!(),
+    };
+    let wrapper = Wrapper {
+        jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
+        result: Some(response),
+        id: external_id,
+    };
+    return Ok(ResponseWrapper::External(
+        serde_json::to_string(&wrapper).unwrap(),
+    ));
 }
 
 async fn handle_account(

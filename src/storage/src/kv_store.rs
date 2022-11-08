@@ -119,7 +119,7 @@ mod tests {
     fn it_batch_get_empty() {
         let tmp_dir_path = TempDir::new("batch get").expect("create temp dir");
         let addr = get_a_static_address();
-        let mut merk = Merk::open(tmp_dir_path).unwrap();
+        let merk = Merk::open(tmp_dir_path).unwrap();
         let db = Box::pin(merk);
         let key = "k1".as_bytes().to_vec();
         let keys = BatchGetKey {
@@ -135,7 +135,7 @@ mod tests {
     fn it_apply_mutation() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
         let addr = get_a_static_address();
-        let mut merk = Merk::open(tmp_dir_path).unwrap();
+        let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let kv1 = KvPair {
             key: "k1".as_bytes().to_vec(),

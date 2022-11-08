@@ -18,13 +18,12 @@
 use crate::session_sdk::{SessionManager, SessionStatus};
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
-use db3_error::{DB3Error, Result};
 use db3_proto::db3_account_proto::Account;
-use db3_proto::db3_bill_proto::{Bill, BillQueryRequest};
+use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, GetAccountRequest,
-    GetKeyRequest, GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse, QueryBillRequest,
-    QueryBillResponse, QuerySessionInfo, RestartSessionRequest, RestartSessionResponse,
+    GetKeyRequest, GetSessionInfoRequest, QueryBillRequest,
+    QuerySessionInfo, RestartSessionRequest
 };
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
@@ -84,7 +83,7 @@ impl StoreSDK {
         }
     }
 
-    fn validate_query_session(&self) -> Result<()> {
+    fn validate_query_session(&self) -> std::result::Result<(), Status> {
         Ok(())
     }
 

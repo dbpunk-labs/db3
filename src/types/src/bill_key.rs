@@ -52,8 +52,6 @@ impl BillKey {
 mod tests {
     use super::*;
     use db3_base::get_address_from_pk;
-    use fastcrypto::secp256k1::Secp256k1PublicKey;
-    use fastcrypto::traits::ToFromBytes;
     #[test]
     fn it_billkey_encode() -> Result<()> {
         let bk = BillKey(1, 10);

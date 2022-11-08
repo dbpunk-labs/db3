@@ -10,7 +10,6 @@ mod node_integration {
     use db3_sdk::session_sdk::DEFAULT_SESSION_QUERY_LIMIT;
     use db3_sdk::store_sdk::StoreSDK;
     use fastcrypto::traits::KeyPair;
-    use regex::Regex;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{thread, time};
@@ -36,8 +35,7 @@ mod node_integration {
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let mut store_sdk = StoreSDK::new(client, signer);
-        store_sdk
+        StoreSDK::new(client, signer)
     }
 
     fn current_seconds() -> u64 {

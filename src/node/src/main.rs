@@ -17,7 +17,8 @@
 //
 //
 //
-
+use shadow_rs::shadow;
+shadow!(build);
 use actix_cors::Cors;
 use actix_web::{rt, web, App, HttpServer};
 use clap::{Parser, Subcommand};
@@ -65,7 +66,7 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Start a interactive shell
-    #[clap(arg_required_else_help = true)]
+    #[clap()]
     Shell {
         /// the url of db3 grpc api
         #[clap(long, default_value = "http://127.0.0.1:26659")]
@@ -75,8 +76,8 @@ enum Commands {
         public_json_rpc_url: String,
     },
 
-    /// Start Compute Node Server
-    #[clap(arg_required_else_help = true)]
+    /// Start DB3 node server
+    #[clap()]
     Node {
         /// Bind the gprc server to this .
         #[clap(long, default_value = "127.0.0.1")]
@@ -105,6 +106,10 @@ enum Commands {
         #[clap(short, long, default_value = "./db")]
         db_path: String,
     },
+
+    /// Get the version of DB3
+    #[clap()]
+    Version {},
 }
 
 ///  start abci server
@@ -139,7 +144,8 @@ fn start_json_rpc_service(
                 HttpServer::new(move || {
                     let cors = Cors::default()
                         .allow_any_origin()
-                        .allowed_methods(vec!["GET", "POST"])
+                        .allow_any_method()
+                        .allow_any_header()
                         .max_age(3600);
                     App::new()
                         .app_data(web::Data::new(context.clone()))
@@ -181,6 +187,12 @@ async fn start_node(cmd: Commands) {
         info!("{}", ABOUT);
         let merk = Merk::open(&db_path).unwrap();
         let store = Arc::new(Mutex::new(Box::pin(AuthStorage::new(merk))));
+        match store.lock() {
+            Ok(mut s) => {
+                s.init().unwrap();
+            }
+            _ => todo!(),
+        }
         //TODO recover storage
         let store_for_abci = store.clone();
         let _node_state = start_abci_service(abci_port, read_buf_size, store_for_abci);
@@ -243,5 +255,16 @@ async fn main() {
     match args.command {
         Commands::Shell { .. } => start_shell(args.command).await,
         Commands::Node { .. } => start_node(args.command).await,
+        Commands::Version { .. } => {
+            if shadow_rs::tag().len() > 0 {
+                println!("version:{}", shadow_rs::tag());
+            } else {
+                println!(
+                    "warning: a development version being used in branch {}",
+                    shadow_rs::branch()
+                );
+            }
+            println!("commit:{}", build::SHORT_COMMIT);
+        }
     }
 }

@@ -20,6 +20,7 @@ use bytes::Bytes;
 use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use ethereum_types::Address as AccountAddress;
+use hex;
 use prost::Message;
 use rust_secp256k1::Message as HashMessage;
 use std::pin::Pin;
@@ -31,7 +32,7 @@ use tendermint_proto::abci::{
     ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
     ResponseQuery,
 };
-use tracing::{span, Level};
+use tracing::{debug, info, span, Level};
 #[derive(Clone)]
 pub struct NodeState {
     total_storage_bytes: Arc<AtomicU64>,
@@ -55,6 +56,7 @@ impl AbciImpl {
             }),
         }
     }
+
     #[inline]
     pub fn get_node_state(&self) -> &Arc<NodeState> {
         &self.node_state
@@ -65,13 +67,23 @@ impl Application for AbciImpl {
     fn info(&self, _request: RequestInfo) -> ResponseInfo {
         // the store must be ready when using it
         match self.store.lock() {
-            Ok(s) => ResponseInfo {
-                data: "db3".to_string(),
-                version: "0.1.0".to_string(),
-                app_version: 1,
-                last_block_height: s.get_last_block_state().block_height,
-                last_block_app_hash: Bytes::copy_from_slice(&s.get_last_block_state().abci_hash),
-            },
+            Ok(s) => {
+                info!(
+                    "height {} hash {}",
+                    s.get_last_block_state().block_height,
+                    hex::encode_upper(s.get_last_block_state().abci_hash)
+                );
+                ResponseInfo {
+                    data: "db3".to_string(),
+                    version: "0.1.0".to_string(),
+                    app_version: 1,
+                    last_block_height: s.get_last_block_state().block_height,
+                    last_block_app_hash: Bytes::copy_from_slice(
+                        &s.get_last_block_state().abci_hash,
+                    ),
+                }
+            }
+
             Err(_) => todo!(),
         }
     }
@@ -175,6 +187,7 @@ impl Application for AbciImpl {
         match self.store.lock() {
             Ok(mut s) => {
                 let span = span!(Level::INFO, "commit").entered();
+                let pending_mutation_len = pending_mutation.len();
                 for item in pending_mutation {
                     if let Ok((_gas, total_bytes)) = s.apply_mutation(&item.0, &item.1, &item.2) {
                         self.node_state
@@ -187,11 +200,23 @@ impl Application for AbciImpl {
                         todo!();
                     }
                 }
-                let hash = s.commit();
-                span.exit();
-                ResponseCommit {
-                    data: Bytes::copy_from_slice(&hash),
-                    retain_height: 0,
+                if pending_mutation_len > 0 {
+                    if let Ok(hash) = s.commit() {
+                        span.exit();
+                        ResponseCommit {
+                            data: Bytes::copy_from_slice(&hash),
+                            retain_height: 0,
+                        }
+                    } else {
+                        todo!();
+                    }
+                } else {
+                    let hash = s.root_hash();
+                    debug!("commit hash {}", hex::encode_upper(hash));
+                    ResponseCommit {
+                        data: Bytes::copy_from_slice(&hash),
+                        retain_height: 0,
+                    }
                 }
             }
             Err(_) => {

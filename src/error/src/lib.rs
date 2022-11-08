@@ -37,6 +37,10 @@ pub enum DB3Error {
     BillQueryError(String),
     #[error("fail to apply account with error {0}")]
     ApplyAccountError(String),
+    #[error("fail to apply commit with error {0}")]
+    ApplyCommitError(String),
+    #[error("fail to get commit with error {0}")]
+    GetCommitError(String),
     #[error("fail to query account with error {0}")]
     GetAccountError(String),
     #[error("out of gas with error {0}")]
