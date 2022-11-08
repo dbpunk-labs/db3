@@ -17,7 +17,7 @@ merk = {version= "2.0.0", path = "../../thirdparty/merk"}
 tokio = { version = "1.17.0", features = ["full"] }
 tonic = { version = "0.7.2", features = ["tls-roots"]}
 tonic-web = "0.4.0"
-prost = "0.10"
+prost = "0.11"
 prost-types = "0.11"
 tendermint-rpc = {version = "0.26.0",  features=["http-client"]}
 tendermint = "0.26.0"
