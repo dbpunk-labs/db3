@@ -53,8 +53,10 @@ impl StoreSDK {
         match self.validate_query_session() {
             Ok(_) => {
                 let query_session_info = QuerySessionInfo {
-                    session: self.session.get_session_id(),
-                    session_query_count: self.session.get_session_query_count(),
+                    id: self.session.get_session_id(),
+                    query_count: self.session.get_session_query_count(),
+                    start_time: self.session.get_start_time(),
+                    status: format!("{:?}", self.session.get_session_status()),
                 };
                 let mut buf = BytesMut::with_capacity(1024 * 8);
                 query_session_info
@@ -122,14 +124,16 @@ impl StoreSDK {
     pub async fn get_session_info(
         &self,
         addr: &AccountAddress,
-    ) -> std::result::Result<(String, i32), Status> {
+    ) -> std::result::Result<QuerySessionInfo, Status> {
         let r = GetSessionInfoRequest {
             addr: format!("{:?}", addr),
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
+
         let response = client.get_session_info(request).await?.into_inner();
-        Ok((format!("{:?}", response), response.id))
+        println!("{:?}", response);
+        Ok(response.session_info.unwrap())
     }
     pub async fn batch_get(
         &mut self,
@@ -164,7 +168,7 @@ impl StoreSDK {
             Ok(response.batch_get_values)
         } else {
             return Err(Status::permission_denied(
-                "Fail to query bill in this session. Please restart query session",
+                "Fail to query in this session. Please restart query session",
             ));
         }
     }

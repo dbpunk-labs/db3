@@ -19,7 +19,6 @@ use chrono::Utc;
 
 #[derive(Debug, PartialEq)]
 pub enum SessionStatus {
-    READY,
     RUNNING,
     BLOCKED,
 }
@@ -30,8 +29,8 @@ pub struct SessionManager {
     query_count: i32,
     status: SessionStatus,
 }
-// default session timeout 60s
-pub const DEFAULT_SESSION_PERIOD: i64 = 60;
+// default session timeout 5min
+pub const DEFAULT_SESSION_PERIOD: i64 = 300;
 // default session limit
 pub const DEFAULT_SESSION_QUERY_LIMIT: i32 = 100;
 
@@ -44,7 +43,7 @@ impl SessionManager {
             id,
             start_time: Utc::now().timestamp(),
             query_count: 0,
-            status: SessionStatus::READY,
+            status: SessionStatus::RUNNING,
         }
     }
     pub fn get_session_id(&self) -> i32 {
@@ -61,10 +60,6 @@ impl SessionManager {
     }
     pub fn check_session_status(&mut self) -> &SessionStatus {
         match self.status {
-            SessionStatus::READY => {
-                self.status = SessionStatus::RUNNING;
-                self.start_time = Utc::now().timestamp();
-            }
             SessionStatus::RUNNING => {
                 if Utc::now().timestamp() - self.start_time > DEFAULT_SESSION_PERIOD {
                     self.status = SessionStatus::BLOCKED;
@@ -78,7 +73,8 @@ impl SessionManager {
     }
     pub fn reset_session(&mut self) {
         self.query_count = 0;
-        self.status = SessionStatus::READY;
+        self.status = SessionStatus::RUNNING;
+        self.start_time = Utc::now().timestamp();
         self.id += 1;
     }
     pub fn increase_query(&mut self, count: i32) {
@@ -92,7 +88,7 @@ mod tests {
     #[test]
     fn test_new_session() {
         let session = SessionManager::new();
-        assert_eq!(SessionStatus::READY, session.status);
+        assert_eq!(SessionStatus::RUNNING, session.status);
     }
 
     #[test]
@@ -105,29 +101,10 @@ mod tests {
     #[test]
     fn query_exceed_limit_session_blocked() {
         let mut session = SessionManager::new();
-        assert_eq!(SessionStatus::READY, session.status);
         session.check_session_status();
         assert_eq!(SessionStatus::RUNNING, session.status);
         session.increase_query(DEFAULT_SESSION_QUERY_LIMIT + 1);
         session.check_session_status();
         assert_eq!(SessionStatus::BLOCKED, session.status);
     }
-    #[ignore]
-    #[test]
-    fn query_session_timeout_blocked() {
-        let mut session = SessionManager::new();
-        assert_eq!(SessionStatus::READY, session.status);
-        session.check_session_status();
-        assert_eq!(SessionStatus::RUNNING, session.status);
-        session.increase_query( 1);
-        session.check_session_status();
-        assert_eq!(SessionStatus::RUNNING, session.status);
-        let duration = time::Duration::from_secs((DEFAULT_SESSION_PERIOD+1) as u64);
-        thread::sleep(duration);
-        session.check_session_status();
-        assert_eq!(SessionStatus::BLOCKED, session.status);
-        session.reset_session();
-        assert_eq!(SessionStatus::READY, session.status);
-    }
-
 }

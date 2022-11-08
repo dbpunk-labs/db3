@@ -47,3 +47,6 @@ subtle-encoding = { version = "0.5", default-features = false, features = ["bech
 
 [build-dependencies]
 tonic-build = "0.7.2"
+
+[dev-dependencies]
+regex = "1"

@@ -136,9 +136,8 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str)
                 "info" => {
                     let kp = get_key_pair(false).unwrap();
                     let addr = get_address_from_pk(&kp.public().pubkey);
-                    if let Ok((session_info, session_id)) = store_sdk.get_session_info(&addr).await
-                    {
-                        println!("{}", session_info)
+                    if let Ok(session_info) = store_sdk.get_session_info(&addr).await {
+                        println!("{:?}", session_info)
                     } else {
                         println!("empty set");
                     }

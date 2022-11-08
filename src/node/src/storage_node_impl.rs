@@ -22,7 +22,7 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BatchGetKey, GetAccountRequest, GetKeyRequest,
     GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse, QueryBillRequest,
-    QueryBillResponse, RestartSessionRequest, RestartSessionResponse,
+    QueryBillResponse, QuerySessionInfo, RestartSessionRequest, RestartSessionResponse,
 };
 use db3_sdk::session_sdk::{SessionManager, SessionStatus};
 use ethereum_types::Address as AccountAddress;
@@ -57,30 +57,19 @@ impl StorageNode for StorageNodeImpl {
     ) -> std::result::Result<Response<RestartSessionResponse>, Status> {
         let r = request.into_inner();
         let account_id = Verifier::verify(r.query_session_info.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{}", e)))?;
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
         match self.sessions.lock() {
             Ok(mut sess_map) => {
                 // Takes a reference and returns Option<&V>
                 let session_id = match sess_map.get_mut(&account_id.addr) {
                     Some(sess) => {
-                        match sess.get_session_status() {
-                            SessionStatus::READY => {
-                                // no need to apply query session bill
-                                sess.get_session_id()
-                            }
-                            SessionStatus::RUNNING | SessionStatus::BLOCKED => {
-                                // TODO(chenjing): apply query session bill
-                                sess.reset_session();
-                                sess.get_session_id()
-                            }
-                        }
+                        sess.reset_session();
+                        sess.get_session_id()
                     }
                     _ => {
                         // no need to apply query session bill
-                        sess_map
-                            .insert(account_id.addr, SessionManager::new())
-                            .unwrap()
-                            .get_session_id()
+                        sess_map.insert(account_id.addr, SessionManager::new());
+                        sess_map.get(&account_id.addr).unwrap().get_session_id()
                     }
                 };
 
@@ -144,7 +133,7 @@ impl StorageNode for StorageNodeImpl {
                     }
                 } else {
                     return Err(Status::permission_denied(
-                        "Fail to query bill in this session. Please restart query session",
+                        "Fail to query in this session. Please restart query session",
                     ));
                 }
             }
@@ -181,10 +170,13 @@ impl StorageNode for StorageNodeImpl {
             Ok(mut sess_map) => {
                 if let Some(mut sess) = sess_map.get_mut(&addr) {
                     Ok(Response::new(GetSessionInfoResponse {
-                        id: sess.get_session_id(),
-                        start_time: sess.get_start_time(),
-                        query_count: sess.get_session_query_count(),
-                        status: format!("{:?}", sess.check_session_status()),
+                        signature: vec![],
+                        session_info: Some(QuerySessionInfo {
+                            id: sess.get_session_id(),
+                            start_time: sess.get_start_time(),
+                            query_count: sess.get_session_query_count(),
+                            status: format!("{:?}", sess.check_session_status()),
+                        }),
                     }))
                 } else {
                     Err(Status::not_found("not found query session"))
