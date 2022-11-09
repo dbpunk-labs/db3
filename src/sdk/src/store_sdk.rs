@@ -22,8 +22,8 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, GetAccountRequest,
-    GetKeyRequest, GetSessionInfoRequest, QueryBillRequest,
-    QuerySessionInfo, RestartSessionRequest
+    GetKeyRequest, GetSessionInfoRequest, QueryBillRequest, QuerySessionInfo,
+    RestartSessionRequest,
 };
 use ethereum_types::Address as AccountAddress;
 use prost::Message;

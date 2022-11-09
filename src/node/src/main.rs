@@ -31,6 +31,7 @@ use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
+use http::Uri;
 use merk::Merk;
 use std::io::stdout;
 use std::io::Write;
@@ -41,8 +42,7 @@ use std::sync::Mutex;
 use std::thread;
 use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
-use tonic::transport::Endpoint;
-use tonic::transport::Server;
+use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
 
@@ -105,6 +105,9 @@ enum Commands {
         quiet: bool,
         #[clap(short, long, default_value = "./db")]
         db_path: String,
+        /// disable grpc-web
+        #[clap(long, default_value = "false")]
+        disable_grpc_web: bool,
     },
 
     /// Get the version of DB3
@@ -174,6 +177,7 @@ async fn start_node(cmd: Commands) {
         verbose,
         quiet,
         db_path,
+        disable_grpc_web,
     } = cmd
     {
         let log_level = if quiet {
@@ -207,11 +211,20 @@ async fn start_node(cmd: Commands) {
         let addr = format!("{}:{}", public_host, public_grpc_port);
         let storage_node = StorageNodeImpl::new(store);
         info!("start db3 storage node on public addr {}", addr);
-        Server::builder()
-            .add_service(StorageNodeServer::new(storage_node))
-            .serve(addr.parse().unwrap())
-            .await
-            .unwrap();
+        if disable_grpc_web {
+            Server::builder()
+                .add_service(StorageNodeServer::new(storage_node))
+                .serve(addr.parse().unwrap())
+                .await
+                .unwrap();
+        } else {
+            Server::builder()
+                .accept_http1(true)
+                .add_service(tonic_web::enable(StorageNodeServer::new(storage_node)))
+                .serve(addr.parse().unwrap())
+                .await
+                .unwrap();
+        }
     }
 }
 
@@ -229,8 +242,21 @@ async fn start_shell(cmd: Commands) {
         let sdk = MutationSDK::new(client, signer);
         let kp = db3_cmd::get_key_pair(false).unwrap();
         let signer = Db3Signer::new(kp);
-        let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
+        let uri = public_grpc_url.parse::<Uri>().unwrap();
+        let endpoint = match uri.scheme_str() == Some("https") {
+            true => {
+                let rpc_endpoint = Endpoint::new(public_grpc_url)
+                    .unwrap()
+                    .tls_config(ClientTlsConfig::new())
+                    .unwrap();
+                rpc_endpoint
+            }
+            false => {
+                let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
+                rpc_endpoint
+            }
+        };
+        let channel = endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
         let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
@@ -238,7 +264,9 @@ async fn start_shell(cmd: Commands) {
         let stdin = io::stdin();
         for line in stdin.lock().lines() {
             match line {
-                Err(_) => break, // with ^Z
+                Err(_) => {
+                    return;
+                }
                 Ok(s) => {
                     db3_cmd::process_cmd(&sdk, &mut store_sdk, s.as_str()).await;
                     print!(">");
