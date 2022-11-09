@@ -45,6 +45,7 @@ mod node_integration {
         }
     }
 
+    #[ignore]
     #[tokio::test]
     async fn smoke_test() {
         // create Mutation SDk
