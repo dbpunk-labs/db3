@@ -15,7 +15,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 const RECOVERABLE_SIGNATURE_SIZE: usize = constants::COMPACT_SIGNATURE_SIZE + 1;
 type HmacSha512 = hmac::Hmac<sha2::Sha512>;
 
-
 #[wasm_bindgen]
 pub fn gen_key(seed: &[u8]) -> Result<js_sys::Array, js_sys::Error> {
     let mut hmac = HmacSha512::new_from_slice(&BIP39_DOMAIN_SEPARATOR)
