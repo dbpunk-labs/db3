@@ -59,11 +59,7 @@ k2 -> v2
 
 # Roadmap
 
-db3 has three phases to reach it's vison
-
-* phase 1 decentralized kv storage and data ownership
-* phase 2 programable data virtual machine and permission control
-* phase 3 data privacy
+![roadmap](./docs/images/db3-roadmap.png)
 
 # Archtecture
 ![db3_arch](./docs/images/db3_arch.png)
