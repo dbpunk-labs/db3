@@ -9,7 +9,7 @@
 
 # What's DB3
 
-DB3 is a SQL compatible and data processing programmable decentralized database network
+DB3 is a SQL-compatible and data-processing programmable decentralized database network
 
 # Getting Started
 
