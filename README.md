@@ -59,7 +59,7 @@ k2 -> v2
 
 # Roadmap
 
-![roadmap](./docs/images/db3-roadmap.png)
+![roadmap](./docs/images/db3_roadmap.png)
 
 # Archtecture
 ![db3_arch](./docs/images/db3_arch.png)
