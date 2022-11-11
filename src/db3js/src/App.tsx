@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import reactLogo from "./assets/react.svg";
-import { gen_key } from "./pkg/db3_jsdk_bg.wasm";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
+import { gen_key, sign } from "./pkg/db3_jsdk";
 import "./App.css";
 
 function App() {
 	useEffect(() => {
 		const mn = bip39.generateMnemonic(wordlist);
-		console.log(mn);
 		bip39.mnemonicToSeed(mn, "password").then((seed: Uint8Array) => {
 			console.log(seed.toString());
-			const p = gen_key(seed);
-			console.log(p);
+			const [pk, sk] = gen_key(seed);
+			const signature = sign(new TextEncoder().encode("test"), sk);
+			console.log(signature);
 		});
 	}, []);
 
