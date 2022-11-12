@@ -70,7 +70,6 @@ impl StoreSDK {
                     query_session_info: buf.as_ref().to_vec(),
                     signature,
                 };
-                println!("{:?}", query_session_info);
                 let request = tonic::Request::new(r);
 
                 let mut client = self.client.as_ref().clone();
