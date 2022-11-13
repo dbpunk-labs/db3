@@ -13,14 +13,21 @@
 
 db3 has the following  concepts
 
-**[Mutation](./docs/mutation.md)** All operations on data modification are defined as mutation.You can use mutation to insert, update and delete data
-**[Query](./docs/query.md)** Reading data from the storagement chain is defined as query. You can use query to read all data that you own
-**DVM** Data Virtual Machine
-**Bills**
-**Storage Chain**
-**Settlement Chain**
-**Service Reward**
-**Staking Reward**
+**1 [Mutation](./docs/mutation.md)** All operations on data modification are defined as mutation.You can use mutation to insert, update and delete data
+
+**2 [Query](./docs/query.md)** Reading data from the storagement chain is defined as query. You can use query to read all data that you own
+
+**3 DVM** Data Virtual Machine
+
+**4 Bills**
+
+**5 Storage Chain**
+
+**6 Settlement Chain**
+
+**7 Service Reward**
+
+**8 Staking Reward**
 
 
 # Getting Started
