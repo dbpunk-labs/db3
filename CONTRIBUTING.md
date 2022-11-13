@@ -40,13 +40,10 @@ If the required subsection does not exist yet under **Unreleased**, create it!
 
 ### Set up ETCD
 
-please go to https://etcd.io/docs/v3.5/install/
-
 
 ### Set up Object Store
 
 ```
-sh tools/run_mino.sh
 ```
 
 ### Build and Test

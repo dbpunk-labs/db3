@@ -9,26 +9,27 @@
 
 # What's DB3
 
-DB3 is a SQL-compatible and data-processing programmable decentralized database network
+![overview](./docs/images/db3-overview.svg)
+
+db3 has the following  concepts
+
+**[Mutation](./docs/mutation.md)** All operations on data modification are defined as mutation.You can use mutation to insert, update and delete data
+**[Query](./docs/query.md)** Reading data from the storagement chain is defined as query. You can use query to read all data that you own
+**DVM** Data Virtual Machine
+**Bills**
+**Storage Chain**
+**Settlement Chain**
+**Service Reward**
+**Staking Reward**
+
 
 # Getting Started
 
 ## Build
 
 ```
-# install rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-# change toolchain to nightly
-rustup default nightly
-# install cmake on mac os
-brew install cmake
-# or
-# install cmake on ubuntu
-sudo apt install cmake
-
-# build db3
 git clone https://github.com/dbpunk-labs/db3.git
-cd db3 & git submodule init & cargo build
+cd db3 & base install_env.sh && cargo build
 ```
 ## Run Localnet
 
@@ -37,14 +38,6 @@ cd db3 & git submodule init & cargo build
 cd tools && bash start_localnet.sh
 # open another terminal , enter db3 dir and run db3 shell
 ./target/debug/db3 shell
-
-██████╗ ██████╗ ██████╗
-██╔══██╗██╔══██╗╚════██╗
-██║  ██║██████╔╝ █████╔╝
-██║  ██║██╔══██╗ ╚═══██╗
-██████╔╝██████╔╝██████╔╝
-╚═════╝ ╚═════╝ ╚═════╝
-@db3.network🚀🚀🚀
 WARNING, db3 will generate private key and save it to ~/.db3/key
 restore the key with addr 0x0dce49e41905e6c0c5091adcedee2dee524a3b06
 >put ns1 k1 v1 k2 v2
