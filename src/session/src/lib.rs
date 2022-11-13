@@ -1,4 +1,5 @@
 //
+//
 // lib.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
@@ -15,12 +16,4 @@
 // limitations under the License.
 //
 
-pub mod mutation_sdk;
-pub mod store_sdk;
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
-}
+pub mod session_manager;

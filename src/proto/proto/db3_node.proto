@@ -81,11 +81,15 @@ message GetSessionInfoRequest {
     // the hex encoded string
     string addr = 1;
 }
+enum SessionStatus {
+    Running = 0;
+    Blocked = 1;
+}
 message QuerySessionInfo {
     // the hex encoded string
     int32 id = 1;
     int64 start_time = 2;
-    string status = 3;
+    SessionStatus status = 3;
     int32 query_count = 4;
 }
 message GetSessionInfoResponse {
