@@ -6,9 +6,10 @@ mod node_integration {
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
+    use db3_proto::db3_node_proto::SessionStatus;
     use db3_sdk::mutation_sdk::MutationSDK;
-    use db3_sdk::session_sdk::DEFAULT_SESSION_QUERY_LIMIT;
     use db3_sdk::store_sdk::StoreSDK;
+    use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
     use fastcrypto::traits::KeyPair;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -45,7 +46,6 @@ mod node_integration {
         }
     }
 
-    #[ignore]
     #[tokio::test]
     async fn smoke_test() {
         // create Mutation SDk
@@ -66,8 +66,10 @@ mod node_integration {
             let kp = db3_cmd::get_key_pair(false).unwrap();
             let addr = get_address_from_pk(&kp.public().pubkey);
             let info = store_sdk.get_session_info(&addr).await.unwrap();
-            // assert_eq!(info, "SessionManager { id: 0, start_time: 1667857213, query_count: 0, status: READY }");
-            assert_eq!(info.status, "RUNNING");
+            assert_eq!(
+                SessionStatus::from_i32(info.status).unwrap(),
+                SessionStatus::Running
+            );
             assert_eq!(info.query_count, 0);
         }
 
@@ -128,8 +130,10 @@ mod node_integration {
             let kp = db3_cmd::get_key_pair(false).unwrap();
             let addr = get_address_from_pk(&kp.public().pubkey);
             let info = store_sdk.get_session_info(&addr).await.unwrap();
-            // assert_eq!(info, "SessionManager { id: 0, start_time: 1667857213, query_count: 0, status: READY }");
-            assert_eq!(info.status, "RUNNING");
+            assert_eq!(
+                SessionStatus::from_i32(info.status).unwrap(),
+                SessionStatus::Running.into()
+            );
             assert_eq!(info.query_count, 1);
         }
 
@@ -167,8 +171,10 @@ mod node_integration {
             let kp = db3_cmd::get_key_pair(false).unwrap();
             let addr = get_address_from_pk(&kp.public().pubkey);
             let info = store_sdk.get_session_info(&addr).await.unwrap();
-            // assert_eq!(info, "SessionManager { id: 0, start_time: 1667857213, query_count: 0, status: READY }");
-            assert_eq!(info.status, "BLOCKED");
+            assert_eq!(
+                SessionStatus::from_i32(info.status).unwrap(),
+                SessionStatus::Blocked
+            );
             assert_eq!(info.query_count, DEFAULT_SESSION_QUERY_LIMIT);
         }
 
@@ -182,7 +188,10 @@ mod node_integration {
             let kp = db3_cmd::get_key_pair(false).unwrap();
             let addr = get_address_from_pk(&kp.public().pubkey);
             let info = store_sdk.get_session_info(&addr).await.unwrap();
-            assert_eq!(info.status, "RUNNING");
+            assert_eq!(
+                SessionStatus::from_i32(info.status).unwrap(),
+                SessionStatus::Running
+            );
             assert_eq!(info.query_count, 0);
         }
         // delete k1
@@ -212,7 +221,10 @@ mod node_integration {
                 let kp = db3_cmd::get_key_pair(false).unwrap();
                 let addr = get_address_from_pk(&kp.public().pubkey);
                 let info = store_sdk.get_session_info(&addr).await.unwrap();
-                assert_eq!(info.status, "RUNNING");
+                assert_eq!(
+                    SessionStatus::from_i32(info.status).unwrap(),
+                    SessionStatus::Running
+                );
                 assert_eq!(info.query_count, 0);
             }
             {

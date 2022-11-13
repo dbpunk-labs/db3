@@ -21,8 +21,14 @@ else
     ./tendermint init
 fi
 
+# clean db3
 killall -s 9 db3
+if [ -e ./db3 ]
+then
+    rm -rf db3
+fi
 ../target/debug/db3 node >>db3.log 2>&1  &
 sleep 1
-./tendermint start
+./tendermint init && ./tendermint unsafe_reset_all && ./tendermint start
+sleep 1
 

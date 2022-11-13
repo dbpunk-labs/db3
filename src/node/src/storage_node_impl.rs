@@ -22,9 +22,9 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BatchGetKey, GetAccountRequest, GetKeyRequest,
     GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse, QueryBillRequest,
-    QueryBillResponse, QuerySessionInfo, RestartSessionRequest, RestartSessionResponse,
+    QueryBillResponse, RestartSessionRequest, RestartSessionResponse,
 };
-use db3_sdk::session_sdk::{SessionManager, SessionStatus};
+use db3_session::session_manager::SessionManager;
 use ethereum_types::Address as AccountAddress;
 use ethereum_types::Address;
 use prost::Message;
@@ -91,7 +91,7 @@ impl StorageNode for StorageNodeImpl {
             Ok(s) => {
                 let bills = s
                     .get_bills(r.height, r.start_id, r.end_id)
-                    .map_err(|e| Status::internal(format!("{}", e)))?;
+                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 Ok(Response::new(QueryBillResponse { bills }))
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
@@ -104,7 +104,7 @@ impl StorageNode for StorageNodeImpl {
     ) -> std::result::Result<Response<GetKeyResponse>, Status> {
         let r = request.into_inner();
         let account_id = Verifier::verify(r.batch_get.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{}", e)))?;
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
         match self.sessions.lock() {
             Ok(mut sess_map) => {
                 // Takes a reference and returns Option<&V>
@@ -112,7 +112,7 @@ impl StorageNode for StorageNodeImpl {
                     sess_map.insert(account_id.addr, SessionManager::new());
                 }
                 let session = sess_map.get_mut(&account_id.addr).unwrap();
-                if let SessionStatus::RUNNING = session.check_session_status() {
+                if session.check_session_running() {
                     let batch_get_key =
                         BatchGetKey::decode(r.batch_get.as_ref()).map_err(|_| {
                             Status::internal("fail to decode batch get key".to_string())
@@ -121,7 +121,7 @@ impl StorageNode for StorageNodeImpl {
                         Ok(s) => {
                             let values = s
                                 .batch_get(&account_id.addr, &batch_get_key)
-                                .map_err(|e| Status::internal(format!("{}", e)))?;
+                                .map_err(|e| Status::internal(format!("{:?}", e)))?;
 
                             session.increase_query(1);
                             Ok(Response::new(GetKeyResponse {
@@ -153,7 +153,7 @@ impl StorageNode for StorageNodeImpl {
             Ok(s) => {
                 let account = s
                     .get_account(&addr)
-                    .map_err(|e| Status::internal(format!("{}", e)))?;
+                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 Ok(Response::new(account))
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
@@ -168,15 +168,11 @@ impl StorageNode for StorageNodeImpl {
             .map_err(|e| Status::internal(format!("{}", e)))?;
         match self.sessions.lock() {
             Ok(mut sess_map) => {
-                if let Some(mut sess) = sess_map.get_mut(&addr) {
+                if let Some(sess) = sess_map.get_mut(&addr) {
+                    sess.check_session_status();
                     Ok(Response::new(GetSessionInfoResponse {
                         signature: vec![],
-                        session_info: Some(QuerySessionInfo {
-                            id: sess.get_session_id(),
-                            start_time: sess.get_start_time(),
-                            query_count: sess.get_session_query_count(),
-                            status: format!("{:?}", sess.check_session_status()),
-                        }),
+                        session_info: Some(sess.get_session_info()),
                     }))
                 } else {
                     Err(Status::not_found("not found query session"))
