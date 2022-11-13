@@ -51,6 +51,8 @@ pub enum DB3Error {
     HashCodecError,
     #[error("fail to query kv error {0}")]
     QueryKvError(String),
+    #[error("fail to query, invalid session status {0}")]
+    QuerySessionStatusError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

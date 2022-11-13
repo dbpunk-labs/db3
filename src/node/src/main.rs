@@ -258,7 +258,7 @@ async fn start_shell(cmd: Commands) {
         };
         let channel = endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let store_sdk = StoreSDK::new(client, signer);
+        let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
         stdout().flush().unwrap();
         let stdin = io::stdin();
@@ -268,7 +268,7 @@ async fn start_shell(cmd: Commands) {
                     return;
                 }
                 Ok(s) => {
-                    db3_cmd::process_cmd(&sdk, &store_sdk, s.as_str()).await;
+                    db3_cmd::process_cmd(&sdk, &mut store_sdk, s.as_str()).await;
                     print!(">");
                     stdout().flush().unwrap();
                 }

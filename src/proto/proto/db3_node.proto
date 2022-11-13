@@ -64,18 +64,43 @@ message GetKeyResponse {
     bytes signature = 1;
     BatchGetValue batch_get_values = 2;
 }
+message RestartSessionRequest {
+    bytes query_session_info = 1;
+    bytes signature = 2;
+}
+message RestartSessionResponse {
+    int32 session = 3;
+}
 
 message GetAccountRequest {
     // the hex encoded string
     string addr = 1;
 }
 
-
+message GetSessionInfoRequest {
+    // the hex encoded string
+    string addr = 1;
+}
+message QuerySessionInfo {
+    // the hex encoded string
+    int32 id = 1;
+    int64 start_time = 2;
+    string status = 3;
+    int32 query_count = 4;
+}
+message GetSessionInfoResponse {
+    // TODO the validator sign
+    bytes signature = 1;
+    QuerySessionInfo session_info = 2;
+}
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
     // method for querying kv data
     rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
+    // method for restart query session
+    rpc RestartQuerySession(RestartSessionRequest) returns (RestartSessionResponse) {}
     // method for querying account
     rpc GetAccount(GetAccountRequest) returns (db3_account_proto.Account) {}
+    rpc GetSessionInfo(GetSessionInfoRequest) returns (GetSessionInfoResponse) {}
 }

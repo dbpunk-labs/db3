@@ -16,7 +16,9 @@
 //
 
 pub mod mutation_sdk;
+pub mod session_sdk;
 pub mod store_sdk;
+
 #[cfg(test)]
 mod tests {
 
