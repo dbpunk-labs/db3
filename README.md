@@ -21,14 +21,6 @@ db3 has the following  concepts
 
 **4 Bills**
 
-**5 Storage Chain**
-
-**6 Settlement Chain**
-
-**7 Service Reward**
-
-**8 Staking Reward**
-
 
 # Getting Started
 
