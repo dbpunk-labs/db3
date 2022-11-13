@@ -19,7 +19,7 @@ use chrono::Utc;
 use db3_proto::db3_node_proto::{QuerySessionInfo, SessionStatus};
 #[derive(Debug)]
 pub struct SessionManager {
-    session_info: QuerySessionInfo
+    session_info: QuerySessionInfo,
 }
 // default session timeout 1hrs
 pub const DEFAULT_SESSION_PERIOD: i64 = 3600;
@@ -32,12 +32,12 @@ impl SessionManager {
     }
     pub fn create_session(id: i32) -> Self {
         SessionManager {
-            session_info : QuerySessionInfo {
+            session_info: QuerySessionInfo {
                 id,
                 start_time: Utc::now().timestamp(),
                 query_count: 0,
                 status: SessionStatus::Running.into(),
-            }
+            },
         }
     }
     pub fn get_session_info(&self) -> QuerySessionInfo {

@@ -24,7 +24,7 @@ use db3_proto::db3_node_proto::{
     GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse, QueryBillRequest,
     QueryBillResponse, RestartSessionRequest, RestartSessionResponse,
 };
-use db3_session::session_manager::{SessionManager};
+use db3_session::session_manager::SessionManager;
 use ethereum_types::Address as AccountAddress;
 use ethereum_types::Address;
 use prost::Message;

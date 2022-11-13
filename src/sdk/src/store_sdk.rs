@@ -15,7 +15,6 @@
 // limitations under the License.
 //
 
-use db3_session::session_manager::{SessionManager};
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
 use db3_proto::db3_account_proto::Account;
@@ -25,6 +24,7 @@ use db3_proto::db3_node_proto::{
     GetKeyRequest, GetSessionInfoRequest, QueryBillRequest, QuerySessionInfo,
     RestartSessionRequest,
 };
+use db3_session::session_manager::SessionManager;
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
@@ -53,7 +53,8 @@ impl StoreSDK {
             Ok(_) => {
                 let query_session_info = self.session.get_session_info();
                 let mut buf = BytesMut::with_capacity(1024 * 8);
-                query_session_info.encode(&mut buf)
+                query_session_info
+                    .encode(&mut buf)
                     .map_err(|e| Status::internal(format!("{}", e)))?;
                 let buf = buf.freeze();
                 let signature = self
@@ -86,7 +87,7 @@ impl StoreSDK {
         start: u64,
         end: u64,
     ) -> std::result::Result<Vec<Bill>, Status> {
-        if  self.session.check_session_running() {
+        if self.session.check_session_running() {
             let mut client = self.client.as_ref().clone();
             let q_req = QueryBillRequest {
                 height,
@@ -131,7 +132,7 @@ impl StoreSDK {
         ns: &[u8],
         keys: Vec<Vec<u8>>,
     ) -> std::result::Result<Option<BatchGetValue>, Status> {
-        if self.session.check_session_running()  {
+        if self.session.check_session_running() {
             let batch_keys = BatchGetKey {
                 ns: ns.to_vec(),
                 keys,
