@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use crate::session_sdk::{SessionManager, SessionStatus};
+use db3_session::session_manager::{SessionManager};
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
 use db3_proto::db3_account_proto::Account;
@@ -51,21 +51,15 @@ impl StoreSDK {
     pub async fn restart_session(&mut self) -> std::result::Result<(String, i32), Status> {
         match self.validate_query_session() {
             Ok(_) => {
-                let query_session_info = QuerySessionInfo {
-                    id: self.session.get_session_id(),
-                    query_count: self.session.get_session_query_count(),
-                    start_time: self.session.get_start_time(),
-                    status: format!("{:?}", self.session.get_session_status()),
-                };
+                let query_session_info = self.session.get_session_info();
                 let mut buf = BytesMut::with_capacity(1024 * 8);
-                query_session_info
-                    .encode(&mut buf)
+                query_session_info.encode(&mut buf)
                     .map_err(|e| Status::internal(format!("{}", e)))?;
                 let buf = buf.freeze();
                 let signature = self
                     .signer
                     .sign(buf.as_ref())
-                    .map_err(|e| Status::internal(format!("{}", e)))?;
+                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 let r = RestartSessionRequest {
                     query_session_info: buf.as_ref().to_vec(),
                     signature,
@@ -92,7 +86,7 @@ impl StoreSDK {
         start: u64,
         end: u64,
     ) -> std::result::Result<Vec<Bill>, Status> {
-        if let SessionStatus::RUNNING = self.session.check_session_status() {
+        if  self.session.check_session_running() {
             let mut client = self.client.as_ref().clone();
             let q_req = QueryBillRequest {
                 height,
@@ -130,7 +124,6 @@ impl StoreSDK {
         let mut client = self.client.as_ref().clone();
 
         let response = client.get_session_info(request).await?.into_inner();
-        println!("{:?}", response);
         Ok(response.session_info.unwrap())
     }
     pub async fn batch_get(
@@ -138,7 +131,7 @@ impl StoreSDK {
         ns: &[u8],
         keys: Vec<Vec<u8>>,
     ) -> std::result::Result<Option<BatchGetValue>, Status> {
-        if let SessionStatus::RUNNING = self.session.check_session_status() {
+        if self.session.check_session_running()  {
             let batch_keys = BatchGetKey {
                 ns: ns.to_vec(),
                 keys,
@@ -152,7 +145,7 @@ impl StoreSDK {
             let signature = self
                 .signer
                 .sign(buf.as_ref())
-                .map_err(|e| Status::internal(format!("{}", e)))?;
+                .map_err(|e| Status::internal(format!("{:?}", e)))?;
             let r = GetKeyRequest {
                 batch_get: buf.as_ref().to_vec(),
                 signature,
