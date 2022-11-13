@@ -36,7 +36,7 @@ db3 has the following  concepts
 
 ```
 git clone https://github.com/dbpunk-labs/db3.git
-cd db3 & base install_env.sh && cargo build
+cd db3 & bash install_env.sh && cargo build
 ```
 ## Run Localnet
 
