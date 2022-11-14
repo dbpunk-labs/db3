@@ -68,7 +68,6 @@ db3 has the following  concepts
 
 **4 [Bills](./docs/bills.md)** Bills will be generated when a mutation or query has been submitted to db3
 
-**5 Gas** 
 
 # Getting Started
 
