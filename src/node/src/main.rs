@@ -218,9 +218,12 @@ async fn start_node(cmd: Commands) {
                 .await
                 .unwrap();
         } else {
+            //TODO use flag to config theses options
+            let config = tonic_web::config().allow_all_origins();
+            let service = config.enable(StorageNodeServer::new(storage_node));
             Server::builder()
                 .accept_http1(true)
-                .add_service(tonic_web::enable(StorageNodeServer::new(storage_node)))
+                .add_service(service)
                 .serve(addr.parse().unwrap())
                 .await
                 .unwrap();
