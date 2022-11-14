@@ -17,10 +17,9 @@ db3 has the following  concepts
 
 **2 [Query](./docs/query.md)** Reading data from the storagement chain is defined as query. You can use query to read all data that you own
 
-**3 DVM** Data Virtual Machine
+**3 [DVM](./docs/dvm.md)** Data Virtual Machine
 
-**4 Bills**
-
+**4 [Bills](./docs/bills.md)** 
 
 # Getting Started
 
@@ -30,7 +29,8 @@ db3 has the following  concepts
 git clone https://github.com/dbpunk-labs/db3.git
 cd db3 & bash install_env.sh && cargo build
 ```
-## Run Localnet
+
+## Play With DB3
 
 ```
 # run localnet
