@@ -152,6 +152,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         "account" => handle_account(&context, request.id, request.params).await,
         "net_info" => handle_netinfo(&context, request.id, request.params).await,
         "validators" => handle_validators(&context, request.id, request.params).await,
+        "broadcast" => handle_broadcast(&context, request.id, request.params).await,
         _ => todo!(),
     };
     let r = match response {
@@ -173,6 +174,47 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
             .body(i.dump())),
         ResponseWrapper::External(e) => {
             Ok(HttpResponse::Ok().content_type("application/json").body(e))
+        }
+    }
+}
+
+///
+/// send mutation or query session to tendermint
+///
+async fn handle_broadcast(
+    context: &Context,
+    id: Value,
+    params: Vec<Value>,
+) -> Result<ResponseWrapper, json_rpc::ErrorData> {
+    if params.len() == 0 {
+        let err = "invalid parameters";
+        Err(json_rpc::ErrorData::new(-32602, err))
+    } else {
+        // the param must be encoded as base64 string
+        if let Value::String(s) = &params[0] {
+            let tx = base64::decode(s.as_str())
+                .map_err(|e| json_rpc::ErrorData::new(-32602, format!("{}", e).as_str()))?;
+            let response = context
+                .client
+                .broadcast_tx_async(tx.into())
+                .await
+                .map_err(|e| json_rpc::ErrorData::new(-32603, format!("{}", e).as_str()))?;
+            let external_id = match id {
+                Value::Number(n) => Id::Num(n.as_i64().unwrap()),
+                Value::String(s) => Id::Str(s),
+                _ => todo!(),
+            };
+            let wrapper = Wrapper {
+                jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
+                result: Some(response),
+                id: external_id,
+            };
+            return Ok(ResponseWrapper::External(
+                serde_json::to_string(&wrapper).unwrap(),
+            ));
+        } else {
+            let err = "invalid parameters";
+            Err(json_rpc::ErrorData::new(-32602, err))
         }
     }
 }
