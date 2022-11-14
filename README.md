@@ -101,7 +101,7 @@ k2 -> v2
 
 ![roadmap](./docs/images/db3-roadmap.svg)
 
-# Archtecture
+# Architecture
 ![db3_arch](./docs/images/db3-architecture.svg)
 
 # Media
