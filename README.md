@@ -19,7 +19,7 @@ db3 has the following  concepts
 
 **3 [DVM](./docs/dvm.md)** Data Virtual Machine
 
-**4 Bills**
+**4 [Bills](./docs/bills.md)** 
 
 # Getting Started
 
