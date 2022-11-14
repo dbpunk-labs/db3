@@ -30,7 +30,7 @@ git clone https://github.com/dbpunk-labs/db3.git
 cd db3 & bash install_env.sh && cargo build
 ```
 
-## Play DB3
+## Play With DB3
 
 ```
 # run localnet
