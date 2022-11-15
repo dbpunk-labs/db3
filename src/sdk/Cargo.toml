@@ -20,7 +20,6 @@ tonic = { version = "0.7.2", features = ["tls-roots"]}
 tonic-web = "0.4.0"
 prost = "0.10"
 prost-types = "0.11"
-tendermint-rpc = {version = "0.26.0",  features=["http-client"]}
 tendermint = "0.26.0"
 ethereum-types = { version = "0.14.0", default-features = false }
 [dev-dependencies]

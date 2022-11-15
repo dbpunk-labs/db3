@@ -19,20 +19,24 @@ use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
+use db3_proto::db3_node_proto::{storage_node_client::StorageNodeClient, BroadcastRequest};
 use prost::Message;
-use tendermint_rpc::{Client, HttpClient};
+use std::sync::Arc;
 
 pub struct MutationSDK {
-    client: HttpClient,
     signer: Db3Signer,
+    client: Arc<StorageNodeClient<tonic::transport::Channel>>,
 }
 
 impl MutationSDK {
-    pub fn new(client: HttpClient, signer: Db3Signer) -> Self {
+    pub fn new(
+        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+        signer: Db3Signer,
+    ) -> Self {
         Self { client, signer }
     }
 
-    pub async fn submit_mutation(&self, mutation: &Mutation) -> Result<()> {
+    pub async fn submit_mutation(&self, mutation: &Mutation) -> Result<Vec<u8>> {
         //TODO update gas and nonce
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
         mutation
@@ -49,30 +53,41 @@ impl MutationSDK {
             .encode(&mut buf)
             .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?;
         let buf = buf.freeze();
-        self.client
-            .broadcast_tx_async(buf.as_ref().to_vec().into())
+        let r = BroadcastRequest {
+            body: buf.as_ref().to_vec(),
+        };
+        let request = tonic::Request::new(r);
+        let mut client = self.client.as_ref().clone();
+        let response = client
+            .broadcast(request)
             .await
-            .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?;
-        Ok(())
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?
+            .into_inner();
+        Ok(response.hash)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Db3Signer;
-    use super::HttpClient;
     use super::Mutation;
     use super::MutationSDK;
+    use crate::mutation_sdk::StorageNodeClient;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::traits::KeyPair;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use std::sync::Arc;
     use std::{thread, time};
+    use tonic::transport::Endpoint;
     #[tokio::test]
-    async fn it_submit_mutation() {
-        let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
+    async fn test_submit_mutation() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let signer = Db3Signer::new(kp);

@@ -75,9 +75,6 @@ enum Commands {
         /// the url of db3 grpc api
         #[clap(long, default_value = "http://127.0.0.1:26659")]
         public_grpc_url: String,
-        /// the broadcast url of db3 json rpc api
-        #[clap(long, default_value = "http://127.0.0.1:26657")]
-        public_json_rpc_url: String,
     },
 
     /// Start DB3 node server
@@ -278,19 +275,9 @@ async fn start_node(cmd: Commands) {
 }
 
 async fn start_shell(cmd: Commands) {
-    if let Commands::Shell {
-        public_grpc_url,
-        public_json_rpc_url,
-    } = cmd
-    {
+    if let Commands::Shell { public_grpc_url } = cmd {
         println!("{}", ABOUT);
-        let kp = db3_cmd::get_key_pair(true).unwrap();
         // broadcast client
-        let client = HttpClient::new(public_json_rpc_url.as_str()).unwrap();
-        let signer = Db3Signer::new(kp);
-        let sdk = MutationSDK::new(client, signer);
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
         let uri = public_grpc_url.parse::<Uri>().unwrap();
         let endpoint = match uri.scheme_str() == Some("https") {
             true => {
@@ -307,6 +294,11 @@ async fn start_shell(cmd: Commands) {
         };
         let channel = endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
+        let kp = db3_cmd::get_key_pair(true).unwrap();
+        let signer = Db3Signer::new(kp);
+        let sdk = MutationSDK::new(client.clone(), signer);
+        let kp = db3_cmd::get_key_pair(false).unwrap();
+        let signer = Db3Signer::new(kp);
         let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
         stdout().flush().unwrap();

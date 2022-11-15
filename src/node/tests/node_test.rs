@@ -14,16 +14,17 @@ mod node_integration {
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{thread, time};
-    use tendermint_rpc::HttpClient;
     use tonic::transport::Endpoint;
 
     fn get_mutation_sdk() -> MutationSDK {
-        // create Mutation SDk
-        let public_json_rpc_url = "http://127.0.0.1:26657";
-        let kp = db3_cmd::get_key_pair(true).unwrap();
-        // broadcast client
-        let client = HttpClient::new(public_json_rpc_url).unwrap();
+        let public_grpc_url = "http://127.0.0.1:26659";
+        // create storage node sdk
+        let kp = db3_cmd::get_key_pair(false).unwrap();
         let signer = Db3Signer::new(kp);
+        let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        // broadcast client
         let sdk = MutationSDK::new(client, signer);
         sdk
     }

@@ -183,16 +183,19 @@ mod tests {
     use rand::SeedableRng;
     use std::sync::Arc;
     use std::time;
-    use tendermint_rpc::HttpClient;
     use tonic::transport::Endpoint;
     #[tokio::test]
     async fn it_get_bills() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let mclient = client.clone();
         {
-            let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
             let mut rng = StdRng::from_seed([0; 32]);
             let kp = Secp256k1KeyPair::generate(&mut rng);
             let signer = Db3Signer::new(kp);
-            let msdk = MutationSDK::new(client, signer);
+            let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
                 value: format!("vkalue_tt{}", 1).as_bytes().to_vec(),
@@ -212,14 +215,9 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             std::thread::sleep(ten_millis);
         }
-
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let signer = Db3Signer::new(kp);
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
         let mut sdk = StoreSDK::new(client, signer);
         let result = sdk.get_bills_by_block(1, 0, 10).await;
         if let Err(ref e) = result {
