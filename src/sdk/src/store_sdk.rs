@@ -114,6 +114,7 @@ impl StoreSDK {
         let account = client.get_account(request).await?.into_inner();
         Ok(account)
     }
+
     pub async fn get_session_info(
         &self,
         addr: &AccountAddress,
@@ -127,6 +128,7 @@ impl StoreSDK {
         let response = client.get_session_info(request).await?.into_inner();
         Ok(response.session_info.unwrap())
     }
+
     pub async fn batch_get(
         &mut self,
         ns: &[u8],
@@ -170,18 +172,47 @@ impl StoreSDK {
 mod tests {
     use super::Db3Signer;
     use super::StoreSDK;
-    use super::*;
+    use crate::mutation_sdk::MutationSDK;
+    use db3_proto::db3_base_proto::{ChainId, ChainRole};
+    use db3_proto::db3_mutation_proto::KvPair;
+    use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use fastcrypto::traits::KeyPair;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     use std::sync::Arc;
+    use std::time;
+    use tendermint_rpc::HttpClient;
     use tonic::transport::Endpoint;
-
-    #[ignore]
     #[tokio::test]
     async fn it_get_bills() {
+        {
+            let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
+            let mut rng = StdRng::from_seed([0; 32]);
+            let kp = Secp256k1KeyPair::generate(&mut rng);
+            let signer = Db3Signer::new(kp);
+            let msdk = MutationSDK::new(client, signer);
+            let kv = KvPair {
+                key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
+                value: format!("vkalue_tt{}", 1).as_bytes().to_vec(),
+                action: MutationAction::InsertKv.into(),
+            };
+            let mutation = Mutation {
+                ns: "my_twitter".as_bytes().to_vec(),
+                kv_pairs: vec![kv],
+                nonce: 11000,
+                chain_id: ChainId::MainNet.into(),
+                chain_role: ChainRole::StorageShardChain.into(),
+                gas_price: None,
+                gas: 10,
+            };
+            let result = msdk.submit_mutation(&mutation).await;
+            assert!(result.is_ok());
+            let ten_millis = time::Duration::from_millis(1000);
+            std::thread::sleep(ten_millis);
+        }
+
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let signer = Db3Signer::new(kp);
@@ -193,10 +224,8 @@ mod tests {
         let result = sdk.get_bills_by_block(1, 0, 10).await;
         if let Err(ref e) = result {
             println!("{}", e);
+            assert!(false);
         }
         assert!(result.is_ok());
-        if let Ok(bills) = result {
-            assert_eq!(0, bills.len());
-        }
     }
 }

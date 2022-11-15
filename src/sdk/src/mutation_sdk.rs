@@ -70,11 +70,9 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     use std::{thread, time};
-    #[ignore]
     #[tokio::test]
     async fn it_submit_mutation() {
-        let client = HttpClient::new("https://devnet.db3.network").unwrap();
-        //let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
+        let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let signer = Db3Signer::new(kp);
@@ -100,7 +98,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             thread::sleep(ten_millis);
             count = count + 1;
-            if count > 1000000000 {
+            if count > 10 {
                 break;
             }
         }

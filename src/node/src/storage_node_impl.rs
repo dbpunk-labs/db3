@@ -16,7 +16,6 @@
 //
 
 use super::auth_storage::AuthStorage;
-use db3_crypto::account_id::AccountId;
 use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
