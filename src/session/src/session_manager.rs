@@ -83,7 +83,6 @@ impl SessionManager {
 mod tests {
     use super::*;
     use db3_proto::db3_node_proto::SessionStatus;
-    use std::{thread, time};
     #[test]
     fn test_new_session() {
         let mut session = SessionManager::new();
