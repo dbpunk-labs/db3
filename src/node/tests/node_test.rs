@@ -265,7 +265,7 @@ mod node_integration {
                     chain_role: ChainRole::StorageShardChain.into(),
                 };
                 assert!(sdk.submit_mutation(&mutation).await.is_ok());
-                thread::sleep(time::Duration::from_secs(2));
+                thread::sleep(time::Duration::from_secs(4));
             }
             {
                 let kp = db3_cmd::get_key_pair(false).unwrap();
