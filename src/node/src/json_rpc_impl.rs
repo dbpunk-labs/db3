@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use super::auth_storage::AuthStorage;
+use super::context::Context;
 use super::hash_util;
 use super::json_rpc;
 use actix_web::{web, Error, HttpResponse};
@@ -28,16 +28,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Value;
 use std::str::FromStr;
-use std::{
-    boxed::Box,
-    pin::Pin,
-    sync::{Arc, Mutex},
-};
+
 use subtle_encoding::base64;
 use tendermint::Hash as TMHash;
-use tendermint_rpc::{Client, HttpClient, Id, Paging};
-
-type ArcAuthStorage = Arc<Mutex<Pin<Box<AuthStorage>>>>;
+use tendermint_rpc::{Client, Id, Paging};
 fn bills_to_value(bills: &Vec<Bill>) -> Value {
     let mut new_bills: Vec<Value> = Vec::new();
     for bill in bills {
@@ -58,12 +52,6 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
         new_bills.push(Value::Object(new_bill));
     }
     Value::Array(new_bills)
-}
-
-#[derive(Clone)]
-pub struct Context {
-    pub store: ArcAuthStorage,
-    pub client: HttpClient,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
