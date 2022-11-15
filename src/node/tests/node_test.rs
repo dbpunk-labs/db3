@@ -1,9 +1,11 @@
 //! Key/value store application integration tests.
 
 mod node_integration {
+    use bytes::BytesMut;
     use db3_base::get_address_from_pk;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
+    use db3_proto::db3_mutation_proto::WriteRequest;
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_proto::db3_node_proto::SessionStatus;
@@ -11,11 +13,12 @@ mod node_integration {
     use db3_sdk::store_sdk::StoreSDK;
     use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
     use fastcrypto::traits::KeyPair;
+    use prost::Message;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{thread, time};
+    use subtle_encoding::base64;
     use tonic::transport::Endpoint;
-
     fn get_mutation_sdk() -> MutationSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
         // create storage node sdk
@@ -44,6 +47,60 @@ mod node_integration {
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(n) => n.as_secs(),
             Err(_) => 0,
+        }
+    }
+
+    #[actix_web::test]
+    async fn json_rpc_smoke_test() {
+        let json_rpc_url = "http://127.0.0.1:26670";
+        let client = awc::Client::default();
+        let kp = db3_cmd::get_key_pair(false).unwrap();
+        let signer = Db3Signer::new(kp);
+        let kv = KvPair {
+            key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
+            value: format!("vkalue_tt{}", 1).as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let mutation = Mutation {
+            ns: "my_twitter".as_bytes().to_vec(),
+            kv_pairs: vec![kv],
+            nonce: 1110,
+            chain_id: ChainId::MainNet.into(),
+            chain_role: ChainRole::StorageShardChain.into(),
+            gas_price: None,
+            gas: 10,
+        };
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        mutation.encode(&mut mbuf).unwrap();
+        let mbuf = mbuf.freeze();
+        let signature = signer.sign(mbuf.as_ref()).unwrap();
+        let request = WriteRequest {
+            signature,
+            mutation: mbuf.as_ref().to_vec().to_owned(),
+        };
+        let mut buf = BytesMut::with_capacity(1024 * 4);
+        request.encode(&mut buf).unwrap();
+        let buf = buf.freeze();
+        // encode request to base64
+        let data = base64::encode(buf.as_ref());
+        let base64_str = String::from_utf8_lossy(data.as_ref()).to_string();
+        let request = serde_json::json!(
+            {"method": "broadcast",
+            "params": vec![base64_str],
+            "id": 1,
+            "jsonrpc": "2.0"
+            }
+        );
+        let mut response = client.post(json_rpc_url).send_json(&request).await.unwrap();
+        if let serde_json::Value::Object(val) = response.json::<serde_json::Value>().await.unwrap()
+        {
+            if let Some(serde_json::Value::String(s)) = val.get("result") {
+                assert!(s.len() > 0);
+            } else {
+                assert!(false)
+            }
+        } else {
+            assert!(false)
         }
     }
 

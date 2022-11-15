@@ -630,3 +630,18 @@ example response
 }
 ```
 
+
+### broadcast
+
+example request
+
+```
+curl --header "Content-Type: application/json" --request POST --data '{"method": "broadcast", "params": ["XADAFA="], "id": 1, "jsonrpc": "2.0"}' localhost:26670
+```
+
+`Note`: you must replace the params with valid one
+example response
+```
+{"id": 1, "jsonrpc": "2.0", "result": "bDJ9tsALNX42gR6UZ8+q/xh5hoacShtKcZj5mxeAmhU="}
+```
+
