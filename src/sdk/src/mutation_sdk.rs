@@ -22,6 +22,7 @@ use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
 use db3_proto::db3_node_proto::{storage_node_client::StorageNodeClient, BroadcastRequest};
 use prost::Message;
 use std::sync::Arc;
+use subtle_encoding::base64;
 
 pub struct MutationSDK {
     signer: Db3Signer,
@@ -36,7 +37,7 @@ impl MutationSDK {
         Self { client, signer }
     }
 
-    pub async fn submit_mutation(&self, mutation: &Mutation) -> Result<Vec<u8>> {
+    pub async fn submit_mutation(&self, mutation: &Mutation) -> Result<String> {
         //TODO update gas and nonce
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
         mutation
@@ -63,7 +64,8 @@ impl MutationSDK {
             .await
             .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?
             .into_inner();
-        Ok(response.hash)
+        let base64_byte = base64::encode(response.hash);
+        Ok(String::from_utf8_lossy(base64_byte.as_ref()).to_string())
     }
 }
 
@@ -110,6 +112,7 @@ mod tests {
             };
             let result = sdk.submit_mutation(&mutation).await;
             assert!(result.is_ok());
+            println!("{:?}", result.unwrap());
             let ten_millis = time::Duration::from_millis(1000);
             thread::sleep(ten_millis);
             count = count + 1;

@@ -192,9 +192,11 @@ async fn handle_broadcast(
                 Value::String(s) => Id::Str(s),
                 _ => todo!(),
             };
+            let base64_byte = base64::encode(response.hash.as_ref());
+            let hash = String::from_utf8_lossy(base64_byte.as_ref()).to_string();
             let wrapper = Wrapper {
                 jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
-                result: Some(response),
+                result: Some(hash),
                 id: external_id,
             };
             return Ok(ResponseWrapper::External(
