@@ -31,7 +31,7 @@ use std::str::FromStr;
 use subtle_encoding::base64;
 use tendermint::Hash as TMHash;
 use tendermint_rpc::{Client, Id, Paging};
-use tracing::info;
+use tracing::debug;
 fn bills_to_value(bills: &Vec<Bill>) -> Value {
     let mut new_bills: Vec<Value> = Vec::new();
     for bill in bills {
@@ -132,7 +132,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
                 .body(r.dump()));
         }
     };
-    info!("request method {}", request.method.as_str());
+    debug!("request method {}", request.method.as_str());
     let response = match request.method.as_str() {
         "bills" => handle_bills(&context, request.id, request.params).await,
         "latest_blocks" => handle_latestblocks(&context, request.id, request.params).await,
