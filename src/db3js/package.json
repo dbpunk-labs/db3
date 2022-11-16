@@ -10,10 +10,15 @@
   },
   "dependencies": {
     "@scure/bip39": "^1.1.0",
+    "google-protobuf": "^3.21.2",
+    "grpc": "^1.24.11",
+    "grpc-web": "^1.4.2",
+    "protobufjs": "^7.1.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@originjs/vite-plugin-commonjs": "^1.0.3",
     "@types/react": "^18.0.24",
     "@types/react-dom": "^18.0.8",
     "@vitejs/plugin-react": "^2.2.0",
