@@ -116,16 +116,6 @@ impl StorageNode for StorageNodeImpl {
             .map_err(|_| Status::internal("fail to decode query_bill_key ".to_string()))?;
         match self.node_ctx.lock() {
             Ok(mut ctx) => {
-                // if !sess_store.is_session_exist(account_id.addr, query_bill_key.session_id) {
-                //     match sess_store.add_new_session(account_id.addr) {
-                //         Ok(_) => {}
-                //         Err(e) => {
-                //             return Err(Status::internal(format!("Fail to , {}", e)));
-                //         }
-                //
-                //     }
-                // }
-                //
                 match ctx
                     .get_session_store()
                     .get_session_mut(account_id.addr, query_bill_key.session_id)
@@ -172,15 +162,6 @@ impl StorageNode for StorageNodeImpl {
             Ok(mut ctx) => {
                 let batch_get_key = BatchGetKey::decode(r.batch_get.as_ref())
                     .map_err(|_| Status::internal("fail to decode batch get key".to_string()))?;
-                // if !sess_store.is_session_exist(account_id.addr, batch_get_key.session) {
-                //     match sess_store.add_new_session(account_id.addr) {
-                //         Ok(_) => {}
-                //         Err(e) => {
-                //             return Err(Status::internal(format!("Fail to get key, {}", e)));
-                //         }
-                //
-                //     }
-                // }
                 match ctx
                     .get_session_store()
                     .get_session_mut(account_id.addr, batch_get_key.session)
