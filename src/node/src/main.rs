@@ -25,6 +25,7 @@ use clap::{Parser, Subcommand};
 use db3_crypto::signer::Db3Signer;
 use db3_node::abci_impl::{AbciImpl, NodeState};
 use db3_node::auth_storage::AuthStorage;
+use db3_node::context::Context;
 use db3_node::json_rpc_impl;
 use db3_node::storage_node_impl::StorageNodeImpl;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
@@ -37,13 +38,16 @@ use std::io::stdout;
 use std::io::Write;
 use std::io::{self, BufRead};
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+use std::thread::JoinHandle;
+use std::time::Duration;
 use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
 const ABOUT: &str = "
@@ -71,9 +75,6 @@ enum Commands {
         /// the url of db3 grpc api
         #[clap(long, default_value = "http://127.0.0.1:26659")]
         public_grpc_url: String,
-        /// the broadcast url of db3 json rpc api
-        #[clap(long, default_value = "http://127.0.0.1:26657")]
-        public_json_rpc_url: String,
     },
 
     /// Start DB3 node server
@@ -115,33 +116,73 @@ enum Commands {
     Version {},
 }
 
-///  start abci server
+///
+/// Start ABCI Service for tendermint and only local process can connect to this service
+///
 fn start_abci_service(
     abci_port: u16,
     read_buf_size: usize,
     store: Arc<Mutex<Pin<Box<AuthStorage>>>>,
-) -> Arc<NodeState> {
+) -> (Arc<NodeState>, JoinHandle<()>) {
     let addr = format!("{}:{}", "127.0.0.1", abci_port);
     let abci_impl = AbciImpl::new(store);
     let node_state = abci_impl.get_node_state().clone();
-    thread::spawn(move || {
-        let server = ServerBuilder::new(read_buf_size)
-            .bind(addr, abci_impl)
-            .unwrap();
-        server.listen().unwrap();
+    let handler = thread::spawn(move || {
+        let server = ServerBuilder::new(read_buf_size).bind(addr, abci_impl);
+        match server {
+            Ok(s) => {
+                if let Err(e) = s.listen() {
+                    warn!("fail to listen addr for error {}", e);
+                }
+            }
+            Err(e) => {
+                warn!("fail to bind addr for error {}", e);
+            }
+        }
     });
-    node_state
+    (node_state, handler)
 }
 
+/// Start GRPC Service
+async fn start_grpc_service(
+    public_host: &str,
+    public_grpc_port: u16,
+    disable_grpc_web: bool,
+    context: Context,
+) {
+    let addr = format!("{}:{}", public_host, public_grpc_port);
+    let storage_node = StorageNodeImpl::new(context);
+    info!("start db3 storage node on public addr {}", addr);
+    if disable_grpc_web {
+        Server::builder()
+            .add_service(StorageNodeServer::new(storage_node))
+            .serve(addr.parse().unwrap())
+            .await
+            .unwrap();
+    } else {
+        let config = tonic_web::config().allow_all_origins();
+        let service = config.enable(StorageNodeServer::new(storage_node));
+        Server::builder()
+            .accept_http1(true)
+            .add_service(service)
+            .serve(addr.parse().unwrap())
+            .await
+            .unwrap();
+    }
+}
+
+///
+/// Start JSON RPC Service
+///
 fn start_json_rpc_service(
     public_host: &str,
     public_json_rpc_port: u16,
-    context: json_rpc_impl::Context,
-) {
+    context: Context,
+) -> JoinHandle<()> {
     let local_public_host = public_host.to_string();
     let addr = format!("{}:{}", local_public_host, public_json_rpc_port);
     info!("start json rpc server with addr {}", addr.as_str());
-    thread::spawn(move || {
+    let handler = thread::spawn(move || {
         rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
@@ -157,6 +198,7 @@ fn start_json_rpc_service(
                             web::resource("/").route(web::post().to(json_rpc_impl::rpc_router)),
                         )
                 })
+                .disable_signals()
                 .bind((local_public_host, public_json_rpc_port))
                 .unwrap()
                 .run()
@@ -164,6 +206,7 @@ fn start_json_rpc_service(
             })
             .unwrap();
     });
+    handler
 }
 
 async fn start_node(cmd: Commands) {
@@ -199,52 +242,42 @@ async fn start_node(cmd: Commands) {
         }
         //TODO recover storage
         let store_for_abci = store.clone();
-        let _node_state = start_abci_service(abci_port, read_buf_size, store_for_abci);
+        let (_node_state, abci_handler) =
+            start_abci_service(abci_port, read_buf_size, store_for_abci);
         let tm_addr = format!("http://127.0.0.1:{}", tm_port);
         info!("db3 json rpc server will connect to tendermint {}", tm_addr);
         let client = HttpClient::new(tm_addr.as_str()).unwrap();
-        let context = json_rpc_impl::Context {
+        let context = Context {
             store: store.clone(),
             client,
         };
-        start_json_rpc_service(&public_host, public_json_rpc_port, context);
-        let addr = format!("{}:{}", public_host, public_grpc_port);
-        let storage_node = StorageNodeImpl::new(store);
-        info!("start db3 storage node on public addr {}", addr);
-        if disable_grpc_web {
-            Server::builder()
-                .add_service(StorageNodeServer::new(storage_node))
-                .serve(addr.parse().unwrap())
-                .await
-                .unwrap();
-        } else {
-            //TODO use flag to config theses options
-            let config = tonic_web::config().allow_all_origins();
-            let service = config.enable(StorageNodeServer::new(storage_node));
-            Server::builder()
-                .accept_http1(true)
-                .add_service(service)
-                .serve(addr.parse().unwrap())
-                .await
-                .unwrap();
+        let json_rpc_handler =
+            start_json_rpc_service(&public_host, public_json_rpc_port, context.clone());
+        start_grpc_service(&public_host, public_grpc_port, disable_grpc_web, context).await;
+        let running = Arc::new(AtomicBool::new(true));
+        let r = running.clone();
+        ctrlc::set_handler(move || {
+            r.store(false, Ordering::SeqCst);
+        })
+        .expect("Error setting Ctrl-C handler");
+        loop {
+            if running.load(Ordering::SeqCst) {
+                let ten_millis = Duration::from_millis(10);
+                thread::sleep(ten_millis);
+            } else {
+                info!("stop db3...");
+                abci_handler.join().unwrap();
+                json_rpc_handler.join().unwrap();
+                break;
+            }
         }
     }
 }
 
 async fn start_shell(cmd: Commands) {
-    if let Commands::Shell {
-        public_grpc_url,
-        public_json_rpc_url,
-    } = cmd
-    {
+    if let Commands::Shell { public_grpc_url } = cmd {
         println!("{}", ABOUT);
-        let kp = db3_cmd::get_key_pair(true).unwrap();
         // broadcast client
-        let client = HttpClient::new(public_json_rpc_url.as_str()).unwrap();
-        let signer = Db3Signer::new(kp);
-        let sdk = MutationSDK::new(client, signer);
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
         let uri = public_grpc_url.parse::<Uri>().unwrap();
         let endpoint = match uri.scheme_str() == Some("https") {
             true => {
@@ -261,7 +294,12 @@ async fn start_shell(cmd: Commands) {
         };
         let channel = endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let store_sdk = StoreSDK::new(client, signer);
+        let kp = db3_cmd::get_key_pair(true).unwrap();
+        let signer = Db3Signer::new(kp);
+        let sdk = MutationSDK::new(client.clone(), signer);
+        let kp = db3_cmd::get_key_pair(false).unwrap();
+        let signer = Db3Signer::new(kp);
+        let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
         stdout().flush().unwrap();
         let stdin = io::stdin();
@@ -271,7 +309,7 @@ async fn start_shell(cmd: Commands) {
                     return;
                 }
                 Ok(s) => {
-                    db3_cmd::process_cmd(&sdk, &store_sdk, s.as_str()).await;
+                    db3_cmd::process_cmd(&sdk, &mut store_sdk, s.as_str()).await;
                     print!(">");
                     stdout().flush().unwrap();
                 }

@@ -42,6 +42,9 @@ get     get value from db3                  e.g. get ns1 key1 key2
 range   get a range from db3                e.g. range ns1 start_key end_key
 account get balance of current account
 blocks  get latest blocks
+session info        get session info    e.g session info
+session restart     restart session             e.g session restart
+
 "#;
 
 fn current_seconds() -> u64 {
@@ -104,7 +107,7 @@ fn show_account(account: &Account) {
     table.printstd();
 }
 
-pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
+pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str) {
     let parts: Vec<&str> = cmd.split(" ").collect();
     if parts.len() < 1 {
         println!("{}", HELP);
@@ -122,6 +125,39 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &StoreSDK, cmd: &str) {
             let account = store_sdk.get_account(&addr).await.unwrap();
             show_account(&account);
             return;
+        }
+        "session" => {
+            if parts.len() < 2 {
+                println!("no enough command, e.g. session info | session restart");
+                return;
+            }
+            let op = parts[1];
+            match op {
+                "info" => {
+                    let kp = get_key_pair(false).unwrap();
+                    let addr = get_address_from_pk(&kp.public().pubkey);
+                    if let Ok(session_info) = store_sdk.get_session_info(&addr).await {
+                        println!("{:?}", session_info)
+                    } else {
+                        println!("empty set");
+                    }
+                    return;
+                }
+                "restart" => {
+                    if let Ok((old_session_info, new_session_id)) =
+                        store_sdk.restart_session().await
+                    {
+                        println!(
+                            "close session {} and restart with session_id {}",
+                            old_session_info, new_session_id
+                        )
+                    } else {
+                        println!("empty set");
+                    }
+                    return;
+                }
+                _ => {}
+            }
         }
         "range" | "blocks" => {
             println!("to be provided");

@@ -5,6 +5,7 @@ members = [
     "src/error",
     "src/types",
     "src/base",
+    "src/session",
     "src/storage",
     "src/node",
     "src/sdk",

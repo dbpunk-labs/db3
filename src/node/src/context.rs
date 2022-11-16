@@ -1,5 +1,5 @@
 //
-// lib.rs
+// context.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,10 +15,23 @@
 // limitations under the License.
 //
 
-pub mod abci_impl;
-pub mod auth_storage;
-pub mod context;
-mod hash_util;
-mod json_rpc;
-pub mod json_rpc_impl;
-pub mod storage_node_impl;
+use super::auth_storage::AuthStorage;
+use std::{
+    boxed::Box,
+    pin::Pin,
+    sync::{Arc, Mutex},
+};
+use tendermint_rpc::HttpClient;
+
+type ArcAuthStorage = Arc<Mutex<Pin<Box<AuthStorage>>>>;
+#[derive(Clone)]
+pub struct Context {
+    pub store: ArcAuthStorage,
+    pub client: HttpClient,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {}
+}

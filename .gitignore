@@ -13,3 +13,5 @@ Cargo.lock
 # Added by cargo
 
 /target
+db
+db3.log
