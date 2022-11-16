@@ -15,8 +15,8 @@
 // limitations under the License.
 //
 
-use super::auth_storage::{AuthStorage, Hash};
-use crate::node_context::NodeContext;
+use super::auth_storage::{Hash};
+use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
@@ -42,15 +42,15 @@ pub struct NodeState {
 }
 #[derive(Clone)]
 pub struct AbciImpl {
-    node_ctx: Arc<Mutex<Pin<Box<NodeContext>>>>,
+    node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
     pending_mutation: Arc<Mutex<Vec<(AccountAddress, Hash, Mutation)>>>,
     node_state: Arc<NodeState>,
 }
 
 impl AbciImpl {
-    pub fn new(node_ctx: Arc<Mutex<Pin<Box<NodeContext>>>>) -> Self {
+    pub fn new(node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>) -> Self {
         Self {
-            node_ctx,
+            node_store,
             pending_mutation: Arc::new(Mutex::new(Vec::new())),
             node_state: Arc::new(NodeState {
                 total_storage_bytes: Arc::new(AtomicU64::new(0)),
@@ -68,9 +68,9 @@ impl AbciImpl {
 impl Application for AbciImpl {
     fn info(&self, _request: RequestInfo) -> ResponseInfo {
         // the store must be ready when using it
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                let s = ctx.get_auth_store();
+        match self.node_store.lock() {
+            Ok(mut store) => {
+                let s = store.get_auth_store();
                 info!(
                     "height {} hash {}",
                     s.get_last_block_state().block_height,
@@ -92,9 +92,9 @@ impl Application for AbciImpl {
     }
 
     fn begin_block(&self, request: RequestBeginBlock) -> ResponseBeginBlock {
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                let s = ctx.get_auth_store();
+        match self.node_store.lock() {
+            Ok(mut store) => {
+                let s = store.get_auth_store();
                 if let Some(header) = request.header {
                     if let Some(time) = header.time {
                         s.begin_block(header.height as u64, time.seconds as u64);
@@ -188,9 +188,9 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                let s = ctx.get_auth_store();
+        match self.node_store.lock() {
+            Ok(mut store) => {
+                let s = store.get_auth_store();
                 let span = span!(Level::INFO, "commit").entered();
                 let pending_mutation_len = pending_mutation.len();
                 for item in pending_mutation {

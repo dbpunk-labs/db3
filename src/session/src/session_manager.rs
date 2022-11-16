@@ -257,7 +257,7 @@ mod tests {
         );
         let addr = get_address_from_pk(&pk.unwrap().pubkey);
 
-        for i in 0..DEFAULT_SESSION_POOL_SIZE_LIMIT {
+        for _ in 0..DEFAULT_SESSION_POOL_SIZE_LIMIT {
             assert!(sess_store.add_new_session(addr).is_ok())
         }
 

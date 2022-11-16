@@ -24,7 +24,7 @@ use db3_proto::db3_node_proto::{
     GetAccountRequest, GetKeyRequest, GetSessionInfoRequest, OpenSessionRequest,
     OpenSessionResponse, QueryBillKey, QueryBillRequest, QuerySessionInfo, SessionIdentifier,
 };
-use db3_session::session_manager::{SessionManager, SessionPool};
+use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
@@ -69,7 +69,7 @@ impl StoreSDK {
         let mut client = self.client.as_ref().clone();
         let response = client.open_query_session(request).await?.into_inner();
         match self.session_pool.create_new_session(response.session_id) {
-            Ok(id) => Ok(response),
+            Ok(_) => Ok(response),
             Err(e) => Err(Status::internal(format!("Fail to create session {}", e))),
         }
     }
@@ -94,8 +94,14 @@ impl StoreSDK {
                 let mut client = self.client.as_ref().clone();
                 match client.close_query_session(request).await {
                     Ok(response) => {
-                        self.session_pool.remove_session(query_session_info.id);
-                        Ok(response.into_inner().session_id)
+                        match self.session_pool.remove_session(query_session_info.id) {
+                            Ok(_) => {
+                                Ok(response.into_inner().session_id)
+                            }
+                            Err(e) => {
+                                Err(Status::internal(format!("{}", e)))
+                            }
+                        }
                     }
                     Err(e) => Err(Status::internal(format!("{}", e))),
                 }
@@ -105,9 +111,6 @@ impl StoreSDK {
                 session_id
             ))),
         }
-    }
-    fn validate_query_session(&self) -> std::result::Result<(), Status> {
-        Ok(())
     }
 
     pub async fn get_bills_by_block(
@@ -260,16 +263,19 @@ mod tests {
     use rand::SeedableRng;
     use std::sync::Arc;
     use std::time;
-    use tendermint_rpc::HttpClient;
     use tonic::transport::Endpoint;
     #[tokio::test]
     async fn it_get_bills() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let mclient = client.clone();
         {
-            let client = HttpClient::new("http://127.0.0.1:26657").unwrap();
             let mut rng = StdRng::from_seed([0; 32]);
             let kp = Secp256k1KeyPair::generate(&mut rng);
             let signer = Db3Signer::new(kp);
-            let msdk = MutationSDK::new(client, signer);
+            let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
                 value: format!("vkalue_tt{}", 1).as_bytes().to_vec(),
@@ -295,15 +301,10 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             std::thread::sleep(ten_millis);
         }
-
         let mut rng = StdRng::from_seed([0; 32]);
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let addr = get_address_from_pk(&kp.public().pubkey);
         let signer = Db3Signer::new(kp);
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session(&addr).await;
         assert!(res.is_ok());

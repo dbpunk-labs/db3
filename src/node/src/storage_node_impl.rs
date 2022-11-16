@@ -15,38 +15,34 @@
 // limitations under the License.
 //
 
-use super::auth_storage::AuthStorage;
-use crate::node_context::NodeContext;
-use db3_crypto::account_id::AccountId;
+use super::context::Context;
 use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, BatchGetKey, CloseSessionRequest, CloseSessionResponse,
+    storage_node_server::StorageNode, BatchGetKey, BroadcastRequest, BroadcastResponse,
+    CloseSessionRequest, CloseSessionResponse,
     GetAccountRequest, GetKeyRequest, GetKeyResponse, GetSessionInfoRequest,
     GetSessionInfoResponse, OpenSessionRequest, OpenSessionResponse, QueryBillKey,
     QueryBillRequest, QueryBillResponse, QuerySessionInfo, SessionIdentifier,
 };
-use db3_session::session_manager::SessionManager;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
 use ethereum_types::Address as AccountAddress;
-use ethereum_types::Address;
 use prost::Message;
-use std::borrow::BorrowMut;
 use std::boxed::Box;
-use std::collections::HashMap;
-use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
 
 pub struct StorageNodeImpl {
-    node_ctx: Arc<Mutex<Pin<Box<NodeContext>>>>,
+    context: Context,
 }
 
 impl StorageNodeImpl {
-    pub fn new(node_ctx: Arc<Mutex<Pin<Box<NodeContext>>>>) -> Self {
-        Self { node_ctx }
+    pub fn new(context: Context) -> Self {
+        Self {
+            context,
+        }
     }
 }
 
@@ -59,9 +55,9 @@ impl StorageNode for StorageNodeImpl {
         let r = request.into_inner();
         let account_id = Verifier::verify(r.addr.as_ref(), r.signature.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                let sess_store = ctx.get_session_store();
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                let sess_store = node_store.get_session_store();
                 match sess_store.add_new_session(account_id.addr) {
                     Ok(session_id) => {
                         // Takes a reference and returns Option<&V>
@@ -87,9 +83,9 @@ impl StorageNode for StorageNodeImpl {
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let query_session_info = QuerySessionInfo::decode(r.query_session_info.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                let mut sess_store = ctx.get_session_store();
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                let sess_store = node_store.get_session_store();
                 // Takes a reference and returns Option<&V>
                 match sess_store.remove_session(account_id.addr, query_session_info.id) {
                     Ok(id) => {
@@ -114,9 +110,9 @@ impl StorageNode for StorageNodeImpl {
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let query_bill_key = QueryBillKey::decode(r.query_bill_key.as_ref())
             .map_err(|_| Status::internal("fail to decode query_bill_key ".to_string()))?;
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                match ctx
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                match node_store
                     .get_session_store()
                     .get_session_mut(account_id.addr, query_bill_key.session_id)
                 {
@@ -131,8 +127,7 @@ impl StorageNode for StorageNodeImpl {
                         return Err(Status::internal("Fail to create session"));
                     }
                 }
-                let bills = ctx
-                    .borrow_mut()
+                let bills = node_store
                     .get_auth_store()
                     .get_bills(
                         query_bill_key.height,
@@ -140,7 +135,7 @@ impl StorageNode for StorageNodeImpl {
                         query_bill_key.end_id,
                     )
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                ctx.get_session_store()
+                node_store.get_session_store()
                     .get_session_mut(account_id.addr, query_bill_key.session_id)
                     .unwrap()
                     .increase_query(1);
@@ -158,11 +153,11 @@ impl StorageNode for StorageNodeImpl {
         let r = request.into_inner();
         let account_id = Verifier::verify(r.batch_get.as_ref(), r.signature.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
                 let batch_get_key = BatchGetKey::decode(r.batch_get.as_ref())
                     .map_err(|_| Status::internal("fail to decode batch get key".to_string()))?;
-                match ctx
+                match node_store
                     .get_session_store()
                     .get_session_mut(account_id.addr, batch_get_key.session)
                 {
@@ -175,13 +170,13 @@ impl StorageNode for StorageNodeImpl {
                     }
                     None => return Err(Status::internal("Fail to create session")),
                 }
-                let values = ctx
+                let values = node_store
                     .get_auth_store()
                     .batch_get(&account_id.addr, &batch_get_key)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
 
                 // TODO(chenjing): evaluate query ops based on keys size
-                ctx.get_session_store()
+                node_store.get_session_store()
                     .get_session_mut(account_id.addr, batch_get_key.session)
                     .unwrap()
                     .increase_query(1);
@@ -200,9 +195,9 @@ impl StorageNode for StorageNodeImpl {
         let r = request.into_inner();
         let addr = AccountAddress::from_str(r.addr.as_str())
             .map_err(|e| Status::internal(format!("{}", e)))?;
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                let account = ctx
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                let account = node_store
                     .get_auth_store()
                     .get_account(&addr)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
@@ -221,9 +216,9 @@ impl StorageNode for StorageNodeImpl {
         let session_identifier = SessionIdentifier::decode(r.session_identifier.as_ref())
             .map_err(|_| Status::internal("fail to decode session_identifier".to_string()))?;
         let session_id = session_identifier.session_id;
-        match self.node_ctx.lock() {
-            Ok(mut ctx) => {
-                if let Some(sess) = ctx
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                if let Some(sess) = node_store
                     .get_session_store()
                     .get_session_mut(account_id.addr, session_id)
                 {
@@ -238,6 +233,23 @@ impl StorageNode for StorageNodeImpl {
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
+    }
+
+    /// handle broadcast mutations and query sessionss
+    async fn broadcast(
+        &self,
+        request: Request<BroadcastRequest>,
+    ) -> std::result::Result<Response<BroadcastResponse>, Status> {
+        let r = request.into_inner();
+        let response = self
+            .context
+            .client
+            .broadcast_tx_async(r.body.into())
+            .await
+            .map_err(|e| Status::internal(format!("{}", e)))?;
+        Ok(Response::new(BroadcastResponse {
+            hash: response.hash.as_ref().to_vec(),
+        }))
     }
 }
 

@@ -48,11 +48,6 @@ session restart     restart session             e.g session restart
 
 "#;
 
-struct CmdSessionConfig {
-    session_id: i32,
-    max_query_limit: i32,
-    session_timeout_second: i64,
-}
 fn current_seconds() -> u64 {
     match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs(),
@@ -125,7 +120,6 @@ pub async fn process_cmd(
     }
     let cmd = parts[0];
     // session info: {session_id, max_query_limit,
-    let mut session_info = (0, 0, 0);
     match cmd {
         "help" => {
             println!("{}", HELP);
@@ -177,8 +171,6 @@ pub async fn process_cmd(
                     }
                 }
                 "close" => {
-                    let kp = get_key_pair(false).unwrap();
-                    let addr = get_address_from_pk(&kp.public().pubkey);
                     match store_sdk
                         .close_session(session.as_ref().unwrap().session_id)
                         .await

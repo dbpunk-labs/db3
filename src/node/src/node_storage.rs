@@ -1,15 +1,12 @@
 use crate::auth_storage::AuthStorage;
-use db3_session::session_manager::{SessionManager, SessionStore};
-use ethereum_types::Address;
-use std::collections::HashMap;
-use std::pin::Pin;
+use db3_session::session_manager::SessionStore;
 
-pub struct NodeContext {
+pub struct NodeStorage{
     auth_store: AuthStorage,
     session_store: SessionStore,
 }
 
-impl NodeContext {
+impl NodeStorage {
     pub fn new(auth_store: AuthStorage) -> Self {
         Self {
             auth_store,

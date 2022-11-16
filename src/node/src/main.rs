@@ -25,8 +25,9 @@ use clap::{Parser, Subcommand};
 use db3_crypto::signer::Db3Signer;
 use db3_node::abci_impl::{AbciImpl, NodeState};
 use db3_node::auth_storage::AuthStorage;
+use db3_node::context::Context;
+use db3_node::node_storage::NodeStorage;
 use db3_node::json_rpc_impl;
-use db3_node::node_context::NodeContext;
 use db3_node::storage_node_impl::StorageNodeImpl;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
@@ -76,9 +77,6 @@ enum Commands {
         /// the url of db3 grpc api
         #[clap(long, default_value = "http://127.0.0.1:26659")]
         public_grpc_url: String,
-        /// the broadcast url of db3 json rpc api
-        #[clap(long, default_value = "http://127.0.0.1:26657")]
-        public_json_rpc_url: String,
     },
 
     /// Start DB3 node server
@@ -126,10 +124,10 @@ enum Commands {
 fn start_abci_service(
     abci_port: u16,
     read_buf_size: usize,
-    context: Arc<Mutex<Pin<Box<NodeContext>>>>,
+    store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
 ) -> (Arc<NodeState>, JoinHandle<()>) {
     let addr = format!("{}:{}", "127.0.0.1", abci_port);
-    let abci_impl = AbciImpl::new(context);
+    let abci_impl = AbciImpl::new(store);
     let node_state = abci_impl.get_node_state().clone();
     let handler = thread::spawn(move || {
         let server = ServerBuilder::new(read_buf_size).bind(addr, abci_impl);
@@ -152,10 +150,10 @@ async fn start_grpc_service(
     public_host: &str,
     public_grpc_port: u16,
     disable_grpc_web: bool,
-    ctx: Arc<Mutex<Pin<Box<NodeContext>>>>,
+    context: Context,
 ) {
     let addr = format!("{}:{}", public_host, public_grpc_port);
-    let storage_node = StorageNodeImpl::new(ctx);
+    let storage_node = StorageNodeImpl::new(context);
     info!("start db3 storage node on public addr {}", addr);
     if disable_grpc_web {
         Server::builder()
@@ -181,7 +179,7 @@ async fn start_grpc_service(
 fn start_json_rpc_service(
     public_host: &str,
     public_json_rpc_port: u16,
-    context: json_rpc_impl::Context,
+    context: Context,
 ) -> JoinHandle<()> {
     let local_public_host = public_host.to_string();
     let addr = format!("{}:{}", local_public_host, public_json_rpc_port);
@@ -237,33 +235,31 @@ async fn start_node(cmd: Commands) {
         tracing_subscriber::fmt().with_max_level(log_level).init();
         info!("{}", ABOUT);
         let merk = Merk::open(&db_path).unwrap();
-        let node_ctx = Arc::new(Mutex::new(Box::pin(NodeContext::new(AuthStorage::new(
+        let node_store = Arc::new(Mutex::new(Box::pin(NodeStorage::new(AuthStorage::new(
             merk,
         )))));
-        match node_ctx.lock() {
-            Ok(mut ctx) => {
-                ctx.get_auth_store().init();
+        match node_store.lock() {
+            Ok(mut store) => {
+                if store.get_auth_store().init().is_err() {
+                    warn!("Fail to init auth storage!");
+                    return;
+                }
             }
             _ => todo!(),
         }
         //TODO recover storage
         let (_node_state, abci_handler) =
-            start_abci_service(abci_port, read_buf_size, node_ctx.clone());
+            start_abci_service(abci_port, read_buf_size, node_store.clone());
         let tm_addr = format!("http://127.0.0.1:{}", tm_port);
         info!("db3 json rpc server will connect to tendermint {}", tm_addr);
         let client = HttpClient::new(tm_addr.as_str()).unwrap();
-        let context = json_rpc_impl::Context {
-            node_ctx: node_ctx.clone(),
+        let context = Context {
+            node_store: node_store.clone(),
             client,
         };
-        let json_rpc_handler = start_json_rpc_service(&public_host, public_json_rpc_port, context);
-        start_grpc_service(
-            &public_host,
-            public_grpc_port,
-            disable_grpc_web,
-            node_ctx.clone(),
-        )
-        .await;
+        let json_rpc_handler =
+            start_json_rpc_service(&public_host, public_json_rpc_port, context.clone());
+        start_grpc_service(&public_host, public_grpc_port, disable_grpc_web, context).await;
         let running = Arc::new(AtomicBool::new(true));
         let r = running.clone();
         ctrlc::set_handler(move || {
@@ -285,19 +281,9 @@ async fn start_node(cmd: Commands) {
 }
 
 async fn start_shell(cmd: Commands) {
-    if let Commands::Shell {
-        public_grpc_url,
-        public_json_rpc_url,
-    } = cmd
-    {
+    if let Commands::Shell { public_grpc_url } = cmd {
         println!("{}", ABOUT);
-        let kp = db3_cmd::get_key_pair(true).unwrap();
         // broadcast client
-        let client = HttpClient::new(public_json_rpc_url.as_str()).unwrap();
-        let signer = Db3Signer::new(kp);
-        let sdk = MutationSDK::new(client, signer);
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
         let uri = public_grpc_url.parse::<Uri>().unwrap();
         let endpoint = match uri.scheme_str() == Some("https") {
             true => {
@@ -314,6 +300,11 @@ async fn start_shell(cmd: Commands) {
         };
         let channel = endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
+        let kp = db3_cmd::get_key_pair(true).unwrap();
+        let signer = Db3Signer::new(kp);
+        let sdk = MutationSDK::new(client.clone(), signer);
+        let kp = db3_cmd::get_key_pair(false).unwrap();
+        let signer = Db3Signer::new(kp);
         let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
         stdout().flush().unwrap();

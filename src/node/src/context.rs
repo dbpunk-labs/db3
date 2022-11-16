@@ -1,5 +1,5 @@
 //
-// lib.rs
+// context.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +15,23 @@
 // limitations under the License.
 //
 
-pub mod abci_impl;
-pub mod auth_storage;
-pub mod context;
-mod hash_util;
-mod json_rpc;
-pub mod json_rpc_impl;
-pub mod node_storage;
-pub mod storage_node_impl;
+use super::node_storage::NodeStorage;
+use std::{
+    boxed::Box,
+    pin::Pin,
+    sync::{Arc, Mutex},
+};
+use tendermint_rpc::HttpClient;
+
+type ArcNodeStorage = Arc<Mutex<Pin<Box<NodeStorage>>>>;
+#[derive(Clone)]
+pub struct Context {
+    pub node_store: ArcNodeStorage,
+    pub client: HttpClient,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {}
+}

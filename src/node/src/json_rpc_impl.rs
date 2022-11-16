@@ -14,10 +14,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use super::auth_storage::AuthStorage;
+use super::context::Context;
 use super::hash_util;
 use super::json_rpc;
-use super::node_context::NodeContext;
 use actix_web::{web, Error, HttpResponse};
 use bytes::Bytes;
 use db3_proto::db3_base_proto::Units;
@@ -29,16 +28,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Value;
 use std::str::FromStr;
-use std::{
-    boxed::Box,
-    pin::Pin,
-    sync::{Arc, Mutex},
-};
 use subtle_encoding::base64;
 use tendermint::Hash as TMHash;
-use tendermint_rpc::{Client, HttpClient, Id, Paging};
-
-type ArcNodeContext = Arc<Mutex<Pin<Box<NodeContext>>>>;
+use tendermint_rpc::{Client, Id, Paging};
+use tracing::debug;
 fn bills_to_value(bills: &Vec<Bill>) -> Value {
     let mut new_bills: Vec<Value> = Vec::new();
     for bill in bills {
@@ -59,12 +52,6 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
         new_bills.push(Value::Object(new_bill));
     }
     Value::Array(new_bills)
-}
-
-#[derive(Clone)]
-pub struct Context {
-    pub node_ctx: ArcNodeContext,
-    pub client: HttpClient,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -145,6 +132,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
                 .body(r.dump()));
         }
     };
+    debug!("request method {}", request.method.as_str());
     let response = match request.method.as_str() {
         "bills" => handle_bills(&context, request.id, request.params).await,
         "latest_blocks" => handle_latestblocks(&context, request.id, request.params).await,
@@ -153,6 +141,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         "account" => handle_account(&context, request.id, request.params).await,
         "net_info" => handle_netinfo(&context, request.id, request.params).await,
         "validators" => handle_validators(&context, request.id, request.params).await,
+        "broadcast" => handle_broadcast(&context, request.id, request.params).await,
         _ => todo!(),
     };
     let r = match response {
@@ -174,6 +163,49 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
             .body(i.dump())),
         ResponseWrapper::External(e) => {
             Ok(HttpResponse::Ok().content_type("application/json").body(e))
+        }
+    }
+}
+
+///
+/// send mutation or query session to tendermint
+///
+async fn handle_broadcast(
+    context: &Context,
+    id: Value,
+    params: Vec<Value>,
+) -> Result<ResponseWrapper, json_rpc::ErrorData> {
+    if params.len() == 0 {
+        let err = "invalid parameters";
+        Err(json_rpc::ErrorData::new(-32602, err))
+    } else {
+        // the param must be encoded as base64 string
+        if let Value::String(s) = &params[0] {
+            let tx = base64::decode(s.as_str())
+                .map_err(|e| json_rpc::ErrorData::new(-32602, format!("{}", e).as_str()))?;
+            let response = context
+                .client
+                .broadcast_tx_async(tx.into())
+                .await
+                .map_err(|e| json_rpc::ErrorData::new(-32603, format!("{}", e).as_str()))?;
+            let external_id = match id {
+                Value::Number(n) => Id::Num(n.as_i64().unwrap()),
+                Value::String(s) => Id::Str(s),
+                _ => todo!(),
+            };
+            let base64_byte = base64::encode(response.hash.as_ref());
+            let hash = String::from_utf8_lossy(base64_byte.as_ref()).to_string();
+            let wrapper = Wrapper {
+                jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
+                result: Some(hash),
+                id: external_id,
+            };
+            return Ok(ResponseWrapper::External(
+                serde_json::to_string(&wrapper).unwrap(),
+            ));
+        } else {
+            let err = "invalid parameters";
+            Err(json_rpc::ErrorData::new(-32602, err))
         }
     }
 }
@@ -248,8 +280,8 @@ async fn handle_account(
     } else {
         if let Value::String(s) = &params[0] {
             if let Ok(addr) = AccountAddress::from_str(s.as_str()) {
-                let account = match context.node_ctx.lock() {
-                    Ok(mut ctx) => ctx.get_auth_store().get_account(&addr),
+                let account = match context.node_store.lock() {
+                    Ok(mut store) => store.get_auth_store().get_account(&addr),
                     _ => todo!(),
                 }
                 .map_err(|_| json_rpc::ErrorData::new(-32601, "fail to get account"))?;
@@ -352,9 +384,9 @@ async fn handle_bills(
         Err(json_rpc::ErrorData::new(-32601, err))
     } else {
         if let Value::Number(n) = &params[0] {
-            match context.node_ctx.lock() {
-                Ok(mut ctx) => {
-                    if let Ok(bills) = ctx.get_auth_store().get_bills(n.as_u64().unwrap(), 1, 100) {
+            match context.node_store.lock() {
+                Ok(mut store) => {
+                    if let Ok(bills) = store.get_auth_store().get_bills(n.as_u64().unwrap(), 1, 100) {
                         let value = bills_to_value(&bills);
                         return Ok(ResponseWrapper::Internal(json_rpc::Response {
                             jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
