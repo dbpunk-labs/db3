@@ -194,7 +194,6 @@ mod tests {
     use fastcrypto::traits::ToFromBytes;
     use hex;
     use std::str::FromStr;
-    use std::{thread, time};
     #[test]
     fn test_new_session() {
         let mut session = SessionManager::new();

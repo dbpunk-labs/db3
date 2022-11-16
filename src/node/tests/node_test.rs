@@ -121,8 +121,6 @@ mod node_integration {
 
         // get ns_test k1
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
             if let Ok(Some(values)) = store_sdk
                 .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
                 .await
@@ -152,9 +150,7 @@ mod node_integration {
 
         // query times == DEFAULT_SESSION_QUERY_LIMIT
         {
-            for i in 0..DEFAULT_SESSION_QUERY_LIMIT - 1 {
-                let kp = db3_cmd::get_key_pair(false).unwrap();
-                let addr = get_address_from_pk(&kp.public().pubkey);
+            for _ in 0..DEFAULT_SESSION_QUERY_LIMIT - 1 {
                 if let Ok(Some(values)) = store_sdk
                     .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
                     .await
@@ -169,8 +165,6 @@ mod node_integration {
         }
         // session blocked because query times >= limit
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
             let result = store_sdk
                 .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
                 .await;
@@ -259,8 +253,6 @@ mod node_integration {
                 assert_eq!(info.query_count, 0);
             }
             {
-                let kp = db3_cmd::get_key_pair(false).unwrap();
-                let addr = get_address_from_pk(&kp.public().pubkey);
                 let result = store_sdk
                     .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_2)
                     .await;

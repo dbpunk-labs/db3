@@ -51,7 +51,6 @@ impl BillKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_address_from_pk;
     #[test]
     fn it_billkey_encode() -> Result<()> {
         let bk = BillKey(1, 10);

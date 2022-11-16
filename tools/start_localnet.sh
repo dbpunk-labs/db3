@@ -23,9 +23,9 @@ fi
 
 # clean db3
 killall -s 9 db3
-if [ -e ./db3 ]
+if [ -e ./db ]
 then
-    rm -rf db3
+    rm -rf db
 fi
 ../target/debug/db3 node >>db3.log 2>&1  &
 sleep 1
