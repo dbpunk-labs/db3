@@ -20,10 +20,9 @@ use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BatchGetKey, BroadcastRequest, BroadcastResponse,
-    CloseSessionRequest, CloseSessionResponse,
-    GetAccountRequest, GetKeyRequest, GetKeyResponse, GetSessionInfoRequest,
-    GetSessionInfoResponse, OpenSessionRequest, OpenSessionResponse, QueryBillKey,
-    QueryBillRequest, QueryBillResponse, QuerySessionInfo, SessionIdentifier,
+    CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse,
+    GetSessionInfoRequest, GetSessionInfoResponse, OpenSessionRequest, OpenSessionResponse,
+    QueryBillKey, QueryBillRequest, QueryBillResponse, QuerySessionInfo, SessionIdentifier,
 };
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
@@ -40,9 +39,7 @@ pub struct StorageNodeImpl {
 
 impl StorageNodeImpl {
     pub fn new(context: Context) -> Self {
-        Self {
-            context,
-        }
+        Self { context }
     }
 }
 
@@ -135,7 +132,8 @@ impl StorageNode for StorageNodeImpl {
                         query_bill_key.end_id,
                     )
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                node_store.get_session_store()
+                node_store
+                    .get_session_store()
                     .get_session_mut(account_id.addr, query_bill_key.session_id)
                     .unwrap()
                     .increase_query(1);
@@ -176,7 +174,8 @@ impl StorageNode for StorageNodeImpl {
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
 
                 // TODO(chenjing): evaluate query ops based on keys size
-                node_store.get_session_store()
+                node_store
+                    .get_session_store()
                     .get_session_mut(account_id.addr, batch_get_key.session)
                     .unwrap()
                     .increase_query(1);

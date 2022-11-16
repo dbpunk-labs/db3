@@ -1,7 +1,7 @@
 use crate::auth_storage::AuthStorage;
 use db3_session::session_manager::SessionStore;
 
-pub struct NodeStorage{
+pub struct NodeStorage {
     auth_store: AuthStorage,
     session_store: SessionStore,
 }

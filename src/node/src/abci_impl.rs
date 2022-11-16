@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use super::auth_storage::{Hash};
+use super::auth_storage::Hash;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::verifier;

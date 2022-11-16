@@ -93,16 +93,10 @@ impl StoreSDK {
                 let request = tonic::Request::new(r);
                 let mut client = self.client.as_ref().clone();
                 match client.close_query_session(request).await {
-                    Ok(response) => {
-                        match self.session_pool.remove_session(query_session_info.id) {
-                            Ok(_) => {
-                                Ok(response.into_inner().session_id)
-                            }
-                            Err(e) => {
-                                Err(Status::internal(format!("{}", e)))
-                            }
-                        }
-                    }
+                    Ok(response) => match self.session_pool.remove_session(query_session_info.id) {
+                        Ok(_) => Ok(response.into_inner().session_id),
+                        Err(e) => Err(Status::internal(format!("{}", e))),
+                    },
                     Err(e) => Err(Status::internal(format!("{}", e))),
                 }
             }
