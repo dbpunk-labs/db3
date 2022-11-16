@@ -462,6 +462,11 @@
     "@types/long" "^3.0.0"
     "@types/node" "*"
 
+"@types/google-protobuf@^3.15.6":
+  version "3.15.6"
+  resolved "https://registry.npmmirror.com/@types/google-protobuf/-/google-protobuf-3.15.6.tgz#674a69493ef2c849b95eafe69167ea59079eb504"
+  integrity sha512-pYVNNJ+winC4aek+lZp93sIKxnXt5qMkuKmaqS3WGuTq0Bw1ZDYNBgzG5kkdtwcv+GmYJGo3yEg6z2cKKAiEdw==
+
 "@types/long@^3.0.0":
   version "3.0.32"
   resolved "https://registry.npmmirror.com/@types/long/-/long-3.0.32.tgz#f4e5af31e9e9b196d8e5fca8a5e2e20aa3d60b69"
@@ -1027,6 +1032,11 @@ globals@^11.1.0:
   resolved "https://registry.npmmirror.com/globals/-/globals-11.12.0.tgz#ab8795338868a0babd8525758018c2a7eb95c42e"
   integrity sha512-WOBp/EEGUiIsJSp7wcv/y6MO+lV9UoncWqxuFfm8eBwzWNgyfBd6Gz+IeKQ9jCmyhoH99g15M3T+QaVHFjizVA==
 
+google-closure-library@^20221102.0.0:
+  version "20221102.0.0"
+  resolved "https://registry.npmmirror.com/google-closure-library/-/google-closure-library-20221102.0.0.tgz#5561dd360414bb64a265a060682038e4e64c15fd"
+  integrity sha512-M5+LWPS99tMB9dOGpZjLT9CdIYpnwBZiwB+dCmZFOOvwJiOWytntzJ/a/hoNF6zxD15l3GWwRJiEkL636D6DRQ==
+
 google-protobuf@^3.21.2:
   version "3.21.2"
   resolved "https://registry.npmmirror.com/google-protobuf/-/google-protobuf-3.21.2.tgz#4580a2bea8bbb291ee579d1fefb14d6fa3070ea4"
@@ -1502,10 +1512,20 @@ tr46@~0.0.3:
   resolved "https://registry.npmmirror.com/tr46/-/tr46-0.0.3.tgz#8184fd347dac9cdc185992f3a6622e14b9d9ab6a"
   integrity sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==
 
+ts-closure-library@^2022.5.0-2.2:
+  version "2022.5.0-2.2"
+  resolved "https://registry.npmmirror.com/ts-closure-library/-/ts-closure-library-2022.5.0-2.2.tgz#f39bd95a37c79043ad585b6a95dd800a7724bd17"
+  integrity sha512-/WvCITugk+U6pMA+0wvgJHU+3ewmCDVC5GkRHv6gT1+n/ZFZxbUv8xTQiFneivhslsE8DymsHYJQKCoi2dgzXg==
+
 typescript@^4.6.4:
   version "4.8.4"
   resolved "https://registry.npmmirror.com/typescript/-/typescript-4.8.4.tgz#c464abca159669597be5f96b8943500b238e60e6"
   integrity sha512-QCh+85mCy+h0IGff8r5XWzOVSbBO+KfeYrMQh7NJ58QujwcE22u+NUSmUxqF+un70P9GXKxa2HCNiTTMJknyjQ==
+
+uint8-to-base64@^0.2.0:
+  version "0.2.0"
+  resolved "https://registry.npmmirror.com/uint8-to-base64/-/uint8-to-base64-0.2.0.tgz#3f46a5f290db773c41c38cef025a4e49eadb3f3f"
+  integrity sha512-r13jrghEYZAN99GeYpEjM107DOxqB65enskpwce8rRHVAGEtaWmsF5GqoGdPMf8DIXc9XyAJTdvlvRZi4LsszA==
 
 update-browserslist-db@^1.0.9:
   version "1.0.10"

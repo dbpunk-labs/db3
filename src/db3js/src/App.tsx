@@ -9,13 +9,14 @@ import db3_bill_pb from "./pkg/db3_bill_pb";
 import { StorageNodeClient } from "./pkg/Db3_nodeServiceClientPb";
 import "./App.css";
 
+var jspb = require("google-protobuf");
 function encodeUint8Array(text: string) {
 	return new TextEncoder().encode(text);
 }
 
 function App() {
 	useEffect(() => {
-		const client = new StorageNodeClient("http://localhost:26657/");
+		const client = new StorageNodeClient("http://localhost:26659/");
 		const nsUint8Array = new TextEncoder().encode("detwitter");
 		const kv_pair = new db3_mutation_pb.KVPair({
 			key: encodeUint8Array("name"),
@@ -32,25 +33,30 @@ function App() {
 			gasPrice: null,
 			gas: 10,
 		});
+		const writeRequest = new db3_mutation_pb.WriteRequest();
+		writeRequest.setMutation(mutationRequest.serializeBinary());
+		const bill = new db3_bill_pb.Bill();
+		bill.setBlockHeight(19595);
+
 		const queryBillRequest = new db3_bill_pb.BillQueryRequest();
 		queryBillRequest.setBlockHeight(19595);
-		// const u8 = queryBillRequest.serializeBinary();
-		// var decoder = new TextDecoder("utf8");
-		// var b64encoded = window.btoa(decoder.decode(u8));
-		client.queryBill(queryBillRequest, {}, (err: any, response: any) => {
+		console.log(
+			jspb.Message.bytesAsB64(queryBillRequest.serializeBinary()),
+		);
+
+		client.queryBill(bill, {}, (err: any, response: any) => {
 			if (err) {
 				console.error(err);
 			} else {
 				console.log(response);
 			}
 		});
-		// const mn = bip39.generateMnemonic(wordlist);
-		// bip39.mnemonicToSeed(mn, "password").then((seed: Uint8Array) => {
-		// 	console.log(seed.toString());
-		// 	const [pk, sk] = gen_key(seed);
-		// 	const signature = sign(new TextEncoder().encode("test"), sk);
-		// 	console.log(signature);
-		// });
+		const mn = bip39.generateMnemonic(wordlist);
+		bip39.mnemonicToSeed(mn, "password").then((seed: Uint8Array) => {
+			const [pk, sk] = gen_key(seed);
+			const signature = sign(new TextEncoder().encode("test"), sk);
+			writeRequest.setSignature(signature);
+		});
 	}, []);
 
 	return (
