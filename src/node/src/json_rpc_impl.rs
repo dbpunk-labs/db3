@@ -17,6 +17,7 @@
 use super::auth_storage::AuthStorage;
 use super::hash_util;
 use super::json_rpc;
+use super::node_context::NodeContext;
 use actix_web::{web, Error, HttpResponse};
 use bytes::Bytes;
 use db3_proto::db3_base_proto::Units;
@@ -37,7 +38,7 @@ use subtle_encoding::base64;
 use tendermint::Hash as TMHash;
 use tendermint_rpc::{Client, HttpClient, Id, Paging};
 
-type ArcAuthStorage = Arc<Mutex<Pin<Box<AuthStorage>>>>;
+type ArcNodeContext = Arc<Mutex<Pin<Box<NodeContext>>>>;
 fn bills_to_value(bills: &Vec<Bill>) -> Value {
     let mut new_bills: Vec<Value> = Vec::new();
     for bill in bills {
@@ -62,7 +63,7 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
 
 #[derive(Clone)]
 pub struct Context {
-    pub store: ArcAuthStorage,
+    pub node_ctx: ArcNodeContext,
     pub client: HttpClient,
 }
 
@@ -247,8 +248,8 @@ async fn handle_account(
     } else {
         if let Value::String(s) = &params[0] {
             if let Ok(addr) = AccountAddress::from_str(s.as_str()) {
-                let account = match context.store.lock() {
-                    Ok(s) => s.get_account(&addr),
+                let account = match context.node_ctx.lock() {
+                    Ok(mut ctx) => ctx.get_auth_store().get_account(&addr),
                     _ => todo!(),
                 }
                 .map_err(|_| json_rpc::ErrorData::new(-32601, "fail to get account"))?;
@@ -351,9 +352,9 @@ async fn handle_bills(
         Err(json_rpc::ErrorData::new(-32601, err))
     } else {
         if let Value::Number(n) = &params[0] {
-            match context.store.lock() {
-                Ok(s) => {
-                    if let Ok(bills) = s.get_bills(n.as_u64().unwrap(), 1, 100) {
+            match context.node_ctx.lock() {
+                Ok(mut ctx) => {
+                    if let Ok(bills) = ctx.get_auth_store().get_bills(n.as_u64().unwrap(), 1, 100) {
                         let value = bills_to_value(&bills);
                         return Ok(ResponseWrapper::Internal(json_rpc::Response {
                             jsonrpc: String::from(json_rpc::JSONRPC_VERSION),

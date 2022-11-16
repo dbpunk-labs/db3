@@ -19,6 +19,7 @@ use db3_base::{get_address_from_pk, strings};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
+use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use fastcrypto::secp256k1::Secp256k1KeyPair;
@@ -47,6 +48,11 @@ session restart     restart session             e.g session restart
 
 "#;
 
+struct CmdSessionConfig {
+    session_id: i32,
+    max_query_limit: i32,
+    session_timeout_second: i64,
+}
 fn current_seconds() -> u64 {
     match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs(),
@@ -106,14 +112,20 @@ fn show_account(account: &Account) {
     ]);
     table.printstd();
 }
-
-pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str) {
+pub async fn process_cmd(
+    sdk: &MutationSDK,
+    store_sdk: &mut StoreSDK,
+    cmd: &str,
+    session: &mut Option<OpenSessionResponse>,
+) {
     let parts: Vec<&str> = cmd.split(" ").collect();
     if parts.len() < 1 {
         println!("{}", HELP);
         return;
     }
     let cmd = parts[0];
+    // session info: {session_id, max_query_limit,
+    let mut session_info = (0, 0, 0);
     match cmd {
         "help" => {
             println!("{}", HELP);
@@ -134,27 +146,80 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str)
             let op = parts[1];
             match op {
                 "info" => {
+                    // TODO(chenjing): show history session list
+                    if session.is_none() {
+                        println!("start a session before query session info");
+                        return;
+                    }
                     let kp = get_key_pair(false).unwrap();
                     let addr = get_address_from_pk(&kp.public().pubkey);
-                    if let Ok(session_info) = store_sdk.get_session_info(&addr).await {
+                    if let Ok(session_info) = store_sdk
+                        .get_session_info(&addr, session.as_ref().unwrap().session_id)
+                        .await
+                    {
                         println!("{:?}", session_info)
                     } else {
                         println!("empty set");
                     }
                     return;
                 }
-                "restart" => {
-                    if let Ok((old_session_info, new_session_id)) =
-                        store_sdk.restart_session().await
-                    {
-                        println!(
-                            "close session {} and restart with session_id {}",
-                            old_session_info, new_session_id
-                        )
-                    } else {
-                        println!("empty set");
+                "open" => {
+                    let kp = get_key_pair(false).unwrap();
+                    let addr = get_address_from_pk(&kp.public().pubkey);
+                    match store_sdk.open_session(&addr).await {
+                        Ok(open_session_info) => {
+                            *session = Some(open_session_info);
+                            println!("{:?}", *session);
+                        }
+                        Err(e) => {
+                            println!("Error: {}", e);
+                        }
                     }
-                    return;
+                }
+                "close" => {
+                    let kp = get_key_pair(false).unwrap();
+                    let addr = get_address_from_pk(&kp.public().pubkey);
+                    match store_sdk
+                        .close_session(session.as_ref().unwrap().session_id)
+                        .await
+                    {
+                        Ok(id) => {
+                            println!("Close Session {}", id);
+                            // set session_id to 0
+                            *session = None;
+                        }
+                        Err(e) => {
+                            println!("Error: {}", e);
+                        }
+                    }
+                }
+                "restart" => {
+                    let kp = get_key_pair(false).unwrap();
+                    let addr = get_address_from_pk(&kp.public().pubkey);
+
+                    match store_sdk
+                        .close_session(session.as_ref().unwrap().session_id)
+                        .await
+                    {
+                        Ok(id) => {
+                            println!("Close Session {}", id);
+                            // set session_id to 0
+                            *session = None;
+                            println!("Open Session ...");
+                            match store_sdk.open_session(&addr).await {
+                                Ok(open_session_info) => {
+                                    *session = Some(open_session_info);
+                                    println!("{:?}", session.as_ref());
+                                }
+                                Err(e) => {
+                                    println!("Open Session Error: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            println!("Close Session Error: {}", e);
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -174,11 +239,18 @@ pub async fn process_cmd(sdk: &MutationSDK, store_sdk: &mut StoreSDK, cmd: &str)
     let mut pairs: Vec<KvPair> = Vec::new();
     match cmd {
         "get" => {
+            if session.is_none() {
+                println!("start a session before query");
+                return;
+            }
             let mut keys: Vec<Vec<u8>> = Vec::new();
             for i in 2..parts.len() {
                 keys.push(parts[i].as_bytes().to_vec());
             }
-            if let Ok(Some(values)) = store_sdk.batch_get(ns.as_bytes(), keys).await {
+            if let Ok(Some(values)) = store_sdk
+                .batch_get(ns.as_bytes(), keys, session.as_ref().unwrap().session_id)
+                .await
+            {
                 for kv in values.values {
                     println!(
                         "{} -> {}",
