@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use super::auth_storage::AuthStorage;
+use super::context::Context;
 use super::hash_util;
 use super::json_rpc;
 use actix_web::{web, Error, HttpResponse};
@@ -28,16 +28,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Value;
 use std::str::FromStr;
-use std::{
-    boxed::Box,
-    pin::Pin,
-    sync::{Arc, Mutex},
-};
 use subtle_encoding::base64;
 use tendermint::Hash as TMHash;
-use tendermint_rpc::{Client, HttpClient, Id, Paging};
-
-type ArcAuthStorage = Arc<Mutex<Pin<Box<AuthStorage>>>>;
+use tendermint_rpc::{Client, Id, Paging};
+use tracing::debug;
 fn bills_to_value(bills: &Vec<Bill>) -> Value {
     let mut new_bills: Vec<Value> = Vec::new();
     for bill in bills {
@@ -58,12 +52,6 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
         new_bills.push(Value::Object(new_bill));
     }
     Value::Array(new_bills)
-}
-
-#[derive(Clone)]
-pub struct Context {
-    pub store: ArcAuthStorage,
-    pub client: HttpClient,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -144,6 +132,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
                 .body(r.dump()));
         }
     };
+    debug!("request method {}", request.method.as_str());
     let response = match request.method.as_str() {
         "bills" => handle_bills(&context, request.id, request.params).await,
         "latest_blocks" => handle_latestblocks(&context, request.id, request.params).await,
@@ -152,6 +141,7 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         "account" => handle_account(&context, request.id, request.params).await,
         "net_info" => handle_netinfo(&context, request.id, request.params).await,
         "validators" => handle_validators(&context, request.id, request.params).await,
+        "broadcast" => handle_broadcast(&context, request.id, request.params).await,
         _ => todo!(),
     };
     let r = match response {
@@ -173,6 +163,49 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
             .body(i.dump())),
         ResponseWrapper::External(e) => {
             Ok(HttpResponse::Ok().content_type("application/json").body(e))
+        }
+    }
+}
+
+///
+/// send mutation or query session to tendermint
+///
+async fn handle_broadcast(
+    context: &Context,
+    id: Value,
+    params: Vec<Value>,
+) -> Result<ResponseWrapper, json_rpc::ErrorData> {
+    if params.len() == 0 {
+        let err = "invalid parameters";
+        Err(json_rpc::ErrorData::new(-32602, err))
+    } else {
+        // the param must be encoded as base64 string
+        if let Value::String(s) = &params[0] {
+            let tx = base64::decode(s.as_str())
+                .map_err(|e| json_rpc::ErrorData::new(-32602, format!("{}", e).as_str()))?;
+            let response = context
+                .client
+                .broadcast_tx_async(tx.into())
+                .await
+                .map_err(|e| json_rpc::ErrorData::new(-32603, format!("{}", e).as_str()))?;
+            let external_id = match id {
+                Value::Number(n) => Id::Num(n.as_i64().unwrap()),
+                Value::String(s) => Id::Str(s),
+                _ => todo!(),
+            };
+            let base64_byte = base64::encode(response.hash.as_ref());
+            let hash = String::from_utf8_lossy(base64_byte.as_ref()).to_string();
+            let wrapper = Wrapper {
+                jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
+                result: Some(hash),
+                id: external_id,
+            };
+            return Ok(ResponseWrapper::External(
+                serde_json::to_string(&wrapper).unwrap(),
+            ));
+        } else {
+            let err = "invalid parameters";
+            Err(json_rpc::ErrorData::new(-32602, err))
         }
     }
 }

@@ -15,13 +15,14 @@
 // limitations under the License.
 //
 
-use super::auth_storage::AuthStorage;
+use super::context::Context;
 use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, BatchGetKey, GetAccountRequest, GetKeyRequest,
-    GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse, QueryBillRequest,
-    QueryBillResponse, RestartSessionRequest, RestartSessionResponse,
+    storage_node_server::StorageNode, BatchGetKey, BroadcastRequest, BroadcastResponse,
+    GetAccountRequest, GetKeyRequest, GetKeyResponse, GetSessionInfoRequest,
+    GetSessionInfoResponse, QueryBillRequest, QueryBillResponse, RestartSessionRequest,
+    RestartSessionResponse,
 };
 use db3_session::session_manager::SessionManager;
 use ethereum_types::Address as AccountAddress;
@@ -32,17 +33,18 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
 
 pub struct StorageNodeImpl {
-    store: Arc<Mutex<Pin<Box<AuthStorage>>>>,
+    context: Context,
     sessions: Arc<Mutex<Pin<Box<HashMap<Address, SessionManager>>>>>,
 }
 
 impl StorageNodeImpl {
-    pub fn new(store: Arc<Mutex<Pin<Box<AuthStorage>>>>) -> Self {
+    pub fn new(context: Context) -> Self {
         Self {
-            store,
+            context,
             sessions: Arc::new(Mutex::new(Box::pin(HashMap::new()))),
         }
     }
@@ -86,7 +88,7 @@ impl StorageNode for StorageNodeImpl {
         request: Request<QueryBillRequest>,
     ) -> std::result::Result<Response<QueryBillResponse>, Status> {
         let r = request.into_inner();
-        match self.store.lock() {
+        match self.context.store.lock() {
             Ok(s) => {
                 let bills = s
                     .get_bills(r.height, r.start_id, r.end_id)
@@ -116,7 +118,7 @@ impl StorageNode for StorageNodeImpl {
                         BatchGetKey::decode(r.batch_get.as_ref()).map_err(|_| {
                             Status::internal("fail to decode batch get key".to_string())
                         })?;
-                    match self.store.lock() {
+                    match self.context.store.lock() {
                         Ok(s) => {
                             let values = s
                                 .batch_get(&account_id.addr, &batch_get_key)
@@ -148,7 +150,7 @@ impl StorageNode for StorageNodeImpl {
         let r = request.into_inner();
         let addr = AccountAddress::from_str(r.addr.as_str())
             .map_err(|e| Status::internal(format!("{}", e)))?;
-        match self.store.lock() {
+        match self.context.store.lock() {
             Ok(s) => {
                 let account = s
                     .get_account(&addr)
@@ -179,6 +181,23 @@ impl StorageNode for StorageNodeImpl {
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
+    }
+
+    /// handle broadcast mutations and query sessionss
+    async fn broadcast(
+        &self,
+        request: Request<BroadcastRequest>,
+    ) -> std::result::Result<Response<BroadcastResponse>, Status> {
+        let r = request.into_inner();
+        let response = self
+            .context
+            .client
+            .broadcast_tx_async(r.body.into())
+            .await
+            .map_err(|e| Status::internal(format!("{}", e)))?;
+        Ok(Response::new(BroadcastResponse {
+            hash: response.hash.as_ref().to_vec(),
+        }))
     }
 }
 

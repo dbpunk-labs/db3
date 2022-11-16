@@ -92,11 +92,21 @@ message QuerySessionInfo {
     SessionStatus status = 3;
     int32 query_count = 4;
 }
+
 message GetSessionInfoResponse {
     // TODO the validator sign
     bytes signature = 1;
     QuerySessionInfo session_info = 2;
 }
+
+message BroadcastRequest {
+    bytes body = 1;
+}
+
+message BroadcastResponse {
+    bytes hash = 2;
+}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
@@ -107,4 +117,6 @@ service StorageNode {
     // method for querying account
     rpc GetAccount(GetAccountRequest) returns (db3_account_proto.Account) {}
     rpc GetSessionInfo(GetSessionInfoRequest) returns (GetSessionInfoResponse) {}
+    // method for broadcast request
+    rpc Broadcast(BroadcastRequest) returns (BroadcastResponse) {}
 }
