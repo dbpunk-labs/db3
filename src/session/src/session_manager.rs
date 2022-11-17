@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use chrono::{Timelike, Utc};
+use chrono::Utc;
 use db3_proto::db3_node_proto::{QuerySessionInfo, SessionStatus};
 use ethereum_types::Address;
 use std::collections::HashMap;
@@ -43,7 +43,7 @@ impl SessionPool {
 
     /// clean up blocked/stop sessions
     pub fn cleanup_session(&mut self) -> bool {
-        self.session_pool.retain(|&k, v| !v.check_session_running());
+        self.session_pool.retain(|_, v| !v.check_session_running());
         self.last_cleanup_time = Utc::now().timestamp();
         return true;
     }
@@ -217,7 +217,6 @@ mod tests {
     use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
     use hex;
-    use std::str::FromStr;
     #[test]
     fn test_new_session() {
         let mut session = SessionManager::new();

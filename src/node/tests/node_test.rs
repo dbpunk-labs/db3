@@ -2,7 +2,6 @@
 
 mod node_integration {
     use bytes::BytesMut;
-    use db3_base::get_address_from_pk;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
     use db3_proto::db3_mutation_proto::WriteRequest;
@@ -12,7 +11,6 @@ mod node_integration {
     use db3_sdk::mutation_sdk::MutationSDK;
     use db3_sdk::store_sdk::StoreSDK;
     use db3_session::session_manager::{DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT};
-    use fastcrypto::traits::KeyPair;
     use prost::Message;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -115,9 +113,7 @@ mod node_integration {
         let mut session_id_1 = 0;
         // session restart
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let res = store_sdk.open_session(&addr).await;
+            let res = store_sdk.open_session().await;
             assert!(res.is_ok());
             let session_info = res.unwrap();
             session_id_1 = session_info.session_id;
@@ -233,9 +229,7 @@ mod node_integration {
         // open another session 2
         let mut session_id_2 = 0;
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let res = store_sdk.open_session(&addr).await;
+            let res = store_sdk.open_session().await;
             assert!(res.is_ok());
             let session_info = res.unwrap();
             // verify session id increase 1

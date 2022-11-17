@@ -84,7 +84,7 @@ message GetSessionInfoRequest {
     bytes signature = 2;
 }
 message OpenSessionRequest {
-    bytes addr = 1;
+    bytes header = 1;
     bytes signature = 2;
 }
 message OpenSessionResponse {

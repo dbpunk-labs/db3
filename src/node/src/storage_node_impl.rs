@@ -50,7 +50,7 @@ impl StorageNode for StorageNodeImpl {
         request: Request<OpenSessionRequest>,
     ) -> std::result::Result<Response<OpenSessionResponse>, Status> {
         let r = request.into_inner();
-        let account_id = Verifier::verify(r.addr.as_ref(), r.signature.as_ref())
+        let account_id = Verifier::verify(r.header.as_ref(), r.signature.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {

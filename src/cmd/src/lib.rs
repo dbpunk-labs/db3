@@ -155,19 +155,15 @@ pub async fn process_cmd(
                     }
                     return;
                 }
-                "open" => {
-                    let kp = get_key_pair(false).unwrap();
-                    let addr = get_address_from_pk(&kp.public().pubkey);
-                    match store_sdk.open_session(&addr).await {
-                        Ok(open_session_info) => {
-                            *session = Some(open_session_info);
-                            println!("{:?}", *session);
-                        }
-                        Err(e) => {
-                            println!("Error: {}", e);
-                        }
+                "open" => match store_sdk.open_session().await {
+                    Ok(open_session_info) => {
+                        *session = Some(open_session_info);
+                        println!("{:?}", *session);
                     }
-                }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                },
                 "close" => {
                     match store_sdk
                         .close_session(session.as_ref().unwrap().session_id)
@@ -184,9 +180,6 @@ pub async fn process_cmd(
                     }
                 }
                 "restart" => {
-                    let kp = get_key_pair(false).unwrap();
-                    let addr = get_address_from_pk(&kp.public().pubkey);
-
                     match store_sdk
                         .close_session(session.as_ref().unwrap().session_id)
                         .await
@@ -196,7 +189,7 @@ pub async fn process_cmd(
                             // set session_id to 0
                             *session = None;
                             println!("Open Session ...");
-                            match store_sdk.open_session(&addr).await {
+                            match store_sdk.open_session().await {
                                 Ok(open_session_info) => {
                                     *session = Some(open_session_info);
                                     println!("{:?}", session.as_ref());
