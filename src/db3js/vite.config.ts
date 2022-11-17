@@ -7,4 +7,13 @@ import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 // https://vitejs.dev/config/
 export default defineConfig({
 	plugins: [react(), wasm(), topLevelAwait(), viteCommonjs()],
+	server: {
+		proxy: {
+			"/api": {
+				target: "http://localhost:26659",
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/api/, ""),
+			},
+		},
+	},
 });

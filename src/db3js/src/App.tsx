@@ -5,9 +5,9 @@ import { wordlist } from "@scure/bip39/wordlists/english";
 import { gen_key, sign } from "./pkg/db3_jsdk";
 import db3_mutation_pb from "./pkg/db3_mutation_pb";
 import db3_base_pb from "./pkg/db3_base_pb";
-import db3_bill_pb from "./pkg/db3_bill_pb";
 import db3_node_pb from "./pkg/db3_node_pb";
 import { StorageNodeClient } from "./pkg/Db3_nodeServiceClientPb";
+import rpc from "./api/rpc.api";
 import "./App.css";
 
 var jspb = require("google-protobuf");
@@ -29,6 +29,7 @@ function App() {
 		mutation.setNonce(22333);
 		mutation.setChainId(db3_base_pb.ChainId.MAINNET);
 		mutation.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN);
+		mutation.setGasPrice();
 		mutation.setGas(10);
 
 		const mn = bip39.generateMnemonic(wordlist);
@@ -41,10 +42,12 @@ function App() {
 
 			const broadcastRequest = new db3_node_pb.BroadcastRequest();
 			broadcastRequest.setBody(writeRequest.serializeBinary());
-
+			// rpc("broadcast", [
+			// 	jspb.Message.bytesAsB64(broadcastRequest.serializeBinary()),
+			// ]);
 			client.broadcast(
 				broadcastRequest,
-				{},
+				null,
 				(err: any, response: any) => {
 					if (err) {
 						console.error(err);
