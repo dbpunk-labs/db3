@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use super::auth_storage::AuthStorage;
+use super::node_storage::NodeStorage;
 use std::{
     boxed::Box,
     pin::Pin,
@@ -23,10 +23,10 @@ use std::{
 };
 use tendermint_rpc::HttpClient;
 
-type ArcAuthStorage = Arc<Mutex<Pin<Box<AuthStorage>>>>;
+type ArcNodeStorage = Arc<Mutex<Pin<Box<NodeStorage>>>>;
 #[derive(Clone)]
 pub struct Context {
-    pub store: ArcAuthStorage,
+    pub node_store: ArcNodeStorage,
     pub client: HttpClient,
 }
 

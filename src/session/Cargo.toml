@@ -12,3 +12,9 @@ keywords = ["database", "web3", "db3"]
 db3-proto={ path ="../proto" }
 ethereum-types = { version = "0.14.0", default-features = false }
 chrono = "0.4.22"
+
+[dev-dependencies]
+fastcrypto="0.1.3"
+db3-base={ path ="../base" }
+bytes = "1"
+hex = "0.4.3"

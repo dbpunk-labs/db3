@@ -21,10 +21,15 @@ import "db3_mutation.proto";
 import "db3_account.proto";
 package db3_node_proto;
 
-message QueryBillRequest {
+message QueryBillKey {
     uint64 height = 1;
     uint64 start_id = 2;
     uint64 end_id = 3;
+    int32 session_id = 4;
+}
+message QueryBillRequest {
+    bytes query_bill_key = 1;
+    bytes signature = 2;
 }
 
 message QueryBillResponse {
@@ -54,6 +59,9 @@ message BatchGetValue {
     bytes ns = 3;
 }
 
+message SessionIdentifier {
+    int32 session_id = 1;
+}
 message GetKeyRequest {
     bytes batch_get = 1;
     bytes signature = 2;
@@ -64,13 +72,6 @@ message GetKeyResponse {
     bytes signature = 1;
     BatchGetValue batch_get_values = 2;
 }
-message RestartSessionRequest {
-    bytes query_session_info = 1;
-    bytes signature = 2;
-}
-message RestartSessionResponse {
-    int32 session = 3;
-}
 
 message GetAccountRequest {
     // the hex encoded string
@@ -79,11 +80,30 @@ message GetAccountRequest {
 
 message GetSessionInfoRequest {
     // the hex encoded string
-    string addr = 1;
+    bytes session_identifier = 1;
+    bytes signature = 2;
 }
+message OpenSessionRequest {
+    bytes header = 1;
+    bytes signature = 2;
+}
+message OpenSessionResponse {
+    int32 session_id = 1;
+    int64 session_timeout_second = 2;
+    int32 max_query_limit = 3;
+}
+message CloseSessionRequest {
+    bytes query_session_info = 1;
+    bytes signature = 2;
+}
+message CloseSessionResponse {
+    int32 session_id = 1;
+}
+
 enum SessionStatus {
     Running = 0;
     Blocked = 1;
+    Stop = 2;
 }
 message QuerySessionInfo {
     // the hex encoded string
@@ -112,8 +132,11 @@ service StorageNode {
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
     // method for querying kv data
     rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
-    // method for restart query session
-    rpc RestartQuerySession(RestartSessionRequest) returns (RestartSessionResponse) {}
+    // method for open query session
+    rpc OpenQuerySession(OpenSessionRequest) returns (OpenSessionResponse) {}
+
+    // method for close query session
+    rpc CloseQuerySession(CloseSessionRequest) returns (CloseSessionResponse) {}
     // method for querying account
     rpc GetAccount(GetAccountRequest) returns (db3_account_proto.Account) {}
     rpc GetSessionInfo(GetSessionInfoRequest) returns (GetSessionInfoResponse) {}

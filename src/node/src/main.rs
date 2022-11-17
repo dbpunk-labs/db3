@@ -27,9 +27,11 @@ use db3_node::abci_impl::{AbciImpl, NodeState};
 use db3_node::auth_storage::AuthStorage;
 use db3_node::context::Context;
 use db3_node::json_rpc_impl;
+use db3_node::node_storage::NodeStorage;
 use db3_node::storage_node_impl::StorageNodeImpl;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
+use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use http::Uri;
@@ -122,7 +124,7 @@ enum Commands {
 fn start_abci_service(
     abci_port: u16,
     read_buf_size: usize,
-    store: Arc<Mutex<Pin<Box<AuthStorage>>>>,
+    store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
 ) -> (Arc<NodeState>, JoinHandle<()>) {
     let addr = format!("{}:{}", "127.0.0.1", abci_port);
     let abci_impl = AbciImpl::new(store);
@@ -233,22 +235,26 @@ async fn start_node(cmd: Commands) {
         tracing_subscriber::fmt().with_max_level(log_level).init();
         info!("{}", ABOUT);
         let merk = Merk::open(&db_path).unwrap();
-        let store = Arc::new(Mutex::new(Box::pin(AuthStorage::new(merk))));
-        match store.lock() {
-            Ok(mut s) => {
-                s.init().unwrap();
+        let node_store = Arc::new(Mutex::new(Box::pin(NodeStorage::new(AuthStorage::new(
+            merk,
+        )))));
+        match node_store.lock() {
+            Ok(mut store) => {
+                if store.get_auth_store().init().is_err() {
+                    warn!("Fail to init auth storage!");
+                    return;
+                }
             }
             _ => todo!(),
         }
         //TODO recover storage
-        let store_for_abci = store.clone();
         let (_node_state, abci_handler) =
-            start_abci_service(abci_port, read_buf_size, store_for_abci);
+            start_abci_service(abci_port, read_buf_size, node_store.clone());
         let tm_addr = format!("http://127.0.0.1:{}", tm_port);
         info!("db3 json rpc server will connect to tendermint {}", tm_addr);
         let client = HttpClient::new(tm_addr.as_str()).unwrap();
         let context = Context {
-            store: store.clone(),
+            node_store: node_store.clone(),
             client,
         };
         let json_rpc_handler =
@@ -302,6 +308,7 @@ async fn start_shell(cmd: Commands) {
         let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
         stdout().flush().unwrap();
+        let mut session: Option<OpenSessionResponse> = None;
         let stdin = io::stdin();
         for line in stdin.lock().lines() {
             match line {
@@ -309,7 +316,7 @@ async fn start_shell(cmd: Commands) {
                     return;
                 }
                 Ok(s) => {
-                    db3_cmd::process_cmd(&sdk, &mut store_sdk, s.as_str()).await;
+                    db3_cmd::process_cmd(&sdk, &mut store_sdk, s.as_str(), &mut session).await;
                     print!(">");
                     stdout().flush().unwrap();
                 }
