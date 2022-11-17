@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use chrono::Utc;
+use chrono::{Timelike, Utc};
 use db3_proto::db3_node_proto::{QuerySessionInfo, SessionStatus};
 use ethereum_types::Address;
 use std::collections::HashMap;
@@ -26,17 +26,37 @@ pub const DEFAULT_SESSION_QUERY_LIMIT: i32 = 1000;
 // default session limit
 pub const DEFAULT_SESSION_POOL_SIZE_LIMIT: usize = 1000;
 
+// default session clean period 1 min
+pub const DEFAULT_CLEANUP_SESSION_PERIOD: i64 = 60;
+
 pub struct SessionPool {
     session_pool: HashMap<i32, SessionManager>,
+    last_cleanup_time: i64,
 }
 impl SessionPool {
     pub fn new() -> Self {
         SessionPool {
             session_pool: HashMap::new(),
+            last_cleanup_time: Utc::now().timestamp(),
         }
     }
 
+    /// clean up blocked/stop sessions
+    pub fn cleanup_session(&mut self) -> bool {
+        self.session_pool.retain(|&k, v| !v.check_session_running());
+        self.last_cleanup_time = Utc::now().timestamp();
+        return true;
+    }
+
+    pub fn need_cleanup(&self) -> bool {
+        (Utc::now().timestamp() - self.last_cleanup_time) >= DEFAULT_CLEANUP_SESSION_PERIOD
+    }
+    /// add brand new session into the pool
+    /// clean up the pool when the pool size exceed half
     pub fn create_new_session(&mut self, id: i32) -> Result<i32, String> {
+        if self.need_cleanup() {
+            self.cleanup_session();
+        }
         if self.session_pool.len() >= DEFAULT_SESSION_POOL_SIZE_LIMIT {
             Err(format!(
                 "Fail to create new session since session pool size exceed limit {}",
@@ -68,6 +88,10 @@ impl SessionPool {
     }
     pub fn get_session_mut(&mut self, session_id: i32) -> Option<&mut SessionManager> {
         self.session_pool.get_mut(&session_id)
+    }
+
+    pub fn get_pool_size(&self) -> usize {
+        self.session_pool.len()
     }
 }
 pub struct SessionStore {
@@ -331,5 +355,45 @@ mod tests {
             assert!(res.is_err());
             assert_eq!("session 2 not exist in session pool", res.err().unwrap());
         }
+    }
+
+    #[test]
+    fn cleanup_session_test() {
+        let mut sess_store = SessionStore::new();
+        let pk = Secp256k1PublicKey::from_bytes(
+            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
+                .unwrap(),
+        );
+        let addr = get_address_from_pk(&pk.unwrap().pubkey);
+
+        for i in 0..100 {
+            let res = sess_store.add_new_session(addr);
+            assert!(res.is_ok());
+
+            // convert session with even id into blocked status
+            if i % 2 == 0 {
+                let session = sess_store.get_session_mut(addr, res.unwrap()).unwrap();
+                session.increase_query(DEFAULT_SESSION_QUERY_LIMIT + 1);
+                session.check_session_status();
+                assert_eq!(SessionStatus::Blocked, session.check_session_status());
+            }
+        }
+        // expect session pool len 100. 50 running, 50 blocked
+        assert_eq!(
+            sess_store.session_pools.get(&addr).unwrap().get_pool_size(),
+            100
+        );
+
+        // Act: clean up session
+        sess_store
+            .session_pools
+            .get_mut(&addr)
+            .unwrap()
+            .cleanup_session();
+
+        assert_eq!(
+            sess_store.session_pools.get(&addr).unwrap().get_pool_size(),
+            50
+        );
     }
 }
