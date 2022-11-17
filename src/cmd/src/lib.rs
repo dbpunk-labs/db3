@@ -145,10 +145,8 @@ pub async fn process_cmd(
                         println!("start a session before query session info");
                         return;
                     }
-                    let kp = get_key_pair(false).unwrap();
-                    let addr = get_address_from_pk(&kp.public().pubkey);
                     if let Ok(session_info) = store_sdk
-                        .get_session_info(&addr, session.as_ref().unwrap().session_id)
+                        .get_session_info(session.as_ref().unwrap().session_id)
                         .await
                     {
                         println!("{:?}", session_info)

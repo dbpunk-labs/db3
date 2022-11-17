@@ -166,13 +166,9 @@ impl StoreSDK {
 
     pub async fn get_session_info(
         &self,
-        addr: &AccountAddress,
         session_id: i32,
     ) -> std::result::Result<QuerySessionInfo, Status> {
-        let session_identifier = SessionIdentifier {
-            addr: format!("{:?}", addr),
-            session_id,
-        };
+        let session_identifier = SessionIdentifier { session_id };
         let mut buf = BytesMut::with_capacity(1024 * 8);
         session_identifier
             .encode(&mut buf)

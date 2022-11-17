@@ -127,12 +127,7 @@ mod node_integration {
 
         // session info
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk
-                .get_session_info(&addr, session_id_1)
-                .await
-                .unwrap();
+            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running
@@ -192,12 +187,7 @@ mod node_integration {
 
         // session info
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk
-                .get_session_info(&addr, session_id_1)
-                .await
-                .unwrap();
+            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running.into()
@@ -232,12 +222,7 @@ mod node_integration {
             );
         }
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk
-                .get_session_info(&addr, session_id_1)
-                .await
-                .unwrap();
+            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Blocked
@@ -261,12 +246,7 @@ mod node_integration {
             session_id_2 = session_info.session_id;
         }
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk
-                .get_session_info(&addr, session_id_2)
-                .await
-                .unwrap();
+            let info = store_sdk.get_session_info(session_id_2).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running
@@ -297,12 +277,7 @@ mod node_integration {
                 thread::sleep(time::Duration::from_secs(4));
             }
             {
-                let kp = db3_cmd::get_key_pair(false).unwrap();
-                let addr = get_address_from_pk(&kp.public().pubkey);
-                let info = store_sdk
-                    .get_session_info(&addr, session_id_2)
-                    .await
-                    .unwrap();
+                let info = store_sdk.get_session_info(session_id_2).await.unwrap();
                 assert_eq!(
                     SessionStatus::from_i32(info.status).unwrap(),
                     SessionStatus::Running
@@ -324,8 +299,6 @@ mod node_integration {
 
         // close session 1
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
             assert_eq!(
                 store_sdk.close_session(session_id_1).await.unwrap(),
                 session_id_1
@@ -333,8 +306,6 @@ mod node_integration {
         }
         // close session 2
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
             assert_eq!(
                 store_sdk.close_session(session_id_2).await.unwrap(),
                 session_id_2
@@ -342,8 +313,6 @@ mod node_integration {
         }
         // close session 3
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
             let res = store_sdk.close_session(session_id_2 + 100).await;
             assert!(res.is_err());
         }

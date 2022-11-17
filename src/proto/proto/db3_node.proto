@@ -61,7 +61,6 @@ message BatchGetValue {
 
 message SessionIdentifier {
     int32 session_id = 1;
-    string addr = 2;
 }
 message GetKeyRequest {
     bytes batch_get = 1;
