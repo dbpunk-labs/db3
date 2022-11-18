@@ -11,17 +11,18 @@
 /* eslint-disable */
 // @ts-nocheck
 
-var jspb = require("google-protobuf");
+import jspb from "google-protobuf";
+import db3_bill_pb from "./db3_bill_pb.js";
+import db3_mutation_pb from "./db3_mutation_pb.js";
+import db3_account_pb from "./db3_account_pb.js";
+
 var goog = jspb;
 var global = function () {
 	return this || window || global || self || Function("return this")();
 }.call(null);
 
-var db3_bill_pb = require("./db3_bill_pb.js");
 goog.object.extend(proto, db3_bill_pb);
-var db3_mutation_pb = require("./db3_mutation_pb.js");
 goog.object.extend(proto, db3_mutation_pb);
-var db3_account_pb = require("./db3_account_pb.js");
 goog.object.extend(proto, db3_account_pb);
 goog.exportSymbol("proto.db3_node_proto.BatchGetKey", null, global);
 goog.exportSymbol("proto.db3_node_proto.BatchGetValue", null, global);

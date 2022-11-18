@@ -11,13 +11,13 @@
 /* eslint-disable */
 // @ts-nocheck
 
-var jspb = require("google-protobuf");
+import jspb from "google-protobuf";
+import db3_base_pb from "./db3_base_pb.js";
 var goog = jspb;
 var global = function () {
 	return this || window || global || self || Function("return this")();
 }.call(null);
 
-var db3_base_pb = require("./db3_base_pb.js");
 goog.object.extend(proto, db3_base_pb);
 goog.exportSymbol("proto.db3_mutation_proto.KVPair", null, global);
 goog.exportSymbol("proto.db3_mutation_proto.Mutation", null, global);
