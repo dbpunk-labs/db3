@@ -55,7 +55,7 @@ impl StoreSDK {
             .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let r = OpenSessionRequest {
-            header: buf.as_ref().to_vec(),
+            header: buf.to_vec(),
             signature,
         };
         let request = tonic::Request::new(r);

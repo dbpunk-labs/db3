@@ -24,6 +24,7 @@ use db3_types::cost;
 use ethereum_types::Address as AccountAddress;
 use merk::proofs::{query::Query, Op as ProofOp};
 use merk::{BatchEntry, Merk, Op};
+use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::pin::Pin;
 
@@ -31,6 +32,20 @@ pub struct KvStore {}
 impl KvStore {
     pub fn new() -> Self {
         Self {}
+    }
+
+    pub fn is_valid(mutation: &Mutation) -> bool {
+        if mutation.ns.len() <= 0 {
+            return false;
+        }
+        let mut keys: HashSet<&[u8]> = HashSet::new();
+        for ref kv in &mutation.kv_pairs {
+            if keys.contains(&kv.key.as_ref()) {
+                return false;
+            }
+            keys.insert(kv.key.as_ref());
+        }
+        return true;
     }
 
     fn convert(

@@ -20,6 +20,7 @@ use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
+use db3_storage::kv_store::KvStore;
 use ethereum_types::Address as AccountAddress;
 use hex;
 use prost::Message;
@@ -115,33 +116,41 @@ impl Application for AbciImpl {
     }
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
-        let request = WriteRequest::decode(request.tx.as_ref()).unwrap();
-        let account_id =
-            verifier::Verifier::verify(request.mutation.as_ref(), request.signature.as_ref());
-        match account_id {
-            Ok(_) => ResponseCheckTx {
-                code: 0,
-                data: Bytes::new(),
-                log: "".to_string(),
-                info: "".to_string(),
-                gas_wanted: 1,
-                gas_used: 0,
-                events: vec![],
-                codespace: "".to_string(),
-                ..Default::default()
-            },
-            Err(_) => ResponseCheckTx {
-                code: 1,
-                data: Bytes::new(),
-                log: "".to_string(),
-                info: "".to_string(),
-                gas_wanted: 1,
-                gas_used: 0,
-                events: vec![],
-                codespace: "".to_string(),
-                ..Default::default()
-            },
+        // decode the request
+        if let Ok(request) = WriteRequest::decode(request.tx.as_ref()) {
+            // recover the account addr
+            if let Ok(_account_id) =
+                verifier::Verifier::verify(request.mutation.as_ref(), request.signature.as_ref())
+            {
+                if let Ok(mutation) = Mutation::decode(request.mutation.as_ref()) {
+                    if KvStore::is_valid(&mutation) {
+                        return ResponseCheckTx {
+                            code: 0,
+                            data: Bytes::new(),
+                            log: "".to_string(),
+                            info: "".to_string(),
+                            gas_wanted: 1,
+                            gas_used: 0,
+                            events: vec![],
+                            codespace: "".to_string(),
+                            ..Default::default()
+                        };
+                    }
+                }
+            }
         }
+        // the tx should be removed from mempool
+        return ResponseCheckTx {
+            code: 1,
+            data: Bytes::new(),
+            log: "bad request".to_string(),
+            info: "".to_string(),
+            gas_wanted: 1,
+            gas_used: 0,
+            events: vec![],
+            codespace: "".to_string(),
+            ..Default::default()
+        };
     }
 
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
