@@ -2,7 +2,6 @@
 
 mod node_integration {
     use bytes::BytesMut;
-    use db3_base::get_address_from_pk;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
     use db3_proto::db3_mutation_proto::WriteRequest;
@@ -11,8 +10,7 @@ mod node_integration {
     use db3_proto::db3_node_proto::SessionStatus;
     use db3_sdk::mutation_sdk::MutationSDK;
     use db3_sdk::store_sdk::StoreSDK;
-    use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
-    use fastcrypto::traits::KeyPair;
+    use db3_session::session_manager::{DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT};
     use prost::Message;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -112,18 +110,20 @@ mod node_integration {
         let mut store_sdk = get_store_sdk();
         let ns = "test_ns";
 
+        let mut session_id_1 = 0;
         // session restart
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let _addr = get_address_from_pk(&kp.public().pubkey);
-            assert!(store_sdk.restart_session().await.is_ok());
+            let res = store_sdk.open_session().await;
+            assert!(res.is_ok());
+            let session_info = res.unwrap();
+            session_id_1 = session_info.session_id;
+            assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
+            assert_eq!(session_info.session_timeout_second, DEFAULT_SESSION_PERIOD);
         }
 
         // session info
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk.get_session_info(&addr).await.unwrap();
+            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running
@@ -170,7 +170,7 @@ mod node_integration {
         // get ns_test k1
         {
             if let Ok(Some(values)) = store_sdk
-                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()])
+                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
                 .await
             {
                 assert_eq!(values.values.len(), 1);
@@ -183,9 +183,7 @@ mod node_integration {
 
         // session info
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk.get_session_info(&addr).await.unwrap();
+            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running.into()
@@ -197,7 +195,7 @@ mod node_integration {
         {
             for _ in 0..DEFAULT_SESSION_QUERY_LIMIT - 1 {
                 if let Ok(Some(values)) = store_sdk
-                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()])
+                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
                     .await
                 {
                     assert_eq!(values.values.len(), 1);
@@ -211,7 +209,7 @@ mod node_integration {
         // session blocked because query times >= limit
         {
             let result = store_sdk
-                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()])
+                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
                 .await;
             assert!(result.is_err());
             assert_eq!(
@@ -220,9 +218,7 @@ mod node_integration {
             );
         }
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk.get_session_info(&addr).await.unwrap();
+            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Blocked
@@ -230,14 +226,21 @@ mod node_integration {
             assert_eq!(info.query_count, DEFAULT_SESSION_QUERY_LIMIT);
         }
 
-        // restart session
+        // open another session 2
+        let mut session_id_2 = 0;
         {
-            assert!(store_sdk.restart_session().await.is_ok());
+            let res = store_sdk.open_session().await;
+            assert!(res.is_ok());
+            let session_info = res.unwrap();
+            // verify session id increase 1
+            assert_eq!(session_info.session_id, session_id_1 + 1);
+            assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
+
+            // update current session id
+            session_id_2 = session_info.session_id;
         }
         {
-            let kp = db3_cmd::get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
-            let info = store_sdk.get_session_info(&addr).await.unwrap();
+            let info = store_sdk.get_session_info(session_id_2).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running
@@ -268,9 +271,7 @@ mod node_integration {
                 thread::sleep(time::Duration::from_secs(4));
             }
             {
-                let kp = db3_cmd::get_key_pair(false).unwrap();
-                let addr = get_address_from_pk(&kp.public().pubkey);
-                let info = store_sdk.get_session_info(&addr).await.unwrap();
+                let info = store_sdk.get_session_info(session_id_2).await.unwrap();
                 assert_eq!(
                     SessionStatus::from_i32(info.status).unwrap(),
                     SessionStatus::Running
@@ -279,7 +280,7 @@ mod node_integration {
             }
             {
                 let result = store_sdk
-                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()])
+                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_2)
                     .await;
                 assert!(result.is_ok());
                 if let Ok(Some(values)) = result {
@@ -288,6 +289,26 @@ mod node_integration {
                     assert!(false);
                 }
             }
+        }
+
+        // close session 1
+        {
+            assert_eq!(
+                store_sdk.close_session(session_id_1).await.unwrap(),
+                session_id_1
+            );
+        }
+        // close session 2
+        {
+            assert_eq!(
+                store_sdk.close_session(session_id_2).await.unwrap(),
+                session_id_2
+            );
+        }
+        // close session 3
+        {
+            let res = store_sdk.close_session(session_id_2 + 100).await;
+            assert!(res.is_err());
         }
     }
 }
