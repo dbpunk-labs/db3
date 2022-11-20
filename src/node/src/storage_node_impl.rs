@@ -83,16 +83,38 @@ impl StorageNode for StorageNodeImpl {
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
-                // Takes a reference and returns Option<&V>
-                match sess_store.remove_session(account_id.addr, query_session_info.id) {
-                    Ok(id) => {
-                        Ok(Response::new(CloseSessionResponse {
-                            // session id --> i64
-                            session_id: id,
-                        }))
+
+                // Verify query session sdk
+                match sess_store.get_session_mut(account_id.addr, query_session_info.id) {
+                    Some(sess) => {
+                        if sess.get_session_query_count() != query_session_info.query_count {
+                            return Err(Status::invalid_argument(format!(
+                                "query session verify fail. expect query count {} but {}",
+                                sess.get_session_query_count(),
+                                query_session_info.query_count
+                            )));
+                        }
                     }
-                    Err(e) => Err(Status::internal(format!("{}", e))),
+                    None => {
+                        return Err(Status::not_found(format!(
+                            "session {} not found in the session store",
+                            query_session_info.id
+                        )));
+                    }
                 }
+
+                // Submit query session
+
+                // Takes a reference and returns Option<&V>
+                let sess = sess_store
+                    .remove_session(account_id.addr, query_session_info.id)
+                    .map_err(|e| Status::internal(format!("{}", e)))
+                    .unwrap();
+                // TODO(chenjing): sign
+                Ok(Response::new(CloseSessionResponse {
+                    signature: vec![],
+                    query_session_info: Some(sess.get_session_info()),
+                }))
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
         }

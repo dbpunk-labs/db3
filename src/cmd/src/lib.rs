@@ -169,8 +169,9 @@ pub async fn process_cmd(
                         .close_session(session.as_ref().unwrap().session_id)
                         .await
                     {
-                        Ok(id) => {
-                            println!("Close Session {}", id);
+                        Ok((sess_info_node, sess_info_client)) => {
+                            println!("Close Session Successfully!\nNode session {:?}\nClient session: {:?}",
+                                     sess_info_node,sess_info_client);
                             // set session_id to 0
                             *session = None;
                         }
@@ -184,8 +185,9 @@ pub async fn process_cmd(
                         .close_session(session.as_ref().unwrap().session_id)
                         .await
                     {
-                        Ok(id) => {
-                            println!("Close Session {}", id);
+                        Ok((sess_info_node, sess_info_client)) => {
+                            println!("Close Session Successfully!\nNode session {:?}\nClient session: {:?}",
+                                     sess_info_node, sess_info_client);
                             // set session_id to 0
                             *session = None;
                             println!("Open Session ...");

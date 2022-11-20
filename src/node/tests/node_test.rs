@@ -293,17 +293,17 @@ mod node_integration {
 
         // close session 1
         {
-            assert_eq!(
-                store_sdk.close_session(session_id_1).await.unwrap(),
-                session_id_1
-            );
+            let (session_node, session_client) =
+                store_sdk.close_session(session_id_1).await.unwrap();
+            assert_eq!(session_node.query_session_info.unwrap().id, session_id_1);
+            assert_eq!(session_client.query_session_info.unwrap().id, session_id_1);
         }
         // close session 2
         {
-            assert_eq!(
-                store_sdk.close_session(session_id_2).await.unwrap(),
-                session_id_2
-            );
+            let (session_node, session_client) =
+                store_sdk.close_session(session_id_2).await.unwrap();
+            assert_eq!(session_node.query_session_info.unwrap().id, session_id_2);
+            assert_eq!(session_client.query_session_info.unwrap().id, session_id_2);
         }
         // close session 3
         {

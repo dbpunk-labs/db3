@@ -21,8 +21,9 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
-    GetAccountRequest, GetKeyRequest, GetSessionInfoRequest, OpenSessionRequest,
-    OpenSessionResponse, QueryBillKey, QueryBillRequest, QuerySessionInfo, SessionIdentifier,
+    CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetSessionInfoRequest,
+    OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest, QuerySessionInfo,
+    SessionIdentifier,
 };
 use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
@@ -66,7 +67,14 @@ impl StoreSDK {
             Err(e) => Err(Status::internal(format!("Fail to create session {}", e))),
         }
     }
-    pub async fn close_session(&mut self, session_id: i32) -> std::result::Result<i32, Status> {
+    /// close session
+    /// 1. verify Account
+    /// 2. request close_query_session
+    /// 3. return node's CloseSessionResponse(query session info and signature) and client's CloseSessionResponse (query session info and signature)
+    pub async fn close_session(
+        &mut self,
+        session_id: i32,
+    ) -> std::result::Result<(CloseSessionResponse, CloseSessionResponse), Status> {
         match self.session_pool.get_session(session_id) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
@@ -81,13 +89,19 @@ impl StoreSDK {
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 let r = CloseSessionRequest {
                     query_session_info: buf.as_ref().to_vec(),
-                    signature,
+                    signature: signature.clone(),
                 };
                 let request = tonic::Request::new(r);
                 let mut client = self.client.as_ref().clone();
                 match client.close_query_session(request).await {
                     Ok(response) => match self.session_pool.remove_session(query_session_info.id) {
-                        Ok(_) => Ok(response.into_inner().session_id),
+                        Ok(_) => Ok((
+                            response.into_inner(),
+                            CloseSessionResponse {
+                                signature,
+                                query_session_info: Some(query_session_info),
+                            },
+                        )),
                         Err(e) => Err(Status::internal(format!("{}", e))),
                     },
                     Err(e) => Err(Status::internal(format!("{}", e))),
