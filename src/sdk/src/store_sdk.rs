@@ -104,7 +104,7 @@ impl StoreSDK {
                         )),
                         Err(e) => Err(Status::internal(format!("{}", e))),
                     },
-                    Err(e) => Err(Status::internal(format!("{}", e))),
+                    Err(e) => Err(e),
                 }
             }
             None => Err(Status::internal(format!(
@@ -308,4 +308,202 @@ mod tests {
         }
         assert!(result.is_ok());
     }
+    #[tokio::test]
+    async fn close_session_happy_path() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let mclient = client.clone();
+        let key_vec = format!("kkkkk_tt{}", 10).as_bytes().to_vec();
+        let value_vec = format!("vkalue_tt{}", 10).as_bytes().to_vec();
+        let ns_vec = "my_twitter".as_bytes().to_vec();
+        {
+            let mut rng = StdRng::from_seed([0; 32]);
+            let kp = Secp256k1KeyPair::generate(&mut rng);
+            let signer = Db3Signer::new(kp);
+            let msdk = MutationSDK::new(mclient, signer);
+            let kv = KvPair {
+                key: key_vec.clone(),
+                value: value_vec.clone(),
+                action: MutationAction::InsertKv.into(),
+            };
+            let mutation = Mutation {
+                ns: ns_vec.clone(),
+                kv_pairs: vec![kv],
+                nonce: 11000,
+                chain_id: ChainId::MainNet.into(),
+                chain_role: ChainRole::StorageShardChain.into(),
+                gas_price: None,
+                gas: 10,
+            };
+            let result = msdk.submit_mutation(&mutation).await;
+            assert!(result.is_ok(), "{}", result.err().unwrap());
+            let ten_millis = time::Duration::from_millis(1000);
+            std::thread::sleep(ten_millis);
+        }
+        let mut rng = StdRng::from_seed([0; 32]);
+        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let signer = Db3Signer::new(kp);
+        let mut sdk = StoreSDK::new(client, signer);
+        let res = sdk.open_session().await;
+        assert!(res.is_ok());
+        let session_info = res.unwrap();
+        assert!(session_info.session_id > 0);
+        if let Ok(Some(values)) = sdk
+            .batch_get(&ns_vec, vec![key_vec.clone()], session_info.session_id)
+            .await
+        {
+            assert_eq!(values.values.len(), 1);
+            assert_eq!(values.values[0].key.to_vec(), key_vec);
+            assert_eq!(values.values[0].value.to_vec(), value_vec);
+        } else {
+            assert!(false);
+        }
+
+        let res = sdk.close_session(session_info.session_id).await;
+        assert!(res.is_ok());
+    }
+    #[tokio::test]
+    async fn close_session_wrong_path() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let mclient = client.clone();
+        let key_vec = format!("kkkkk_tt{}", 20).as_bytes().to_vec();
+        let value_vec = format!("vkalue_tt{}", 20).as_bytes().to_vec();
+        let ns_vec = "my_twitter".as_bytes().to_vec();
+        {
+            let mut rng = StdRng::from_seed([0; 32]);
+            let kp = Secp256k1KeyPair::generate(&mut rng);
+            let signer = Db3Signer::new(kp);
+            let msdk = MutationSDK::new(mclient, signer);
+            let kv = KvPair {
+                key: key_vec.clone(),
+                value: value_vec.clone(),
+                action: MutationAction::InsertKv.into(),
+            };
+            let mutation = Mutation {
+                ns: ns_vec.clone(),
+                kv_pairs: vec![kv],
+                nonce: 11000,
+                chain_id: ChainId::MainNet.into(),
+                chain_role: ChainRole::StorageShardChain.into(),
+                gas_price: None,
+                gas: 10,
+            };
+            let result = msdk.submit_mutation(&mutation).await;
+            assert!(result.is_ok(), "{}", result.err().unwrap());
+            let ten_millis = time::Duration::from_millis(1000);
+            std::thread::sleep(ten_millis);
+        }
+        let mut rng = StdRng::from_seed([0; 32]);
+        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let signer = Db3Signer::new(kp);
+        let mut sdk = StoreSDK::new(client, signer);
+        let res = sdk.open_session().await;
+        assert!(res.is_ok());
+        let session_info = res.unwrap();
+        assert!(session_info.session_id > 0);
+        if let Ok(Some(values)) = sdk
+            .batch_get(&ns_vec, vec![key_vec.clone()], session_info.session_id)
+            .await
+        {
+            assert_eq!(values.values.len(), 1);
+            assert_eq!(values.values[0].key.to_vec(), key_vec);
+            assert_eq!(values.values[0].value.to_vec(), value_vec);
+        } else {
+            assert!(false);
+        }
+
+        sdk.session_pool
+            .get_session_mut(session_info.session_id)
+            .unwrap()
+            .increase_query(100);
+        let res = sdk.close_session(session_info.session_id).await;
+        assert!(res.is_err());
+        assert_eq!(
+            res.err().unwrap().message(),
+            "query session verify fail. expect query count 1 but 101"
+        );
+    }
+    // #[tokio::test]
+    // async fn close_session_wrong_path_query_count_mismatch() {
+    //     let client = prepare_sdk().await;
+    //     prepare_kv_store(client.clone(), "my_twitter", "close_session_wrong_path_query_count_mismatch_key", "close_session_wrong_path_query_count_mismatch_value").await;
+    //     let mut rng = StdRng::from_seed([0; 32]);
+    //     let kp = Secp256k1KeyPair::generate(&mut rng);
+    //     let signer = Db3Signer::new(kp);
+    //     let mut sdk = StoreSDK::new(client.clone(), signer);
+    //     let res = sdk.open_session().await;
+    //     assert!(res.is_ok(), "{:?}", res.err());
+    //     let session_info = res.unwrap();
+    //     assert!(session_info.session_id > 0);
+    //     if let Ok(Some(values)) = sdk
+    //         .batch_get(
+    //             "my_twitter".as_bytes(),
+    //             vec!["close_session_wrong_path_query_count_mismatch_key".as_bytes().to_vec()],
+    //             session_info.session_id,
+    //         )
+    //         .await
+    //     {
+    //         assert_eq!(values.values.len(), 1);
+    //         assert_eq!(values.values[0].key, "close_session_wrong_path_query_count_mismatch_key".as_bytes());
+    //         assert_eq!(values.values[0].value, "close_session_wrong_path_query_count_mismatch_value".as_bytes());
+    //     } else {
+    //         assert!(false);
+    //     }
+    //
+    //     let res = sdk.close_session(session_info.session_id).await;
+    //     assert!(res.is_ok());
+    //
+    //     let (node_session, client_session) = res.unwrap();
+    //     assert_eq!(
+    //         node_session.query_session_info.unwrap().query_count,
+    //         client_session.query_session_info.unwrap().query_count
+    //     )
+    // }
+    //
+    // #[tokio::test]
+    // async fn close_session_wrong_path_query_count_mismatch() {
+    //     let client = prepare_sdk().await;
+    //     prepare_kv_store(client.clone(), "my_twitter", "close_session_wrong_path_query_count_mismatch_key", "close_session_wrong_path_query_count_mismatch_value").await;
+    //     let mut rng = StdRng::from_seed([0; 32]);
+    //     let kp = Secp256k1KeyPair::generate(&mut rng);
+    //     let signer = Db3Signer::new(kp);
+    //     let mut sdk = StoreSDK::new(client.clone(), signer);
+    //     let res = sdk.open_session().await;
+    //     assert!(res.is_ok());
+    //     let session_info = res.unwrap();
+    //     assert!(session_info.session_id > 0);
+    //     if let Ok(Some(values)) = sdk
+    //         .batch_get(
+    //             "my_twitter".as_bytes(),
+    //             vec!["close_session_wrong_path_query_count_mismatch_key".as_bytes().to_vec()],
+    //             session_info.session_id,
+    //         )
+    //         .await
+    //     {
+    //         assert_eq!(values.values.len(), 1);
+    //         assert_eq!(values.values[0].key, "close_session_wrong_path_query_count_mismatch_key".as_bytes());
+    //         assert_eq!(values.values[0].value, "close_session_wrong_path_query_count_mismatch_value".as_bytes());
+    //     } else {
+    //         assert!(false);
+    //     }
+    //
+    //     // Act increase query count
+    //     sdk.session_pool
+    //         .get_session_mut(session_info.session_id)
+    //         .unwrap()
+    //         .increase_query(10);
+    //
+    //     // Expect failure when close session
+    //     let res = sdk.close_session(session_info.session_id).await;
+    //     assert!(res.is_err());
+    //     assert_eq!(
+    //         "query session verify fail. expect query count 1 but 11",
+    //         res.err().unwrap().message()
+    //     );
+    // }
 }
