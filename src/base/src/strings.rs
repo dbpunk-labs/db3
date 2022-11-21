@@ -33,7 +33,7 @@ pub fn bytes_to_readable_num_str(bytes_size: u64) -> String {
 
 pub fn units_to_readable_num_str(units: &Units) -> String {
     if units.utype == UnitType::Tai as i32 {
-        format!("{} tai", units.amount)
+        format!("{:.4} db3", units.amount as f64 / 1000_000.0)
     } else {
         format!("{} db3", units.amount)
     }
