@@ -15,8 +15,8 @@
 // limitations under the License.
 //
 use db3_proto::db3_base_proto::{UnitType, Units};
-const SHIFT: [i64; 2] = [1, 1000_000];
-const REVERSE_SHIFT: [i64; 2] = [1000_000, 1];
+const SHIFT: [i64; 2] = [1, 1000_000_000];
+const REVERSE_SHIFT: [i64; 2] = [1000_000_000, 1];
 
 pub fn gas_cmp(left: &Units, right: &Units) -> std::cmp::Ordering {
     let mut left_value: i64 = left.amount;

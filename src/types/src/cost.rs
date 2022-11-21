@@ -62,6 +62,6 @@ mod tests {
         };
         let units = estimate_gas(&mutation);
         assert_eq!(1, units.utype);
-        assert_eq!(2800, units.amount);
+        assert_eq!(190, units.amount);
     }
 }
