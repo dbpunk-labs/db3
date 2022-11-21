@@ -29,7 +29,6 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 #[macro_use]
 extern crate prettytable;
@@ -56,14 +55,20 @@ fn current_seconds() -> u64 {
 }
 
 pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
-    if warning {
-        println!("WARNING, db3 will generate private key and save it to ~/.db3/key");
-    }
-    let user_dir: &str = "~/.db3";
-    let user_key: &str = "~/.db3/key";
+    let mut home_dir = std::env::home_dir().unwrap();
+    home_dir.push(".db3");
+    let user_dir = home_dir.as_path();
     std::fs::create_dir_all(user_dir)?;
-    if Path::new("~/.db3/key").exists() {
-        let b64_str = std::fs::read_to_string(user_key)?;
+    home_dir.push("user.key");
+    let key_path = home_dir.as_path();
+    if warning {
+        println!(
+            "WARNING, db3 will generate private key and save it to {}",
+            key_path.to_string_lossy()
+        );
+    }
+    if key_path.exists() {
+        let b64_str = std::fs::read_to_string(key_path)?;
         let key_pair = Secp256k1KeyPair::decode_base64(b64_str.as_str()).unwrap();
         let addr = get_address_from_pk(&key_pair.public().pubkey);
         if warning {
@@ -71,11 +76,11 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
         }
         Ok(key_pair)
     } else {
-        let mut rng = StdRng::from_seed([0; 32]);
+        let mut rng = StdRng::seed_from_u64(current_seconds());
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let addr = get_address_from_pk(&kp.public().pubkey);
         let b64_str = kp.encode_base64();
-        let mut f = File::create(user_key)?;
+        let mut f = File::create(key_path)?;
         f.write_all(b64_str.as_bytes())?;
         f.sync_all()?;
         if warning {
