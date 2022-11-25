@@ -11,10 +11,10 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import jspb from "google-protobuf";
+import * as jspb from "google-protobuf";
 import db3_base_pb from "./db3_base_pb.js";
 var goog = jspb;
-var global = function () {
+var global = function() {
 	return this || window || global || self || Function("return this")();
 }.call(null);
 
@@ -33,7 +33,7 @@ goog.exportSymbol("proto.db3_mutation_proto.WriteRequest", null, global);
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_mutation_proto.KVPair = function (opt_data) {
+proto.db3_mutation_proto.KVPair = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_mutation_proto.KVPair, jspb.Message);
@@ -55,7 +55,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_mutation_proto.Mutation = function (opt_data) {
+proto.db3_mutation_proto.Mutation = function(opt_data) {
 	jspb.Message.initialize(
 		this,
 		opt_data,
@@ -84,7 +84,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_mutation_proto.WriteRequest = function (opt_data) {
+proto.db3_mutation_proto.WriteRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_mutation_proto.WriteRequest, jspb.Message);
@@ -110,7 +110,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_mutation_proto.KVPair.prototype.toObject = function (
+	proto.db3_mutation_proto.KVPair.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_mutation_proto.KVPair.toObject(
@@ -128,7 +128,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_mutation_proto.KVPair.toObject = function (includeInstance, msg) {
+	proto.db3_mutation_proto.KVPair.toObject = function(includeInstance, msg) {
 		var f,
 			obj = {
 				key: msg.getKey_asB64(),
@@ -148,7 +148,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_mutation_proto.KVPair}
  */
-proto.db3_mutation_proto.KVPair.deserializeBinary = function (bytes) {
+proto.db3_mutation_proto.KVPair.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_mutation_proto.KVPair();
 	return proto.db3_mutation_proto.KVPair.deserializeBinaryFromReader(
@@ -164,7 +164,7 @@ proto.db3_mutation_proto.KVPair.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_mutation_proto.KVPair}
  */
-proto.db3_mutation_proto.KVPair.deserializeBinaryFromReader = function (
+proto.db3_mutation_proto.KVPair.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -183,10 +183,7 @@ proto.db3_mutation_proto.KVPair.deserializeBinaryFromReader = function (
 				msg.setValue(value);
 				break;
 			case 3:
-				var value =
-					/** @type {!proto.db3_mutation_proto.MutationAction} */ (
-						reader.readEnum()
-					);
+				var value = /** @type {!proto.db3_mutation_proto.MutationAction} */ (reader.readEnum());
 				msg.setAction(value);
 				break;
 			default:
@@ -201,7 +198,7 @@ proto.db3_mutation_proto.KVPair.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.KVPair.prototype.serializeBinary = function () {
+proto.db3_mutation_proto.KVPair.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_mutation_proto.KVPair.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -214,7 +211,7 @@ proto.db3_mutation_proto.KVPair.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_mutation_proto.KVPair.serializeBinaryToWriter = function (
+proto.db3_mutation_proto.KVPair.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -237,10 +234,12 @@ proto.db3_mutation_proto.KVPair.serializeBinaryToWriter = function (
  * optional bytes key = 1;
  * @return {string}
  */
-proto.db3_mutation_proto.KVPair.prototype.getKey = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_mutation_proto.KVPair.prototype.getKey = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -248,7 +247,7 @@ proto.db3_mutation_proto.KVPair.prototype.getKey = function () {
  * This is a type-conversion wrapper around `getKey()`
  * @return {string}
  */
-proto.db3_mutation_proto.KVPair.prototype.getKey_asB64 = function () {
+proto.db3_mutation_proto.KVPair.prototype.getKey_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getKey()));
 };
 
@@ -259,7 +258,7 @@ proto.db3_mutation_proto.KVPair.prototype.getKey_asB64 = function () {
  * This is a type-conversion wrapper around `getKey()`
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.KVPair.prototype.getKey_asU8 = function () {
+proto.db3_mutation_proto.KVPair.prototype.getKey_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getKey()));
 };
 
@@ -267,7 +266,7 @@ proto.db3_mutation_proto.KVPair.prototype.getKey_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_mutation_proto.KVPair} returns this
  */
-proto.db3_mutation_proto.KVPair.prototype.setKey = function (value) {
+proto.db3_mutation_proto.KVPair.prototype.setKey = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -275,10 +274,12 @@ proto.db3_mutation_proto.KVPair.prototype.setKey = function (value) {
  * optional bytes value = 2;
  * @return {string}
  */
-proto.db3_mutation_proto.KVPair.prototype.getValue = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 2, "")
-	);
+proto.db3_mutation_proto.KVPair.prototype.getValue = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		2,
+		"",
+	));
 };
 
 /**
@@ -286,7 +287,7 @@ proto.db3_mutation_proto.KVPair.prototype.getValue = function () {
  * This is a type-conversion wrapper around `getValue()`
  * @return {string}
  */
-proto.db3_mutation_proto.KVPair.prototype.getValue_asB64 = function () {
+proto.db3_mutation_proto.KVPair.prototype.getValue_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getValue()));
 };
 
@@ -297,7 +298,7 @@ proto.db3_mutation_proto.KVPair.prototype.getValue_asB64 = function () {
  * This is a type-conversion wrapper around `getValue()`
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.KVPair.prototype.getValue_asU8 = function () {
+proto.db3_mutation_proto.KVPair.prototype.getValue_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getValue()));
 };
 
@@ -305,7 +306,7 @@ proto.db3_mutation_proto.KVPair.prototype.getValue_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_mutation_proto.KVPair} returns this
  */
-proto.db3_mutation_proto.KVPair.prototype.setValue = function (value) {
+proto.db3_mutation_proto.KVPair.prototype.setValue = function(value) {
 	return jspb.Message.setProto3BytesField(this, 2, value);
 };
 
@@ -313,17 +314,19 @@ proto.db3_mutation_proto.KVPair.prototype.setValue = function (value) {
  * optional MutationAction action = 3;
  * @return {!proto.db3_mutation_proto.MutationAction}
  */
-proto.db3_mutation_proto.KVPair.prototype.getAction = function () {
-	return /** @type {!proto.db3_mutation_proto.MutationAction} */ (
-		jspb.Message.getFieldWithDefault(this, 3, 0)
-	);
+proto.db3_mutation_proto.KVPair.prototype.getAction = function() {
+	return /** @type {!proto.db3_mutation_proto.MutationAction} */ (jspb.Message.getFieldWithDefault(
+		this,
+		3,
+		0,
+	));
 };
 
 /**
  * @param {!proto.db3_mutation_proto.MutationAction} value
  * @return {!proto.db3_mutation_proto.KVPair} returns this
  */
-proto.db3_mutation_proto.KVPair.prototype.setAction = function (value) {
+proto.db3_mutation_proto.KVPair.prototype.setAction = function(value) {
 	return jspb.Message.setProto3EnumField(this, 3, value);
 };
 
@@ -347,7 +350,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_mutation_proto.Mutation.prototype.toObject = function (
+	proto.db3_mutation_proto.Mutation.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_mutation_proto.Mutation.toObject(
@@ -365,7 +368,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_mutation_proto.Mutation.toObject = function (
+	proto.db3_mutation_proto.Mutation.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -398,7 +401,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_mutation_proto.Mutation}
  */
-proto.db3_mutation_proto.Mutation.deserializeBinary = function (bytes) {
+proto.db3_mutation_proto.Mutation.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_mutation_proto.Mutation();
 	return proto.db3_mutation_proto.Mutation.deserializeBinaryFromReader(
@@ -414,7 +417,7 @@ proto.db3_mutation_proto.Mutation.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_mutation_proto.Mutation}
  */
-proto.db3_mutation_proto.Mutation.deserializeBinaryFromReader = function (
+proto.db3_mutation_proto.Mutation.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -441,15 +444,11 @@ proto.db3_mutation_proto.Mutation.deserializeBinaryFromReader = function (
 				msg.setNonce(value);
 				break;
 			case 4:
-				var value = /** @type {!proto.db3_base_proto.ChainId} */ (
-					reader.readEnum()
-				);
+				var value = /** @type {!proto.db3_base_proto.ChainId} */ (reader.readEnum());
 				msg.setChainId(value);
 				break;
 			case 5:
-				var value = /** @type {!proto.db3_base_proto.ChainRole} */ (
-					reader.readEnum()
-				);
+				var value = /** @type {!proto.db3_base_proto.ChainRole} */ (reader.readEnum());
 				msg.setChainRole(value);
 				break;
 			case 6:
@@ -476,7 +475,7 @@ proto.db3_mutation_proto.Mutation.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.Mutation.prototype.serializeBinary = function () {
+proto.db3_mutation_proto.Mutation.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_mutation_proto.Mutation.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -489,7 +488,7 @@ proto.db3_mutation_proto.Mutation.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_mutation_proto.Mutation.serializeBinaryToWriter = function (
+proto.db3_mutation_proto.Mutation.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -532,10 +531,12 @@ proto.db3_mutation_proto.Mutation.serializeBinaryToWriter = function (
  * optional bytes ns = 1;
  * @return {string}
  */
-proto.db3_mutation_proto.Mutation.prototype.getNs = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_mutation_proto.Mutation.prototype.getNs = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -543,7 +544,7 @@ proto.db3_mutation_proto.Mutation.prototype.getNs = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {string}
  */
-proto.db3_mutation_proto.Mutation.prototype.getNs_asB64 = function () {
+proto.db3_mutation_proto.Mutation.prototype.getNs_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getNs()));
 };
 
@@ -554,7 +555,7 @@ proto.db3_mutation_proto.Mutation.prototype.getNs_asB64 = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.Mutation.prototype.getNs_asU8 = function () {
+proto.db3_mutation_proto.Mutation.prototype.getNs_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getNs()));
 };
 
@@ -562,7 +563,7 @@ proto.db3_mutation_proto.Mutation.prototype.getNs_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.setNs = function (value) {
+proto.db3_mutation_proto.Mutation.prototype.setNs = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -570,21 +571,19 @@ proto.db3_mutation_proto.Mutation.prototype.setNs = function (value) {
  * repeated KVPair kv_pairs = 2;
  * @return {!Array<!proto.db3_mutation_proto.KVPair>}
  */
-proto.db3_mutation_proto.Mutation.prototype.getKvPairsList = function () {
-	return /** @type{!Array<!proto.db3_mutation_proto.KVPair>} */ (
-		jspb.Message.getRepeatedWrapperField(
-			this,
-			proto.db3_mutation_proto.KVPair,
-			2,
-		)
-	);
+proto.db3_mutation_proto.Mutation.prototype.getKvPairsList = function() {
+	return /** @type{!Array<!proto.db3_mutation_proto.KVPair>} */ (jspb.Message.getRepeatedWrapperField(
+		this,
+		proto.db3_mutation_proto.KVPair,
+		2,
+	));
 };
 
 /**
  * @param {!Array<!proto.db3_mutation_proto.KVPair>} value
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.setKvPairsList = function (value) {
+proto.db3_mutation_proto.Mutation.prototype.setKvPairsList = function(value) {
 	return jspb.Message.setRepeatedWrapperField(this, 2, value);
 };
 
@@ -593,7 +592,7 @@ proto.db3_mutation_proto.Mutation.prototype.setKvPairsList = function (value) {
  * @param {number=} opt_index
  * @return {!proto.db3_mutation_proto.KVPair}
  */
-proto.db3_mutation_proto.Mutation.prototype.addKvPairs = function (
+proto.db3_mutation_proto.Mutation.prototype.addKvPairs = function(
 	opt_value,
 	opt_index,
 ) {
@@ -610,7 +609,7 @@ proto.db3_mutation_proto.Mutation.prototype.addKvPairs = function (
  * Clears the list making it empty but non-null.
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.clearKvPairsList = function () {
+proto.db3_mutation_proto.Mutation.prototype.clearKvPairsList = function() {
 	return this.setKvPairsList([]);
 };
 
@@ -618,7 +617,7 @@ proto.db3_mutation_proto.Mutation.prototype.clearKvPairsList = function () {
  * optional uint64 nonce = 3;
  * @return {number}
  */
-proto.db3_mutation_proto.Mutation.prototype.getNonce = function () {
+proto.db3_mutation_proto.Mutation.prototype.getNonce = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -626,7 +625,7 @@ proto.db3_mutation_proto.Mutation.prototype.getNonce = function () {
  * @param {number} value
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.setNonce = function (value) {
+proto.db3_mutation_proto.Mutation.prototype.setNonce = function(value) {
 	return jspb.Message.setProto3IntField(this, 3, value);
 };
 
@@ -634,17 +633,19 @@ proto.db3_mutation_proto.Mutation.prototype.setNonce = function (value) {
  * optional db3_base_proto.ChainId chain_id = 4;
  * @return {!proto.db3_base_proto.ChainId}
  */
-proto.db3_mutation_proto.Mutation.prototype.getChainId = function () {
-	return /** @type {!proto.db3_base_proto.ChainId} */ (
-		jspb.Message.getFieldWithDefault(this, 4, 0)
-	);
+proto.db3_mutation_proto.Mutation.prototype.getChainId = function() {
+	return /** @type {!proto.db3_base_proto.ChainId} */ (jspb.Message.getFieldWithDefault(
+		this,
+		4,
+		0,
+	));
 };
 
 /**
  * @param {!proto.db3_base_proto.ChainId} value
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.setChainId = function (value) {
+proto.db3_mutation_proto.Mutation.prototype.setChainId = function(value) {
 	return jspb.Message.setProto3EnumField(this, 4, value);
 };
 
@@ -652,17 +653,19 @@ proto.db3_mutation_proto.Mutation.prototype.setChainId = function (value) {
  * optional db3_base_proto.ChainRole chain_role = 5;
  * @return {!proto.db3_base_proto.ChainRole}
  */
-proto.db3_mutation_proto.Mutation.prototype.getChainRole = function () {
-	return /** @type {!proto.db3_base_proto.ChainRole} */ (
-		jspb.Message.getFieldWithDefault(this, 5, 0)
-	);
+proto.db3_mutation_proto.Mutation.prototype.getChainRole = function() {
+	return /** @type {!proto.db3_base_proto.ChainRole} */ (jspb.Message.getFieldWithDefault(
+		this,
+		5,
+		0,
+	));
 };
 
 /**
  * @param {!proto.db3_base_proto.ChainRole} value
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.setChainRole = function (value) {
+proto.db3_mutation_proto.Mutation.prototype.setChainRole = function(value) {
 	return jspb.Message.setProto3EnumField(this, 5, value);
 };
 
@@ -670,17 +673,19 @@ proto.db3_mutation_proto.Mutation.prototype.setChainRole = function (value) {
  * optional db3_base_proto.Units gas_price = 6;
  * @return {?proto.db3_base_proto.Units}
  */
-proto.db3_mutation_proto.Mutation.prototype.getGasPrice = function () {
-	return /** @type{?proto.db3_base_proto.Units} */ (
-		jspb.Message.getWrapperField(this, db3_base_pb.Units, 6)
-	);
+proto.db3_mutation_proto.Mutation.prototype.getGasPrice = function() {
+	return /** @type{?proto.db3_base_proto.Units} */ (jspb.Message.getWrapperField(
+		this,
+		db3_base_pb.Units,
+		6,
+	));
 };
 
 /**
  * @param {?proto.db3_base_proto.Units|undefined} value
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.setGasPrice = function (value) {
+proto.db3_mutation_proto.Mutation.prototype.setGasPrice = function(value) {
 	return jspb.Message.setWrapperField(this, 6, value);
 };
 
@@ -688,7 +693,7 @@ proto.db3_mutation_proto.Mutation.prototype.setGasPrice = function (value) {
  * Clears the message field making it undefined.
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.clearGasPrice = function () {
+proto.db3_mutation_proto.Mutation.prototype.clearGasPrice = function() {
 	return this.setGasPrice(undefined);
 };
 
@@ -696,7 +701,7 @@ proto.db3_mutation_proto.Mutation.prototype.clearGasPrice = function () {
  * Returns whether this field is set.
  * @return {boolean}
  */
-proto.db3_mutation_proto.Mutation.prototype.hasGasPrice = function () {
+proto.db3_mutation_proto.Mutation.prototype.hasGasPrice = function() {
 	return jspb.Message.getField(this, 6) != null;
 };
 
@@ -704,7 +709,7 @@ proto.db3_mutation_proto.Mutation.prototype.hasGasPrice = function () {
  * optional uint64 gas = 7;
  * @return {number}
  */
-proto.db3_mutation_proto.Mutation.prototype.getGas = function () {
+proto.db3_mutation_proto.Mutation.prototype.getGas = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 7, 0));
 };
 
@@ -712,7 +717,7 @@ proto.db3_mutation_proto.Mutation.prototype.getGas = function () {
  * @param {number} value
  * @return {!proto.db3_mutation_proto.Mutation} returns this
  */
-proto.db3_mutation_proto.Mutation.prototype.setGas = function (value) {
+proto.db3_mutation_proto.Mutation.prototype.setGas = function(value) {
 	return jspb.Message.setProto3IntField(this, 7, value);
 };
 
@@ -729,7 +734,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_mutation_proto.WriteRequest.prototype.toObject = function (
+	proto.db3_mutation_proto.WriteRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_mutation_proto.WriteRequest.toObject(
@@ -747,7 +752,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_mutation_proto.WriteRequest.toObject = function (
+	proto.db3_mutation_proto.WriteRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -769,7 +774,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_mutation_proto.WriteRequest}
  */
-proto.db3_mutation_proto.WriteRequest.deserializeBinary = function (bytes) {
+proto.db3_mutation_proto.WriteRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_mutation_proto.WriteRequest();
 	return proto.db3_mutation_proto.WriteRequest.deserializeBinaryFromReader(
@@ -785,7 +790,7 @@ proto.db3_mutation_proto.WriteRequest.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_mutation_proto.WriteRequest}
  */
-proto.db3_mutation_proto.WriteRequest.deserializeBinaryFromReader = function (
+proto.db3_mutation_proto.WriteRequest.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -815,7 +820,7 @@ proto.db3_mutation_proto.WriteRequest.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.WriteRequest.prototype.serializeBinary = function () {
+proto.db3_mutation_proto.WriteRequest.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_mutation_proto.WriteRequest.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -828,7 +833,7 @@ proto.db3_mutation_proto.WriteRequest.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_mutation_proto.WriteRequest.serializeBinaryToWriter = function (
+proto.db3_mutation_proto.WriteRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -847,10 +852,12 @@ proto.db3_mutation_proto.WriteRequest.serializeBinaryToWriter = function (
  * optional bytes signature = 1;
  * @return {string}
  */
-proto.db3_mutation_proto.WriteRequest.prototype.getSignature = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_mutation_proto.WriteRequest.prototype.getSignature = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -858,12 +865,9 @@ proto.db3_mutation_proto.WriteRequest.prototype.getSignature = function () {
  * This is a type-conversion wrapper around `getSignature()`
  * @return {string}
  */
-proto.db3_mutation_proto.WriteRequest.prototype.getSignature_asB64 =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.bytesAsB64(this.getSignature())
-		);
-	};
+proto.db3_mutation_proto.WriteRequest.prototype.getSignature_asB64 = function() {
+	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getSignature()));
+};
 
 /**
  * optional bytes signature = 1;
@@ -872,20 +876,17 @@ proto.db3_mutation_proto.WriteRequest.prototype.getSignature_asB64 =
  * This is a type-conversion wrapper around `getSignature()`
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.WriteRequest.prototype.getSignature_asU8 =
-	function () {
-		return /** @type {!Uint8Array} */ (
-			jspb.Message.bytesAsU8(this.getSignature())
-		);
-	};
+proto.db3_mutation_proto.WriteRequest.prototype.getSignature_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getSignature(),
+	));
+};
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_mutation_proto.WriteRequest} returns this
  */
-proto.db3_mutation_proto.WriteRequest.prototype.setSignature = function (
-	value,
-) {
+proto.db3_mutation_proto.WriteRequest.prototype.setSignature = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -893,10 +894,12 @@ proto.db3_mutation_proto.WriteRequest.prototype.setSignature = function (
  * optional bytes mutation = 2;
  * @return {string}
  */
-proto.db3_mutation_proto.WriteRequest.prototype.getMutation = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 2, "")
-	);
+proto.db3_mutation_proto.WriteRequest.prototype.getMutation = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		2,
+		"",
+	));
 };
 
 /**
@@ -904,12 +907,9 @@ proto.db3_mutation_proto.WriteRequest.prototype.getMutation = function () {
  * This is a type-conversion wrapper around `getMutation()`
  * @return {string}
  */
-proto.db3_mutation_proto.WriteRequest.prototype.getMutation_asB64 =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.bytesAsB64(this.getMutation())
-		);
-	};
+proto.db3_mutation_proto.WriteRequest.prototype.getMutation_asB64 = function() {
+	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getMutation()));
+};
 
 /**
  * optional bytes mutation = 2;
@@ -918,17 +918,17 @@ proto.db3_mutation_proto.WriteRequest.prototype.getMutation_asB64 =
  * This is a type-conversion wrapper around `getMutation()`
  * @return {!Uint8Array}
  */
-proto.db3_mutation_proto.WriteRequest.prototype.getMutation_asU8 = function () {
-	return /** @type {!Uint8Array} */ (
-		jspb.Message.bytesAsU8(this.getMutation())
-	);
+proto.db3_mutation_proto.WriteRequest.prototype.getMutation_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getMutation(),
+	));
 };
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_mutation_proto.WriteRequest} returns this
  */
-proto.db3_mutation_proto.WriteRequest.prototype.setMutation = function (value) {
+proto.db3_mutation_proto.WriteRequest.prototype.setMutation = function(value) {
 	return jspb.Message.setProto3BytesField(this, 2, value);
 };
 

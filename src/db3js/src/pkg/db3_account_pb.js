@@ -11,10 +11,10 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import jspb from "google-protobuf";
+import * as jspb from "google-protobuf";
 import db3_base_pb from "./db3_base_pb.js";
 var goog = jspb;
-var global = function () {
+var global = function() {
 	return this || window || global || self || Function("return this")();
 }.call(null);
 
@@ -30,7 +30,7 @@ goog.exportSymbol("proto.db3_account_proto.Account", null, global);
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_account_proto.Account = function (opt_data) {
+proto.db3_account_proto.Account = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_account_proto.Account, jspb.Message);
@@ -56,7 +56,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_account_proto.Account.prototype.toObject = function (
+	proto.db3_account_proto.Account.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_account_proto.Account.toObject(
@@ -74,7 +74,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_account_proto.Account.toObject = function (includeInstance, msg) {
+	proto.db3_account_proto.Account.toObject = function(includeInstance, msg) {
 		var f,
 			obj = {
 				totalBills:
@@ -110,7 +110,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_account_proto.Account}
  */
-proto.db3_account_proto.Account.deserializeBinary = function (bytes) {
+proto.db3_account_proto.Account.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_account_proto.Account();
 	return proto.db3_account_proto.Account.deserializeBinaryFromReader(
@@ -126,7 +126,7 @@ proto.db3_account_proto.Account.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_account_proto.Account}
  */
-proto.db3_account_proto.Account.deserializeBinaryFromReader = function (
+proto.db3_account_proto.Account.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -184,7 +184,7 @@ proto.db3_account_proto.Account.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_account_proto.Account.prototype.serializeBinary = function () {
+proto.db3_account_proto.Account.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_account_proto.Account.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -197,7 +197,7 @@ proto.db3_account_proto.Account.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_account_proto.Account.serializeBinaryToWriter = function (
+proto.db3_account_proto.Account.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -236,17 +236,19 @@ proto.db3_account_proto.Account.serializeBinaryToWriter = function (
  * optional db3_base_proto.Units total_bills = 1;
  * @return {?proto.db3_base_proto.Units}
  */
-proto.db3_account_proto.Account.prototype.getTotalBills = function () {
-	return /** @type{?proto.db3_base_proto.Units} */ (
-		jspb.Message.getWrapperField(this, db3_base_pb.Units, 1)
-	);
+proto.db3_account_proto.Account.prototype.getTotalBills = function() {
+	return /** @type{?proto.db3_base_proto.Units} */ (jspb.Message.getWrapperField(
+		this,
+		db3_base_pb.Units,
+		1,
+	));
 };
 
 /**
  * @param {?proto.db3_base_proto.Units|undefined} value
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.setTotalBills = function (value) {
+proto.db3_account_proto.Account.prototype.setTotalBills = function(value) {
 	return jspb.Message.setWrapperField(this, 1, value);
 };
 
@@ -254,7 +256,7 @@ proto.db3_account_proto.Account.prototype.setTotalBills = function (value) {
  * Clears the message field making it undefined.
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.clearTotalBills = function () {
+proto.db3_account_proto.Account.prototype.clearTotalBills = function() {
 	return this.setTotalBills(undefined);
 };
 
@@ -262,7 +264,7 @@ proto.db3_account_proto.Account.prototype.clearTotalBills = function () {
  * Returns whether this field is set.
  * @return {boolean}
  */
-proto.db3_account_proto.Account.prototype.hasTotalBills = function () {
+proto.db3_account_proto.Account.prototype.hasTotalBills = function() {
 	return jspb.Message.getField(this, 1) != null;
 };
 
@@ -270,7 +272,7 @@ proto.db3_account_proto.Account.prototype.hasTotalBills = function () {
  * optional uint64 total_storage_in_bytes = 2;
  * @return {number}
  */
-proto.db3_account_proto.Account.prototype.getTotalStorageInBytes = function () {
+proto.db3_account_proto.Account.prototype.getTotalStorageInBytes = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
@@ -278,7 +280,7 @@ proto.db3_account_proto.Account.prototype.getTotalStorageInBytes = function () {
  * @param {number} value
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.setTotalStorageInBytes = function (
+proto.db3_account_proto.Account.prototype.setTotalStorageInBytes = function(
 	value,
 ) {
 	return jspb.Message.setProto3IntField(this, 2, value);
@@ -288,7 +290,7 @@ proto.db3_account_proto.Account.prototype.setTotalStorageInBytes = function (
  * optional uint64 total_mutation_count = 3;
  * @return {number}
  */
-proto.db3_account_proto.Account.prototype.getTotalMutationCount = function () {
+proto.db3_account_proto.Account.prototype.getTotalMutationCount = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -296,7 +298,7 @@ proto.db3_account_proto.Account.prototype.getTotalMutationCount = function () {
  * @param {number} value
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.setTotalMutationCount = function (
+proto.db3_account_proto.Account.prototype.setTotalMutationCount = function(
 	value,
 ) {
 	return jspb.Message.setProto3IntField(this, 3, value);
@@ -306,18 +308,15 @@ proto.db3_account_proto.Account.prototype.setTotalMutationCount = function (
  * optional uint64 total_query_session_count = 4;
  * @return {number}
  */
-proto.db3_account_proto.Account.prototype.getTotalQuerySessionCount =
-	function () {
-		return /** @type {number} */ (
-			jspb.Message.getFieldWithDefault(this, 4, 0)
-		);
-	};
+proto.db3_account_proto.Account.prototype.getTotalQuerySessionCount = function() {
+	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 4, 0));
+};
 
 /**
  * @param {number} value
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.setTotalQuerySessionCount = function (
+proto.db3_account_proto.Account.prototype.setTotalQuerySessionCount = function(
 	value,
 ) {
 	return jspb.Message.setProto3IntField(this, 4, value);
@@ -327,17 +326,19 @@ proto.db3_account_proto.Account.prototype.setTotalQuerySessionCount = function (
  * optional db3_base_proto.Units credits = 5;
  * @return {?proto.db3_base_proto.Units}
  */
-proto.db3_account_proto.Account.prototype.getCredits = function () {
-	return /** @type{?proto.db3_base_proto.Units} */ (
-		jspb.Message.getWrapperField(this, db3_base_pb.Units, 5)
-	);
+proto.db3_account_proto.Account.prototype.getCredits = function() {
+	return /** @type{?proto.db3_base_proto.Units} */ (jspb.Message.getWrapperField(
+		this,
+		db3_base_pb.Units,
+		5,
+	));
 };
 
 /**
  * @param {?proto.db3_base_proto.Units|undefined} value
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.setCredits = function (value) {
+proto.db3_account_proto.Account.prototype.setCredits = function(value) {
 	return jspb.Message.setWrapperField(this, 5, value);
 };
 
@@ -345,7 +346,7 @@ proto.db3_account_proto.Account.prototype.setCredits = function (value) {
  * Clears the message field making it undefined.
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.clearCredits = function () {
+proto.db3_account_proto.Account.prototype.clearCredits = function() {
 	return this.setCredits(undefined);
 };
 
@@ -353,7 +354,7 @@ proto.db3_account_proto.Account.prototype.clearCredits = function () {
  * Returns whether this field is set.
  * @return {boolean}
  */
-proto.db3_account_proto.Account.prototype.hasCredits = function () {
+proto.db3_account_proto.Account.prototype.hasCredits = function() {
 	return jspb.Message.getField(this, 5) != null;
 };
 
@@ -361,7 +362,7 @@ proto.db3_account_proto.Account.prototype.hasCredits = function () {
  * optional uint64 nonce = 6;
  * @return {number}
  */
-proto.db3_account_proto.Account.prototype.getNonce = function () {
+proto.db3_account_proto.Account.prototype.getNonce = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 6, 0));
 };
 
@@ -369,7 +370,7 @@ proto.db3_account_proto.Account.prototype.getNonce = function () {
  * @param {number} value
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.setNonce = function (value) {
+proto.db3_account_proto.Account.prototype.setNonce = function(value) {
 	return jspb.Message.setProto3IntField(this, 6, value);
 };
 
@@ -377,7 +378,7 @@ proto.db3_account_proto.Account.prototype.setNonce = function (value) {
  * optional uint64 bill_next_id = 7;
  * @return {number}
  */
-proto.db3_account_proto.Account.prototype.getBillNextId = function () {
+proto.db3_account_proto.Account.prototype.getBillNextId = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 7, 0));
 };
 
@@ -385,7 +386,7 @@ proto.db3_account_proto.Account.prototype.getBillNextId = function () {
  * @param {number} value
  * @return {!proto.db3_account_proto.Account} returns this
  */
-proto.db3_account_proto.Account.prototype.setBillNextId = function (value) {
+proto.db3_account_proto.Account.prototype.setBillNextId = function(value) {
 	return jspb.Message.setProto3IntField(this, 7, value);
 };
 

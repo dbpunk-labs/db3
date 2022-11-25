@@ -11,9 +11,9 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import jspb from "google-protobuf";
+import * as jspb from "google-protobuf";
 var goog = jspb;
-var global = function () {
+var global = function() {
 	return this || window || global || self || Function("return this")();
 }.call(null);
 
@@ -31,7 +31,7 @@ goog.exportSymbol("proto.db3_base_proto.Units", null, global);
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_base_proto.Units = function (opt_data) {
+proto.db3_base_proto.Units = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_base_proto.Units, jspb.Message);
@@ -56,7 +56,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_base_proto.Units.prototype.toObject = function (
+	proto.db3_base_proto.Units.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_base_proto.Units.toObject(opt_includeInstance, this);
@@ -71,7 +71,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_base_proto.Units.toObject = function (includeInstance, msg) {
+	proto.db3_base_proto.Units.toObject = function(includeInstance, msg) {
 		var f,
 			obj = {
 				utype: jspb.Message.getFieldWithDefault(msg, 1, 0),
@@ -90,7 +90,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_base_proto.Units}
  */
-proto.db3_base_proto.Units.deserializeBinary = function (bytes) {
+proto.db3_base_proto.Units.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_base_proto.Units();
 	return proto.db3_base_proto.Units.deserializeBinaryFromReader(msg, reader);
@@ -103,10 +103,7 @@ proto.db3_base_proto.Units.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_base_proto.Units}
  */
-proto.db3_base_proto.Units.deserializeBinaryFromReader = function (
-	msg,
-	reader,
-) {
+proto.db3_base_proto.Units.deserializeBinaryFromReader = function(msg, reader) {
 	while (reader.nextField()) {
 		if (reader.isEndGroup()) {
 			break;
@@ -114,9 +111,7 @@ proto.db3_base_proto.Units.deserializeBinaryFromReader = function (
 		var field = reader.getFieldNumber();
 		switch (field) {
 			case 1:
-				var value = /** @type {!proto.db3_base_proto.UnitType} */ (
-					reader.readEnum()
-				);
+				var value = /** @type {!proto.db3_base_proto.UnitType} */ (reader.readEnum());
 				msg.setUtype(value);
 				break;
 			case 2:
@@ -135,7 +130,7 @@ proto.db3_base_proto.Units.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_base_proto.Units.prototype.serializeBinary = function () {
+proto.db3_base_proto.Units.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_base_proto.Units.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -148,10 +143,7 @@ proto.db3_base_proto.Units.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_base_proto.Units.serializeBinaryToWriter = function (
-	message,
-	writer,
-) {
+proto.db3_base_proto.Units.serializeBinaryToWriter = function(message, writer) {
 	var f = undefined;
 	f = message.getUtype();
 	if (f !== 0.0) {
@@ -167,17 +159,19 @@ proto.db3_base_proto.Units.serializeBinaryToWriter = function (
  * optional UnitType utype = 1;
  * @return {!proto.db3_base_proto.UnitType}
  */
-proto.db3_base_proto.Units.prototype.getUtype = function () {
-	return /** @type {!proto.db3_base_proto.UnitType} */ (
-		jspb.Message.getFieldWithDefault(this, 1, 0)
-	);
+proto.db3_base_proto.Units.prototype.getUtype = function() {
+	return /** @type {!proto.db3_base_proto.UnitType} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		0,
+	));
 };
 
 /**
  * @param {!proto.db3_base_proto.UnitType} value
  * @return {!proto.db3_base_proto.Units} returns this
  */
-proto.db3_base_proto.Units.prototype.setUtype = function (value) {
+proto.db3_base_proto.Units.prototype.setUtype = function(value) {
 	return jspb.Message.setProto3EnumField(this, 1, value);
 };
 
@@ -185,7 +179,7 @@ proto.db3_base_proto.Units.prototype.setUtype = function (value) {
  * optional int64 amount = 2;
  * @return {number}
  */
-proto.db3_base_proto.Units.prototype.getAmount = function () {
+proto.db3_base_proto.Units.prototype.getAmount = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
@@ -193,7 +187,7 @@ proto.db3_base_proto.Units.prototype.getAmount = function () {
  * @param {number} value
  * @return {!proto.db3_base_proto.Units} returns this
  */
-proto.db3_base_proto.Units.prototype.setAmount = function (value) {
+proto.db3_base_proto.Units.prototype.setAmount = function(value) {
 	return jspb.Message.setProto3IntField(this, 2, value);
 };
 

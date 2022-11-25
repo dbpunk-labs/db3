@@ -11,10 +11,10 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import jspb from "google-protobuf";
+import * as jspb from "google-protobuf";
 import db3_base_pb from "./db3_base_pb.js";
 var goog = jspb;
-var global = function () {
+var global = function() {
 	return this || window || global || self || Function("return this")();
 }.call(null);
 
@@ -32,7 +32,7 @@ goog.exportSymbol("proto.db3_bill_proto.BillType", null, global);
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_bill_proto.Bill = function (opt_data) {
+proto.db3_bill_proto.Bill = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_bill_proto.Bill, jspb.Message);
@@ -53,7 +53,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_bill_proto.BillQueryRequest = function (opt_data) {
+proto.db3_bill_proto.BillQueryRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_bill_proto.BillQueryRequest, jspb.Message);
@@ -79,7 +79,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_bill_proto.Bill.prototype.toObject = function (
+	proto.db3_bill_proto.Bill.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_bill_proto.Bill.toObject(opt_includeInstance, this);
@@ -94,7 +94,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_bill_proto.Bill.toObject = function (includeInstance, msg) {
+	proto.db3_bill_proto.Bill.toObject = function(includeInstance, msg) {
 		var f,
 			obj = {
 				gasFee:
@@ -121,7 +121,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_bill_proto.Bill}
  */
-proto.db3_bill_proto.Bill.deserializeBinary = function (bytes) {
+proto.db3_bill_proto.Bill.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_bill_proto.Bill();
 	return proto.db3_bill_proto.Bill.deserializeBinaryFromReader(msg, reader);
@@ -134,7 +134,7 @@ proto.db3_bill_proto.Bill.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_bill_proto.Bill}
  */
-proto.db3_bill_proto.Bill.deserializeBinaryFromReader = function (msg, reader) {
+proto.db3_bill_proto.Bill.deserializeBinaryFromReader = function(msg, reader) {
 	while (reader.nextField()) {
 		if (reader.isEndGroup()) {
 			break;
@@ -158,9 +158,7 @@ proto.db3_bill_proto.Bill.deserializeBinaryFromReader = function (msg, reader) {
 				msg.setBillId(value);
 				break;
 			case 4:
-				var value = /** @type {!proto.db3_bill_proto.BillType} */ (
-					reader.readEnum()
-				);
+				var value = /** @type {!proto.db3_bill_proto.BillType} */ (reader.readEnum());
 				msg.setBillType(value);
 				break;
 			case 5:
@@ -191,7 +189,7 @@ proto.db3_bill_proto.Bill.deserializeBinaryFromReader = function (msg, reader) {
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_bill_proto.Bill.prototype.serializeBinary = function () {
+proto.db3_bill_proto.Bill.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_bill_proto.Bill.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -204,7 +202,7 @@ proto.db3_bill_proto.Bill.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_bill_proto.Bill.serializeBinaryToWriter = function (message, writer) {
+proto.db3_bill_proto.Bill.serializeBinaryToWriter = function(message, writer) {
 	var f = undefined;
 	f = message.getGasFee();
 	if (f != null) {
@@ -244,17 +242,19 @@ proto.db3_bill_proto.Bill.serializeBinaryToWriter = function (message, writer) {
  * optional db3_base_proto.Units gas_fee = 1;
  * @return {?proto.db3_base_proto.Units}
  */
-proto.db3_bill_proto.Bill.prototype.getGasFee = function () {
-	return /** @type{?proto.db3_base_proto.Units} */ (
-		jspb.Message.getWrapperField(this, db3_base_pb.Units, 1)
-	);
+proto.db3_bill_proto.Bill.prototype.getGasFee = function() {
+	return /** @type{?proto.db3_base_proto.Units} */ (jspb.Message.getWrapperField(
+		this,
+		db3_base_pb.Units,
+		1,
+	));
 };
 
 /**
  * @param {?proto.db3_base_proto.Units|undefined} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setGasFee = function (value) {
+proto.db3_bill_proto.Bill.prototype.setGasFee = function(value) {
 	return jspb.Message.setWrapperField(this, 1, value);
 };
 
@@ -262,7 +262,7 @@ proto.db3_bill_proto.Bill.prototype.setGasFee = function (value) {
  * Clears the message field making it undefined.
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.clearGasFee = function () {
+proto.db3_bill_proto.Bill.prototype.clearGasFee = function() {
 	return this.setGasFee(undefined);
 };
 
@@ -270,7 +270,7 @@ proto.db3_bill_proto.Bill.prototype.clearGasFee = function () {
  * Returns whether this field is set.
  * @return {boolean}
  */
-proto.db3_bill_proto.Bill.prototype.hasGasFee = function () {
+proto.db3_bill_proto.Bill.prototype.hasGasFee = function() {
 	return jspb.Message.getField(this, 1) != null;
 };
 
@@ -278,7 +278,7 @@ proto.db3_bill_proto.Bill.prototype.hasGasFee = function () {
  * optional uint64 block_height = 2;
  * @return {number}
  */
-proto.db3_bill_proto.Bill.prototype.getBlockHeight = function () {
+proto.db3_bill_proto.Bill.prototype.getBlockHeight = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
@@ -286,7 +286,7 @@ proto.db3_bill_proto.Bill.prototype.getBlockHeight = function () {
  * @param {number} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setBlockHeight = function (value) {
+proto.db3_bill_proto.Bill.prototype.setBlockHeight = function(value) {
 	return jspb.Message.setProto3IntField(this, 2, value);
 };
 
@@ -294,7 +294,7 @@ proto.db3_bill_proto.Bill.prototype.setBlockHeight = function (value) {
  * optional uint64 bill_id = 3;
  * @return {number}
  */
-proto.db3_bill_proto.Bill.prototype.getBillId = function () {
+proto.db3_bill_proto.Bill.prototype.getBillId = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -302,7 +302,7 @@ proto.db3_bill_proto.Bill.prototype.getBillId = function () {
  * @param {number} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setBillId = function (value) {
+proto.db3_bill_proto.Bill.prototype.setBillId = function(value) {
 	return jspb.Message.setProto3IntField(this, 3, value);
 };
 
@@ -310,17 +310,19 @@ proto.db3_bill_proto.Bill.prototype.setBillId = function (value) {
  * optional BillType bill_type = 4;
  * @return {!proto.db3_bill_proto.BillType}
  */
-proto.db3_bill_proto.Bill.prototype.getBillType = function () {
-	return /** @type {!proto.db3_bill_proto.BillType} */ (
-		jspb.Message.getFieldWithDefault(this, 4, 0)
-	);
+proto.db3_bill_proto.Bill.prototype.getBillType = function() {
+	return /** @type {!proto.db3_bill_proto.BillType} */ (jspb.Message.getFieldWithDefault(
+		this,
+		4,
+		0,
+	));
 };
 
 /**
  * @param {!proto.db3_bill_proto.BillType} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setBillType = function (value) {
+proto.db3_bill_proto.Bill.prototype.setBillType = function(value) {
 	return jspb.Message.setProto3EnumField(this, 4, value);
 };
 
@@ -328,7 +330,7 @@ proto.db3_bill_proto.Bill.prototype.setBillType = function (value) {
  * optional uint64 time = 5;
  * @return {number}
  */
-proto.db3_bill_proto.Bill.prototype.getTime = function () {
+proto.db3_bill_proto.Bill.prototype.getTime = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 5, 0));
 };
 
@@ -336,7 +338,7 @@ proto.db3_bill_proto.Bill.prototype.getTime = function () {
  * @param {number} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setTime = function (value) {
+proto.db3_bill_proto.Bill.prototype.setTime = function(value) {
 	return jspb.Message.setProto3IntField(this, 5, value);
 };
 
@@ -344,10 +346,12 @@ proto.db3_bill_proto.Bill.prototype.setTime = function (value) {
  * optional bytes bill_target_id = 6;
  * @return {string}
  */
-proto.db3_bill_proto.Bill.prototype.getBillTargetId = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 6, "")
-	);
+proto.db3_bill_proto.Bill.prototype.getBillTargetId = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		6,
+		"",
+	));
 };
 
 /**
@@ -355,10 +359,10 @@ proto.db3_bill_proto.Bill.prototype.getBillTargetId = function () {
  * This is a type-conversion wrapper around `getBillTargetId()`
  * @return {string}
  */
-proto.db3_bill_proto.Bill.prototype.getBillTargetId_asB64 = function () {
-	return /** @type {string} */ (
-		jspb.Message.bytesAsB64(this.getBillTargetId())
-	);
+proto.db3_bill_proto.Bill.prototype.getBillTargetId_asB64 = function() {
+	return /** @type {string} */ (jspb.Message.bytesAsB64(
+		this.getBillTargetId(),
+	));
 };
 
 /**
@@ -368,17 +372,17 @@ proto.db3_bill_proto.Bill.prototype.getBillTargetId_asB64 = function () {
  * This is a type-conversion wrapper around `getBillTargetId()`
  * @return {!Uint8Array}
  */
-proto.db3_bill_proto.Bill.prototype.getBillTargetId_asU8 = function () {
-	return /** @type {!Uint8Array} */ (
-		jspb.Message.bytesAsU8(this.getBillTargetId())
-	);
+proto.db3_bill_proto.Bill.prototype.getBillTargetId_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getBillTargetId(),
+	));
 };
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setBillTargetId = function (value) {
+proto.db3_bill_proto.Bill.prototype.setBillTargetId = function(value) {
 	return jspb.Message.setProto3BytesField(this, 6, value);
 };
 
@@ -386,10 +390,12 @@ proto.db3_bill_proto.Bill.prototype.setBillTargetId = function (value) {
  * optional bytes owner = 8;
  * @return {string}
  */
-proto.db3_bill_proto.Bill.prototype.getOwner = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 8, "")
-	);
+proto.db3_bill_proto.Bill.prototype.getOwner = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		8,
+		"",
+	));
 };
 
 /**
@@ -397,7 +403,7 @@ proto.db3_bill_proto.Bill.prototype.getOwner = function () {
  * This is a type-conversion wrapper around `getOwner()`
  * @return {string}
  */
-proto.db3_bill_proto.Bill.prototype.getOwner_asB64 = function () {
+proto.db3_bill_proto.Bill.prototype.getOwner_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getOwner()));
 };
 
@@ -408,7 +414,7 @@ proto.db3_bill_proto.Bill.prototype.getOwner_asB64 = function () {
  * This is a type-conversion wrapper around `getOwner()`
  * @return {!Uint8Array}
  */
-proto.db3_bill_proto.Bill.prototype.getOwner_asU8 = function () {
+proto.db3_bill_proto.Bill.prototype.getOwner_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getOwner()));
 };
 
@@ -416,7 +422,7 @@ proto.db3_bill_proto.Bill.prototype.getOwner_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setOwner = function (value) {
+proto.db3_bill_proto.Bill.prototype.setOwner = function(value) {
 	return jspb.Message.setProto3BytesField(this, 8, value);
 };
 
@@ -424,10 +430,12 @@ proto.db3_bill_proto.Bill.prototype.setOwner = function (value) {
  * optional bytes query_addr = 9;
  * @return {string}
  */
-proto.db3_bill_proto.Bill.prototype.getQueryAddr = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 9, "")
-	);
+proto.db3_bill_proto.Bill.prototype.getQueryAddr = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		9,
+		"",
+	));
 };
 
 /**
@@ -435,7 +443,7 @@ proto.db3_bill_proto.Bill.prototype.getQueryAddr = function () {
  * This is a type-conversion wrapper around `getQueryAddr()`
  * @return {string}
  */
-proto.db3_bill_proto.Bill.prototype.getQueryAddr_asB64 = function () {
+proto.db3_bill_proto.Bill.prototype.getQueryAddr_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getQueryAddr()));
 };
 
@@ -446,17 +454,17 @@ proto.db3_bill_proto.Bill.prototype.getQueryAddr_asB64 = function () {
  * This is a type-conversion wrapper around `getQueryAddr()`
  * @return {!Uint8Array}
  */
-proto.db3_bill_proto.Bill.prototype.getQueryAddr_asU8 = function () {
-	return /** @type {!Uint8Array} */ (
-		jspb.Message.bytesAsU8(this.getQueryAddr())
-	);
+proto.db3_bill_proto.Bill.prototype.getQueryAddr_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getQueryAddr(),
+	));
 };
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_bill_proto.Bill} returns this
  */
-proto.db3_bill_proto.Bill.prototype.setQueryAddr = function (value) {
+proto.db3_bill_proto.Bill.prototype.setQueryAddr = function(value) {
 	return jspb.Message.setProto3BytesField(this, 9, value);
 };
 
@@ -473,7 +481,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_bill_proto.BillQueryRequest.prototype.toObject = function (
+	proto.db3_bill_proto.BillQueryRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_bill_proto.BillQueryRequest.toObject(
@@ -491,7 +499,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_bill_proto.BillQueryRequest.toObject = function (
+	proto.db3_bill_proto.BillQueryRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -514,7 +522,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_bill_proto.BillQueryRequest}
  */
-proto.db3_bill_proto.BillQueryRequest.deserializeBinary = function (bytes) {
+proto.db3_bill_proto.BillQueryRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_bill_proto.BillQueryRequest();
 	return proto.db3_bill_proto.BillQueryRequest.deserializeBinaryFromReader(
@@ -530,7 +538,7 @@ proto.db3_bill_proto.BillQueryRequest.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_bill_proto.BillQueryRequest}
  */
-proto.db3_bill_proto.BillQueryRequest.deserializeBinaryFromReader = function (
+proto.db3_bill_proto.BillQueryRequest.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -564,7 +572,7 @@ proto.db3_bill_proto.BillQueryRequest.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_bill_proto.BillQueryRequest.prototype.serializeBinary = function () {
+proto.db3_bill_proto.BillQueryRequest.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_bill_proto.BillQueryRequest.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -577,7 +585,7 @@ proto.db3_bill_proto.BillQueryRequest.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_bill_proto.BillQueryRequest.serializeBinaryToWriter = function (
+proto.db3_bill_proto.BillQueryRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -600,7 +608,7 @@ proto.db3_bill_proto.BillQueryRequest.serializeBinaryToWriter = function (
  * optional uint64 block_height = 1;
  * @return {number}
  */
-proto.db3_bill_proto.BillQueryRequest.prototype.getBlockHeight = function () {
+proto.db3_bill_proto.BillQueryRequest.prototype.getBlockHeight = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 1, 0));
 };
 
@@ -608,7 +616,7 @@ proto.db3_bill_proto.BillQueryRequest.prototype.getBlockHeight = function () {
  * @param {number} value
  * @return {!proto.db3_bill_proto.BillQueryRequest} returns this
  */
-proto.db3_bill_proto.BillQueryRequest.prototype.setBlockHeight = function (
+proto.db3_bill_proto.BillQueryRequest.prototype.setBlockHeight = function(
 	value,
 ) {
 	return jspb.Message.setProto3IntField(this, 1, value);
@@ -618,7 +626,7 @@ proto.db3_bill_proto.BillQueryRequest.prototype.setBlockHeight = function (
  * optional uint64 start_id = 2;
  * @return {number}
  */
-proto.db3_bill_proto.BillQueryRequest.prototype.getStartId = function () {
+proto.db3_bill_proto.BillQueryRequest.prototype.getStartId = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
@@ -626,7 +634,7 @@ proto.db3_bill_proto.BillQueryRequest.prototype.getStartId = function () {
  * @param {number} value
  * @return {!proto.db3_bill_proto.BillQueryRequest} returns this
  */
-proto.db3_bill_proto.BillQueryRequest.prototype.setStartId = function (value) {
+proto.db3_bill_proto.BillQueryRequest.prototype.setStartId = function(value) {
 	return jspb.Message.setProto3IntField(this, 2, value);
 };
 
@@ -634,7 +642,7 @@ proto.db3_bill_proto.BillQueryRequest.prototype.setStartId = function (value) {
  * optional uint64 end_id = 3;
  * @return {number}
  */
-proto.db3_bill_proto.BillQueryRequest.prototype.getEndId = function () {
+proto.db3_bill_proto.BillQueryRequest.prototype.getEndId = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -642,7 +650,7 @@ proto.db3_bill_proto.BillQueryRequest.prototype.getEndId = function () {
  * @param {number} value
  * @return {!proto.db3_bill_proto.BillQueryRequest} returns this
  */
-proto.db3_bill_proto.BillQueryRequest.prototype.setEndId = function (value) {
+proto.db3_bill_proto.BillQueryRequest.prototype.setEndId = function(value) {
 	return jspb.Message.setProto3IntField(this, 3, value);
 };
 

@@ -1,10 +1,9 @@
-// import * as bip39 from "@scure/bip39";
-// import { wordlist } from "@scure/bip39/wordlists/english";
-// import { gen_key, sign } from "../pkg/db3_jsdk";
-import db3_mutation_pb, { KVPair } from "../pkg/db3_mutation_pb";
+import db3_mutation_pb from "../pkg/db3_mutation_pb";
+import type { KVPair } from "../pkg/db3_mutation_pb";
 import db3_base_pb from "../pkg/db3_base_pb";
 import db3_node_pb from "../pkg/db3_node_pb";
 import { StorageNodeClient } from "../pkg/Db3_nodeServiceClientPb";
+import * as jspb from 'google-protobuf';
 
 export interface Mutation {
 	ns: string;
@@ -21,7 +20,7 @@ export interface DB3_Options {
 }
 
 function encodeUint8Array(text: string) {
-	return new TextEncoder().encode(text);
+	return jspb.Message.bytesAsU8(text);
 }
 
 export class DB3 {
@@ -29,7 +28,7 @@ export class DB3 {
 	constructor(node: string, options?: DB3_Options) {
 		this.client = new StorageNodeClient(node, null, null);
 	}
-	submitMutaition(
+	async submitMutaition(
 		mutation: Mutation,
 		sign: (target: Uint8Array) => Uint8Array,
 	) {
@@ -59,19 +58,7 @@ export class DB3 {
 		const broadcastRequest = new db3_node_pb.BroadcastRequest();
 		broadcastRequest.setBody(writeRequest.serializeBinary());
 
-		return this.client
-			.broadcast(broadcastRequest, {})
-			.then((res) => res.toObject());
+		const res = await this.client.broadcast(broadcastRequest, {});
+		return res.toObject();
 	}
 }
-
-// export function generateMnemonic() {
-// 	return bip39.generateMnemonic(wordlist);
-// }
-
-// export function generateKey(mn: string, password: string) {
-// 	return bip39.mnemonicToSeed(mn, password).then((seed: Uint8Array) => {
-// 		const [pk, sk] = gen_key(seed);
-// 		return [pk, sk, seed];
-// 	});
-// }

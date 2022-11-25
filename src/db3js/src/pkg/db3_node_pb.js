@@ -11,13 +11,13 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import jspb from "google-protobuf";
+import * as jspb from "google-protobuf";
 import db3_bill_pb from "./db3_bill_pb.js";
 import db3_mutation_pb from "./db3_mutation_pb.js";
 import db3_account_pb from "./db3_account_pb.js";
 
 var goog = jspb;
-var global = function () {
+var global = function() {
 	return this || window || global || self || Function("return this")();
 }.call(null);
 
@@ -51,7 +51,7 @@ goog.exportSymbol("proto.db3_node_proto.SessionStatus", null, global);
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.QueryBillRequest = function (opt_data) {
+proto.db3_node_proto.QueryBillRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.QueryBillRequest, jspb.Message);
@@ -73,7 +73,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.QueryBillResponse = function (opt_data) {
+proto.db3_node_proto.QueryBillResponse = function(opt_data) {
 	jspb.Message.initialize(
 		this,
 		opt_data,
@@ -102,7 +102,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.Range = function (opt_data) {
+proto.db3_node_proto.Range = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.Range, jspb.Message);
@@ -123,7 +123,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.BatchRangeKey = function (opt_data) {
+proto.db3_node_proto.BatchRangeKey = function(opt_data) {
 	jspb.Message.initialize(
 		this,
 		opt_data,
@@ -152,7 +152,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.BatchGetKey = function (opt_data) {
+proto.db3_node_proto.BatchGetKey = function(opt_data) {
 	jspb.Message.initialize(
 		this,
 		opt_data,
@@ -181,7 +181,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.BatchGetValue = function (opt_data) {
+proto.db3_node_proto.BatchGetValue = function(opt_data) {
 	jspb.Message.initialize(
 		this,
 		opt_data,
@@ -210,7 +210,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.GetKeyRequest = function (opt_data) {
+proto.db3_node_proto.GetKeyRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.GetKeyRequest, jspb.Message);
@@ -232,7 +232,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.GetKeyResponse = function (opt_data) {
+proto.db3_node_proto.GetKeyResponse = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.GetKeyResponse, jspb.Message);
@@ -254,7 +254,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.RestartSessionRequest = function (opt_data) {
+proto.db3_node_proto.RestartSessionRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.RestartSessionRequest, jspb.Message);
@@ -276,7 +276,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.RestartSessionResponse = function (opt_data) {
+proto.db3_node_proto.RestartSessionResponse = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.RestartSessionResponse, jspb.Message);
@@ -298,7 +298,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.GetAccountRequest = function (opt_data) {
+proto.db3_node_proto.GetAccountRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.GetAccountRequest, jspb.Message);
@@ -320,7 +320,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.GetSessionInfoRequest = function (opt_data) {
+proto.db3_node_proto.GetSessionInfoRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.GetSessionInfoRequest, jspb.Message);
@@ -342,7 +342,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.QuerySessionInfo = function (opt_data) {
+proto.db3_node_proto.QuerySessionInfo = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.QuerySessionInfo, jspb.Message);
@@ -364,7 +364,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.GetSessionInfoResponse = function (opt_data) {
+proto.db3_node_proto.GetSessionInfoResponse = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.GetSessionInfoResponse, jspb.Message);
@@ -386,7 +386,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.BroadcastRequest = function (opt_data) {
+proto.db3_node_proto.BroadcastRequest = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.BroadcastRequest, jspb.Message);
@@ -408,7 +408,7 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.db3_node_proto.BroadcastResponse = function (opt_data) {
+proto.db3_node_proto.BroadcastResponse = function(opt_data) {
 	jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
 goog.inherits(proto.db3_node_proto.BroadcastResponse, jspb.Message);
@@ -434,7 +434,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.QueryBillRequest.prototype.toObject = function (
+	proto.db3_node_proto.QueryBillRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.QueryBillRequest.toObject(
@@ -452,7 +452,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.QueryBillRequest.toObject = function (
+	proto.db3_node_proto.QueryBillRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -475,7 +475,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.QueryBillRequest}
  */
-proto.db3_node_proto.QueryBillRequest.deserializeBinary = function (bytes) {
+proto.db3_node_proto.QueryBillRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.QueryBillRequest();
 	return proto.db3_node_proto.QueryBillRequest.deserializeBinaryFromReader(
@@ -491,7 +491,7 @@ proto.db3_node_proto.QueryBillRequest.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.QueryBillRequest}
  */
-proto.db3_node_proto.QueryBillRequest.deserializeBinaryFromReader = function (
+proto.db3_node_proto.QueryBillRequest.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -525,7 +525,7 @@ proto.db3_node_proto.QueryBillRequest.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.QueryBillRequest.prototype.serializeBinary = function () {
+proto.db3_node_proto.QueryBillRequest.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.QueryBillRequest.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -538,7 +538,7 @@ proto.db3_node_proto.QueryBillRequest.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.QueryBillRequest.serializeBinaryToWriter = function (
+proto.db3_node_proto.QueryBillRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -561,7 +561,7 @@ proto.db3_node_proto.QueryBillRequest.serializeBinaryToWriter = function (
  * optional uint64 height = 1;
  * @return {number}
  */
-proto.db3_node_proto.QueryBillRequest.prototype.getHeight = function () {
+proto.db3_node_proto.QueryBillRequest.prototype.getHeight = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 1, 0));
 };
 
@@ -569,7 +569,7 @@ proto.db3_node_proto.QueryBillRequest.prototype.getHeight = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.QueryBillRequest} returns this
  */
-proto.db3_node_proto.QueryBillRequest.prototype.setHeight = function (value) {
+proto.db3_node_proto.QueryBillRequest.prototype.setHeight = function(value) {
 	return jspb.Message.setProto3IntField(this, 1, value);
 };
 
@@ -577,7 +577,7 @@ proto.db3_node_proto.QueryBillRequest.prototype.setHeight = function (value) {
  * optional uint64 start_id = 2;
  * @return {number}
  */
-proto.db3_node_proto.QueryBillRequest.prototype.getStartId = function () {
+proto.db3_node_proto.QueryBillRequest.prototype.getStartId = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
@@ -585,7 +585,7 @@ proto.db3_node_proto.QueryBillRequest.prototype.getStartId = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.QueryBillRequest} returns this
  */
-proto.db3_node_proto.QueryBillRequest.prototype.setStartId = function (value) {
+proto.db3_node_proto.QueryBillRequest.prototype.setStartId = function(value) {
 	return jspb.Message.setProto3IntField(this, 2, value);
 };
 
@@ -593,7 +593,7 @@ proto.db3_node_proto.QueryBillRequest.prototype.setStartId = function (value) {
  * optional uint64 end_id = 3;
  * @return {number}
  */
-proto.db3_node_proto.QueryBillRequest.prototype.getEndId = function () {
+proto.db3_node_proto.QueryBillRequest.prototype.getEndId = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -601,7 +601,7 @@ proto.db3_node_proto.QueryBillRequest.prototype.getEndId = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.QueryBillRequest} returns this
  */
-proto.db3_node_proto.QueryBillRequest.prototype.setEndId = function (value) {
+proto.db3_node_proto.QueryBillRequest.prototype.setEndId = function(value) {
 	return jspb.Message.setProto3IntField(this, 3, value);
 };
 
@@ -625,7 +625,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.QueryBillResponse.prototype.toObject = function (
+	proto.db3_node_proto.QueryBillResponse.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.QueryBillResponse.toObject(
@@ -643,7 +643,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.QueryBillResponse.toObject = function (
+	proto.db3_node_proto.QueryBillResponse.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -668,7 +668,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.QueryBillResponse}
  */
-proto.db3_node_proto.QueryBillResponse.deserializeBinary = function (bytes) {
+proto.db3_node_proto.QueryBillResponse.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.QueryBillResponse();
 	return proto.db3_node_proto.QueryBillResponse.deserializeBinaryFromReader(
@@ -684,7 +684,7 @@ proto.db3_node_proto.QueryBillResponse.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.QueryBillResponse}
  */
-proto.db3_node_proto.QueryBillResponse.deserializeBinaryFromReader = function (
+proto.db3_node_proto.QueryBillResponse.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -714,7 +714,7 @@ proto.db3_node_proto.QueryBillResponse.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.QueryBillResponse.prototype.serializeBinary = function () {
+proto.db3_node_proto.QueryBillResponse.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.QueryBillResponse.serializeBinaryToWriter(
 		this,
@@ -730,7 +730,7 @@ proto.db3_node_proto.QueryBillResponse.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.QueryBillResponse.serializeBinaryToWriter = function (
+proto.db3_node_proto.QueryBillResponse.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -749,17 +749,19 @@ proto.db3_node_proto.QueryBillResponse.serializeBinaryToWriter = function (
  * repeated db3_bill_proto.Bill bills = 1;
  * @return {!Array<!proto.db3_bill_proto.Bill>}
  */
-proto.db3_node_proto.QueryBillResponse.prototype.getBillsList = function () {
-	return /** @type{!Array<!proto.db3_bill_proto.Bill>} */ (
-		jspb.Message.getRepeatedWrapperField(this, db3_bill_pb.Bill, 1)
-	);
+proto.db3_node_proto.QueryBillResponse.prototype.getBillsList = function() {
+	return /** @type{!Array<!proto.db3_bill_proto.Bill>} */ (jspb.Message.getRepeatedWrapperField(
+		this,
+		db3_bill_pb.Bill,
+		1,
+	));
 };
 
 /**
  * @param {!Array<!proto.db3_bill_proto.Bill>} value
  * @return {!proto.db3_node_proto.QueryBillResponse} returns this
  */
-proto.db3_node_proto.QueryBillResponse.prototype.setBillsList = function (
+proto.db3_node_proto.QueryBillResponse.prototype.setBillsList = function(
 	value,
 ) {
 	return jspb.Message.setRepeatedWrapperField(this, 1, value);
@@ -770,7 +772,7 @@ proto.db3_node_proto.QueryBillResponse.prototype.setBillsList = function (
  * @param {number=} opt_index
  * @return {!proto.db3_bill_proto.Bill}
  */
-proto.db3_node_proto.QueryBillResponse.prototype.addBills = function (
+proto.db3_node_proto.QueryBillResponse.prototype.addBills = function(
 	opt_value,
 	opt_index,
 ) {
@@ -787,7 +789,7 @@ proto.db3_node_proto.QueryBillResponse.prototype.addBills = function (
  * Clears the list making it empty but non-null.
  * @return {!proto.db3_node_proto.QueryBillResponse} returns this
  */
-proto.db3_node_proto.QueryBillResponse.prototype.clearBillsList = function () {
+proto.db3_node_proto.QueryBillResponse.prototype.clearBillsList = function() {
 	return this.setBillsList([]);
 };
 
@@ -804,7 +806,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.Range.prototype.toObject = function (
+	proto.db3_node_proto.Range.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.Range.toObject(opt_includeInstance, this);
@@ -819,7 +821,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.Range.toObject = function (includeInstance, msg) {
+	proto.db3_node_proto.Range.toObject = function(includeInstance, msg) {
 		var f,
 			obj = {
 				start: msg.getStart_asB64(),
@@ -838,7 +840,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.Range}
  */
-proto.db3_node_proto.Range.deserializeBinary = function (bytes) {
+proto.db3_node_proto.Range.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.Range();
 	return proto.db3_node_proto.Range.deserializeBinaryFromReader(msg, reader);
@@ -851,10 +853,7 @@ proto.db3_node_proto.Range.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.Range}
  */
-proto.db3_node_proto.Range.deserializeBinaryFromReader = function (
-	msg,
-	reader,
-) {
+proto.db3_node_proto.Range.deserializeBinaryFromReader = function(msg, reader) {
 	while (reader.nextField()) {
 		if (reader.isEndGroup()) {
 			break;
@@ -881,7 +880,7 @@ proto.db3_node_proto.Range.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.Range.prototype.serializeBinary = function () {
+proto.db3_node_proto.Range.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.Range.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -894,10 +893,7 @@ proto.db3_node_proto.Range.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.Range.serializeBinaryToWriter = function (
-	message,
-	writer,
-) {
+proto.db3_node_proto.Range.serializeBinaryToWriter = function(message, writer) {
 	var f = undefined;
 	f = message.getStart_asU8();
 	if (f.length > 0) {
@@ -913,10 +909,12 @@ proto.db3_node_proto.Range.serializeBinaryToWriter = function (
  * optional bytes start = 1;
  * @return {string}
  */
-proto.db3_node_proto.Range.prototype.getStart = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.Range.prototype.getStart = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -924,7 +922,7 @@ proto.db3_node_proto.Range.prototype.getStart = function () {
  * This is a type-conversion wrapper around `getStart()`
  * @return {string}
  */
-proto.db3_node_proto.Range.prototype.getStart_asB64 = function () {
+proto.db3_node_proto.Range.prototype.getStart_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getStart()));
 };
 
@@ -935,7 +933,7 @@ proto.db3_node_proto.Range.prototype.getStart_asB64 = function () {
  * This is a type-conversion wrapper around `getStart()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.Range.prototype.getStart_asU8 = function () {
+proto.db3_node_proto.Range.prototype.getStart_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getStart()));
 };
 
@@ -943,7 +941,7 @@ proto.db3_node_proto.Range.prototype.getStart_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.Range} returns this
  */
-proto.db3_node_proto.Range.prototype.setStart = function (value) {
+proto.db3_node_proto.Range.prototype.setStart = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -951,10 +949,12 @@ proto.db3_node_proto.Range.prototype.setStart = function (value) {
  * optional bytes end = 2;
  * @return {string}
  */
-proto.db3_node_proto.Range.prototype.getEnd = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 2, "")
-	);
+proto.db3_node_proto.Range.prototype.getEnd = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		2,
+		"",
+	));
 };
 
 /**
@@ -962,7 +962,7 @@ proto.db3_node_proto.Range.prototype.getEnd = function () {
  * This is a type-conversion wrapper around `getEnd()`
  * @return {string}
  */
-proto.db3_node_proto.Range.prototype.getEnd_asB64 = function () {
+proto.db3_node_proto.Range.prototype.getEnd_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getEnd()));
 };
 
@@ -973,7 +973,7 @@ proto.db3_node_proto.Range.prototype.getEnd_asB64 = function () {
  * This is a type-conversion wrapper around `getEnd()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.Range.prototype.getEnd_asU8 = function () {
+proto.db3_node_proto.Range.prototype.getEnd_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getEnd()));
 };
 
@@ -981,7 +981,7 @@ proto.db3_node_proto.Range.prototype.getEnd_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.Range} returns this
  */
-proto.db3_node_proto.Range.prototype.setEnd = function (value) {
+proto.db3_node_proto.Range.prototype.setEnd = function(value) {
 	return jspb.Message.setProto3BytesField(this, 2, value);
 };
 
@@ -1005,7 +1005,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.BatchRangeKey.prototype.toObject = function (
+	proto.db3_node_proto.BatchRangeKey.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.BatchRangeKey.toObject(
@@ -1023,7 +1023,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.BatchRangeKey.toObject = function (
+	proto.db3_node_proto.BatchRangeKey.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -1050,7 +1050,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.BatchRangeKey}
  */
-proto.db3_node_proto.BatchRangeKey.deserializeBinary = function (bytes) {
+proto.db3_node_proto.BatchRangeKey.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.BatchRangeKey();
 	return proto.db3_node_proto.BatchRangeKey.deserializeBinaryFromReader(
@@ -1066,7 +1066,7 @@ proto.db3_node_proto.BatchRangeKey.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.BatchRangeKey}
  */
-proto.db3_node_proto.BatchRangeKey.deserializeBinaryFromReader = function (
+proto.db3_node_proto.BatchRangeKey.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -1104,7 +1104,7 @@ proto.db3_node_proto.BatchRangeKey.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BatchRangeKey.prototype.serializeBinary = function () {
+proto.db3_node_proto.BatchRangeKey.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.BatchRangeKey.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -1117,7 +1117,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.BatchRangeKey.serializeBinaryToWriter = function (
+proto.db3_node_proto.BatchRangeKey.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -1144,10 +1144,12 @@ proto.db3_node_proto.BatchRangeKey.serializeBinaryToWriter = function (
  * optional bytes ns = 1;
  * @return {string}
  */
-proto.db3_node_proto.BatchRangeKey.prototype.getNs = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.BatchRangeKey.prototype.getNs = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -1155,7 +1157,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.getNs = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {string}
  */
-proto.db3_node_proto.BatchRangeKey.prototype.getNs_asB64 = function () {
+proto.db3_node_proto.BatchRangeKey.prototype.getNs_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getNs()));
 };
 
@@ -1166,7 +1168,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.getNs_asB64 = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BatchRangeKey.prototype.getNs_asU8 = function () {
+proto.db3_node_proto.BatchRangeKey.prototype.getNs_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getNs()));
 };
 
@@ -1174,7 +1176,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.getNs_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.BatchRangeKey} returns this
  */
-proto.db3_node_proto.BatchRangeKey.prototype.setNs = function (value) {
+proto.db3_node_proto.BatchRangeKey.prototype.setNs = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -1182,21 +1184,19 @@ proto.db3_node_proto.BatchRangeKey.prototype.setNs = function (value) {
  * repeated Range range = 2;
  * @return {!Array<!proto.db3_node_proto.Range>}
  */
-proto.db3_node_proto.BatchRangeKey.prototype.getRangeList = function () {
-	return /** @type{!Array<!proto.db3_node_proto.Range>} */ (
-		jspb.Message.getRepeatedWrapperField(
-			this,
-			proto.db3_node_proto.Range,
-			2,
-		)
-	);
+proto.db3_node_proto.BatchRangeKey.prototype.getRangeList = function() {
+	return /** @type{!Array<!proto.db3_node_proto.Range>} */ (jspb.Message.getRepeatedWrapperField(
+		this,
+		proto.db3_node_proto.Range,
+		2,
+	));
 };
 
 /**
  * @param {!Array<!proto.db3_node_proto.Range>} value
  * @return {!proto.db3_node_proto.BatchRangeKey} returns this
  */
-proto.db3_node_proto.BatchRangeKey.prototype.setRangeList = function (value) {
+proto.db3_node_proto.BatchRangeKey.prototype.setRangeList = function(value) {
 	return jspb.Message.setRepeatedWrapperField(this, 2, value);
 };
 
@@ -1205,7 +1205,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.setRangeList = function (value) {
  * @param {number=} opt_index
  * @return {!proto.db3_node_proto.Range}
  */
-proto.db3_node_proto.BatchRangeKey.prototype.addRange = function (
+proto.db3_node_proto.BatchRangeKey.prototype.addRange = function(
 	opt_value,
 	opt_index,
 ) {
@@ -1222,7 +1222,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.addRange = function (
  * Clears the list making it empty but non-null.
  * @return {!proto.db3_node_proto.BatchRangeKey} returns this
  */
-proto.db3_node_proto.BatchRangeKey.prototype.clearRangeList = function () {
+proto.db3_node_proto.BatchRangeKey.prototype.clearRangeList = function() {
 	return this.setRangeList([]);
 };
 
@@ -1230,7 +1230,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.clearRangeList = function () {
  * optional int32 session = 3;
  * @return {number}
  */
-proto.db3_node_proto.BatchRangeKey.prototype.getSession = function () {
+proto.db3_node_proto.BatchRangeKey.prototype.getSession = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -1238,7 +1238,7 @@ proto.db3_node_proto.BatchRangeKey.prototype.getSession = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.BatchRangeKey} returns this
  */
-proto.db3_node_proto.BatchRangeKey.prototype.setSession = function (value) {
+proto.db3_node_proto.BatchRangeKey.prototype.setSession = function(value) {
 	return jspb.Message.setProto3IntField(this, 3, value);
 };
 
@@ -1262,7 +1262,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.BatchGetKey.prototype.toObject = function (
+	proto.db3_node_proto.BatchGetKey.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.BatchGetKey.toObject(
@@ -1280,10 +1280,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.BatchGetKey.toObject = function (
-		includeInstance,
-		msg,
-	) {
+	proto.db3_node_proto.BatchGetKey.toObject = function(includeInstance, msg) {
 		var f,
 			obj = {
 				ns: msg.getNs_asB64(),
@@ -1303,7 +1300,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.BatchGetKey}
  */
-proto.db3_node_proto.BatchGetKey.deserializeBinary = function (bytes) {
+proto.db3_node_proto.BatchGetKey.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.BatchGetKey();
 	return proto.db3_node_proto.BatchGetKey.deserializeBinaryFromReader(
@@ -1319,7 +1316,7 @@ proto.db3_node_proto.BatchGetKey.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.BatchGetKey}
  */
-proto.db3_node_proto.BatchGetKey.deserializeBinaryFromReader = function (
+proto.db3_node_proto.BatchGetKey.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -1353,7 +1350,7 @@ proto.db3_node_proto.BatchGetKey.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BatchGetKey.prototype.serializeBinary = function () {
+proto.db3_node_proto.BatchGetKey.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.BatchGetKey.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -1366,7 +1363,7 @@ proto.db3_node_proto.BatchGetKey.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.BatchGetKey.serializeBinaryToWriter = function (
+proto.db3_node_proto.BatchGetKey.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -1389,10 +1386,12 @@ proto.db3_node_proto.BatchGetKey.serializeBinaryToWriter = function (
  * optional bytes ns = 1;
  * @return {string}
  */
-proto.db3_node_proto.BatchGetKey.prototype.getNs = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.BatchGetKey.prototype.getNs = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -1400,7 +1399,7 @@ proto.db3_node_proto.BatchGetKey.prototype.getNs = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {string}
  */
-proto.db3_node_proto.BatchGetKey.prototype.getNs_asB64 = function () {
+proto.db3_node_proto.BatchGetKey.prototype.getNs_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getNs()));
 };
 
@@ -1411,7 +1410,7 @@ proto.db3_node_proto.BatchGetKey.prototype.getNs_asB64 = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BatchGetKey.prototype.getNs_asU8 = function () {
+proto.db3_node_proto.BatchGetKey.prototype.getNs_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getNs()));
 };
 
@@ -1419,7 +1418,7 @@ proto.db3_node_proto.BatchGetKey.prototype.getNs_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.BatchGetKey} returns this
  */
-proto.db3_node_proto.BatchGetKey.prototype.setNs = function (value) {
+proto.db3_node_proto.BatchGetKey.prototype.setNs = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -1427,10 +1426,11 @@ proto.db3_node_proto.BatchGetKey.prototype.setNs = function (value) {
  * repeated bytes keys = 2;
  * @return {!Array<string>}
  */
-proto.db3_node_proto.BatchGetKey.prototype.getKeysList = function () {
-	return /** @type {!Array<string>} */ (
-		jspb.Message.getRepeatedField(this, 2)
-	);
+proto.db3_node_proto.BatchGetKey.prototype.getKeysList = function() {
+	return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(
+		this,
+		2,
+	));
 };
 
 /**
@@ -1438,10 +1438,10 @@ proto.db3_node_proto.BatchGetKey.prototype.getKeysList = function () {
  * This is a type-conversion wrapper around `getKeysList()`
  * @return {!Array<string>}
  */
-proto.db3_node_proto.BatchGetKey.prototype.getKeysList_asB64 = function () {
-	return /** @type {!Array<string>} */ (
-		jspb.Message.bytesListAsB64(this.getKeysList())
-	);
+proto.db3_node_proto.BatchGetKey.prototype.getKeysList_asB64 = function() {
+	return /** @type {!Array<string>} */ (jspb.Message.bytesListAsB64(
+		this.getKeysList(),
+	));
 };
 
 /**
@@ -1451,17 +1451,17 @@ proto.db3_node_proto.BatchGetKey.prototype.getKeysList_asB64 = function () {
  * This is a type-conversion wrapper around `getKeysList()`
  * @return {!Array<!Uint8Array>}
  */
-proto.db3_node_proto.BatchGetKey.prototype.getKeysList_asU8 = function () {
-	return /** @type {!Array<!Uint8Array>} */ (
-		jspb.Message.bytesListAsU8(this.getKeysList())
-	);
+proto.db3_node_proto.BatchGetKey.prototype.getKeysList_asU8 = function() {
+	return /** @type {!Array<!Uint8Array>} */ (jspb.Message.bytesListAsU8(
+		this.getKeysList(),
+	));
 };
 
 /**
  * @param {!(Array<!Uint8Array>|Array<string>)} value
  * @return {!proto.db3_node_proto.BatchGetKey} returns this
  */
-proto.db3_node_proto.BatchGetKey.prototype.setKeysList = function (value) {
+proto.db3_node_proto.BatchGetKey.prototype.setKeysList = function(value) {
 	return jspb.Message.setField(this, 2, value || []);
 };
 
@@ -1470,7 +1470,7 @@ proto.db3_node_proto.BatchGetKey.prototype.setKeysList = function (value) {
  * @param {number=} opt_index
  * @return {!proto.db3_node_proto.BatchGetKey} returns this
  */
-proto.db3_node_proto.BatchGetKey.prototype.addKeys = function (
+proto.db3_node_proto.BatchGetKey.prototype.addKeys = function(
 	value,
 	opt_index,
 ) {
@@ -1481,7 +1481,7 @@ proto.db3_node_proto.BatchGetKey.prototype.addKeys = function (
  * Clears the list making it empty but non-null.
  * @return {!proto.db3_node_proto.BatchGetKey} returns this
  */
-proto.db3_node_proto.BatchGetKey.prototype.clearKeysList = function () {
+proto.db3_node_proto.BatchGetKey.prototype.clearKeysList = function() {
 	return this.setKeysList([]);
 };
 
@@ -1489,7 +1489,7 @@ proto.db3_node_proto.BatchGetKey.prototype.clearKeysList = function () {
  * optional int32 session = 3;
  * @return {number}
  */
-proto.db3_node_proto.BatchGetKey.prototype.getSession = function () {
+proto.db3_node_proto.BatchGetKey.prototype.getSession = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -1497,7 +1497,7 @@ proto.db3_node_proto.BatchGetKey.prototype.getSession = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.BatchGetKey} returns this
  */
-proto.db3_node_proto.BatchGetKey.prototype.setSession = function (value) {
+proto.db3_node_proto.BatchGetKey.prototype.setSession = function(value) {
 	return jspb.Message.setProto3IntField(this, 3, value);
 };
 
@@ -1521,7 +1521,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.BatchGetValue.prototype.toObject = function (
+	proto.db3_node_proto.BatchGetValue.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.BatchGetValue.toObject(
@@ -1539,7 +1539,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.BatchGetValue.toObject = function (
+	proto.db3_node_proto.BatchGetValue.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -1566,7 +1566,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.BatchGetValue}
  */
-proto.db3_node_proto.BatchGetValue.deserializeBinary = function (bytes) {
+proto.db3_node_proto.BatchGetValue.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.BatchGetValue();
 	return proto.db3_node_proto.BatchGetValue.deserializeBinaryFromReader(
@@ -1582,7 +1582,7 @@ proto.db3_node_proto.BatchGetValue.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.BatchGetValue}
  */
-proto.db3_node_proto.BatchGetValue.deserializeBinaryFromReader = function (
+proto.db3_node_proto.BatchGetValue.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -1620,7 +1620,7 @@ proto.db3_node_proto.BatchGetValue.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BatchGetValue.prototype.serializeBinary = function () {
+proto.db3_node_proto.BatchGetValue.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.BatchGetValue.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -1633,7 +1633,7 @@ proto.db3_node_proto.BatchGetValue.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.BatchGetValue.serializeBinaryToWriter = function (
+proto.db3_node_proto.BatchGetValue.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -1660,17 +1660,19 @@ proto.db3_node_proto.BatchGetValue.serializeBinaryToWriter = function (
  * repeated db3_mutation_proto.KVPair values = 1;
  * @return {!Array<!proto.db3_mutation_proto.KVPair>}
  */
-proto.db3_node_proto.BatchGetValue.prototype.getValuesList = function () {
-	return /** @type{!Array<!proto.db3_mutation_proto.KVPair>} */ (
-		jspb.Message.getRepeatedWrapperField(this, db3_mutation_pb.KVPair, 1)
-	);
+proto.db3_node_proto.BatchGetValue.prototype.getValuesList = function() {
+	return /** @type{!Array<!proto.db3_mutation_proto.KVPair>} */ (jspb.Message.getRepeatedWrapperField(
+		this,
+		db3_mutation_pb.KVPair,
+		1,
+	));
 };
 
 /**
  * @param {!Array<!proto.db3_mutation_proto.KVPair>} value
  * @return {!proto.db3_node_proto.BatchGetValue} returns this
  */
-proto.db3_node_proto.BatchGetValue.prototype.setValuesList = function (value) {
+proto.db3_node_proto.BatchGetValue.prototype.setValuesList = function(value) {
 	return jspb.Message.setRepeatedWrapperField(this, 1, value);
 };
 
@@ -1679,7 +1681,7 @@ proto.db3_node_proto.BatchGetValue.prototype.setValuesList = function (value) {
  * @param {number=} opt_index
  * @return {!proto.db3_mutation_proto.KVPair}
  */
-proto.db3_node_proto.BatchGetValue.prototype.addValues = function (
+proto.db3_node_proto.BatchGetValue.prototype.addValues = function(
 	opt_value,
 	opt_index,
 ) {
@@ -1696,7 +1698,7 @@ proto.db3_node_proto.BatchGetValue.prototype.addValues = function (
  * Clears the list making it empty but non-null.
  * @return {!proto.db3_node_proto.BatchGetValue} returns this
  */
-proto.db3_node_proto.BatchGetValue.prototype.clearValuesList = function () {
+proto.db3_node_proto.BatchGetValue.prototype.clearValuesList = function() {
 	return this.setValuesList([]);
 };
 
@@ -1704,7 +1706,7 @@ proto.db3_node_proto.BatchGetValue.prototype.clearValuesList = function () {
  * optional int32 session = 2;
  * @return {number}
  */
-proto.db3_node_proto.BatchGetValue.prototype.getSession = function () {
+proto.db3_node_proto.BatchGetValue.prototype.getSession = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
@@ -1712,7 +1714,7 @@ proto.db3_node_proto.BatchGetValue.prototype.getSession = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.BatchGetValue} returns this
  */
-proto.db3_node_proto.BatchGetValue.prototype.setSession = function (value) {
+proto.db3_node_proto.BatchGetValue.prototype.setSession = function(value) {
 	return jspb.Message.setProto3IntField(this, 2, value);
 };
 
@@ -1720,10 +1722,12 @@ proto.db3_node_proto.BatchGetValue.prototype.setSession = function (value) {
  * optional bytes ns = 3;
  * @return {string}
  */
-proto.db3_node_proto.BatchGetValue.prototype.getNs = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 3, "")
-	);
+proto.db3_node_proto.BatchGetValue.prototype.getNs = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		3,
+		"",
+	));
 };
 
 /**
@@ -1731,7 +1735,7 @@ proto.db3_node_proto.BatchGetValue.prototype.getNs = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {string}
  */
-proto.db3_node_proto.BatchGetValue.prototype.getNs_asB64 = function () {
+proto.db3_node_proto.BatchGetValue.prototype.getNs_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getNs()));
 };
 
@@ -1742,7 +1746,7 @@ proto.db3_node_proto.BatchGetValue.prototype.getNs_asB64 = function () {
  * This is a type-conversion wrapper around `getNs()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BatchGetValue.prototype.getNs_asU8 = function () {
+proto.db3_node_proto.BatchGetValue.prototype.getNs_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getNs()));
 };
 
@@ -1750,7 +1754,7 @@ proto.db3_node_proto.BatchGetValue.prototype.getNs_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.BatchGetValue} returns this
  */
-proto.db3_node_proto.BatchGetValue.prototype.setNs = function (value) {
+proto.db3_node_proto.BatchGetValue.prototype.setNs = function(value) {
 	return jspb.Message.setProto3BytesField(this, 3, value);
 };
 
@@ -1767,7 +1771,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.GetKeyRequest.prototype.toObject = function (
+	proto.db3_node_proto.GetKeyRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.GetKeyRequest.toObject(
@@ -1785,7 +1789,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.GetKeyRequest.toObject = function (
+	proto.db3_node_proto.GetKeyRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -1807,7 +1811,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.GetKeyRequest}
  */
-proto.db3_node_proto.GetKeyRequest.deserializeBinary = function (bytes) {
+proto.db3_node_proto.GetKeyRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.GetKeyRequest();
 	return proto.db3_node_proto.GetKeyRequest.deserializeBinaryFromReader(
@@ -1823,7 +1827,7 @@ proto.db3_node_proto.GetKeyRequest.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.GetKeyRequest}
  */
-proto.db3_node_proto.GetKeyRequest.deserializeBinaryFromReader = function (
+proto.db3_node_proto.GetKeyRequest.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -1853,7 +1857,7 @@ proto.db3_node_proto.GetKeyRequest.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetKeyRequest.prototype.serializeBinary = function () {
+proto.db3_node_proto.GetKeyRequest.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.GetKeyRequest.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -1866,7 +1870,7 @@ proto.db3_node_proto.GetKeyRequest.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.GetKeyRequest.serializeBinaryToWriter = function (
+proto.db3_node_proto.GetKeyRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -1885,10 +1889,12 @@ proto.db3_node_proto.GetKeyRequest.serializeBinaryToWriter = function (
  * optional bytes batch_get = 1;
  * @return {string}
  */
-proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -1896,7 +1902,7 @@ proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet = function () {
  * This is a type-conversion wrapper around `getBatchGet()`
  * @return {string}
  */
-proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet_asB64 = function () {
+proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getBatchGet()));
 };
 
@@ -1907,17 +1913,17 @@ proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet_asB64 = function () {
  * This is a type-conversion wrapper around `getBatchGet()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet_asU8 = function () {
-	return /** @type {!Uint8Array} */ (
-		jspb.Message.bytesAsU8(this.getBatchGet())
-	);
+proto.db3_node_proto.GetKeyRequest.prototype.getBatchGet_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getBatchGet(),
+	));
 };
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.GetKeyRequest} returns this
  */
-proto.db3_node_proto.GetKeyRequest.prototype.setBatchGet = function (value) {
+proto.db3_node_proto.GetKeyRequest.prototype.setBatchGet = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -1925,10 +1931,12 @@ proto.db3_node_proto.GetKeyRequest.prototype.setBatchGet = function (value) {
  * optional bytes signature = 2;
  * @return {string}
  */
-proto.db3_node_proto.GetKeyRequest.prototype.getSignature = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 2, "")
-	);
+proto.db3_node_proto.GetKeyRequest.prototype.getSignature = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		2,
+		"",
+	));
 };
 
 /**
@@ -1936,7 +1944,7 @@ proto.db3_node_proto.GetKeyRequest.prototype.getSignature = function () {
  * This is a type-conversion wrapper around `getSignature()`
  * @return {string}
  */
-proto.db3_node_proto.GetKeyRequest.prototype.getSignature_asB64 = function () {
+proto.db3_node_proto.GetKeyRequest.prototype.getSignature_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getSignature()));
 };
 
@@ -1947,17 +1955,17 @@ proto.db3_node_proto.GetKeyRequest.prototype.getSignature_asB64 = function () {
  * This is a type-conversion wrapper around `getSignature()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetKeyRequest.prototype.getSignature_asU8 = function () {
-	return /** @type {!Uint8Array} */ (
-		jspb.Message.bytesAsU8(this.getSignature())
-	);
+proto.db3_node_proto.GetKeyRequest.prototype.getSignature_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getSignature(),
+	));
 };
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.GetKeyRequest} returns this
  */
-proto.db3_node_proto.GetKeyRequest.prototype.setSignature = function (value) {
+proto.db3_node_proto.GetKeyRequest.prototype.setSignature = function(value) {
 	return jspb.Message.setProto3BytesField(this, 2, value);
 };
 
@@ -1974,7 +1982,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.GetKeyResponse.prototype.toObject = function (
+	proto.db3_node_proto.GetKeyResponse.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.GetKeyResponse.toObject(
@@ -1992,7 +2000,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.GetKeyResponse.toObject = function (
+	proto.db3_node_proto.GetKeyResponse.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -2019,7 +2027,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.GetKeyResponse}
  */
-proto.db3_node_proto.GetKeyResponse.deserializeBinary = function (bytes) {
+proto.db3_node_proto.GetKeyResponse.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.GetKeyResponse();
 	return proto.db3_node_proto.GetKeyResponse.deserializeBinaryFromReader(
@@ -2035,7 +2043,7 @@ proto.db3_node_proto.GetKeyResponse.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.GetKeyResponse}
  */
-proto.db3_node_proto.GetKeyResponse.deserializeBinaryFromReader = function (
+proto.db3_node_proto.GetKeyResponse.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -2070,7 +2078,7 @@ proto.db3_node_proto.GetKeyResponse.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetKeyResponse.prototype.serializeBinary = function () {
+proto.db3_node_proto.GetKeyResponse.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.GetKeyResponse.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -2083,7 +2091,7 @@ proto.db3_node_proto.GetKeyResponse.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.GetKeyResponse.serializeBinaryToWriter = function (
+proto.db3_node_proto.GetKeyResponse.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -2106,10 +2114,12 @@ proto.db3_node_proto.GetKeyResponse.serializeBinaryToWriter = function (
  * optional bytes signature = 1;
  * @return {string}
  */
-proto.db3_node_proto.GetKeyResponse.prototype.getSignature = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.GetKeyResponse.prototype.getSignature = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -2117,7 +2127,7 @@ proto.db3_node_proto.GetKeyResponse.prototype.getSignature = function () {
  * This is a type-conversion wrapper around `getSignature()`
  * @return {string}
  */
-proto.db3_node_proto.GetKeyResponse.prototype.getSignature_asB64 = function () {
+proto.db3_node_proto.GetKeyResponse.prototype.getSignature_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getSignature()));
 };
 
@@ -2128,17 +2138,17 @@ proto.db3_node_proto.GetKeyResponse.prototype.getSignature_asB64 = function () {
  * This is a type-conversion wrapper around `getSignature()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetKeyResponse.prototype.getSignature_asU8 = function () {
-	return /** @type {!Uint8Array} */ (
-		jspb.Message.bytesAsU8(this.getSignature())
-	);
+proto.db3_node_proto.GetKeyResponse.prototype.getSignature_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getSignature(),
+	));
 };
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.GetKeyResponse} returns this
  */
-proto.db3_node_proto.GetKeyResponse.prototype.setSignature = function (value) {
+proto.db3_node_proto.GetKeyResponse.prototype.setSignature = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -2146,21 +2156,19 @@ proto.db3_node_proto.GetKeyResponse.prototype.setSignature = function (value) {
  * optional BatchGetValue batch_get_values = 2;
  * @return {?proto.db3_node_proto.BatchGetValue}
  */
-proto.db3_node_proto.GetKeyResponse.prototype.getBatchGetValues = function () {
-	return /** @type{?proto.db3_node_proto.BatchGetValue} */ (
-		jspb.Message.getWrapperField(
-			this,
-			proto.db3_node_proto.BatchGetValue,
-			2,
-		)
-	);
+proto.db3_node_proto.GetKeyResponse.prototype.getBatchGetValues = function() {
+	return /** @type{?proto.db3_node_proto.BatchGetValue} */ (jspb.Message.getWrapperField(
+		this,
+		proto.db3_node_proto.BatchGetValue,
+		2,
+	));
 };
 
 /**
  * @param {?proto.db3_node_proto.BatchGetValue|undefined} value
  * @return {!proto.db3_node_proto.GetKeyResponse} returns this
  */
-proto.db3_node_proto.GetKeyResponse.prototype.setBatchGetValues = function (
+proto.db3_node_proto.GetKeyResponse.prototype.setBatchGetValues = function(
 	value,
 ) {
 	return jspb.Message.setWrapperField(this, 2, value);
@@ -2170,16 +2178,15 @@ proto.db3_node_proto.GetKeyResponse.prototype.setBatchGetValues = function (
  * Clears the message field making it undefined.
  * @return {!proto.db3_node_proto.GetKeyResponse} returns this
  */
-proto.db3_node_proto.GetKeyResponse.prototype.clearBatchGetValues =
-	function () {
-		return this.setBatchGetValues(undefined);
-	};
+proto.db3_node_proto.GetKeyResponse.prototype.clearBatchGetValues = function() {
+	return this.setBatchGetValues(undefined);
+};
 
 /**
  * Returns whether this field is set.
  * @return {boolean}
  */
-proto.db3_node_proto.GetKeyResponse.prototype.hasBatchGetValues = function () {
+proto.db3_node_proto.GetKeyResponse.prototype.hasBatchGetValues = function() {
 	return jspb.Message.getField(this, 2) != null;
 };
 
@@ -2196,7 +2203,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.RestartSessionRequest.prototype.toObject = function (
+	proto.db3_node_proto.RestartSessionRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.RestartSessionRequest.toObject(
@@ -2214,7 +2221,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.RestartSessionRequest.toObject = function (
+	proto.db3_node_proto.RestartSessionRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -2236,9 +2243,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.RestartSessionRequest}
  */
-proto.db3_node_proto.RestartSessionRequest.deserializeBinary = function (
-	bytes,
-) {
+proto.db3_node_proto.RestartSessionRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.RestartSessionRequest();
 	return proto.db3_node_proto.RestartSessionRequest.deserializeBinaryFromReader(
@@ -2254,43 +2259,44 @@ proto.db3_node_proto.RestartSessionRequest.deserializeBinary = function (
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.RestartSessionRequest}
  */
-proto.db3_node_proto.RestartSessionRequest.deserializeBinaryFromReader =
-	function (msg, reader) {
-		while (reader.nextField()) {
-			if (reader.isEndGroup()) {
-				break;
-			}
-			var field = reader.getFieldNumber();
-			switch (field) {
-				case 1:
-					var value = /** @type {!Uint8Array} */ (reader.readBytes());
-					msg.setQuerySessionInfo(value);
-					break;
-				case 2:
-					var value = /** @type {!Uint8Array} */ (reader.readBytes());
-					msg.setSignature(value);
-					break;
-				default:
-					reader.skipField();
-					break;
-			}
+proto.db3_node_proto.RestartSessionRequest.deserializeBinaryFromReader = function(
+	msg,
+	reader,
+) {
+	while (reader.nextField()) {
+		if (reader.isEndGroup()) {
+			break;
 		}
-		return msg;
-	};
+		var field = reader.getFieldNumber();
+		switch (field) {
+			case 1:
+				var value = /** @type {!Uint8Array} */ (reader.readBytes());
+				msg.setQuerySessionInfo(value);
+				break;
+			case 2:
+				var value = /** @type {!Uint8Array} */ (reader.readBytes());
+				msg.setSignature(value);
+				break;
+			default:
+				reader.skipField();
+				break;
+		}
+	}
+	return msg;
+};
 
 /**
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.serializeBinary =
-	function () {
-		var writer = new jspb.BinaryWriter();
-		proto.db3_node_proto.RestartSessionRequest.serializeBinaryToWriter(
-			this,
-			writer,
-		);
-		return writer.getResultBuffer();
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.serializeBinary = function() {
+	var writer = new jspb.BinaryWriter();
+	proto.db3_node_proto.RestartSessionRequest.serializeBinaryToWriter(
+		this,
+		writer,
+	);
+	return writer.getResultBuffer();
+};
 
 /**
  * Serializes the given message to binary data (in protobuf wire
@@ -2299,7 +2305,7 @@ proto.db3_node_proto.RestartSessionRequest.prototype.serializeBinary =
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.RestartSessionRequest.serializeBinaryToWriter = function (
+proto.db3_node_proto.RestartSessionRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -2318,24 +2324,24 @@ proto.db3_node_proto.RestartSessionRequest.serializeBinaryToWriter = function (
  * optional bytes query_session_info = 1;
  * @return {string}
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.getQuerySessionInfo =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.getFieldWithDefault(this, 1, "")
-		);
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.getQuerySessionInfo = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
+};
 
 /**
  * optional bytes query_session_info = 1;
  * This is a type-conversion wrapper around `getQuerySessionInfo()`
  * @return {string}
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.getQuerySessionInfo_asB64 =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.bytesAsB64(this.getQuerySessionInfo())
-		);
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.getQuerySessionInfo_asB64 = function() {
+	return /** @type {string} */ (jspb.Message.bytesAsB64(
+		this.getQuerySessionInfo(),
+	));
+};
 
 /**
  * optional bytes query_session_info = 1;
@@ -2344,44 +2350,42 @@ proto.db3_node_proto.RestartSessionRequest.prototype.getQuerySessionInfo_asB64 =
  * This is a type-conversion wrapper around `getQuerySessionInfo()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.getQuerySessionInfo_asU8 =
-	function () {
-		return /** @type {!Uint8Array} */ (
-			jspb.Message.bytesAsU8(this.getQuerySessionInfo())
-		);
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.getQuerySessionInfo_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getQuerySessionInfo(),
+	));
+};
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.RestartSessionRequest} returns this
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.setQuerySessionInfo =
-	function (value) {
-		return jspb.Message.setProto3BytesField(this, 1, value);
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.setQuerySessionInfo = function(
+	value,
+) {
+	return jspb.Message.setProto3BytesField(this, 1, value);
+};
 
 /**
  * optional bytes signature = 2;
  * @return {string}
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.getSignature =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.getFieldWithDefault(this, 2, "")
-		);
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.getSignature = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		2,
+		"",
+	));
+};
 
 /**
  * optional bytes signature = 2;
  * This is a type-conversion wrapper around `getSignature()`
  * @return {string}
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.getSignature_asB64 =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.bytesAsB64(this.getSignature())
-		);
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.getSignature_asB64 = function() {
+	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getSignature()));
+};
 
 /**
  * optional bytes signature = 2;
@@ -2390,18 +2394,17 @@ proto.db3_node_proto.RestartSessionRequest.prototype.getSignature_asB64 =
  * This is a type-conversion wrapper around `getSignature()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.getSignature_asU8 =
-	function () {
-		return /** @type {!Uint8Array} */ (
-			jspb.Message.bytesAsU8(this.getSignature())
-		);
-	};
+proto.db3_node_proto.RestartSessionRequest.prototype.getSignature_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getSignature(),
+	));
+};
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.RestartSessionRequest} returns this
  */
-proto.db3_node_proto.RestartSessionRequest.prototype.setSignature = function (
+proto.db3_node_proto.RestartSessionRequest.prototype.setSignature = function(
 	value,
 ) {
 	return jspb.Message.setProto3BytesField(this, 2, value);
@@ -2420,7 +2423,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.RestartSessionResponse.prototype.toObject = function (
+	proto.db3_node_proto.RestartSessionResponse.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.RestartSessionResponse.toObject(
@@ -2438,7 +2441,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.RestartSessionResponse.toObject = function (
+	proto.db3_node_proto.RestartSessionResponse.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -2459,7 +2462,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.RestartSessionResponse}
  */
-proto.db3_node_proto.RestartSessionResponse.deserializeBinary = function (
+proto.db3_node_proto.RestartSessionResponse.deserializeBinary = function(
 	bytes,
 ) {
 	var reader = new jspb.BinaryReader(bytes);
@@ -2477,39 +2480,40 @@ proto.db3_node_proto.RestartSessionResponse.deserializeBinary = function (
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.RestartSessionResponse}
  */
-proto.db3_node_proto.RestartSessionResponse.deserializeBinaryFromReader =
-	function (msg, reader) {
-		while (reader.nextField()) {
-			if (reader.isEndGroup()) {
-				break;
-			}
-			var field = reader.getFieldNumber();
-			switch (field) {
-				case 3:
-					var value = /** @type {number} */ (reader.readInt32());
-					msg.setSession(value);
-					break;
-				default:
-					reader.skipField();
-					break;
-			}
+proto.db3_node_proto.RestartSessionResponse.deserializeBinaryFromReader = function(
+	msg,
+	reader,
+) {
+	while (reader.nextField()) {
+		if (reader.isEndGroup()) {
+			break;
 		}
-		return msg;
-	};
+		var field = reader.getFieldNumber();
+		switch (field) {
+			case 3:
+				var value = /** @type {number} */ (reader.readInt32());
+				msg.setSession(value);
+				break;
+			default:
+				reader.skipField();
+				break;
+		}
+	}
+	return msg;
+};
 
 /**
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.RestartSessionResponse.prototype.serializeBinary =
-	function () {
-		var writer = new jspb.BinaryWriter();
-		proto.db3_node_proto.RestartSessionResponse.serializeBinaryToWriter(
-			this,
-			writer,
-		);
-		return writer.getResultBuffer();
-	};
+proto.db3_node_proto.RestartSessionResponse.prototype.serializeBinary = function() {
+	var writer = new jspb.BinaryWriter();
+	proto.db3_node_proto.RestartSessionResponse.serializeBinaryToWriter(
+		this,
+		writer,
+	);
+	return writer.getResultBuffer();
+};
 
 /**
  * Serializes the given message to binary data (in protobuf wire
@@ -2518,7 +2522,7 @@ proto.db3_node_proto.RestartSessionResponse.prototype.serializeBinary =
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.RestartSessionResponse.serializeBinaryToWriter = function (
+proto.db3_node_proto.RestartSessionResponse.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -2533,7 +2537,7 @@ proto.db3_node_proto.RestartSessionResponse.serializeBinaryToWriter = function (
  * optional int32 session = 3;
  * @return {number}
  */
-proto.db3_node_proto.RestartSessionResponse.prototype.getSession = function () {
+proto.db3_node_proto.RestartSessionResponse.prototype.getSession = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -2541,7 +2545,7 @@ proto.db3_node_proto.RestartSessionResponse.prototype.getSession = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.RestartSessionResponse} returns this
  */
-proto.db3_node_proto.RestartSessionResponse.prototype.setSession = function (
+proto.db3_node_proto.RestartSessionResponse.prototype.setSession = function(
 	value,
 ) {
 	return jspb.Message.setProto3IntField(this, 3, value);
@@ -2560,7 +2564,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.GetAccountRequest.prototype.toObject = function (
+	proto.db3_node_proto.GetAccountRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.GetAccountRequest.toObject(
@@ -2578,7 +2582,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.GetAccountRequest.toObject = function (
+	proto.db3_node_proto.GetAccountRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -2599,7 +2603,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.GetAccountRequest}
  */
-proto.db3_node_proto.GetAccountRequest.deserializeBinary = function (bytes) {
+proto.db3_node_proto.GetAccountRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.GetAccountRequest();
 	return proto.db3_node_proto.GetAccountRequest.deserializeBinaryFromReader(
@@ -2615,7 +2619,7 @@ proto.db3_node_proto.GetAccountRequest.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.GetAccountRequest}
  */
-proto.db3_node_proto.GetAccountRequest.deserializeBinaryFromReader = function (
+proto.db3_node_proto.GetAccountRequest.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -2641,7 +2645,7 @@ proto.db3_node_proto.GetAccountRequest.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetAccountRequest.prototype.serializeBinary = function () {
+proto.db3_node_proto.GetAccountRequest.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.GetAccountRequest.serializeBinaryToWriter(
 		this,
@@ -2657,7 +2661,7 @@ proto.db3_node_proto.GetAccountRequest.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.GetAccountRequest.serializeBinaryToWriter = function (
+proto.db3_node_proto.GetAccountRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -2672,17 +2676,19 @@ proto.db3_node_proto.GetAccountRequest.serializeBinaryToWriter = function (
  * optional string addr = 1;
  * @return {string}
  */
-proto.db3_node_proto.GetAccountRequest.prototype.getAddr = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.GetAccountRequest.prototype.getAddr = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
  * @param {string} value
  * @return {!proto.db3_node_proto.GetAccountRequest} returns this
  */
-proto.db3_node_proto.GetAccountRequest.prototype.setAddr = function (value) {
+proto.db3_node_proto.GetAccountRequest.prototype.setAddr = function(value) {
 	return jspb.Message.setProto3StringField(this, 1, value);
 };
 
@@ -2699,7 +2705,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.GetSessionInfoRequest.prototype.toObject = function (
+	proto.db3_node_proto.GetSessionInfoRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.GetSessionInfoRequest.toObject(
@@ -2717,7 +2723,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.GetSessionInfoRequest.toObject = function (
+	proto.db3_node_proto.GetSessionInfoRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -2738,9 +2744,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.GetSessionInfoRequest}
  */
-proto.db3_node_proto.GetSessionInfoRequest.deserializeBinary = function (
-	bytes,
-) {
+proto.db3_node_proto.GetSessionInfoRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.GetSessionInfoRequest();
 	return proto.db3_node_proto.GetSessionInfoRequest.deserializeBinaryFromReader(
@@ -2756,39 +2760,40 @@ proto.db3_node_proto.GetSessionInfoRequest.deserializeBinary = function (
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.GetSessionInfoRequest}
  */
-proto.db3_node_proto.GetSessionInfoRequest.deserializeBinaryFromReader =
-	function (msg, reader) {
-		while (reader.nextField()) {
-			if (reader.isEndGroup()) {
-				break;
-			}
-			var field = reader.getFieldNumber();
-			switch (field) {
-				case 1:
-					var value = /** @type {string} */ (reader.readString());
-					msg.setAddr(value);
-					break;
-				default:
-					reader.skipField();
-					break;
-			}
+proto.db3_node_proto.GetSessionInfoRequest.deserializeBinaryFromReader = function(
+	msg,
+	reader,
+) {
+	while (reader.nextField()) {
+		if (reader.isEndGroup()) {
+			break;
 		}
-		return msg;
-	};
+		var field = reader.getFieldNumber();
+		switch (field) {
+			case 1:
+				var value = /** @type {string} */ (reader.readString());
+				msg.setAddr(value);
+				break;
+			default:
+				reader.skipField();
+				break;
+		}
+	}
+	return msg;
+};
 
 /**
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetSessionInfoRequest.prototype.serializeBinary =
-	function () {
-		var writer = new jspb.BinaryWriter();
-		proto.db3_node_proto.GetSessionInfoRequest.serializeBinaryToWriter(
-			this,
-			writer,
-		);
-		return writer.getResultBuffer();
-	};
+proto.db3_node_proto.GetSessionInfoRequest.prototype.serializeBinary = function() {
+	var writer = new jspb.BinaryWriter();
+	proto.db3_node_proto.GetSessionInfoRequest.serializeBinaryToWriter(
+		this,
+		writer,
+	);
+	return writer.getResultBuffer();
+};
 
 /**
  * Serializes the given message to binary data (in protobuf wire
@@ -2797,7 +2802,7 @@ proto.db3_node_proto.GetSessionInfoRequest.prototype.serializeBinary =
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.GetSessionInfoRequest.serializeBinaryToWriter = function (
+proto.db3_node_proto.GetSessionInfoRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -2812,19 +2817,19 @@ proto.db3_node_proto.GetSessionInfoRequest.serializeBinaryToWriter = function (
  * optional string addr = 1;
  * @return {string}
  */
-proto.db3_node_proto.GetSessionInfoRequest.prototype.getAddr = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.GetSessionInfoRequest.prototype.getAddr = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
  * @param {string} value
  * @return {!proto.db3_node_proto.GetSessionInfoRequest} returns this
  */
-proto.db3_node_proto.GetSessionInfoRequest.prototype.setAddr = function (
-	value,
-) {
+proto.db3_node_proto.GetSessionInfoRequest.prototype.setAddr = function(value) {
 	return jspb.Message.setProto3StringField(this, 1, value);
 };
 
@@ -2841,7 +2846,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.QuerySessionInfo.prototype.toObject = function (
+	proto.db3_node_proto.QuerySessionInfo.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.QuerySessionInfo.toObject(
@@ -2859,7 +2864,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.QuerySessionInfo.toObject = function (
+	proto.db3_node_proto.QuerySessionInfo.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -2883,7 +2888,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.QuerySessionInfo}
  */
-proto.db3_node_proto.QuerySessionInfo.deserializeBinary = function (bytes) {
+proto.db3_node_proto.QuerySessionInfo.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.QuerySessionInfo();
 	return proto.db3_node_proto.QuerySessionInfo.deserializeBinaryFromReader(
@@ -2899,7 +2904,7 @@ proto.db3_node_proto.QuerySessionInfo.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.QuerySessionInfo}
  */
-proto.db3_node_proto.QuerySessionInfo.deserializeBinaryFromReader = function (
+proto.db3_node_proto.QuerySessionInfo.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -2918,9 +2923,7 @@ proto.db3_node_proto.QuerySessionInfo.deserializeBinaryFromReader = function (
 				msg.setStartTime(value);
 				break;
 			case 3:
-				var value = /** @type {!proto.db3_node_proto.SessionStatus} */ (
-					reader.readEnum()
-				);
+				var value = /** @type {!proto.db3_node_proto.SessionStatus} */ (reader.readEnum());
 				msg.setStatus(value);
 				break;
 			case 4:
@@ -2939,7 +2942,7 @@ proto.db3_node_proto.QuerySessionInfo.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.serializeBinary = function () {
+proto.db3_node_proto.QuerySessionInfo.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.QuerySessionInfo.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -2952,7 +2955,7 @@ proto.db3_node_proto.QuerySessionInfo.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.QuerySessionInfo.serializeBinaryToWriter = function (
+proto.db3_node_proto.QuerySessionInfo.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -2979,7 +2982,7 @@ proto.db3_node_proto.QuerySessionInfo.serializeBinaryToWriter = function (
  * optional int32 id = 1;
  * @return {number}
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.getId = function () {
+proto.db3_node_proto.QuerySessionInfo.prototype.getId = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 1, 0));
 };
 
@@ -2987,7 +2990,7 @@ proto.db3_node_proto.QuerySessionInfo.prototype.getId = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.QuerySessionInfo} returns this
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.setId = function (value) {
+proto.db3_node_proto.QuerySessionInfo.prototype.setId = function(value) {
 	return jspb.Message.setProto3IntField(this, 1, value);
 };
 
@@ -2995,7 +2998,7 @@ proto.db3_node_proto.QuerySessionInfo.prototype.setId = function (value) {
  * optional int64 start_time = 2;
  * @return {number}
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.getStartTime = function () {
+proto.db3_node_proto.QuerySessionInfo.prototype.getStartTime = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
@@ -3003,9 +3006,7 @@ proto.db3_node_proto.QuerySessionInfo.prototype.getStartTime = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.QuerySessionInfo} returns this
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.setStartTime = function (
-	value,
-) {
+proto.db3_node_proto.QuerySessionInfo.prototype.setStartTime = function(value) {
 	return jspb.Message.setProto3IntField(this, 2, value);
 };
 
@@ -3013,17 +3014,19 @@ proto.db3_node_proto.QuerySessionInfo.prototype.setStartTime = function (
  * optional SessionStatus status = 3;
  * @return {!proto.db3_node_proto.SessionStatus}
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.getStatus = function () {
-	return /** @type {!proto.db3_node_proto.SessionStatus} */ (
-		jspb.Message.getFieldWithDefault(this, 3, 0)
-	);
+proto.db3_node_proto.QuerySessionInfo.prototype.getStatus = function() {
+	return /** @type {!proto.db3_node_proto.SessionStatus} */ (jspb.Message.getFieldWithDefault(
+		this,
+		3,
+		0,
+	));
 };
 
 /**
  * @param {!proto.db3_node_proto.SessionStatus} value
  * @return {!proto.db3_node_proto.QuerySessionInfo} returns this
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.setStatus = function (value) {
+proto.db3_node_proto.QuerySessionInfo.prototype.setStatus = function(value) {
 	return jspb.Message.setProto3EnumField(this, 3, value);
 };
 
@@ -3031,7 +3034,7 @@ proto.db3_node_proto.QuerySessionInfo.prototype.setStatus = function (value) {
  * optional int32 query_count = 4;
  * @return {number}
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.getQueryCount = function () {
+proto.db3_node_proto.QuerySessionInfo.prototype.getQueryCount = function() {
 	return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 4, 0));
 };
 
@@ -3039,7 +3042,7 @@ proto.db3_node_proto.QuerySessionInfo.prototype.getQueryCount = function () {
  * @param {number} value
  * @return {!proto.db3_node_proto.QuerySessionInfo} returns this
  */
-proto.db3_node_proto.QuerySessionInfo.prototype.setQueryCount = function (
+proto.db3_node_proto.QuerySessionInfo.prototype.setQueryCount = function(
 	value,
 ) {
 	return jspb.Message.setProto3IntField(this, 4, value);
@@ -3058,7 +3061,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.GetSessionInfoResponse.prototype.toObject = function (
+	proto.db3_node_proto.GetSessionInfoResponse.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.GetSessionInfoResponse.toObject(
@@ -3076,7 +3079,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.GetSessionInfoResponse.toObject = function (
+	proto.db3_node_proto.GetSessionInfoResponse.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -3103,7 +3106,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.GetSessionInfoResponse}
  */
-proto.db3_node_proto.GetSessionInfoResponse.deserializeBinary = function (
+proto.db3_node_proto.GetSessionInfoResponse.deserializeBinary = function(
 	bytes,
 ) {
 	var reader = new jspb.BinaryReader(bytes);
@@ -3121,48 +3124,49 @@ proto.db3_node_proto.GetSessionInfoResponse.deserializeBinary = function (
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.GetSessionInfoResponse}
  */
-proto.db3_node_proto.GetSessionInfoResponse.deserializeBinaryFromReader =
-	function (msg, reader) {
-		while (reader.nextField()) {
-			if (reader.isEndGroup()) {
-				break;
-			}
-			var field = reader.getFieldNumber();
-			switch (field) {
-				case 1:
-					var value = /** @type {!Uint8Array} */ (reader.readBytes());
-					msg.setSignature(value);
-					break;
-				case 2:
-					var value = new proto.db3_node_proto.QuerySessionInfo();
-					reader.readMessage(
-						value,
-						proto.db3_node_proto.QuerySessionInfo
-							.deserializeBinaryFromReader,
-					);
-					msg.setSessionInfo(value);
-					break;
-				default:
-					reader.skipField();
-					break;
-			}
+proto.db3_node_proto.GetSessionInfoResponse.deserializeBinaryFromReader = function(
+	msg,
+	reader,
+) {
+	while (reader.nextField()) {
+		if (reader.isEndGroup()) {
+			break;
 		}
-		return msg;
-	};
+		var field = reader.getFieldNumber();
+		switch (field) {
+			case 1:
+				var value = /** @type {!Uint8Array} */ (reader.readBytes());
+				msg.setSignature(value);
+				break;
+			case 2:
+				var value = new proto.db3_node_proto.QuerySessionInfo();
+				reader.readMessage(
+					value,
+					proto.db3_node_proto.QuerySessionInfo
+						.deserializeBinaryFromReader,
+				);
+				msg.setSessionInfo(value);
+				break;
+			default:
+				reader.skipField();
+				break;
+		}
+	}
+	return msg;
+};
 
 /**
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.serializeBinary =
-	function () {
-		var writer = new jspb.BinaryWriter();
-		proto.db3_node_proto.GetSessionInfoResponse.serializeBinaryToWriter(
-			this,
-			writer,
-		);
-		return writer.getResultBuffer();
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.serializeBinary = function() {
+	var writer = new jspb.BinaryWriter();
+	proto.db3_node_proto.GetSessionInfoResponse.serializeBinaryToWriter(
+		this,
+		writer,
+	);
+	return writer.getResultBuffer();
+};
 
 /**
  * Serializes the given message to binary data (in protobuf wire
@@ -3171,7 +3175,7 @@ proto.db3_node_proto.GetSessionInfoResponse.prototype.serializeBinary =
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.GetSessionInfoResponse.serializeBinaryToWriter = function (
+proto.db3_node_proto.GetSessionInfoResponse.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -3194,24 +3198,22 @@ proto.db3_node_proto.GetSessionInfoResponse.serializeBinaryToWriter = function (
  * optional bytes signature = 1;
  * @return {string}
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.getSignature =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.getFieldWithDefault(this, 1, "")
-		);
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.getSignature = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
+};
 
 /**
  * optional bytes signature = 1;
  * This is a type-conversion wrapper around `getSignature()`
  * @return {string}
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.getSignature_asB64 =
-	function () {
-		return /** @type {string} */ (
-			jspb.Message.bytesAsB64(this.getSignature())
-		);
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.getSignature_asB64 = function() {
+	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getSignature()));
+};
 
 /**
  * optional bytes signature = 1;
@@ -3220,18 +3222,17 @@ proto.db3_node_proto.GetSessionInfoResponse.prototype.getSignature_asB64 =
  * This is a type-conversion wrapper around `getSignature()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.getSignature_asU8 =
-	function () {
-		return /** @type {!Uint8Array} */ (
-			jspb.Message.bytesAsU8(this.getSignature())
-		);
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.getSignature_asU8 = function() {
+	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+		this.getSignature(),
+	));
+};
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.GetSessionInfoResponse} returns this
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.setSignature = function (
+proto.db3_node_proto.GetSessionInfoResponse.prototype.setSignature = function(
 	value,
 ) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
@@ -3241,43 +3242,39 @@ proto.db3_node_proto.GetSessionInfoResponse.prototype.setSignature = function (
  * optional QuerySessionInfo session_info = 2;
  * @return {?proto.db3_node_proto.QuerySessionInfo}
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.getSessionInfo =
-	function () {
-		return /** @type{?proto.db3_node_proto.QuerySessionInfo} */ (
-			jspb.Message.getWrapperField(
-				this,
-				proto.db3_node_proto.QuerySessionInfo,
-				2,
-			)
-		);
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.getSessionInfo = function() {
+	return /** @type{?proto.db3_node_proto.QuerySessionInfo} */ (jspb.Message.getWrapperField(
+		this,
+		proto.db3_node_proto.QuerySessionInfo,
+		2,
+	));
+};
 
 /**
  * @param {?proto.db3_node_proto.QuerySessionInfo|undefined} value
  * @return {!proto.db3_node_proto.GetSessionInfoResponse} returns this
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.setSessionInfo =
-	function (value) {
-		return jspb.Message.setWrapperField(this, 2, value);
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.setSessionInfo = function(
+	value,
+) {
+	return jspb.Message.setWrapperField(this, 2, value);
+};
 
 /**
  * Clears the message field making it undefined.
  * @return {!proto.db3_node_proto.GetSessionInfoResponse} returns this
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.clearSessionInfo =
-	function () {
-		return this.setSessionInfo(undefined);
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.clearSessionInfo = function() {
+	return this.setSessionInfo(undefined);
+};
 
 /**
  * Returns whether this field is set.
  * @return {boolean}
  */
-proto.db3_node_proto.GetSessionInfoResponse.prototype.hasSessionInfo =
-	function () {
-		return jspb.Message.getField(this, 2) != null;
-	};
+proto.db3_node_proto.GetSessionInfoResponse.prototype.hasSessionInfo = function() {
+	return jspb.Message.getField(this, 2) != null;
+};
 
 if (jspb.Message.GENERATE_TO_OBJECT) {
 	/**
@@ -3292,7 +3289,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.BroadcastRequest.prototype.toObject = function (
+	proto.db3_node_proto.BroadcastRequest.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.BroadcastRequest.toObject(
@@ -3310,7 +3307,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.BroadcastRequest.toObject = function (
+	proto.db3_node_proto.BroadcastRequest.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -3331,7 +3328,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.BroadcastRequest}
  */
-proto.db3_node_proto.BroadcastRequest.deserializeBinary = function (bytes) {
+proto.db3_node_proto.BroadcastRequest.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.BroadcastRequest();
 	return proto.db3_node_proto.BroadcastRequest.deserializeBinaryFromReader(
@@ -3347,7 +3344,7 @@ proto.db3_node_proto.BroadcastRequest.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.BroadcastRequest}
  */
-proto.db3_node_proto.BroadcastRequest.deserializeBinaryFromReader = function (
+proto.db3_node_proto.BroadcastRequest.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -3373,7 +3370,7 @@ proto.db3_node_proto.BroadcastRequest.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BroadcastRequest.prototype.serializeBinary = function () {
+proto.db3_node_proto.BroadcastRequest.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.BroadcastRequest.serializeBinaryToWriter(this, writer);
 	return writer.getResultBuffer();
@@ -3386,7 +3383,7 @@ proto.db3_node_proto.BroadcastRequest.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.BroadcastRequest.serializeBinaryToWriter = function (
+proto.db3_node_proto.BroadcastRequest.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -3401,10 +3398,12 @@ proto.db3_node_proto.BroadcastRequest.serializeBinaryToWriter = function (
  * optional bytes body = 1;
  * @return {string}
  */
-proto.db3_node_proto.BroadcastRequest.prototype.getBody = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 1, "")
-	);
+proto.db3_node_proto.BroadcastRequest.prototype.getBody = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		1,
+		"",
+	));
 };
 
 /**
@@ -3412,7 +3411,7 @@ proto.db3_node_proto.BroadcastRequest.prototype.getBody = function () {
  * This is a type-conversion wrapper around `getBody()`
  * @return {string}
  */
-proto.db3_node_proto.BroadcastRequest.prototype.getBody_asB64 = function () {
+proto.db3_node_proto.BroadcastRequest.prototype.getBody_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getBody()));
 };
 
@@ -3423,7 +3422,7 @@ proto.db3_node_proto.BroadcastRequest.prototype.getBody_asB64 = function () {
  * This is a type-conversion wrapper around `getBody()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BroadcastRequest.prototype.getBody_asU8 = function () {
+proto.db3_node_proto.BroadcastRequest.prototype.getBody_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getBody()));
 };
 
@@ -3431,7 +3430,7 @@ proto.db3_node_proto.BroadcastRequest.prototype.getBody_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.BroadcastRequest} returns this
  */
-proto.db3_node_proto.BroadcastRequest.prototype.setBody = function (value) {
+proto.db3_node_proto.BroadcastRequest.prototype.setBody = function(value) {
 	return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -3448,7 +3447,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 *     http://goto/soy-param-migration
 	 * @return {!Object}
 	 */
-	proto.db3_node_proto.BroadcastResponse.prototype.toObject = function (
+	proto.db3_node_proto.BroadcastResponse.prototype.toObject = function(
 		opt_includeInstance,
 	) {
 		return proto.db3_node_proto.BroadcastResponse.toObject(
@@ -3466,7 +3465,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
 	 * @return {!Object}
 	 * @suppress {unusedLocalVariables} f is only used for nested messages
 	 */
-	proto.db3_node_proto.BroadcastResponse.toObject = function (
+	proto.db3_node_proto.BroadcastResponse.toObject = function(
 		includeInstance,
 		msg,
 	) {
@@ -3487,7 +3486,7 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.db3_node_proto.BroadcastResponse}
  */
-proto.db3_node_proto.BroadcastResponse.deserializeBinary = function (bytes) {
+proto.db3_node_proto.BroadcastResponse.deserializeBinary = function(bytes) {
 	var reader = new jspb.BinaryReader(bytes);
 	var msg = new proto.db3_node_proto.BroadcastResponse();
 	return proto.db3_node_proto.BroadcastResponse.deserializeBinaryFromReader(
@@ -3503,7 +3502,7 @@ proto.db3_node_proto.BroadcastResponse.deserializeBinary = function (bytes) {
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
  * @return {!proto.db3_node_proto.BroadcastResponse}
  */
-proto.db3_node_proto.BroadcastResponse.deserializeBinaryFromReader = function (
+proto.db3_node_proto.BroadcastResponse.deserializeBinaryFromReader = function(
 	msg,
 	reader,
 ) {
@@ -3529,7 +3528,7 @@ proto.db3_node_proto.BroadcastResponse.deserializeBinaryFromReader = function (
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BroadcastResponse.prototype.serializeBinary = function () {
+proto.db3_node_proto.BroadcastResponse.prototype.serializeBinary = function() {
 	var writer = new jspb.BinaryWriter();
 	proto.db3_node_proto.BroadcastResponse.serializeBinaryToWriter(
 		this,
@@ -3545,7 +3544,7 @@ proto.db3_node_proto.BroadcastResponse.prototype.serializeBinary = function () {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.BroadcastResponse.serializeBinaryToWriter = function (
+proto.db3_node_proto.BroadcastResponse.serializeBinaryToWriter = function(
 	message,
 	writer,
 ) {
@@ -3560,10 +3559,12 @@ proto.db3_node_proto.BroadcastResponse.serializeBinaryToWriter = function (
  * optional bytes hash = 2;
  * @return {string}
  */
-proto.db3_node_proto.BroadcastResponse.prototype.getHash = function () {
-	return /** @type {string} */ (
-		jspb.Message.getFieldWithDefault(this, 2, "")
-	);
+proto.db3_node_proto.BroadcastResponse.prototype.getHash = function() {
+	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
+		this,
+		2,
+		"",
+	));
 };
 
 /**
@@ -3571,7 +3572,7 @@ proto.db3_node_proto.BroadcastResponse.prototype.getHash = function () {
  * This is a type-conversion wrapper around `getHash()`
  * @return {string}
  */
-proto.db3_node_proto.BroadcastResponse.prototype.getHash_asB64 = function () {
+proto.db3_node_proto.BroadcastResponse.prototype.getHash_asB64 = function() {
 	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getHash()));
 };
 
@@ -3582,7 +3583,7 @@ proto.db3_node_proto.BroadcastResponse.prototype.getHash_asB64 = function () {
  * This is a type-conversion wrapper around `getHash()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.BroadcastResponse.prototype.getHash_asU8 = function () {
+proto.db3_node_proto.BroadcastResponse.prototype.getHash_asU8 = function() {
 	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(this.getHash()));
 };
 
@@ -3590,7 +3591,7 @@ proto.db3_node_proto.BroadcastResponse.prototype.getHash_asU8 = function () {
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.BroadcastResponse} returns this
  */
-proto.db3_node_proto.BroadcastResponse.prototype.setHash = function (value) {
+proto.db3_node_proto.BroadcastResponse.prototype.setHash = function(value) {
 	return jspb.Message.setProto3BytesField(this, 2, value);
 };
 
