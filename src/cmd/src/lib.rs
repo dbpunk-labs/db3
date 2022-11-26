@@ -193,7 +193,7 @@ pub async fn process_cmd(
             return true;
         }
         "quit" => {
-            close_session(store_sdk, session);
+            close_session(store_sdk, session).await;
             println!("Good bye!");
             exit(1);
         }
@@ -376,7 +376,7 @@ mod tests {
             );
         }
         let session_2 = session.as_ref().unwrap().session_id;
-        assert_eq!(session_2, session_1 + 1);
+        assert_ne!(session_2, session_1);
 
         // Del kv store
         assert!(process_cmd(&msdk, &mut sdk, "del cmd_smoke_test k1", &mut session).await);
