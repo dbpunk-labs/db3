@@ -16,4 +16,4 @@ else
     echo "$OSTYPE is not supported, please give us a issue https://github.com/dbpunk-labs/db3/issues/new/choose"
     exit 1
 fi
-git submodule init
+git submodule update

@@ -7,3 +7,6 @@
 
 ![sharding](./images/db3-sharding.svg)
 
+## Submit Mutaion From SDK
+
+![sdk] (./images/db3_sdk.png)
