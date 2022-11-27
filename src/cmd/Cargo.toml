@@ -21,3 +21,9 @@ prost-types = "0.11"
 rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["recovery", "rand-std", "bitcoin_hashes", "global-context"] }
 rand = "0.8.5"
 prettytable-rs = "^0.9"
+
+[dev-dependencies]
+db3-session={ path = "../session"}
+db3-crypto={ path = "../crypto"}
+tokio = { version = "1.17.0", features = ["full"] }
+tonic = { version = "0.7.2", features = ["tls-roots"]}

@@ -53,6 +53,8 @@ pub enum DB3Error {
     QueryKvError(String),
     #[error("fail to query, invalid session status {0}")]
     QuerySessionStatusError(String),
+    #[error("fail to verify query session")]
+    QuerySessionVerifyError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

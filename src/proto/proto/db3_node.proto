@@ -62,6 +62,18 @@ message BatchGetValue {
 message SessionIdentifier {
     int32 session_id = 1;
 }
+enum SessionStatus {
+    Running = 0;
+    Blocked = 1;
+    Stop = 2;
+}
+message QuerySessionInfo {
+    // the hex encoded string
+    int32 id = 1;
+    int64 start_time = 2;
+    SessionStatus status = 3;
+    int32 query_count = 4;
+}
 message GetKeyRequest {
     bytes batch_get = 1;
     bytes signature = 2;
@@ -97,21 +109,11 @@ message CloseSessionRequest {
     bytes signature = 2;
 }
 message CloseSessionResponse {
-    int32 session_id = 1;
+    QuerySessionInfo query_session_info = 1;
+    bytes signature = 2;
 }
 
-enum SessionStatus {
-    Running = 0;
-    Blocked = 1;
-    Stop = 2;
-}
-message QuerySessionInfo {
-    // the hex encoded string
-    int32 id = 1;
-    int64 start_time = 2;
-    SessionStatus status = 3;
-    int32 query_count = 4;
-}
+
 
 message GetSessionInfoResponse {
     // TODO the validator sign
