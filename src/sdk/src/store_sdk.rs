@@ -25,7 +25,7 @@ use db3_proto::db3_node_proto::{
     GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
     QuerySessionInfo, SessionIdentifier,
 };
-use db3_session::session_manager::{SessionManager, SessionPool};
+use db3_session::session_manager::{SessionPool};
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
@@ -106,7 +106,6 @@ impl StoreSDK {
                         Ok(_) => Ok((
                             response.into_inner(),
                             CloseSessionResponse {
-                                signature,
                                 query_session_info: Some(query_session_info),
                             },
                         )),
@@ -130,25 +129,13 @@ impl StoreSDK {
             Some(session) => {
                 if session.check_session_running() {
                     let mut client = self.client.as_ref().clone();
-                    let query_bill_key = QueryBillKey {
+                    let query_bill_key = Some(QueryBillKey {
                         height,
                         start_id: start,
                         end_id: end,
                         session_token: token.clone(),
-                    };
-                    let mut buf = BytesMut::with_capacity(1024 * 8);
-                    query_bill_key
-                        .encode(&mut buf)
-                        .map_err(|e| Status::internal(format!("{}", e)))?;
-                    let buf = buf.freeze();
-                    let signature = self
-                        .signer
-                        .sign(buf.as_ref())
-                        .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                    let q_req = QueryBillRequest {
-                        query_bill_key: buf.as_ref().to_vec(),
-                        signature,
-                    };
+                    });
+                    let q_req = QueryBillRequest { query_bill_key };
                     let request = tonic::Request::new(q_req);
                     let response = client.query_bill(request).await?.into_inner();
                     session.increase_query(1);
@@ -180,22 +167,10 @@ impl StoreSDK {
         &self,
         session_token: &String,
     ) -> std::result::Result<QuerySessionInfo, Status> {
-        let session_identifier = SessionIdentifier {
+        let session_identifier = Some(SessionIdentifier {
             session_token: session_token.clone(),
-        };
-        let mut buf = BytesMut::with_capacity(1024 * 8);
-        session_identifier
-            .encode(&mut buf)
-            .map_err(|e| Status::internal(format!("{}", e)))?;
-        let buf = buf.freeze();
-        let signature = self
-            .signer
-            .sign(buf.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        let r = GetSessionInfoRequest {
-            session_identifier: buf.as_ref().to_vec(),
-            signature,
-        };
+        });
+        let r = GetSessionInfoRequest { session_identifier };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
 
@@ -212,24 +187,12 @@ impl StoreSDK {
         match self.session_pool.get_session_mut(token) {
             Some(session) => {
                 if session.check_session_running() {
-                    let batch_keys = BatchGetKey {
+                    let batch_get = Some(BatchGetKey {
                         ns: ns.to_vec(),
                         keys,
                         session_token: token.clone(),
-                    };
-                    let mut buf = BytesMut::with_capacity(1024 * 8);
-                    batch_keys
-                        .encode(&mut buf)
-                        .map_err(|e| Status::internal(format!("{}", e)))?;
-                    let buf = buf.freeze();
-                    let signature = self
-                        .signer
-                        .sign(buf.as_ref())
-                        .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                    let r = GetKeyRequest {
-                        batch_get: buf.as_ref().to_vec(),
-                        signature,
-                    };
+                    });
+                    let r = GetKeyRequest { batch_get };
                     let request = tonic::Request::new(r);
 
                     let mut client = self.client.as_ref().clone();

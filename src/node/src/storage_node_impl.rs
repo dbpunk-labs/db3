@@ -19,11 +19,10 @@ use super::context::Context;
 use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, BatchGetKey, BroadcastRequest, BroadcastResponse,
+    storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse,
     CloseSessionPayload, CloseSessionRequest, CloseSessionResponse, GetAccountRequest,
     GetKeyRequest, GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse,
-    OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest, QueryBillResponse,
-    QuerySessionInfo, SessionIdentifier,
+    OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse,
 };
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
@@ -77,7 +76,7 @@ impl StorageNode for StorageNodeImpl {
         request: Request<CloseSessionRequest>,
     ) -> std::result::Result<Response<CloseSessionResponse>, Status> {
         let r = request.into_inner();
-        let account_id = Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
+        Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = CloseSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
@@ -86,7 +85,7 @@ impl StorageNode for StorageNodeImpl {
                 let sess_store = node_store.get_session_store();
 
                 // Verify query session sdk
-                match sess_store.get_session_mut(account_id.addr, &payload.session_token) {
+                match sess_store.get_session_mut(&payload.session_token) {
                     Some(sess) => {
                         let query_session_info = &payload.session_info.unwrap();
                         if sess.get_session_query_count() != query_session_info.query_count {
@@ -109,12 +108,11 @@ impl StorageNode for StorageNodeImpl {
 
                 // Takes a reference and returns Option<&V>
                 let sess = sess_store
-                    .remove_session(account_id.addr, &payload.session_token)
+                    .remove_session(&payload.session_token)
                     .map_err(|e| Status::internal(format!("{}", e)))
                     .unwrap();
                 // TODO(chenjing): sign
                 Ok(Response::new(CloseSessionResponse {
-                    signature: vec![],
                     query_session_info: Some(sess.get_session_info()),
                 }))
             }
@@ -126,16 +124,12 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<QueryBillRequest>,
     ) -> std::result::Result<Response<QueryBillResponse>, Status> {
-        let r = request.into_inner();
-        let account_id = Verifier::verify(r.query_bill_key.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        let query_bill_key = QueryBillKey::decode(r.query_bill_key.as_ref())
-            .map_err(|_| Status::internal("fail to decode query_bill_key ".to_string()))?;
+        let query_bill_key = request.into_inner().query_bill_key.unwrap();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 match node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, &query_bill_key.session_token)
+                    .get_session_mut(&query_bill_key.session_token)
                 {
                     Some(session) => {
                         if !session.check_session_running() {
@@ -158,7 +152,7 @@ impl StorageNode for StorageNodeImpl {
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, &query_bill_key.session_token)
+                    .get_session_mut(&query_bill_key.session_token)
                     .unwrap()
                     .increase_query(1);
                 Ok(Response::new(QueryBillResponse { bills }))
@@ -172,16 +166,12 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetKeyRequest>,
     ) -> std::result::Result<Response<GetKeyResponse>, Status> {
-        let r = request.into_inner();
-        let account_id = Verifier::verify(r.batch_get.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        let batch_get_key = request.into_inner().batch_get.unwrap();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
-                let batch_get_key = BatchGetKey::decode(r.batch_get.as_ref())
-                    .map_err(|_| Status::internal("fail to decode batch get key".to_string()))?;
                 match node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, &batch_get_key.session_token)
+                    .get_session_mut(&batch_get_key.session_token)
                 {
                     Some(session) => {
                         if !session.check_session_running() {
@@ -192,19 +182,28 @@ impl StorageNode for StorageNodeImpl {
                     }
                     None => return Err(Status::internal("Fail to create session")),
                 }
+                let addr = node_store
+                    .get_session_store()
+                    .get_address(&batch_get_key.session_token);
+
+                if addr.is_none() {
+                    return Err(Status::internal(format!(
+                        "not address found related to current token {}",
+                        &batch_get_key.session_token
+                    )));
+                }
                 let values = node_store
                     .get_auth_store()
-                    .batch_get(&account_id.addr, &batch_get_key)
+                    .batch_get(&addr.unwrap(), &batch_get_key)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
 
                 // TODO(chenjing): evaluate query ops based on keys size
                 node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, &batch_get_key.session_token)
+                    .get_session_mut(&batch_get_key.session_token)
                     .unwrap()
                     .increase_query(1);
                 Ok(Response::new(GetKeyResponse {
-                    signature: vec![],
                     batch_get_values: Some(values.to_owned()),
                 }))
             }
@@ -233,21 +232,16 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetSessionInfoRequest>,
     ) -> std::result::Result<Response<GetSessionInfoResponse>, Status> {
-        let r = request.into_inner();
-        let account_id = Verifier::verify(r.session_identifier.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        let session_identifier = SessionIdentifier::decode(r.session_identifier.as_ref())
-            .map_err(|_| Status::internal("fail to decode session_identifier".to_string()))?;
+        let session_identifier = request.into_inner().session_identifier.unwrap();
         let session_token = session_identifier.session_token;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 if let Some(sess) = node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, &session_token)
+                    .get_session_mut(&session_token)
                 {
                     sess.check_session_status();
                     Ok(Response::new(GetSessionInfoResponse {
-                        signature: vec![],
                         session_info: Some(sess.get_session_info()),
                     }))
                 } else {
