@@ -25,7 +25,7 @@ use db3_proto::db3_node_proto::{
     GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
     QuerySessionInfo, SessionIdentifier,
 };
-use db3_session::session_manager::{SessionPool};
+use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
