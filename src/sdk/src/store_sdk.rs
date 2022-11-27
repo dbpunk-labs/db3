@@ -20,12 +20,12 @@ use db3_crypto::signer::Db3Signer;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
-    storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
-    CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetSessionInfoRequest,
-    OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest, QuerySessionInfo,
-    SessionIdentifier,
+    storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionPayload,
+    CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest,
+    GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
+    QuerySessionInfo, SessionIdentifier,
 };
-use db3_session::session_manager::SessionPool;
+use db3_session::session_manager::{SessionManager, SessionPool};
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
@@ -62,8 +62,12 @@ impl StoreSDK {
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
         let response = client.open_query_session(request).await?.into_inner();
-        match self.session_pool.create_new_session(response.session_id) {
-            Ok(_) => Ok(response),
+        let result = response.clone();
+        match self
+            .session_pool
+            .insert_session_with_token(&result.query_session_info.unwrap(), &result.session_token)
+        {
+            Ok(_) => Ok(response.clone()),
             Err(e) => Err(Status::internal(format!("Fail to create session {}", e))),
         }
     }
@@ -73,13 +77,17 @@ impl StoreSDK {
     /// 3. return node's CloseSessionResponse(query session info and signature) and client's CloseSessionResponse (query session info and signature)
     pub async fn close_session(
         &mut self,
-        session_id: i32,
+        token: &String,
     ) -> std::result::Result<(CloseSessionResponse, CloseSessionResponse), Status> {
-        match self.session_pool.get_session(session_id) {
+        match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
+                let payload = CloseSessionPayload {
+                    session_info: Some(query_session_info.clone()),
+                    session_token: token.clone(),
+                };
                 let mut buf = BytesMut::with_capacity(1024 * 8);
-                query_session_info
+                payload
                     .encode(&mut buf)
                     .map_err(|e| Status::internal(format!("{}", e)))?;
                 let buf = buf.freeze();
@@ -88,13 +96,13 @@ impl StoreSDK {
                     .sign(buf.as_ref())
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 let r = CloseSessionRequest {
-                    query_session_info: buf.as_ref().to_vec(),
+                    payload: buf.as_ref().to_vec(),
                     signature: signature.clone(),
                 };
                 let request = tonic::Request::new(r);
                 let mut client = self.client.as_ref().clone();
                 match client.close_query_session(request).await {
-                    Ok(response) => match self.session_pool.remove_session(query_session_info.id) {
+                    Ok(response) => match self.session_pool.remove_session(token) {
                         Ok(_) => Ok((
                             response.into_inner(),
                             CloseSessionResponse {
@@ -107,10 +115,7 @@ impl StoreSDK {
                     Err(e) => Err(e),
                 }
             }
-            None => Err(Status::internal(format!(
-                "Session {} not exist",
-                session_id
-            ))),
+            None => Err(Status::internal(format!("Session {} not exist", token))),
         }
     }
 
@@ -119,9 +124,9 @@ impl StoreSDK {
         height: u64,
         start: u64,
         end: u64,
-        session_id: i32,
+        token: &String,
     ) -> std::result::Result<Vec<Bill>, Status> {
-        match self.session_pool.get_session_mut(session_id) {
+        match self.session_pool.get_session_mut(token) {
             Some(session) => {
                 if session.check_session_running() {
                     let mut client = self.client.as_ref().clone();
@@ -129,7 +134,7 @@ impl StoreSDK {
                         height,
                         start_id: start,
                         end_id: end,
-                        session_id,
+                        session_token: token.clone(),
                     };
                     let mut buf = BytesMut::with_capacity(1024 * 8);
                     query_bill_key
@@ -155,8 +160,8 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session {} not found",
-                session_id
+                "Fail to query, session with token {} not found",
+                token
             ))),
         }
     }
@@ -173,9 +178,11 @@ impl StoreSDK {
 
     pub async fn get_session_info(
         &self,
-        session_id: i32,
+        session_token: &String,
     ) -> std::result::Result<QuerySessionInfo, Status> {
-        let session_identifier = SessionIdentifier { session_id };
+        let session_identifier = SessionIdentifier {
+            session_token: session_token.clone(),
+        };
         let mut buf = BytesMut::with_capacity(1024 * 8);
         session_identifier
             .encode(&mut buf)
@@ -200,15 +207,15 @@ impl StoreSDK {
         &mut self,
         ns: &[u8],
         keys: Vec<Vec<u8>>,
-        session_id: i32,
+        token: &String,
     ) -> std::result::Result<Option<BatchGetValue>, Status> {
-        match self.session_pool.get_session_mut(session_id) {
+        match self.session_pool.get_session_mut(token) {
             Some(session) => {
                 if session.check_session_running() {
                     let batch_keys = BatchGetKey {
                         ns: ns.to_vec(),
                         keys,
-                        session: session_id,
+                        session_token: token.clone(),
                     };
                     let mut buf = BytesMut::with_capacity(1024 * 8);
                     batch_keys
@@ -237,8 +244,8 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session {} not found",
-                session_id
+                "Fail to query, session with token {} not found",
+                token
             ))),
         }
     }
@@ -298,9 +305,9 @@ mod tests {
         let res = sdk.open_session().await;
         assert!(res.is_ok());
         let session_info = res.unwrap();
-        assert!(session_info.session_id > 0);
+        assert_eq!(session_info.session_token.len(), 36);
         let result = sdk
-            .get_bills_by_block(1, 0, 10, session_info.session_id)
+            .get_bills_by_block(1, 0, 10, &session_info.session_token)
             .await;
         if let Err(ref e) = result {
             println!("{}", e);
@@ -349,9 +356,9 @@ mod tests {
         let res = sdk.open_session().await;
         assert!(res.is_ok());
         let session_info = res.unwrap();
-        assert!(session_info.session_id > 0);
+        assert_eq!(session_info.session_token.len(), 36);
         if let Ok(Some(values)) = sdk
-            .batch_get(&ns_vec, vec![key_vec.clone()], session_info.session_id)
+            .batch_get(&ns_vec, vec![key_vec.clone()], &session_info.session_token)
             .await
         {
             assert_eq!(values.values.len(), 1);
@@ -361,7 +368,7 @@ mod tests {
             assert!(false);
         }
 
-        let res = sdk.close_session(session_info.session_id).await;
+        let res = sdk.close_session(&session_info.session_token).await;
         assert!(res.is_ok());
     }
     #[tokio::test]
@@ -405,9 +412,9 @@ mod tests {
         let res = sdk.open_session().await;
         assert!(res.is_ok());
         let session_info = res.unwrap();
-        assert!(session_info.session_id > 0);
+        assert_eq!(session_info.session_token.len(), 36);
         if let Ok(Some(values)) = sdk
-            .batch_get(&ns_vec, vec![key_vec.clone()], session_info.session_id)
+            .batch_get(&ns_vec, vec![key_vec.clone()], &session_info.session_token)
             .await
         {
             assert_eq!(values.values.len(), 1);
@@ -418,10 +425,10 @@ mod tests {
         }
 
         sdk.session_pool
-            .get_session_mut(session_info.session_id)
+            .get_session_mut(&session_info.session_token)
             .unwrap()
             .increase_query(100);
-        let res = sdk.close_session(session_info.session_id).await;
+        let res = sdk.close_session(&session_info.session_token).await;
         assert!(res.is_err());
         assert_eq!(
             res.err().unwrap().message(),

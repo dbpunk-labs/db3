@@ -132,7 +132,7 @@ impl AuthStorage {
         }
         Ok(BatchGetValue {
             values: kv_pairs.to_owned(),
-            session: batch_get_keys.session,
+            session_token: batch_get_keys.session_token.clone(),
             ns: ns.to_vec(),
         })
     }

@@ -20,9 +20,10 @@ use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BatchGetKey, BroadcastRequest, BroadcastResponse,
-    CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse,
-    GetSessionInfoRequest, GetSessionInfoResponse, OpenSessionRequest, OpenSessionResponse,
-    QueryBillKey, QueryBillRequest, QueryBillResponse, QuerySessionInfo, SessionIdentifier,
+    CloseSessionPayload, CloseSessionRequest, CloseSessionResponse, GetAccountRequest,
+    GetKeyRequest, GetKeyResponse, GetSessionInfoRequest, GetSessionInfoResponse,
+    OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest, QueryBillResponse,
+    QuerySessionInfo, SessionIdentifier,
 };
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
@@ -56,11 +57,11 @@ impl StorageNode for StorageNodeImpl {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
                 match sess_store.add_new_session(account_id.addr) {
-                    Ok(session_id) => {
+                    Ok((session_token, query_session_info)) => {
                         // Takes a reference and returns Option<&V>
                         Ok(Response::new(OpenSessionResponse {
-                            // session id --> i64
-                            session_id,
+                            query_session_info: Some(query_session_info),
+                            session_token,
                             session_timeout_second: DEFAULT_SESSION_PERIOD,
                             max_query_limit: DEFAULT_SESSION_QUERY_LIMIT,
                         }))
@@ -76,17 +77,18 @@ impl StorageNode for StorageNodeImpl {
         request: Request<CloseSessionRequest>,
     ) -> std::result::Result<Response<CloseSessionResponse>, Status> {
         let r = request.into_inner();
-        let account_id = Verifier::verify(r.query_session_info.as_ref(), r.signature.as_ref())
+        let account_id = Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        let query_session_info = QuerySessionInfo::decode(r.query_session_info.as_ref())
+        let payload = CloseSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
 
                 // Verify query session sdk
-                match sess_store.get_session_mut(account_id.addr, query_session_info.id) {
+                match sess_store.get_session_mut(account_id.addr, &payload.session_token) {
                     Some(sess) => {
+                        let query_session_info = &payload.session_info.unwrap();
                         if sess.get_session_query_count() != query_session_info.query_count {
                             return Err(Status::invalid_argument(format!(
                                 "query session verify fail. expect query count {} but {}",
@@ -98,7 +100,7 @@ impl StorageNode for StorageNodeImpl {
                     None => {
                         return Err(Status::not_found(format!(
                             "session {} not found in the session store",
-                            query_session_info.id
+                            payload.session_token
                         )));
                     }
                 }
@@ -107,7 +109,7 @@ impl StorageNode for StorageNodeImpl {
 
                 // Takes a reference and returns Option<&V>
                 let sess = sess_store
-                    .remove_session(account_id.addr, query_session_info.id)
+                    .remove_session(account_id.addr, &payload.session_token)
                     .map_err(|e| Status::internal(format!("{}", e)))
                     .unwrap();
                 // TODO(chenjing): sign
@@ -133,7 +135,7 @@ impl StorageNode for StorageNodeImpl {
             Ok(mut node_store) => {
                 match node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, query_bill_key.session_id)
+                    .get_session_mut(account_id.addr, &query_bill_key.session_token)
                 {
                     Some(session) => {
                         if !session.check_session_running() {
@@ -156,7 +158,7 @@ impl StorageNode for StorageNodeImpl {
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, query_bill_key.session_id)
+                    .get_session_mut(account_id.addr, &query_bill_key.session_token)
                     .unwrap()
                     .increase_query(1);
                 Ok(Response::new(QueryBillResponse { bills }))
@@ -179,7 +181,7 @@ impl StorageNode for StorageNodeImpl {
                     .map_err(|_| Status::internal("fail to decode batch get key".to_string()))?;
                 match node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, batch_get_key.session)
+                    .get_session_mut(account_id.addr, &batch_get_key.session_token)
                 {
                     Some(session) => {
                         if !session.check_session_running() {
@@ -198,7 +200,7 @@ impl StorageNode for StorageNodeImpl {
                 // TODO(chenjing): evaluate query ops based on keys size
                 node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, batch_get_key.session)
+                    .get_session_mut(account_id.addr, &batch_get_key.session_token)
                     .unwrap()
                     .increase_query(1);
                 Ok(Response::new(GetKeyResponse {
@@ -236,12 +238,12 @@ impl StorageNode for StorageNodeImpl {
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let session_identifier = SessionIdentifier::decode(r.session_identifier.as_ref())
             .map_err(|_| Status::internal("fail to decode session_identifier".to_string()))?;
-        let session_id = session_identifier.session_id;
+        let session_token = session_identifier.session_token;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 if let Some(sess) = node_store
                     .get_session_store()
-                    .get_session_mut(account_id.addr, session_id)
+                    .get_session_mut(account_id.addr, &session_token)
                 {
                     sess.check_session_status();
                     Ok(Response::new(GetSessionInfoResponse {
