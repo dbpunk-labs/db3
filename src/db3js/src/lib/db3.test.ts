@@ -5,7 +5,7 @@ import { generateKey, sign } from "./keys";
 describe("test db3js api", () => {
 	test("test submitMutation", async () => {
 		const [sk] = await generateKey();
-		const db3_instance = new DB3("https://grpc.devnet.db3.network/");
+		const db3_instance = new DB3("http://locahost:26659");
 		function _sign(data: Uint8Array) {
 			return sign(data, sk);
 		}
