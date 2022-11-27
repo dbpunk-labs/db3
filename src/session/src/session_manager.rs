@@ -74,12 +74,11 @@ impl SessionPool {
         }
     }
 
-    pub fn remove_session(&mut self, session_id: i32) -> Result<i32, String> {
-        if self.session_pool.contains_key(&session_id) {
-            self.session_pool.remove(&session_id);
-            Ok(session_id)
-        } else {
-            Err(format!("session {} not exist in session pool", session_id))
+    pub fn remove_session(&mut self, session_id: i32) -> Result<SessionManager, String> {
+        // if self.session_pool.contains_key(&session_id) {
+        match self.session_pool.remove(&session_id) {
+            Some(session) => Ok(session),
+            None => Err(format!("session {} not exist in session pool", session_id)),
         }
     }
 
@@ -122,7 +121,11 @@ impl SessionStore {
             }
         }
     }
-    pub fn remove_session(&mut self, addr: Address, session_id: i32) -> Result<i32, String> {
+    pub fn remove_session(
+        &mut self,
+        addr: Address,
+        session_id: i32,
+    ) -> Result<SessionManager, String> {
         match self.session_pools.get_mut(&addr) {
             Some(sess_pool) => sess_pool.remove_session(session_id),
             None => Err(format!(
@@ -347,7 +350,7 @@ mod tests {
         {
             let res = sess_store.remove_session(addr, 2);
             assert!(res.is_ok());
-            assert_eq!(2, res.unwrap());
+            assert_eq!(2, res.unwrap().get_session_id());
         }
         {
             let res = sess_store.remove_session(addr, 2);
