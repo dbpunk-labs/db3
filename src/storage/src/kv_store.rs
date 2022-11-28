@@ -22,8 +22,8 @@ use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::BatchGetKey;
 use db3_types::cost;
 use ethereum_types::Address as AccountAddress;
-use merk::proofs::{query::Query, Op as ProofOp};
-use merk::{BatchEntry, Merk, Op};
+use merkdb::proofs::{query::Query, Op as ProofOp};
+use merkdb::{BatchEntry, Merk, Op};
 use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::pin::Pin;
@@ -126,7 +126,7 @@ mod tests {
     use super::*;
     use db3_base::get_a_static_address;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use merk::proofs::Node;
+    use merkdb::proofs::Node;
     use std::boxed::Box;
     use tempdir::TempDir;
 

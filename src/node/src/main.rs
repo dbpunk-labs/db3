@@ -35,7 +35,7 @@ use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use http::Uri;
-use merk::Merk;
+use merkdb::Merk;
 use std::io::stdout;
 use std::io::Write;
 use std::io::{self, BufRead};

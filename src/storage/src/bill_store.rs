@@ -19,8 +19,8 @@ use bytes::BytesMut;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_bill_proto::Bill;
 use db3_types::bill_key::BillKey;
-use merk::proofs::{query::Query, Op as ProofOp};
-use merk::{Merk, Op};
+use merkdb::proofs::{query::Query, Op as ProofOp};
+use merkdb::{Merk, Op};
 use prost::Message;
 use std::collections::LinkedList;
 use std::ops::Range;
@@ -68,7 +68,7 @@ mod tests {
     use db3_base::get_a_static_address;
     use db3_proto::db3_base_proto::{UnitType, Units};
     use db3_proto::db3_bill_proto::BillType;
-    use merk::proofs::{Decoder, Node};
+    use merkdb::proofs::{Decoder, Node};
     use std::boxed::Box;
     use tempdir::TempDir;
     #[test]

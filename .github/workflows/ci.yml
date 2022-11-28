@@ -79,4 +79,4 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Run rust test
         run: |
-          cargo nextest run --workspace --exclude merk
+          cargo nextest run --workspace --exclude merkdb
