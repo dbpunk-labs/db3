@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 bytes = { version = "1.0", default-features = false }
 tendermint-abci = "0.26.0"
-tendermint-proto = "0.26.0"
+tendermint-proto = "0.27.0"
 tendermint-rpc = {version = "0.26.0",  features=["http-client"]}
 tendermint = "0.26.0"
 actix-web = "4.2.1"
