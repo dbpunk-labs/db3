@@ -140,7 +140,7 @@ mod tests {
         let keys = BatchGetKey {
             ns: "my_twitter".as_bytes().to_vec(),
             keys: vec![key],
-            session: 1,
+            session_token: "MOCK_TOKEN".to_string(),
         };
         let result = KvStore::batch_get(db.as_ref(), &addr, &keys);
         assert!(!result.is_ok());
@@ -179,7 +179,7 @@ mod tests {
         let keys = BatchGetKey {
             ns: ns.as_bytes().to_vec(),
             keys: vec![key.to_vec()],
-            session: 1,
+            session_token: "MOCK_TOKEN".to_string(),
         };
         let result = KvStore::batch_get(db.as_ref(), &addr, &keys);
         assert!(result.is_ok());
