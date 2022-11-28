@@ -85,16 +85,19 @@ cd db3 & bash install_env.sh && cargo build
 cd tools && bash start_localnet.sh
 # open another terminal , enter db3 dir and run db3 shell
 ./target/debug/db3 shell
-WARNING, db3 will generate private key and save it to ~/.db3/key
-restore the key with addr 0x0dce49e41905e6c0c5091adcedee2dee524a3b06
->put ns1 k1 v1 k2 v2
+@db3.network🚀🚀🚀
+WARNING, db3 will generate private key and save it to /home/jackwang/.db3/user.key
+restore the key with addr 0x97b478ac2bef8762c2ecc08417f35838c4bf73fc
+>get ns1 k1
+Open Session Successfully!
+Some(OpenSessionResponse { session_id: 2, session_timeout_second: 3600, max_query_limit: 1000 })
+>put ns1 k1 v1
 submit mutation to mempool done!
->get ns1 k1 k2
+>get ns1 k1
 k1 -> v1
-k2 -> v2
 >account
- total bills | storage used | mutation | querys | credits
-  3400 tai    | 76.00        | 1        | 0      | 10 db3
+ total bills  | storage used | mutation | querys | credits
+ 0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
 
 # Roadmap
