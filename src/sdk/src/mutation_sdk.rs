@@ -137,14 +137,18 @@ mod tests {
         let kp = db3_cmd::get_key_pair(false).unwrap();
         let signer = Db3Signer::new(kp);
         let mut store_sdk = StoreSDK::new(client, signer);
-        let sid = store_sdk.open_session().await.unwrap().session_id;
+        let sess_token = store_sdk.open_session().await.unwrap().session_token;
         let values = store_sdk
-            .batch_get(ns.as_bytes(), vec!["dkkk1".as_bytes().to_vec()], sid)
+            .batch_get(
+                ns.as_bytes(),
+                vec!["dkkk1".as_bytes().to_vec()],
+                &sess_token,
+            )
             .await
             .unwrap();
         assert!(!values.is_none());
         assert_eq!(values.unwrap().values.len(), 0);
-        store_sdk.close_session(sid).await.unwrap();
+        store_sdk.close_session(&sess_token).await.unwrap();
     }
 
     #[tokio::test]

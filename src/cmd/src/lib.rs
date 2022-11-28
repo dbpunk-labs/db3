@@ -137,7 +137,7 @@ async fn close_session(
         return true;
     }
     match store_sdk
-        .close_session(session.as_ref().unwrap().session_id)
+        .close_session(&session.as_ref().unwrap().session_token)
         .await
     {
         Ok((sess_info_node, sess_info_client)) => {
@@ -164,7 +164,7 @@ async fn refresh_session(
         return open_session(store_sdk, session).await;
     }
     if store_sdk
-        .get_session_info(session.as_ref().unwrap().session_id)
+        .get_session_info(&session.as_ref().unwrap().session_token)
         .await
         .map_err(|e| {
             println!("{:?}", e);
@@ -223,7 +223,7 @@ pub async fn process_cmd(
                         return true;
                     }
                     if let Ok(session_info) = store_sdk
-                        .get_session_info(session.as_ref().unwrap().session_id)
+                        .get_session_info(&session.as_ref().unwrap().session_token)
                         .await
                     {
                         println!("{:?}", session_info);
@@ -260,7 +260,11 @@ pub async fn process_cmd(
                 keys.push(parts[i].as_bytes().to_vec());
             }
             if let Ok(Some(values)) = store_sdk
-                .batch_get(ns.as_bytes(), keys, session.as_ref().unwrap().session_id)
+                .batch_get(
+                    ns.as_bytes(),
+                    keys,
+                    &session.as_ref().unwrap().session_token,
+                )
                 .await
                 .map_err(|e| {
                     println!("{:?}", e);
@@ -370,17 +374,17 @@ mod tests {
 
         // Get kv store
         assert!(process_cmd(&msdk, &mut sdk, "get cmd_smoke_test k1 k2 k3", &mut session).await);
-        assert!(session.as_ref().unwrap().session_id > 0);
 
         // Refresh session
-        let session_1 = session.as_ref().unwrap().session_id;
+        let session_token1 = session.as_ref().unwrap().session_token.clone();
+        assert!(!session_token1.is_empty());
         for _ in 0..(DEFAULT_SESSION_QUERY_LIMIT + 10) {
             assert!(
                 process_cmd(&msdk, &mut sdk, "get cmd_smoke_test k1 k2 k3", &mut session).await
             );
         }
-        let session_2 = session.as_ref().unwrap().session_id;
-        assert_ne!(session_2, session_1);
+        let session_token2 = session.as_ref().unwrap().session_token.clone();
+        assert_ne!(session_token2, session_token1);
 
         // Del kv store
         assert!(process_cmd(&msdk, &mut sdk, "del cmd_smoke_test k1", &mut session).await);
@@ -400,6 +404,6 @@ mod tests {
         let mut session: Option<OpenSessionResponse> = None;
 
         assert!(open_session(&mut sdk, &mut session).await);
-        assert!(session.as_ref().unwrap().session_id > 0);
+        assert!(!session.as_ref().unwrap().session_token.is_empty());
     }
 }

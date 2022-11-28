@@ -110,20 +110,20 @@ mod node_integration {
         let mut store_sdk = get_store_sdk();
         let ns = "test_ns";
 
-        let mut session_id_1 = 0;
+        let mut session_id_1: String = String::new();
         // session restart
         {
             let res = store_sdk.open_session().await;
             assert!(res.is_ok());
             let session_info = res.unwrap();
-            session_id_1 = session_info.session_id;
+            session_id_1 = session_info.session_token.clone();
             assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
             assert_eq!(session_info.session_timeout_second, DEFAULT_SESSION_PERIOD);
         }
 
         // session info
         {
-            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
+            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running
@@ -170,7 +170,7 @@ mod node_integration {
         // get ns_test k1
         {
             if let Ok(Some(values)) = store_sdk
-                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
+                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], &session_id_1)
                 .await
             {
                 assert_eq!(values.values.len(), 1);
@@ -183,7 +183,7 @@ mod node_integration {
 
         // session info
         {
-            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
+            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running.into()
@@ -195,7 +195,7 @@ mod node_integration {
         {
             for _ in 0..DEFAULT_SESSION_QUERY_LIMIT - 1 {
                 if let Ok(Some(values)) = store_sdk
-                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
+                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], &session_id_1)
                     .await
                 {
                     assert_eq!(values.values.len(), 1);
@@ -209,7 +209,7 @@ mod node_integration {
         // session blocked because query times >= limit
         {
             let result = store_sdk
-                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_1)
+                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], &session_id_1)
                 .await;
             assert!(result.is_err());
             assert_eq!(
@@ -218,7 +218,7 @@ mod node_integration {
             );
         }
         {
-            let info = store_sdk.get_session_info(session_id_1).await.unwrap();
+            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Blocked
@@ -227,20 +227,20 @@ mod node_integration {
         }
 
         // open another session 2
-        let mut session_id_2 = 0;
+        let mut session_id_2 = String::new();
         {
             let res = store_sdk.open_session().await;
             assert!(res.is_ok());
             let session_info = res.unwrap();
             // verify session id increase 1
-            assert_eq!(session_info.session_id, session_id_1 + 1);
+            assert_ne!(session_info.session_token, session_id_1.clone());
             assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
 
             // update current session id
-            session_id_2 = session_info.session_id;
+            session_id_2 = session_info.session_token;
         }
         {
-            let info = store_sdk.get_session_info(session_id_2).await.unwrap();
+            let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
             assert_eq!(
                 SessionStatus::from_i32(info.status).unwrap(),
                 SessionStatus::Running
@@ -271,7 +271,7 @@ mod node_integration {
                 thread::sleep(time::Duration::from_secs(4));
             }
             {
-                let info = store_sdk.get_session_info(session_id_2).await.unwrap();
+                let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
                 assert_eq!(
                     SessionStatus::from_i32(info.status).unwrap(),
                     SessionStatus::Running
@@ -280,7 +280,7 @@ mod node_integration {
             }
             {
                 let result = store_sdk
-                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], session_id_2)
+                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], &session_id_2)
                     .await;
                 assert!(result.is_ok());
                 if let Ok(Some(values)) = result {
@@ -293,21 +293,17 @@ mod node_integration {
 
         // close session 1
         {
-            let (session_node, session_client) =
-                store_sdk.close_session(session_id_1).await.unwrap();
-            assert_eq!(session_node.query_session_info.unwrap().id, session_id_1);
-            assert_eq!(session_client.query_session_info.unwrap().id, session_id_1);
+            assert!(store_sdk.close_session(&session_id_1).await.is_ok())
         }
         // close session 2
         {
-            let (session_node, session_client) =
-                store_sdk.close_session(session_id_2).await.unwrap();
-            assert_eq!(session_node.query_session_info.unwrap().id, session_id_2);
-            assert_eq!(session_client.query_session_info.unwrap().id, session_id_2);
+            assert!(store_sdk.close_session(&session_id_2).await.is_ok());
         }
         // close session 3
         {
-            let res = store_sdk.close_session(session_id_2 + 100).await;
+            let res = store_sdk
+                .close_session(&"UNKNOW_SESSION_TOKEN".to_string())
+                .await;
             assert!(res.is_err());
         }
     }
