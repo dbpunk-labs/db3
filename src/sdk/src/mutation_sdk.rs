@@ -75,6 +75,7 @@ mod tests {
     use super::Mutation;
     use super::MutationSDK;
     use crate::mutation_sdk::StorageNodeClient;
+    use crate::store_sdk::StoreSDK;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use fastcrypto::secp256k1::Secp256k1KeyPair;
@@ -84,6 +85,72 @@ mod tests {
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
+
+    #[tokio::test]
+    async fn test_submit_duplicated_key_mutation() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let kp = db3_cmd::get_key_pair(false).unwrap();
+        let signer = Db3Signer::new(kp);
+        let ns = "my_twitter";
+        {
+            let sdk = MutationSDK::new(client.clone(), signer);
+            let kv = KvPair {
+                key: format!("kk{}", 1).as_bytes().to_vec(),
+                value: format!("dkalue{}", 1).as_bytes().to_vec(),
+                action: MutationAction::InsertKv.into(),
+            };
+            let mutation = Mutation {
+                ns: ns.as_bytes().to_vec(),
+                kv_pairs: vec![kv],
+                nonce: 11000,
+                chain_id: ChainId::MainNet.into(),
+                chain_role: ChainRole::StorageShardChain.into(),
+                gas_price: None,
+                gas: 10,
+            };
+            // submit ok
+            let result = sdk.submit_mutation(&mutation).await;
+            assert!(result.is_ok());
+            let kv = KvPair {
+                key: format!("dkkkk{}", 1).as_bytes().to_vec(),
+                value: format!("dkalue{}", 1).as_bytes().to_vec(),
+                action: MutationAction::InsertKv.into(),
+            };
+            let mutation = Mutation {
+                ns: ns.as_bytes().to_vec(),
+                kv_pairs: vec![kv.clone(), kv],
+                nonce: 11000,
+                chain_id: ChainId::MainNet.into(),
+                chain_role: ChainRole::StorageShardChain.into(),
+                gas_price: None,
+                gas: 10,
+            };
+            let result = sdk.submit_mutation(&mutation).await;
+            assert!(result.is_ok());
+            // submit ok
+        }
+        let millis = time::Duration::from_millis(2000);
+        thread::sleep(millis);
+        let kp = db3_cmd::get_key_pair(false).unwrap();
+        let signer = Db3Signer::new(kp);
+        let mut store_sdk = StoreSDK::new(client, signer);
+        let sess_token = store_sdk.open_session().await.unwrap().session_token;
+        let values = store_sdk
+            .batch_get(
+                ns.as_bytes(),
+                vec!["dkkk1".as_bytes().to_vec()],
+                &sess_token,
+            )
+            .await
+            .unwrap();
+        assert!(!values.is_none());
+        assert_eq!(values.unwrap().values.len(), 0);
+        store_sdk.close_session(&sess_token).await.unwrap();
+    }
+
     #[tokio::test]
     async fn test_submit_mutation() {
         let ep = "http://127.0.0.1:26659";

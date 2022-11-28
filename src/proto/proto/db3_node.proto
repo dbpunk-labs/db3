@@ -25,11 +25,10 @@ message QueryBillKey {
     uint64 height = 1;
     uint64 start_id = 2;
     uint64 end_id = 3;
-    int32 session_id = 4;
+    string session_token = 4;
 }
 message QueryBillRequest {
-    bytes query_bill_key = 1;
-    bytes signature = 2;
+    QueryBillKey query_bill_key = 1;
 }
 
 message QueryBillResponse {
@@ -50,56 +49,18 @@ message BatchRangeKey {
 message BatchGetKey {
     bytes ns = 1;
     repeated bytes keys = 2;
-    int32 session = 3;
+    string session_token = 3;
 }
 
 message BatchGetValue {
     repeated db3_mutation_proto.KVPair values = 1;
-    int32 session = 2;
+    string session_token = 2;
     bytes ns = 3;
 }
 
 message SessionIdentifier {
-    int32 session_id = 1;
+    string session_token = 1;
 }
-message GetKeyRequest {
-    bytes batch_get = 1;
-    bytes signature = 2;
-}
-
-message GetKeyResponse {
-    // TODO the validator sign
-    bytes signature = 1;
-    BatchGetValue batch_get_values = 2;
-}
-
-message GetAccountRequest {
-    // the hex encoded string
-    string addr = 1;
-}
-
-message GetSessionInfoRequest {
-    // the hex encoded string
-    bytes session_identifier = 1;
-    bytes signature = 2;
-}
-message OpenSessionRequest {
-    bytes header = 1;
-    bytes signature = 2;
-}
-message OpenSessionResponse {
-    int32 session_id = 1;
-    int64 session_timeout_second = 2;
-    int32 max_query_limit = 3;
-}
-message CloseSessionRequest {
-    bytes query_session_info = 1;
-    bytes signature = 2;
-}
-message CloseSessionResponse {
-    int32 session_id = 1;
-}
-
 enum SessionStatus {
     Running = 0;
     Blocked = 1;
@@ -113,9 +74,48 @@ message QuerySessionInfo {
     int32 query_count = 4;
 }
 
+message GetKeyRequest {
+    BatchGetKey batch_get = 1;
+}
+
+message GetKeyResponse {
+    BatchGetValue batch_get_values = 2;
+}
+
+message GetAccountRequest {
+    // the hex encoded string
+    string addr = 1;
+}
+
+message GetSessionInfoRequest {
+    // the hex encoded string
+    SessionIdentifier session_identifier = 1;
+}
+message OpenSessionRequest {
+    bytes header = 1;
+    bytes signature = 2;
+}
+message OpenSessionResponse {
+    QuerySessionInfo query_session_info = 1;
+    int64 session_timeout_second = 2;
+    int32 max_query_limit = 3;
+    string session_token = 4;
+}
+message CloseSessionPayload {
+    QuerySessionInfo session_info = 1;
+    string session_token = 2;
+}
+message CloseSessionRequest {
+    bytes payload = 1;
+    bytes signature = 2;
+}
+message CloseSessionResponse {
+    QuerySessionInfo query_session_info = 1;
+}
+
+
+
 message GetSessionInfoResponse {
-    // TODO the validator sign
-    bytes signature = 1;
     QuerySessionInfo session_info = 2;
 }
 

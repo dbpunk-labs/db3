@@ -140,7 +140,7 @@ example response
 example request
 
 ```
-{"method": "mutation", "params": ["b22Ui6N2RNkUyESx7KBXbFNW0RghyUO4vA8rW/DadSc="], "id": 1, "jsonrpc": "2.0"}
+curl --header "Content-Type: application/json" --request POST --data '{"method": "mutation", "params": ["b22Ui6N2RNkUyESx7KBXbFNW0RghyUO4vA8rW/DadSc="], "id": 1, "jsonrpc": "2.0"}' localhost:26670
 ```
 
 example response

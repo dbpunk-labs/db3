@@ -5,15 +5,41 @@ import * as db3_mutation_pb from './db3_mutation_pb';
 import * as db3_account_pb from './db3_account_pb';
 
 
-export class QueryBillRequest extends jspb.Message {
+export class QueryBillKey extends jspb.Message {
   getHeight(): number;
-  setHeight(value: number): QueryBillRequest;
+  setHeight(value: number): QueryBillKey;
 
   getStartId(): number;
-  setStartId(value: number): QueryBillRequest;
+  setStartId(value: number): QueryBillKey;
 
   getEndId(): number;
-  setEndId(value: number): QueryBillRequest;
+  setEndId(value: number): QueryBillKey;
+
+  getSessionToken(): string;
+  setSessionToken(value: string): QueryBillKey;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): QueryBillKey.AsObject;
+  static toObject(includeInstance: boolean, msg: QueryBillKey): QueryBillKey.AsObject;
+  static serializeBinaryToWriter(message: QueryBillKey, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): QueryBillKey;
+  static deserializeBinaryFromReader(message: QueryBillKey, reader: jspb.BinaryReader): QueryBillKey;
+}
+
+export namespace QueryBillKey {
+  export type AsObject = {
+    height: number,
+    startId: number,
+    endId: number,
+    sessionToken: string,
+  }
+}
+
+export class QueryBillRequest extends jspb.Message {
+  getQueryBillKey(): QueryBillKey | undefined;
+  setQueryBillKey(value?: QueryBillKey): QueryBillRequest;
+  hasQueryBillKey(): boolean;
+  clearQueryBillKey(): QueryBillRequest;
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): QueryBillRequest.AsObject;
@@ -25,9 +51,7 @@ export class QueryBillRequest extends jspb.Message {
 
 export namespace QueryBillRequest {
   export type AsObject = {
-    height: number,
-    startId: number,
-    endId: number,
+    queryBillKey?: QueryBillKey.AsObject,
   }
 }
 
@@ -118,8 +142,8 @@ export class BatchGetKey extends jspb.Message {
   clearKeysList(): BatchGetKey;
   addKeys(value: Uint8Array | string, index?: number): BatchGetKey;
 
-  getSession(): number;
-  setSession(value: number): BatchGetKey;
+  getSessionToken(): string;
+  setSessionToken(value: string): BatchGetKey;
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): BatchGetKey.AsObject;
@@ -133,7 +157,7 @@ export namespace BatchGetKey {
   export type AsObject = {
     ns: Uint8Array | string,
     keysList: Array<Uint8Array | string>,
-    session: number,
+    sessionToken: string,
   }
 }
 
@@ -143,8 +167,8 @@ export class BatchGetValue extends jspb.Message {
   clearValuesList(): BatchGetValue;
   addValues(value?: db3_mutation_pb.KVPair, index?: number): db3_mutation_pb.KVPair;
 
-  getSession(): number;
-  setSession(value: number): BatchGetValue;
+  getSessionToken(): string;
+  setSessionToken(value: string): BatchGetValue;
 
   getNs(): Uint8Array | string;
   getNs_asU8(): Uint8Array;
@@ -162,140 +186,26 @@ export class BatchGetValue extends jspb.Message {
 export namespace BatchGetValue {
   export type AsObject = {
     valuesList: Array<db3_mutation_pb.KVPair.AsObject>,
-    session: number,
+    sessionToken: string,
     ns: Uint8Array | string,
   }
 }
 
-export class GetKeyRequest extends jspb.Message {
-  getBatchGet(): Uint8Array | string;
-  getBatchGet_asU8(): Uint8Array;
-  getBatchGet_asB64(): string;
-  setBatchGet(value: Uint8Array | string): GetKeyRequest;
-
-  getSignature(): Uint8Array | string;
-  getSignature_asU8(): Uint8Array;
-  getSignature_asB64(): string;
-  setSignature(value: Uint8Array | string): GetKeyRequest;
+export class SessionIdentifier extends jspb.Message {
+  getSessionToken(): string;
+  setSessionToken(value: string): SessionIdentifier;
 
   serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): GetKeyRequest.AsObject;
-  static toObject(includeInstance: boolean, msg: GetKeyRequest): GetKeyRequest.AsObject;
-  static serializeBinaryToWriter(message: GetKeyRequest, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): GetKeyRequest;
-  static deserializeBinaryFromReader(message: GetKeyRequest, reader: jspb.BinaryReader): GetKeyRequest;
+  toObject(includeInstance?: boolean): SessionIdentifier.AsObject;
+  static toObject(includeInstance: boolean, msg: SessionIdentifier): SessionIdentifier.AsObject;
+  static serializeBinaryToWriter(message: SessionIdentifier, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): SessionIdentifier;
+  static deserializeBinaryFromReader(message: SessionIdentifier, reader: jspb.BinaryReader): SessionIdentifier;
 }
 
-export namespace GetKeyRequest {
+export namespace SessionIdentifier {
   export type AsObject = {
-    batchGet: Uint8Array | string,
-    signature: Uint8Array | string,
-  }
-}
-
-export class GetKeyResponse extends jspb.Message {
-  getSignature(): Uint8Array | string;
-  getSignature_asU8(): Uint8Array;
-  getSignature_asB64(): string;
-  setSignature(value: Uint8Array | string): GetKeyResponse;
-
-  getBatchGetValues(): BatchGetValue | undefined;
-  setBatchGetValues(value?: BatchGetValue): GetKeyResponse;
-  hasBatchGetValues(): boolean;
-  clearBatchGetValues(): GetKeyResponse;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): GetKeyResponse.AsObject;
-  static toObject(includeInstance: boolean, msg: GetKeyResponse): GetKeyResponse.AsObject;
-  static serializeBinaryToWriter(message: GetKeyResponse, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): GetKeyResponse;
-  static deserializeBinaryFromReader(message: GetKeyResponse, reader: jspb.BinaryReader): GetKeyResponse;
-}
-
-export namespace GetKeyResponse {
-  export type AsObject = {
-    signature: Uint8Array | string,
-    batchGetValues?: BatchGetValue.AsObject,
-  }
-}
-
-export class RestartSessionRequest extends jspb.Message {
-  getQuerySessionInfo(): Uint8Array | string;
-  getQuerySessionInfo_asU8(): Uint8Array;
-  getQuerySessionInfo_asB64(): string;
-  setQuerySessionInfo(value: Uint8Array | string): RestartSessionRequest;
-
-  getSignature(): Uint8Array | string;
-  getSignature_asU8(): Uint8Array;
-  getSignature_asB64(): string;
-  setSignature(value: Uint8Array | string): RestartSessionRequest;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): RestartSessionRequest.AsObject;
-  static toObject(includeInstance: boolean, msg: RestartSessionRequest): RestartSessionRequest.AsObject;
-  static serializeBinaryToWriter(message: RestartSessionRequest, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): RestartSessionRequest;
-  static deserializeBinaryFromReader(message: RestartSessionRequest, reader: jspb.BinaryReader): RestartSessionRequest;
-}
-
-export namespace RestartSessionRequest {
-  export type AsObject = {
-    querySessionInfo: Uint8Array | string,
-    signature: Uint8Array | string,
-  }
-}
-
-export class RestartSessionResponse extends jspb.Message {
-  getSession(): number;
-  setSession(value: number): RestartSessionResponse;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): RestartSessionResponse.AsObject;
-  static toObject(includeInstance: boolean, msg: RestartSessionResponse): RestartSessionResponse.AsObject;
-  static serializeBinaryToWriter(message: RestartSessionResponse, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): RestartSessionResponse;
-  static deserializeBinaryFromReader(message: RestartSessionResponse, reader: jspb.BinaryReader): RestartSessionResponse;
-}
-
-export namespace RestartSessionResponse {
-  export type AsObject = {
-    session: number,
-  }
-}
-
-export class GetAccountRequest extends jspb.Message {
-  getAddr(): string;
-  setAddr(value: string): GetAccountRequest;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): GetAccountRequest.AsObject;
-  static toObject(includeInstance: boolean, msg: GetAccountRequest): GetAccountRequest.AsObject;
-  static serializeBinaryToWriter(message: GetAccountRequest, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): GetAccountRequest;
-  static deserializeBinaryFromReader(message: GetAccountRequest, reader: jspb.BinaryReader): GetAccountRequest;
-}
-
-export namespace GetAccountRequest {
-  export type AsObject = {
-    addr: string,
-  }
-}
-
-export class GetSessionInfoRequest extends jspb.Message {
-  getAddr(): string;
-  setAddr(value: string): GetSessionInfoRequest;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): GetSessionInfoRequest.AsObject;
-  static toObject(includeInstance: boolean, msg: GetSessionInfoRequest): GetSessionInfoRequest.AsObject;
-  static serializeBinaryToWriter(message: GetSessionInfoRequest, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): GetSessionInfoRequest;
-  static deserializeBinaryFromReader(message: GetSessionInfoRequest, reader: jspb.BinaryReader): GetSessionInfoRequest;
-}
-
-export namespace GetSessionInfoRequest {
-  export type AsObject = {
-    addr: string,
+    sessionToken: string,
   }
 }
 
@@ -329,12 +239,213 @@ export namespace QuerySessionInfo {
   }
 }
 
-export class GetSessionInfoResponse extends jspb.Message {
+export class GetKeyRequest extends jspb.Message {
+  getBatchGet(): BatchGetKey | undefined;
+  setBatchGet(value?: BatchGetKey): GetKeyRequest;
+  hasBatchGet(): boolean;
+  clearBatchGet(): GetKeyRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetKeyRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetKeyRequest): GetKeyRequest.AsObject;
+  static serializeBinaryToWriter(message: GetKeyRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetKeyRequest;
+  static deserializeBinaryFromReader(message: GetKeyRequest, reader: jspb.BinaryReader): GetKeyRequest;
+}
+
+export namespace GetKeyRequest {
+  export type AsObject = {
+    batchGet?: BatchGetKey.AsObject,
+  }
+}
+
+export class GetKeyResponse extends jspb.Message {
+  getBatchGetValues(): BatchGetValue | undefined;
+  setBatchGetValues(value?: BatchGetValue): GetKeyResponse;
+  hasBatchGetValues(): boolean;
+  clearBatchGetValues(): GetKeyResponse;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetKeyResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: GetKeyResponse): GetKeyResponse.AsObject;
+  static serializeBinaryToWriter(message: GetKeyResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetKeyResponse;
+  static deserializeBinaryFromReader(message: GetKeyResponse, reader: jspb.BinaryReader): GetKeyResponse;
+}
+
+export namespace GetKeyResponse {
+  export type AsObject = {
+    batchGetValues?: BatchGetValue.AsObject,
+  }
+}
+
+export class GetAccountRequest extends jspb.Message {
+  getAddr(): string;
+  setAddr(value: string): GetAccountRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetAccountRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetAccountRequest): GetAccountRequest.AsObject;
+  static serializeBinaryToWriter(message: GetAccountRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetAccountRequest;
+  static deserializeBinaryFromReader(message: GetAccountRequest, reader: jspb.BinaryReader): GetAccountRequest;
+}
+
+export namespace GetAccountRequest {
+  export type AsObject = {
+    addr: string,
+  }
+}
+
+export class GetSessionInfoRequest extends jspb.Message {
+  getSessionIdentifier(): SessionIdentifier | undefined;
+  setSessionIdentifier(value?: SessionIdentifier): GetSessionInfoRequest;
+  hasSessionIdentifier(): boolean;
+  clearSessionIdentifier(): GetSessionInfoRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetSessionInfoRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetSessionInfoRequest): GetSessionInfoRequest.AsObject;
+  static serializeBinaryToWriter(message: GetSessionInfoRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetSessionInfoRequest;
+  static deserializeBinaryFromReader(message: GetSessionInfoRequest, reader: jspb.BinaryReader): GetSessionInfoRequest;
+}
+
+export namespace GetSessionInfoRequest {
+  export type AsObject = {
+    sessionIdentifier?: SessionIdentifier.AsObject,
+  }
+}
+
+export class OpenSessionRequest extends jspb.Message {
+  getHeader(): Uint8Array | string;
+  getHeader_asU8(): Uint8Array;
+  getHeader_asB64(): string;
+  setHeader(value: Uint8Array | string): OpenSessionRequest;
+
   getSignature(): Uint8Array | string;
   getSignature_asU8(): Uint8Array;
   getSignature_asB64(): string;
-  setSignature(value: Uint8Array | string): GetSessionInfoResponse;
+  setSignature(value: Uint8Array | string): OpenSessionRequest;
 
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): OpenSessionRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: OpenSessionRequest): OpenSessionRequest.AsObject;
+  static serializeBinaryToWriter(message: OpenSessionRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): OpenSessionRequest;
+  static deserializeBinaryFromReader(message: OpenSessionRequest, reader: jspb.BinaryReader): OpenSessionRequest;
+}
+
+export namespace OpenSessionRequest {
+  export type AsObject = {
+    header: Uint8Array | string,
+    signature: Uint8Array | string,
+  }
+}
+
+export class OpenSessionResponse extends jspb.Message {
+  getQuerySessionInfo(): QuerySessionInfo | undefined;
+  setQuerySessionInfo(value?: QuerySessionInfo): OpenSessionResponse;
+  hasQuerySessionInfo(): boolean;
+  clearQuerySessionInfo(): OpenSessionResponse;
+
+  getSessionTimeoutSecond(): number;
+  setSessionTimeoutSecond(value: number): OpenSessionResponse;
+
+  getMaxQueryLimit(): number;
+  setMaxQueryLimit(value: number): OpenSessionResponse;
+
+  getSessionToken(): string;
+  setSessionToken(value: string): OpenSessionResponse;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): OpenSessionResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: OpenSessionResponse): OpenSessionResponse.AsObject;
+  static serializeBinaryToWriter(message: OpenSessionResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): OpenSessionResponse;
+  static deserializeBinaryFromReader(message: OpenSessionResponse, reader: jspb.BinaryReader): OpenSessionResponse;
+}
+
+export namespace OpenSessionResponse {
+  export type AsObject = {
+    querySessionInfo?: QuerySessionInfo.AsObject,
+    sessionTimeoutSecond: number,
+    maxQueryLimit: number,
+    sessionToken: string,
+  }
+}
+
+export class CloseSessionPayload extends jspb.Message {
+  getSessionInfo(): QuerySessionInfo | undefined;
+  setSessionInfo(value?: QuerySessionInfo): CloseSessionPayload;
+  hasSessionInfo(): boolean;
+  clearSessionInfo(): CloseSessionPayload;
+
+  getSessionToken(): string;
+  setSessionToken(value: string): CloseSessionPayload;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): CloseSessionPayload.AsObject;
+  static toObject(includeInstance: boolean, msg: CloseSessionPayload): CloseSessionPayload.AsObject;
+  static serializeBinaryToWriter(message: CloseSessionPayload, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): CloseSessionPayload;
+  static deserializeBinaryFromReader(message: CloseSessionPayload, reader: jspb.BinaryReader): CloseSessionPayload;
+}
+
+export namespace CloseSessionPayload {
+  export type AsObject = {
+    sessionInfo?: QuerySessionInfo.AsObject,
+    sessionToken: string,
+  }
+}
+
+export class CloseSessionRequest extends jspb.Message {
+  getPayload(): Uint8Array | string;
+  getPayload_asU8(): Uint8Array;
+  getPayload_asB64(): string;
+  setPayload(value: Uint8Array | string): CloseSessionRequest;
+
+  getSignature(): Uint8Array | string;
+  getSignature_asU8(): Uint8Array;
+  getSignature_asB64(): string;
+  setSignature(value: Uint8Array | string): CloseSessionRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): CloseSessionRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: CloseSessionRequest): CloseSessionRequest.AsObject;
+  static serializeBinaryToWriter(message: CloseSessionRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): CloseSessionRequest;
+  static deserializeBinaryFromReader(message: CloseSessionRequest, reader: jspb.BinaryReader): CloseSessionRequest;
+}
+
+export namespace CloseSessionRequest {
+  export type AsObject = {
+    payload: Uint8Array | string,
+    signature: Uint8Array | string,
+  }
+}
+
+export class CloseSessionResponse extends jspb.Message {
+  getQuerySessionInfo(): QuerySessionInfo | undefined;
+  setQuerySessionInfo(value?: QuerySessionInfo): CloseSessionResponse;
+  hasQuerySessionInfo(): boolean;
+  clearQuerySessionInfo(): CloseSessionResponse;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): CloseSessionResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: CloseSessionResponse): CloseSessionResponse.AsObject;
+  static serializeBinaryToWriter(message: CloseSessionResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): CloseSessionResponse;
+  static deserializeBinaryFromReader(message: CloseSessionResponse, reader: jspb.BinaryReader): CloseSessionResponse;
+}
+
+export namespace CloseSessionResponse {
+  export type AsObject = {
+    querySessionInfo?: QuerySessionInfo.AsObject,
+  }
+}
+
+export class GetSessionInfoResponse extends jspb.Message {
   getSessionInfo(): QuerySessionInfo | undefined;
   setSessionInfo(value?: QuerySessionInfo): GetSessionInfoResponse;
   hasSessionInfo(): boolean;
@@ -350,7 +461,6 @@ export class GetSessionInfoResponse extends jspb.Message {
 
 export namespace GetSessionInfoResponse {
   export type AsObject = {
-    signature: Uint8Array | string,
     sessionInfo?: QuerySessionInfo.AsObject,
   }
 }
@@ -398,4 +508,5 @@ export namespace BroadcastResponse {
 export enum SessionStatus { 
   RUNNING = 0,
   BLOCKED = 1,
+  STOP = 2,
 }
