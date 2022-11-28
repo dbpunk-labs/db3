@@ -15,10 +15,12 @@
 // limitations under the License.
 //
 
-use super::auth_storage::{AuthStorage, Hash};
+use super::auth_storage::Hash;
+use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
+use db3_storage::kv_store::KvStore;
 use ethereum_types::Address as AccountAddress;
 use hex;
 use prost::Message;
@@ -33,6 +35,7 @@ use tendermint_proto::abci::{
     ResponseQuery,
 };
 use tracing::{debug, info, span, Level};
+
 #[derive(Clone)]
 pub struct NodeState {
     total_storage_bytes: Arc<AtomicU64>,
@@ -40,15 +43,15 @@ pub struct NodeState {
 }
 #[derive(Clone)]
 pub struct AbciImpl {
-    store: Arc<Mutex<Pin<Box<AuthStorage>>>>,
+    node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
     pending_mutation: Arc<Mutex<Vec<(AccountAddress, Hash, Mutation)>>>,
     node_state: Arc<NodeState>,
 }
 
 impl AbciImpl {
-    pub fn new(store: Arc<Mutex<Pin<Box<AuthStorage>>>>) -> Self {
+    pub fn new(node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>) -> Self {
         Self {
-            store,
+            node_store,
             pending_mutation: Arc::new(Mutex::new(Vec::new())),
             node_state: Arc::new(NodeState {
                 total_storage_bytes: Arc::new(AtomicU64::new(0)),
@@ -66,8 +69,9 @@ impl AbciImpl {
 impl Application for AbciImpl {
     fn info(&self, _request: RequestInfo) -> ResponseInfo {
         // the store must be ready when using it
-        match self.store.lock() {
-            Ok(s) => {
+        match self.node_store.lock() {
+            Ok(mut store) => {
+                let s = store.get_auth_store();
                 info!(
                     "height {} hash {}",
                     s.get_last_block_state().block_height,
@@ -89,8 +93,9 @@ impl Application for AbciImpl {
     }
 
     fn begin_block(&self, request: RequestBeginBlock) -> ResponseBeginBlock {
-        match self.store.lock() {
-            Ok(mut s) => {
+        match self.node_store.lock() {
+            Ok(mut store) => {
+                let s = store.get_auth_store();
                 if let Some(header) = request.header {
                     if let Some(time) = header.time {
                         s.begin_block(header.height as u64, time.seconds as u64);
@@ -111,33 +116,41 @@ impl Application for AbciImpl {
     }
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
-        let request = WriteRequest::decode(request.tx.as_ref()).unwrap();
-        let account_id =
-            verifier::Verifier::verify(request.mutation.as_ref(), request.signature.as_ref());
-        match account_id {
-            Ok(_) => ResponseCheckTx {
-                code: 0,
-                data: Bytes::new(),
-                log: "".to_string(),
-                info: "".to_string(),
-                gas_wanted: 1,
-                gas_used: 0,
-                events: vec![],
-                codespace: "".to_string(),
-                ..Default::default()
-            },
-            Err(_) => ResponseCheckTx {
-                code: 1,
-                data: Bytes::new(),
-                log: "".to_string(),
-                info: "".to_string(),
-                gas_wanted: 1,
-                gas_used: 0,
-                events: vec![],
-                codespace: "".to_string(),
-                ..Default::default()
-            },
+        // decode the request
+        if let Ok(request) = WriteRequest::decode(request.tx.as_ref()) {
+            // recover the account addr
+            if let Ok(_account_id) =
+                verifier::Verifier::verify(request.mutation.as_ref(), request.signature.as_ref())
+            {
+                if let Ok(mutation) = Mutation::decode(request.mutation.as_ref()) {
+                    if KvStore::is_valid(&mutation) {
+                        return ResponseCheckTx {
+                            code: 0,
+                            data: Bytes::new(),
+                            log: "".to_string(),
+                            info: "".to_string(),
+                            gas_wanted: 1,
+                            gas_used: 0,
+                            events: vec![],
+                            codespace: "".to_string(),
+                            ..Default::default()
+                        };
+                    }
+                }
+            }
         }
+        // the tx should be removed from mempool
+        return ResponseCheckTx {
+            code: 1,
+            data: Bytes::new(),
+            log: "bad request".to_string(),
+            info: "".to_string(),
+            gas_wanted: 1,
+            gas_used: 0,
+            events: vec![],
+            codespace: "".to_string(),
+            ..Default::default()
+        };
     }
 
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
@@ -184,8 +197,9 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
-        match self.store.lock() {
-            Ok(mut s) => {
+        match self.node_store.lock() {
+            Ok(mut store) => {
+                let s = store.get_auth_store();
                 let span = span!(Level::INFO, "commit").entered();
                 let pending_mutation_len = pending_mutation.len();
                 for item in pending_mutation {

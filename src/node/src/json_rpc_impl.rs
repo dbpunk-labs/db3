@@ -280,8 +280,8 @@ async fn handle_account(
     } else {
         if let Value::String(s) = &params[0] {
             if let Ok(addr) = AccountAddress::from_str(s.as_str()) {
-                let account = match context.store.lock() {
-                    Ok(s) => s.get_account(&addr),
+                let account = match context.node_store.lock() {
+                    Ok(mut store) => store.get_auth_store().get_account(&addr),
                     _ => todo!(),
                 }
                 .map_err(|_| json_rpc::ErrorData::new(-32601, "fail to get account"))?;
@@ -384,9 +384,12 @@ async fn handle_bills(
         Err(json_rpc::ErrorData::new(-32601, err))
     } else {
         if let Value::Number(n) = &params[0] {
-            match context.store.lock() {
-                Ok(s) => {
-                    if let Ok(bills) = s.get_bills(n.as_u64().unwrap(), 1, 100) {
+            match context.node_store.lock() {
+                Ok(mut store) => {
+                    if let Ok(bills) = store
+                        .get_auth_store()
+                        .get_bills(n.as_u64().unwrap(), 1, 100)
+                    {
                         let value = bills_to_value(&bills);
                         return Ok(ResponseWrapper::Internal(json_rpc::Response {
                             jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
