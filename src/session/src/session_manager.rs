@@ -19,6 +19,10 @@ use chrono::Utc;
 use db3_proto::db3_node_proto::{QuerySessionInfo, SessionStatus};
 use ethereum_types::Address;
 use std::collections::HashMap;
+use uuid::Uuid;
+
+// retry generate token
+pub const GEN_TOKEN_RETRY: i32 = 10;
 // default session timeout 1hrs
 pub const DEFAULT_SESSION_PERIOD: i64 = 3600;
 // default session limit
@@ -30,9 +34,10 @@ pub const DEFAULT_SESSION_POOL_SIZE_LIMIT: usize = 1000;
 pub const DEFAULT_CLEANUP_SESSION_PERIOD: i64 = 60;
 
 pub struct SessionPool {
-    session_pool: HashMap<i32, SessionManager>,
+    session_pool: HashMap<String, SessionManager>,
     last_cleanup_time: i64,
 }
+
 impl SessionPool {
     pub fn new() -> Self {
         SessionPool {
@@ -51,105 +56,153 @@ impl SessionPool {
     pub fn need_cleanup(&self) -> bool {
         (Utc::now().timestamp() - self.last_cleanup_time) >= DEFAULT_CLEANUP_SESSION_PERIOD
     }
+
     /// add brand new session into the pool
     /// clean up the pool when the pool size exceed half
-    pub fn create_new_session(&mut self, id: i32) -> Result<i32, String> {
+    pub fn create_new_session(
+        &mut self,
+        sid: i32,
+        token: &String,
+    ) -> Result<(String, QuerySessionInfo), String> {
         if self.need_cleanup() {
             self.cleanup_session();
         }
+
         if self.session_pool.len() >= DEFAULT_SESSION_POOL_SIZE_LIMIT {
-            Err(format!(
+            return Err(format!(
                 "Fail to create new session since session pool size exceed limit {}",
                 DEFAULT_SESSION_POOL_SIZE_LIMIT
-            ))
-        } else if self.session_pool.contains_key(&id) {
-            Err(format!(
-                "Fail to create new session since session id {} already exist",
-                id
-            ))
+            ));
+        }
+
+        let sess = SessionManager::create_session(sid);
+        self.session_pool.insert(token.clone(), sess.clone());
+        return Ok((token.clone(), sess.session_info));
+    }
+    pub fn insert_session_with_token(
+        &mut self,
+        session_info: &QuerySessionInfo,
+        token: &String,
+    ) -> Result<String, String> {
+        if self.session_pool.contains_key(token) {
+            Err(format!("Fail to create session. Token already exist."))
         } else {
-            self.session_pool
-                .insert(id, SessionManager::create_session(id));
-            Ok(id)
+            self.session_pool.insert(
+                token.clone(),
+                SessionManager {
+                    session_info: session_info.clone(),
+                },
+            );
+            Ok(token.clone())
+        }
+    }
+    pub fn remove_session(&mut self, token: &String) -> Result<SessionManager, String> {
+        match self.session_pool.remove(token) {
+            Some(session) => Ok(session),
+            None => Err(format!("session {} not exist in session pool", token)),
         }
     }
 
-    pub fn remove_session(&mut self, session_id: i32) -> Result<i32, String> {
-        if self.session_pool.contains_key(&session_id) {
-            self.session_pool.remove(&session_id);
-            Ok(session_id)
-        } else {
-            Err(format!("session {} not exist in session pool", session_id))
-        }
+    pub fn get_session(&self, token: &String) -> Option<&SessionManager> {
+        self.session_pool.get(token)
     }
-
-    pub fn get_session(&self, session_id: i32) -> Option<&SessionManager> {
-        self.session_pool.get(&session_id)
-    }
-    pub fn get_session_mut(&mut self, session_id: i32) -> Option<&mut SessionManager> {
-        self.session_pool.get_mut(&session_id)
+    pub fn get_session_mut(&mut self, token: &String) -> Option<&mut SessionManager> {
+        self.session_pool.get_mut(token)
     }
 
     pub fn get_pool_size(&self) -> usize {
         self.session_pool.len()
     }
 }
+
 pub struct SessionStore {
     session_pools: HashMap<Address, SessionPool>,
-    uuid: i32,
+    token_account_map: HashMap<String, Address>,
+    sid: i32,
 }
 
 impl SessionStore {
     pub fn new() -> Self {
         SessionStore {
             session_pools: HashMap::new(),
-            uuid: 0,
+            token_account_map: HashMap::new(),
+            sid: 0,
         }
+    }
+    fn gen_token(&self) -> String {
+        Uuid::new_v4().to_string()
+    }
+
+    fn generate_unique_token(&self) -> Result<String, String> {
+        for _ in 0..GEN_TOKEN_RETRY {
+            let token = self.gen_token();
+            if !self.token_account_map.contains_key(&token) {
+                return Ok(token.clone());
+            }
+        }
+        Err(format!("Fail to generate unique token after retry"))
     }
 
     /// Add session into pool
-    pub fn add_new_session(&mut self, addr: Address) -> Result<i32, String> {
-        self.uuid += 1;
+    pub fn add_new_session(&mut self, addr: Address) -> Result<(String, QuerySessionInfo), String> {
+        self.sid += 1;
+        let token = self.generate_unique_token().map_err(|e| e)?;
         match self.session_pools.get_mut(&addr) {
-            Some(sess_pool) => sess_pool.create_new_session(self.uuid),
+            Some(sess_pool) => {
+                self.token_account_map.insert(token.clone(), addr);
+                sess_pool.create_new_session(self.sid, &token)
+            }
             None => {
                 let mut sess_pool = SessionPool::new();
-                let res = sess_pool.create_new_session(self.uuid);
+                let res = sess_pool.create_new_session(self.sid, &token);
                 if res.is_ok() {
+                    self.token_account_map.insert(token.clone(), addr);
                     self.session_pools.insert(addr, sess_pool);
                 }
                 res
             }
         }
     }
-    pub fn remove_session(&mut self, addr: Address, session_id: i32) -> Result<i32, String> {
-        match self.session_pools.get_mut(&addr) {
-            Some(sess_pool) => sess_pool.remove_session(session_id),
-            None => Err(format!(
-                "Fail to remove session since  {}",
-                DEFAULT_SESSION_POOL_SIZE_LIMIT
-            )),
+
+    /// remove session with given token
+    /// 1. verify token exsit
+    /// 2. verify session exist with given (token, addr)
+    pub fn remove_session(&mut self, token: &String) -> Result<SessionManager, String> {
+        match self.token_account_map.remove(token) {
+            Some(addr) => match self.session_pools.get_mut(&addr) {
+                Some(sess_pool) => sess_pool.remove_session(token),
+                None => Err(format!("Fail to remove session. Address not exist")),
+            },
+            None => Err(format!("Fail to remove session, token not exist {}", token)),
         }
     }
-    pub fn is_session_exist(self, addr: Address, session_id: i32) -> bool {
-        match self.session_pools.get(&addr) {
-            Some(sess_pool) => sess_pool.session_pool.contains_key(&session_id),
+    pub fn is_session_exist(&self, token: &String) -> bool {
+        match self.token_account_map.get(token) {
+            Some(addr) => match self.session_pools.get(&addr) {
+                Some(sess_pool) => sess_pool.session_pool.contains_key(token),
+                None => false,
+            },
             None => false,
         }
     }
-    pub fn get_session_mut(
-        &mut self,
-        addr: Address,
-        session_id: i32,
-    ) -> Option<&mut SessionManager> {
-        match self.session_pools.get_mut(&addr) {
-            Some(sess_pool) => sess_pool.session_pool.get_mut(&session_id),
+    pub fn get_address(&self, token: &String) -> Option<Address> {
+        match self.token_account_map.get(token).clone() {
+            Some(addr) => Some(addr.clone()),
+            None => None,
+        }
+    }
+    pub fn get_session_mut(&mut self, token: &String) -> Option<&mut SessionManager> {
+        match self.token_account_map.get(token) {
+            Some(addr) => match self.session_pools.get_mut(&addr) {
+                Some(sess_pool) => sess_pool.session_pool.get_mut(token),
+                None => None,
+            },
             None => None,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SessionManager {
     session_info: QuerySessionInfo,
 }
@@ -159,10 +212,11 @@ impl SessionManager {
         Self::create_session(0)
     }
     pub fn create_session(id: i32) -> Self {
+        let start_time = Utc::now().timestamp();
         SessionManager {
             session_info: QuerySessionInfo {
                 id,
-                start_time: Utc::now().timestamp(),
+                start_time,
                 query_count: 0,
                 status: SessionStatus::Running.into(),
             },
@@ -199,16 +253,11 @@ impl SessionManager {
     pub fn close_session(&mut self) {
         self.session_info.status = SessionStatus::Stop.into();
     }
-    pub fn reset_session(&mut self) {
-        self.session_info.query_count = 0;
-        self.session_info.status = SessionStatus::Running.into();
-        self.session_info.start_time = Utc::now().timestamp();
-        self.session_info.id += 1;
-    }
     pub fn increase_query(&mut self, count: i32) {
         self.session_info.query_count += count;
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,6 +266,7 @@ mod tests {
     use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
     use hex;
+
     #[test]
     fn test_new_session() {
         let mut session = SessionManager::new();
@@ -248,30 +298,6 @@ mod tests {
     }
 
     #[test]
-    fn add_session_test() {
-        let mut sess_store = SessionStore::new();
-        let pk = Secp256k1PublicKey::from_bytes(
-            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
-                .unwrap(),
-        );
-        let addr = get_address_from_pk(&pk.unwrap().pubkey);
-
-        // add session and create new session pool
-        {
-            let res = sess_store.add_new_session(addr);
-            assert!(res.is_ok());
-            assert_eq!(1, res.unwrap());
-        }
-
-        // add session into existing session pool
-        {
-            let res = sess_store.add_new_session(addr);
-            assert!(res.is_ok());
-            assert_eq!(2, res.unwrap());
-        }
-    }
-
-    #[test]
     fn add_session_exceed_limit() {
         let mut sess_store = SessionStore::new();
         let pk = Secp256k1PublicKey::from_bytes(
@@ -291,6 +317,7 @@ mod tests {
             res.err().unwrap()
         );
     }
+
     #[test]
     fn get_session() {
         let mut sess_store = SessionStore::new();
@@ -299,25 +326,29 @@ mod tests {
                 .unwrap(),
         );
         let addr = get_address_from_pk(&pk.unwrap().pubkey);
+        let mut token1 = String::new();
         // add session and create new session pool
         {
             let res = sess_store.add_new_session(addr);
             assert!(res.is_ok());
-            assert_eq!(1, res.unwrap());
+            token1 = res.unwrap().0;
+            assert_eq!(token1.len(), 36);
         }
         // add session into existing session pool
+        let mut token2 = String::new();
         {
             let res = sess_store.add_new_session(addr);
             assert!(res.is_ok());
-            assert_eq!(2, res.unwrap());
+            token2 = res.unwrap().0;
+            assert_ne!(token1, token2);
         }
         {
-            let res = sess_store.get_session_mut(addr, 1);
+            let res = sess_store.get_session_mut(&token1);
             assert!(res.is_some());
             assert_eq!(res.unwrap().get_session_id(), 1);
         }
         {
-            let res = sess_store.get_session_mut(addr, 3);
+            let res = sess_store.get_session_mut(&"token_unknow".to_string());
             assert!(res.is_none());
         }
     }
@@ -331,28 +362,30 @@ mod tests {
         );
         let addr = get_address_from_pk(&pk.unwrap().pubkey);
 
+        let mut token1 = String::new();
         // add session and create new session pool
         {
             let res = sess_store.add_new_session(addr);
             assert!(res.is_ok());
-            assert_eq!(1, res.unwrap());
+            token1 = res.unwrap().0;
+            assert_eq!(token1.len(), 36);
         }
-
         // add session into existing session pool
+        let mut token2 = String::new();
         {
             let res = sess_store.add_new_session(addr);
             assert!(res.is_ok());
-            assert_eq!(2, res.unwrap());
+            token2 = res.unwrap().0;
+            assert_ne!(token1, token2);
         }
         {
-            let res = sess_store.remove_session(addr, 2);
+            let res = sess_store.remove_session(&token2);
             assert!(res.is_ok());
-            assert_eq!(2, res.unwrap());
+            assert_eq!(2, res.unwrap().get_session_id());
         }
         {
-            let res = sess_store.remove_session(addr, 2);
+            let res = sess_store.remove_session(&token2);
             assert!(res.is_err());
-            assert_eq!("session 2 not exist in session pool", res.err().unwrap());
         }
     }
 
@@ -366,12 +399,11 @@ mod tests {
         let addr = get_address_from_pk(&pk.unwrap().pubkey);
 
         for i in 0..100 {
-            let res = sess_store.add_new_session(addr);
-            assert!(res.is_ok());
+            let (token, _) = sess_store.add_new_session(addr).unwrap();
 
             // convert session with even id into blocked status
             if i % 2 == 0 {
-                let session = sess_store.get_session_mut(addr, res.unwrap()).unwrap();
+                let session = sess_store.get_session_mut(&token).unwrap();
                 session.increase_query(DEFAULT_SESSION_QUERY_LIMIT + 1);
                 session.check_session_status();
                 assert_eq!(SessionStatus::Blocked, session.check_session_status());

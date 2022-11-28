@@ -139,54 +139,104 @@ export class StorageNodeClient {
 		);
 	}
 
-	methodDescriptorRestartQuerySession = new grpcWeb.MethodDescriptor(
-		"/db3_node_proto.StorageNode/RestartQuerySession",
+	methodDescriptorOpenQuerySession = new grpcWeb.MethodDescriptor(
+		"/db3_node_proto.StorageNode/OpenQuerySession",
 		grpcWeb.MethodType.UNARY,
-		db3_node_pb.RestartSessionRequest,
-		db3_node_pb.RestartSessionResponse,
-		(request: db3_node_pb.RestartSessionRequest) => {
+		db3_node_pb.OpenSessionRequest,
+		db3_node_pb.OpenSessionResponse,
+		(request: db3_node_pb.OpenSessionRequest) => {
 			return request.serializeBinary();
 		},
-		db3_node_pb.RestartSessionResponse.deserializeBinary,
+		db3_node_pb.OpenSessionResponse.deserializeBinary,
 	);
 
-	restartQuerySession(
-		request: db3_node_pb.RestartSessionRequest,
+	openQuerySession(
+		request: db3_node_pb.OpenSessionRequest,
 		metadata: grpcWeb.Metadata | null,
-	): Promise<db3_node_pb.RestartSessionResponse>;
+	): Promise<db3_node_pb.OpenSessionResponse>;
 
-	restartQuerySession(
-		request: db3_node_pb.RestartSessionRequest,
+	openQuerySession(
+		request: db3_node_pb.OpenSessionRequest,
 		metadata: grpcWeb.Metadata | null,
 		callback: (
 			err: grpcWeb.RpcError,
-			response: db3_node_pb.RestartSessionResponse,
+			response: db3_node_pb.OpenSessionResponse,
 		) => void,
-	): grpcWeb.ClientReadableStream<db3_node_pb.RestartSessionResponse>;
+	): grpcWeb.ClientReadableStream<db3_node_pb.OpenSessionResponse>;
 
-	restartQuerySession(
-		request: db3_node_pb.RestartSessionRequest,
+	openQuerySession(
+		request: db3_node_pb.OpenSessionRequest,
 		metadata: grpcWeb.Metadata | null,
 		callback?: (
 			err: grpcWeb.RpcError,
-			response: db3_node_pb.RestartSessionResponse,
+			response: db3_node_pb.OpenSessionResponse,
+		) => void,
+	) {
+		if (callback !== undefined) {
+			return this.client_.rpcCall(
+				this.hostname_ + "/db3_node_proto.StorageNode/OpenQuerySession",
+				request,
+				metadata || {},
+				this.methodDescriptorOpenQuerySession,
+				callback,
+			);
+		}
+		return this.client_.unaryCall(
+			this.hostname_ + "/db3_node_proto.StorageNode/OpenQuerySession",
+			request,
+			metadata || {},
+			this.methodDescriptorOpenQuerySession,
+		);
+	}
+
+	methodDescriptorCloseQuerySession = new grpcWeb.MethodDescriptor(
+		"/db3_node_proto.StorageNode/CloseQuerySession",
+		grpcWeb.MethodType.UNARY,
+		db3_node_pb.CloseSessionRequest,
+		db3_node_pb.CloseSessionResponse,
+		(request: db3_node_pb.CloseSessionRequest) => {
+			return request.serializeBinary();
+		},
+		db3_node_pb.CloseSessionResponse.deserializeBinary,
+	);
+
+	closeQuerySession(
+		request: db3_node_pb.CloseSessionRequest,
+		metadata: grpcWeb.Metadata | null,
+	): Promise<db3_node_pb.CloseSessionResponse>;
+
+	closeQuerySession(
+		request: db3_node_pb.CloseSessionRequest,
+		metadata: grpcWeb.Metadata | null,
+		callback: (
+			err: grpcWeb.RpcError,
+			response: db3_node_pb.CloseSessionResponse,
+		) => void,
+	): grpcWeb.ClientReadableStream<db3_node_pb.CloseSessionResponse>;
+
+	closeQuerySession(
+		request: db3_node_pb.CloseSessionRequest,
+		metadata: grpcWeb.Metadata | null,
+		callback?: (
+			err: grpcWeb.RpcError,
+			response: db3_node_pb.CloseSessionResponse,
 		) => void,
 	) {
 		if (callback !== undefined) {
 			return this.client_.rpcCall(
 				this.hostname_ +
-					"/db3_node_proto.StorageNode/RestartQuerySession",
+					"/db3_node_proto.StorageNode/CloseQuerySession",
 				request,
 				metadata || {},
-				this.methodDescriptorRestartQuerySession,
+				this.methodDescriptorCloseQuerySession,
 				callback,
 			);
 		}
 		return this.client_.unaryCall(
-			this.hostname_ + "/db3_node_proto.StorageNode/RestartQuerySession",
+			this.hostname_ + "/db3_node_proto.StorageNode/CloseQuerySession",
 			request,
 			metadata || {},
-			this.methodDescriptorRestartQuerySession,
+			this.methodDescriptorCloseQuerySession,
 		);
 	}
 

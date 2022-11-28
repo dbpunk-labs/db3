@@ -19,7 +19,7 @@ use db3_base::{get_address_from_pk, strings};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
-use db3_proto::db3_node_proto::OpenSessionResponse;
+use db3_proto::db3_node_proto::{OpenSessionResponse, SessionStatus};
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use fastcrypto::secp256k1::Secp256k1KeyPair;
@@ -29,11 +29,11 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 #[macro_use]
 extern crate prettytable;
 use prettytable::{format, Table};
+use std::process::exit;
 
 const HELP: &str = r#"the help of db3 command
 help    show all command
@@ -44,8 +44,7 @@ range   get a range from db3                e.g. range ns1 start_key end_key
 account get balance of current account
 blocks  get latest blocks
 session info        get session info    e.g session info
-session restart     restart session             e.g session restart
-
+quit    quit command line console
 "#;
 
 fn current_seconds() -> u64 {
@@ -56,14 +55,20 @@ fn current_seconds() -> u64 {
 }
 
 pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
-    if warning {
-        println!("WARNING, db3 will generate private key and save it to ~/.db3/key");
-    }
-    let user_dir: &str = "~/.db3";
-    let user_key: &str = "~/.db3/key";
+    let mut home_dir = std::env::home_dir().unwrap();
+    home_dir.push(".db3");
+    let user_dir = home_dir.as_path();
     std::fs::create_dir_all(user_dir)?;
-    if Path::new("~/.db3/key").exists() {
-        let b64_str = std::fs::read_to_string(user_key)?;
+    home_dir.push("user.key");
+    let key_path = home_dir.as_path();
+    if warning {
+        println!(
+            "WARNING, db3 will generate private key and save it to {}",
+            key_path.to_string_lossy()
+        );
+    }
+    if key_path.exists() {
+        let b64_str = std::fs::read_to_string(key_path)?;
         let key_pair = Secp256k1KeyPair::decode_base64(b64_str.as_str()).unwrap();
         let addr = get_address_from_pk(&key_pair.public().pubkey);
         if warning {
@@ -71,11 +76,11 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
         }
         Ok(key_pair)
     } else {
-        let mut rng = StdRng::from_seed([0; 32]);
+        let mut rng = StdRng::seed_from_u64(current_seconds());
         let kp = Secp256k1KeyPair::generate(&mut rng);
         let addr = get_address_from_pk(&kp.public().pubkey);
         let b64_str = kp.encode_base64();
-        let mut f = File::create(user_key)?;
+        let mut f = File::create(key_path)?;
         f.write_all(b64_str.as_bytes())?;
         f.sync_all()?;
         if warning {
@@ -107,35 +112,107 @@ fn show_account(account: &Account) {
     ]);
     table.printstd();
 }
+
+/// open new session
+async fn open_session(store_sdk: &mut StoreSDK, session: &mut Option<OpenSessionResponse>) -> bool {
+    match store_sdk.open_session().await {
+        Ok(open_session_info) => {
+            *session = Some(open_session_info);
+            println!("Open Session Successfully!\n{:?}", session.as_ref());
+            return true;
+        }
+        Err(e) => {
+            println!("Open Session Error: {}", e);
+            return false;
+        }
+    }
+}
+
+/// close current session
+async fn close_session(
+    store_sdk: &mut StoreSDK,
+    session: &mut Option<OpenSessionResponse>,
+) -> bool {
+    if session.is_none() {
+        return true;
+    }
+    match store_sdk
+        .close_session(&session.as_ref().unwrap().session_token)
+        .await
+    {
+        Ok((sess_info_node, sess_info_client)) => {
+            println!(
+                "Close Session Successfully!\nNode session {:?}\nClient session: {:?}",
+                sess_info_node, sess_info_client
+            );
+            // set session_id to 0
+            *session = None;
+            return true;
+        }
+        Err(e) => {
+            println!("Close Session Error: {}", e);
+            return false;
+        }
+    }
+}
+/// restart session when current session is invalid/closed/blocked
+async fn refresh_session(
+    store_sdk: &mut StoreSDK,
+    session: &mut Option<OpenSessionResponse>,
+) -> bool {
+    if session.is_none() {
+        return open_session(store_sdk, session).await;
+    }
+    if store_sdk
+        .get_session_info(&session.as_ref().unwrap().session_token)
+        .await
+        .map_err(|e| {
+            println!("{:?}", e);
+            return false;
+        })
+        .unwrap()
+        .status
+        != SessionStatus::Running.into()
+    {
+        println!("Refresh session...");
+        return close_session(store_sdk, session).await && open_session(store_sdk, session).await;
+    }
+    return true;
+}
 pub async fn process_cmd(
     sdk: &MutationSDK,
     store_sdk: &mut StoreSDK,
     cmd: &str,
     session: &mut Option<OpenSessionResponse>,
-) {
+) -> bool {
     let parts: Vec<&str> = cmd.split(" ").collect();
     if parts.len() < 1 {
         println!("{}", HELP);
-        return;
+        return false;
     }
     let cmd = parts[0];
     // session info: {session_id, max_query_limit,
     match cmd {
         "help" => {
             println!("{}", HELP);
-            return;
+            return true;
+        }
+        "quit" => {
+            close_session(store_sdk, session).await;
+            println!("Good bye!");
+            exit(1);
         }
         "account" => {
             let kp = get_key_pair(false).unwrap();
             let addr = get_address_from_pk(&kp.public().pubkey);
             let account = store_sdk.get_account(&addr).await.unwrap();
             show_account(&account);
-            return;
+            return true;
         }
         "session" => {
             if parts.len() < 2 {
                 println!("no enough command, e.g. session info | session restart");
-                return;
+                return false;
             }
             let op = parts[1];
             match op {
@@ -143,65 +220,17 @@ pub async fn process_cmd(
                     // TODO(chenjing): show history session list
                     if session.is_none() {
                         println!("start a session before query session info");
-                        return;
+                        return true;
                     }
                     if let Ok(session_info) = store_sdk
-                        .get_session_info(session.as_ref().unwrap().session_id)
+                        .get_session_info(&session.as_ref().unwrap().session_token)
                         .await
                     {
-                        println!("{:?}", session_info)
+                        println!("{:?}", session_info);
+                        return true;
                     } else {
                         println!("empty set");
-                    }
-                    return;
-                }
-                "open" => match store_sdk.open_session().await {
-                    Ok(open_session_info) => {
-                        *session = Some(open_session_info);
-                        println!("{:?}", *session);
-                    }
-                    Err(e) => {
-                        println!("Error: {}", e);
-                    }
-                },
-                "close" => {
-                    match store_sdk
-                        .close_session(session.as_ref().unwrap().session_id)
-                        .await
-                    {
-                        Ok(id) => {
-                            println!("Close Session {}", id);
-                            // set session_id to 0
-                            *session = None;
-                        }
-                        Err(e) => {
-                            println!("Error: {}", e);
-                        }
-                    }
-                }
-                "restart" => {
-                    match store_sdk
-                        .close_session(session.as_ref().unwrap().session_id)
-                        .await
-                    {
-                        Ok(id) => {
-                            println!("Close Session {}", id);
-                            // set session_id to 0
-                            *session = None;
-                            println!("Open Session ...");
-                            match store_sdk.open_session().await {
-                                Ok(open_session_info) => {
-                                    *session = Some(open_session_info);
-                                    println!("{:?}", session.as_ref());
-                                }
-                                Err(e) => {
-                                    println!("Open Session Error: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            println!("Close Session Error: {}", e);
-                        }
+                        return false;
                     }
                 }
                 _ => {}
@@ -209,30 +238,38 @@ pub async fn process_cmd(
         }
         "range" | "blocks" => {
             println!("to be provided");
-            return;
+            return false;
         }
         _ => {}
     }
     if parts.len() < 3 {
         println!("no enough command, e.g. put n1 k1 v1 k2 v2 k3 v3");
-        return;
+        return false;
     }
 
     let ns = parts[1];
     let mut pairs: Vec<KvPair> = Vec::new();
     match cmd {
         "get" => {
-            if session.is_none() {
-                println!("start a session before query");
-                return;
+            if !refresh_session(store_sdk, session).await {
+                return false;
             }
+
             let mut keys: Vec<Vec<u8>> = Vec::new();
             for i in 2..parts.len() {
                 keys.push(parts[i].as_bytes().to_vec());
             }
             if let Ok(Some(values)) = store_sdk
-                .batch_get(ns.as_bytes(), keys, session.as_ref().unwrap().session_id)
+                .batch_get(
+                    ns.as_bytes(),
+                    keys,
+                    &session.as_ref().unwrap().session_token,
+                )
                 .await
+                .map_err(|e| {
+                    println!("{:?}", e);
+                    return false;
+                })
             {
                 for kv in values.values {
                     println!(
@@ -241,15 +278,13 @@ pub async fn process_cmd(
                         std::str::from_utf8(kv.value.as_ref()).unwrap()
                     );
                 }
-            } else {
-                println!("empty set");
+                return true;
             }
-            return;
         }
         "put" => {
             if parts.len() < 4 {
                 println!("no enough command, e.g. put n1 k1 v1 k2 v2 k3 v3");
-                return;
+                return false;
             }
             for i in 1..parts.len() / 2 {
                 pairs.push(KvPair {
@@ -285,7 +320,90 @@ pub async fn process_cmd(
 
     if let Ok(_) = sdk.submit_mutation(&mutation).await {
         println!("submit mutation to mempool done!");
+        return true;
     } else {
         println!("fail to submit mutation to mempool");
+        return false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use db3_crypto::signer::Db3Signer;
+    use db3_proto::db3_mutation_proto::KvPair;
+    use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
+    use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
+    use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
+    use fastcrypto::secp256k1::Secp256k1KeyPair;
+    use fastcrypto::traits::KeyPair;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    use std::sync::Arc;
+    use std::{thread, time};
+    use tonic::transport::Endpoint;
+    #[tokio::test]
+    async fn cmd_smoke_test() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let mclient = client.clone();
+
+        let mut rng = StdRng::from_seed([0; 32]);
+        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let signer = Db3Signer::new(kp);
+        let msdk = MutationSDK::new(mclient, signer);
+        let mut rng = StdRng::from_seed([0; 32]);
+        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let signer = Db3Signer::new(kp);
+        let mut sdk = StoreSDK::new(client, signer);
+        let mut session: Option<OpenSessionResponse> = None;
+
+        // Put kv store
+        assert!(
+            process_cmd(
+                &msdk,
+                &mut sdk,
+                "put cmd_smoke_test k1 v1 k2 v2 k3 v3",
+                &mut session
+            )
+            .await
+        );
+        thread::sleep(time::Duration::from_millis(2000));
+
+        // Get kv store
+        assert!(process_cmd(&msdk, &mut sdk, "get cmd_smoke_test k1 k2 k3", &mut session).await);
+
+        // Refresh session
+        let session_token1 = session.as_ref().unwrap().session_token.clone();
+        assert!(!session_token1.is_empty());
+        for _ in 0..(DEFAULT_SESSION_QUERY_LIMIT + 10) {
+            assert!(
+                process_cmd(&msdk, &mut sdk, "get cmd_smoke_test k1 k2 k3", &mut session).await
+            );
+        }
+        let session_token2 = session.as_ref().unwrap().session_token.clone();
+        assert_ne!(session_token2, session_token1);
+
+        // Del kv store
+        assert!(process_cmd(&msdk, &mut sdk, "del cmd_smoke_test k1", &mut session).await);
+        thread::sleep(time::Duration::from_millis(2000));
+    }
+    #[tokio::test]
+    async fn open_session_test() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+
+        let mut rng = StdRng::from_seed([0; 32]);
+        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let signer = Db3Signer::new(kp);
+        let mut sdk = StoreSDK::new(client, signer);
+        let mut session: Option<OpenSessionResponse> = None;
+
+        assert!(open_session(&mut sdk, &mut session).await);
+        assert!(!session.as_ref().unwrap().session_token.is_empty());
     }
 }

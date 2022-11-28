@@ -27,4 +27,5 @@ subtle-encoding = { version = "0.5", default-features = false, features = ["bech
 rand = "0.8.5"
 fastcrypto="0.1.3"
 db3-base={path="../base", version="0.1.0"}
+db3-cmd={path="../cmd", version="0.1.0"}
 
