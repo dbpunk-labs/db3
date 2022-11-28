@@ -126,7 +126,7 @@ Again, since you're not responsible for any of the management and deployment of 
 
 Since all the code on-chain is open to the public, everyone can check the code and know exactly how does the code dealing with their data. Of cause, this will lead to the problem of privacy which will be the main subject of DB3’s Phase 3.
 
-![contract](./docs/images/contract.png)
+![contract](./docs/images/contract.png =100x100)
 # How does DB3 works?
 
 ![overview](./docs/images/db3-overview.svg)
