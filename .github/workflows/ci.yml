@@ -80,7 +80,7 @@ jobs:
           sh start_localnet.sh >tm.log 2>&1 &
       - name: Run rust test with coverage
         run: |
-          cargo llvm-cov nextest --workspace --exclude merk  --lcov --output-path lcov.info --no-fail-fast
+          cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}

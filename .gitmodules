@@ -4,6 +4,6 @@
 [submodule "thirdparty/msql-srv"]
 	path = thirdparty/msql-srv
 	url = https://github.com/imotai/msql-srv.git
-[submodule "db3_merk"]
-	path = thirdparty/merk
-	url = git@github.com:imotai/merk.git
+[submodule "thirdparty/merkdb"]
+	path = thirdparty/merkdb
+	url = https://github.com/dbpunk-labs/merkdb.git

@@ -35,7 +35,7 @@ use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use http::Uri;
-use merk::Merk;
+use merkdb::Merk;
 use std::io::stdout;
 use std::io::Write;
 use std::io::{self, BufRead};
@@ -108,6 +108,8 @@ enum Commands {
         quiet: bool,
         #[clap(short, long, default_value = "./db")]
         db_path: String,
+        #[clap(long, default_value = "16")]
+        db_tree_level_in_memory: u8,
         /// disable grpc-web
         #[clap(long, default_value = "false")]
         disable_grpc_web: bool,
@@ -222,6 +224,7 @@ async fn start_node(cmd: Commands) {
         verbose,
         quiet,
         db_path,
+        db_tree_level_in_memory,
         disable_grpc_web,
     } = cmd
     {
@@ -234,7 +237,8 @@ async fn start_node(cmd: Commands) {
         };
         tracing_subscriber::fmt().with_max_level(log_level).init();
         info!("{}", ABOUT);
-        let merk = Merk::open(&db_path).unwrap();
+        let opts = Merk::default_db_opts();
+        let merk = Merk::open_opt(&db_path, opts, db_tree_level_in_memory).unwrap();
         let node_store = Arc::new(Mutex::new(Box::pin(NodeStorage::new(AuthStorage::new(
             merk,
         )))));
