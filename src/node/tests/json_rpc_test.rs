@@ -20,7 +20,7 @@ mod json_rpc_test {
     use prost::Message;
 
     pub async fn init_context() -> Context {
-        let db_path = "../db";
+        let db_path = "../../db";
         let tm_port = "26657".to_string();
         let merk = Merk::open(&db_path).unwrap();
         let node_store = Arc::new(Mutex::new(Box::pin(NodeStorage::new(AuthStorage::new(
