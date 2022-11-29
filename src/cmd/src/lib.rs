@@ -172,7 +172,7 @@ async fn refresh_session(
         })
         .unwrap()
         .status
-        != SessionStatus::Running.into()
+        != SessionStatus::Running as i32
     {
         println!("Refresh session...");
         return close_session(store_sdk, session).await && open_session(store_sdk, session).await;
