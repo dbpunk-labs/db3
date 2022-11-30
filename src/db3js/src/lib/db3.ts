@@ -58,7 +58,9 @@ export class DB3 {
 		const broadcastRequest = new db3_node_pb.BroadcastRequest();
 		broadcastRequest.setBody(writeRequest.serializeBinary());
 
-		const res = await this.client.broadcast(broadcastRequest, {});
+		const res = await this.client.broadcast(broadcastRequest, {
+			"content-type": "application/grpc-web-text"
+		});
 		return res.toObject();
 	}
 }
