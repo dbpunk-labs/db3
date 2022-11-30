@@ -1,7 +1,6 @@
 #! /bin/base
 #
 # start_localnet.sh
-
 test_dir=`pwd`
 if [ -e ./tendermint ]
 then

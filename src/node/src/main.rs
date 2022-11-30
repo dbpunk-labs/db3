@@ -48,10 +48,11 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
+use tonic::codegen::http::Method;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
-
 const ABOUT: &str = "
 ██████╗ ██████╗ ██████╗ 
 ██╔══██╗██╔══██╗╚════██╗
@@ -164,11 +165,15 @@ async fn start_grpc_service(
             .await
             .unwrap();
     } else {
-        let config = tonic_web::config().allow_all_origins();
-        let service = config.enable(StorageNodeServer::new(storage_node));
+        let cors_layer = CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+            .allow_headers(Any)
+            .allow_origin(Any);
         Server::builder()
             .accept_http1(true)
-            .add_service(service)
+            .layer(cors_layer)
+            .layer(tonic_web::GrpcWebLayer::new())
+            .add_service(StorageNodeServer::new(storage_node))
             .serve(addr.parse().unwrap())
             .await
             .unwrap();

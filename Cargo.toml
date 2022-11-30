@@ -10,5 +10,4 @@ members = [
     "src/node",
     "src/sdk",
     "src/cmd",
-    "src/jsdk",
 ]
