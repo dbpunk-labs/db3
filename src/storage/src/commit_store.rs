@@ -17,7 +17,7 @@
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use db3_error::{DB3Error, Result};
-use merk::{Merk, Op};
+use merkdb::{Merk, Op};
 use std::pin::Pin;
 const COMMIT_KEY: &str = "_DB3_COMMIT_KEY_";
 

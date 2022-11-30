@@ -230,6 +230,7 @@ mod tests {
     use std::sync::Arc;
     use std::time;
     use tonic::transport::Endpoint;
+
     #[tokio::test]
     async fn it_get_bills() {
         let ep = "http://127.0.0.1:26659";
@@ -334,6 +335,7 @@ mod tests {
         let res = sdk.close_session(&session_info.session_token).await;
         assert!(res.is_ok());
     }
+
     #[tokio::test]
     async fn close_session_wrong_path() {
         let ep = "http://127.0.0.1:26659";
