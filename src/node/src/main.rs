@@ -48,9 +48,9 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
+use tonic::codegen::http::Method;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 use tower_http::cors::{Any, CorsLayer};
-use tonic::codegen::http::Method;
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 const ABOUT: &str = "
