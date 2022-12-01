@@ -18,7 +18,7 @@
 use super::get_address_from_pk;
 use ed25519_dalek::{Keypair, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 use ethereum_types::Address as AccountAddress;
-use hex;
+use hex::FromHex;
 
 // this function is used for testing
 pub fn get_a_static_keypair() -> Keypair {
@@ -32,6 +32,6 @@ pub fn get_a_static_keypair() -> Keypair {
 }
 
 pub fn get_a_static_address() -> AccountAddress {
-    let kp = get_static_keypair();
+    let kp = get_a_static_keypair();
     get_address_from_pk(&kp.public)
 }

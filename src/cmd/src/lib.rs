@@ -22,11 +22,8 @@ use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{OpenSessionResponse, SessionStatus};
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
-use fastcrypto::secp256k1::Secp256k1KeyPair;
-use fastcrypto::traits::EncodeDecodeBase64;
-use fastcrypto::traits::KeyPair;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use ed25519_dalek::Keypair;
+use rand::rngs::OsRng;
 use std::fs::File;
 use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -54,7 +51,7 @@ fn current_seconds() -> u64 {
     }
 }
 
-pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
+pub fn get_key_pair(warning: bool) -> std::io::Result<Keypair> {
     let mut home_dir = std::env::home_dir().unwrap();
     home_dir.push(".db3");
     let user_dir = home_dir.as_path();
@@ -68,20 +65,20 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Secp256k1KeyPair> {
         );
     }
     if key_path.exists() {
-        let b64_str = std::fs::read_to_string(key_path)?;
-        let key_pair = Secp256k1KeyPair::decode_base64(b64_str.as_str()).unwrap();
-        let addr = get_address_from_pk(&key_pair.public().pubkey);
+        let kp_bytes = std::fs::read(key_path)?;
+        let key_pair = Keypair::from_bytes(kp_bytes.as_ref()).unwrap();
+        let addr = get_address_from_pk(&key_pair.public);
         if warning {
             println!("restore the key with addr {:?}", addr);
         }
         Ok(key_pair)
     } else {
-        let mut rng = StdRng::seed_from_u64(current_seconds());
-        let kp = Secp256k1KeyPair::generate(&mut rng);
-        let addr = get_address_from_pk(&kp.public().pubkey);
-        let b64_str = kp.encode_base64();
+        let mut rng = OsRng {};
+        let kp: Keypair = Keypair::generate(&mut rng);
+        let addr = get_address_from_pk(&kp.public);
+        let kp_bytes = kp.to_bytes();
         let mut f = File::create(key_path)?;
-        f.write_all(b64_str.as_bytes())?;
+        f.write_all(kp_bytes.as_ref())?;
         f.sync_all()?;
         if warning {
             println!("create new key with addr {:?}", addr);
@@ -204,7 +201,7 @@ pub async fn process_cmd(
         }
         "account" => {
             let kp = get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public().pubkey);
+            let addr = get_address_from_pk(&kp.public);
             let account = store_sdk.get_account(&addr).await.unwrap();
             show_account(&account);
             return true;

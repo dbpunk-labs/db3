@@ -44,11 +44,13 @@ impl MutationSDK {
             .encode(&mut mbuf)
             .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?;
         let mbuf = mbuf.freeze();
-        let signature = self.signer.sign(mbuf.as_ref())?;
+        let (signature, public_key) = self.signer.sign(mbuf.as_ref())?;
         let request = WriteRequest {
-            signature,
+            signature: signature.as_ref().to_vec().to_owned(),
             mutation: mbuf.as_ref().to_vec().to_owned(),
+            public_key: public_key.as_ref().to_vec().to_owned(),
         };
+        //TODO add the capacity to mutation sdk configuration
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request
             .encode(&mut buf)

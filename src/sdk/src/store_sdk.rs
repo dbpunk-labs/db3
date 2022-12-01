@@ -51,13 +51,14 @@ impl StoreSDK {
 
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
         let buf = "Header".as_bytes();
-        let signature = self
+        let (signature, public_key) = self
             .signer
             .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let r = OpenSessionRequest {
             header: buf.to_vec(),
-            signature,
+            signature: signature.as_ref().to_vec(),
+            public_key: public_key.as_ref().to_vec(),
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
@@ -91,13 +92,14 @@ impl StoreSDK {
                     .encode(&mut buf)
                     .map_err(|e| Status::internal(format!("{}", e)))?;
                 let buf = buf.freeze();
-                let signature = self
+                let (signature, public_key) = self
                     .signer
                     .sign(buf.as_ref())
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 let r = CloseSessionRequest {
                     payload: buf.as_ref().to_vec(),
-                    signature: signature.clone(),
+                    signature: signature.as_ref().to_vec(),
+                    public_key: public_key.as_ref().to_vec(),
                 };
                 let request = tonic::Request::new(r);
                 let mut client = self.client.as_ref().clone();

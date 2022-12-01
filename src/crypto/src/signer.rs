@@ -20,11 +20,11 @@ use db3_error::Result;
 use ed25519_dalek::{Keypair, Signature, Signer, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 
 pub struct Db3Signer {
-    kp: KeyPair,
+    kp: Keypair,
 }
 
 impl Db3Signer {
-    pub fn new(kp: KeyPair) -> Self {
+    pub fn new(kp: Keypair) -> Self {
         Self { kp }
     }
 
