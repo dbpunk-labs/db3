@@ -16,8 +16,8 @@
 //
 
 use db3_base::get_address_from_pk;
+use ed25519_dalek::PublicKey;
 use ethereum_types::Address;
-use rust_secp256k1::PublicKey;
 
 // it's ethereum compatiable account id
 pub struct AccountId {
@@ -30,11 +30,4 @@ impl AccountId {
         let addr = get_address_from_pk(&pk);
         Self { addr, pk }
     }
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
 }

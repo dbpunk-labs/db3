@@ -17,45 +17,38 @@
 //
 
 use db3_error::Result;
-use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1Signature};
-use fastcrypto::traits::Signer;
+use ed25519_dalek::{Keypair, Signature, Signer, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 
 pub struct Db3Signer {
-    kp: Secp256k1KeyPair,
+    kp: KeyPair,
 }
 
-//
-// Signer is used in sdk
-//
 impl Db3Signer {
-    pub fn new(kp: Secp256k1KeyPair) -> Self {
+    pub fn new(kp: KeyPair) -> Self {
         Self { kp }
     }
 
     // sign msg
-    pub fn sign(&self, msg: &[u8]) -> Result<Vec<u8>> {
-        let signature: Secp256k1Signature = self.kp.sign(msg);
-        Ok(signature.as_ref().to_vec())
+    pub fn sign(&self, msg: &[u8]) -> Result<([u8; SIGNATURE_LENGTH], [u8; PUBLIC_KEY_LENGTH])> {
+        let signature: Signature = self.kp.sign(msg);
+        Ok((signature.to_bytes(), self.kp.public.to_bytes()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::base::test_base;
     use bytes::BytesMut;
     use db3_error::DB3Error;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::Mutation;
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
-    use fastcrypto::secp256k1::Secp256k1KeyPair;
-    use fastcrypto::traits::KeyPair;
+    use ed25519_dalek::Verifier;
     use prost::Message;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
     #[test]
-    fn test_sign() -> Result<()> {
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+    fn smoke_test() -> Result<()> {
+        let kp = test_base::get_a_static_keypair();
         let kv = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
@@ -77,6 +70,10 @@ mod tests {
         let buf = buf.freeze();
         let signer = Db3Signer::new(kp);
         let result = signer.sign(buf.as_ref());
+        assert!(result.is_ok());
+        let signature = Signature::try_from(result.unwrap()).unwrap();
+        let the_same_kp = test_base::get_a_static_keypair();
+        let result = the_same_kp.verify(buf.as_ref(), &signature);
         assert!(result.is_ok());
         Ok(())
     }
