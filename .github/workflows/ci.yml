@@ -73,6 +73,8 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Setup test env
         run: |
+          sudo apt-get install protobuf-compiler
+          protoc --version
           cargo build
           cd tools
           wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
