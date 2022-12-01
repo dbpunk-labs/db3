@@ -262,6 +262,7 @@ impl SessionManager {
 mod tests {
     use super::*;
     use db3_base::get_address_from_pk;
+    use db3_base::get_a_static_keypair;
     use db3_proto::db3_node_proto::SessionStatus;
     use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;
@@ -300,12 +301,8 @@ mod tests {
     #[test]
     fn add_session_exceed_limit() {
         let mut sess_store = SessionStore::new();
-        let pk = Secp256k1PublicKey::from_bytes(
-            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
-                .unwrap(),
-        );
-        let addr = get_address_from_pk(&pk.unwrap().pubkey);
-
+        let kp = get_a_static_keypair();
+        let addr = get_address_from_pk(&kp.public);
         for _ in 0..DEFAULT_SESSION_POOL_SIZE_LIMIT {
             assert!(sess_store.add_new_session(addr).is_ok())
         }
@@ -321,11 +318,8 @@ mod tests {
     #[test]
     fn get_session() {
         let mut sess_store = SessionStore::new();
-        let pk = Secp256k1PublicKey::from_bytes(
-            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
-                .unwrap(),
-        );
-        let addr = get_address_from_pk(&pk.unwrap().pubkey);
+        let kp = get_a_static_keypair();
+        let addr = get_address_from_pk(&kp.public);
         let mut token1 = String::new();
         // add session and create new session pool
         {
@@ -356,11 +350,8 @@ mod tests {
     #[test]
     fn remove_session_test() {
         let mut sess_store = SessionStore::new();
-        let pk = Secp256k1PublicKey::from_bytes(
-            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
-                .unwrap(),
-        );
-        let addr = get_address_from_pk(&pk.unwrap().pubkey);
+        let kp = get_a_static_keypair();
+        let addr = get_address_from_pk(&kp.public);
 
         let mut token1 = String::new();
         // add session and create new session pool
@@ -392,12 +383,8 @@ mod tests {
     #[test]
     fn cleanup_session_test() {
         let mut sess_store = SessionStore::new();
-        let pk = Secp256k1PublicKey::from_bytes(
-            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
-                .unwrap(),
-        );
-        let addr = get_address_from_pk(&pk.unwrap().pubkey);
-
+        let kp = get_a_static_keypair();
+        let addr = get_address_from_pk(&kp.public);
         for i in 0..100 {
             let (token, _) = sess_store.add_new_session(addr).unwrap();
 

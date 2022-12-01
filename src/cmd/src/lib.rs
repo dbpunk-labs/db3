@@ -332,8 +332,7 @@ mod tests {
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
-    use fastcrypto::secp256k1::Secp256k1KeyPair;
-    use fastcrypto::traits::KeyPair;
+    use db3_base::get_a_static_keypair;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
     use std::sync::Arc;
@@ -347,12 +346,11 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         let mclient = client.clone();
 
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let msdk = MutationSDK::new(mclient, signer);
         let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let mut session: Option<OpenSessionResponse> = None;
@@ -394,8 +392,7 @@ mod tests {
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
 
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let mut session: Option<OpenSessionResponse> = None;

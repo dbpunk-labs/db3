@@ -71,10 +71,11 @@ mod node_integration {
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
         mutation.encode(&mut mbuf).unwrap();
         let mbuf = mbuf.freeze();
-        let signature = signer.sign(mbuf.as_ref()).unwrap();
+        let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
         let request = WriteRequest {
-            signature,
+            signature: signature.as_ref().to_vec(),
             mutation: mbuf.as_ref().to_vec().to_owned(),
+            public_key: public_key.as_ref().to_vec(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf).unwrap();

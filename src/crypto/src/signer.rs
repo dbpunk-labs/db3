@@ -38,7 +38,7 @@ impl Db3Signer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::test_base;
+    use db3_base::get_a_static_keypair;
     use bytes::BytesMut;
     use db3_error::DB3Error;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
@@ -48,7 +48,7 @@ mod tests {
     use prost::Message;
     #[test]
     fn smoke_test() -> Result<()> {
-        let kp = test_base::get_a_static_keypair();
+        let kp = get_a_static_keypair();
         let kv = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
@@ -69,10 +69,9 @@ mod tests {
             .map_err(|e| DB3Error::SignError(format!("{}", e)))?;
         let buf = buf.freeze();
         let signer = Db3Signer::new(kp);
-        let result = signer.sign(buf.as_ref());
-        assert!(result.is_ok());
-        let signature = Signature::try_from(result.unwrap()).unwrap();
-        let the_same_kp = test_base::get_a_static_keypair();
+        let (result, _public_key) = signer.sign(buf.as_ref()).unwrap();
+        let signature = Signature::try_from(result).unwrap();
+        let the_same_kp = get_a_static_keypair();
         let result = the_same_kp.verify(buf.as_ref(), &signature);
         assert!(result.is_ok());
         Ok(())

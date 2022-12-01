@@ -28,7 +28,7 @@ pub fn get_address_from_pk(pk: &PublicKey) -> Address {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::test_base;
+    use crate::test_base;
     use hex;
     use std::str::FromStr;
     #[test]
@@ -39,6 +39,6 @@ mod tests {
             format!("{:?}", get_address_from_pk(&kp.public))
         );
         let addr = Address::from_str("0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2");
-        assert_eq!(addr.unwrap(), get_address_from_pk(&pk.pubkey));
+        assert_eq!(addr.unwrap(), get_address_from_pk(&kp.public));
     }
 }

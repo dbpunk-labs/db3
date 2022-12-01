@@ -220,15 +220,12 @@ impl StoreSDK {
 mod tests {
     use super::Db3Signer;
     use super::StoreSDK;
+    use db3_base::get_a_static_keypair;
     use crate::mutation_sdk::MutationSDK;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-    use fastcrypto::secp256k1::Secp256k1KeyPair;
-    use fastcrypto::traits::KeyPair;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
     use std::sync::Arc;
     use std::time;
     use tonic::transport::Endpoint;
@@ -241,8 +238,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         let mclient = client.clone();
         {
-            let mut rng = StdRng::from_seed([0; 32]);
-            let kp = Secp256k1KeyPair::generate(&mut rng);
+            let kp = get_a_static_keypair();
             let signer = Db3Signer::new(kp);
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
@@ -264,8 +260,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             std::thread::sleep(ten_millis);
         }
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
@@ -292,8 +287,7 @@ mod tests {
         let value_vec = format!("vkalue_tt{}", 10).as_bytes().to_vec();
         let ns_vec = "my_twitter".as_bytes().to_vec();
         {
-            let mut rng = StdRng::from_seed([0; 32]);
-            let kp = Secp256k1KeyPair::generate(&mut rng);
+            let kp = get_a_static_keypair();
             let signer = Db3Signer::new(kp);
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
@@ -315,8 +309,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             std::thread::sleep(ten_millis);
         }
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
@@ -349,8 +342,7 @@ mod tests {
         let value_vec = format!("vkalue_tt{}", 20).as_bytes().to_vec();
         let ns_vec = "my_twitter".as_bytes().to_vec();
         {
-            let mut rng = StdRng::from_seed([0; 32]);
-            let kp = Secp256k1KeyPair::generate(&mut rng);
+            let kp = get_a_static_keypair();
             let signer = Db3Signer::new(kp);
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
@@ -372,8 +364,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(1000);
             std::thread::sleep(ten_millis);
         }
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;

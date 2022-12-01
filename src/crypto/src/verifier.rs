@@ -41,17 +41,15 @@ impl Verifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::test_base;
-    use crate::crypto::signer::Db3Signer;
+    use db3_base::get_a_static_keypair;
+    use crate::signer::Db3Signer;
     use bytes::BytesMut;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
-    use fastcrypto::secp256k1::Secp256k1KeyPair;
-    use fastcrypto::traits::KeyPair;
     use prost::Message;
     #[test]
     fn test_verify() -> Result<()> {
-        let kp = test_base::get_a_static_keypair();
+        let kp = get_a_static_keypair();
         let kv = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
