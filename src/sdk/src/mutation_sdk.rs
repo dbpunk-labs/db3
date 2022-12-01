@@ -76,9 +76,9 @@ mod tests {
     use super::Db3Signer;
     use super::Mutation;
     use super::MutationSDK;
-    use db3_base::get_a_static_keypair;
     use crate::mutation_sdk::StorageNodeClient;
     use crate::store_sdk::StoreSDK;
+    use db3_base::get_a_static_keypair;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use std::sync::Arc;

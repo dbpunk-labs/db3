@@ -38,13 +38,12 @@ impl Db3Signer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_keypair;
     use bytes::BytesMut;
+    use db3_base::get_a_static_keypair;
     use db3_error::DB3Error;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::Mutation;
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
-    use ed25519_dalek::Verifier;
     use prost::Message;
     #[test]
     fn smoke_test() -> Result<()> {

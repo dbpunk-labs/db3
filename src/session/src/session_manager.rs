@@ -261,8 +261,8 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_address_from_pk;
     use db3_base::get_a_static_keypair;
+    use db3_base::get_address_from_pk;
     use db3_proto::db3_node_proto::SessionStatus;
     use fastcrypto::secp256k1::Secp256k1PublicKey;
     use fastcrypto::traits::ToFromBytes;

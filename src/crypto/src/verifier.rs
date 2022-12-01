@@ -41,9 +41,9 @@ impl Verifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_keypair;
     use crate::signer::Db3Signer;
     use bytes::BytesMut;
+    use db3_base::get_a_static_keypair;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
     use prost::Message;
