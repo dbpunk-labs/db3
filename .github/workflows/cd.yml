@@ -92,14 +92,14 @@ jobs:
         steps:
             - uses: actions/checkout@v3
             - uses: actions/setup-node@v3.5.1
+              with:
+                  node-version: "16.x"
+                  # registry-url: "https://registry.npmmirror.com/"
+                  path: ./src/db3js
             - uses: CultureHQ/actions-yarn@v1.0.1
             - run: cd src/db3js
             - run: yarn install
             - run: yarn build
             - run: npm publish
-              with:
-                  node-version: "16.x"
-                  # registry-url: "https://registry.npmmirror.com/"
-                  path: ./src/db3js
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
