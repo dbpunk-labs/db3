@@ -50,8 +50,12 @@ impl StorageNode for StorageNodeImpl {
         request: Request<OpenSessionRequest>,
     ) -> std::result::Result<Response<OpenSessionResponse>, Status> {
         let r = request.into_inner();
-        let account_id = Verifier::verify(r.header.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        let account_id = Verifier::verify(
+            r.header.as_ref(),
+            r.signature.as_ref(),
+            r.public_key.as_ref(),
+        )
+        .map_err(|e| Status::internal(format!("{:?}", e)))?;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
@@ -76,8 +80,12 @@ impl StorageNode for StorageNodeImpl {
         request: Request<CloseSessionRequest>,
     ) -> std::result::Result<Response<CloseSessionResponse>, Status> {
         let r = request.into_inner();
-        Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        Verifier::verify(
+            r.payload.as_ref(),
+            r.signature.as_ref(),
+            r.public_key.as_ref(),
+        )
+        .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = CloseSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
         match self.context.node_store.lock() {

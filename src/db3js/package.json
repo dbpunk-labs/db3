@@ -10,6 +10,7 @@
 		"test": "jest"
 	},
 	"dependencies": {
+		"@deliberative/crypto": "^0.6.18",
 		"@noble/secp256k1": "^1.7.0",
 		"@scure/bip39": "^1.1.0",
 		"google-protobuf": "^3.21.2",

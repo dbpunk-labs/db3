@@ -44,11 +44,13 @@ impl MutationSDK {
             .encode(&mut mbuf)
             .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?;
         let mbuf = mbuf.freeze();
-        let signature = self.signer.sign(mbuf.as_ref())?;
+        let (signature, public_key) = self.signer.sign(mbuf.as_ref())?;
         let request = WriteRequest {
-            signature,
+            signature: signature.as_ref().to_vec().to_owned(),
             mutation: mbuf.as_ref().to_vec().to_owned(),
+            public_key: public_key.as_ref().to_vec().to_owned(),
         };
+        //TODO add the capacity to mutation sdk configuration
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request
             .encode(&mut buf)
@@ -76,12 +78,9 @@ mod tests {
     use super::MutationSDK;
     use crate::mutation_sdk::StorageNodeClient;
     use crate::store_sdk::StoreSDK;
+    use db3_base::get_a_static_keypair;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
-    use fastcrypto::secp256k1::Secp256k1KeyPair;
-    use fastcrypto::traits::KeyPair;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
@@ -157,8 +156,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let sdk = MutationSDK::new(client, signer);
         let mut count = 1;

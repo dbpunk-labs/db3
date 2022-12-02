@@ -988,6 +988,11 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
+"@deliberative/crypto@^0.6.18":
+  version "0.6.18"
+  resolved "https://registry.npmmirror.com/@deliberative/crypto/-/crypto-0.6.18.tgz#0f25c1bc170bc3be1d2db8dc7c3c46bfb82eedf8"
+  integrity sha512-JRq1OCN41qYcAif4KFCA0hKQ+hRCcmhHS3mInAdLkfHr+ObDQSQO/klS0Jr+2JSs+YNmAKn0BiWKDlwA6VUZ9w==
+
 "@esbuild/android-arm@0.15.16":
   version "0.15.16"
   resolved "https://registry.npmmirror.com/@esbuild/android-arm/-/android-arm-0.15.16.tgz#0642926178b15e3d1545efae6eee05c4f3451d15"

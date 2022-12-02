@@ -54,4 +54,5 @@ message WriteRequest {
     bytes signature = 1;
     // the protobuf binary format
     bytes mutation = 2;
+    bytes public_key = 3;
 }

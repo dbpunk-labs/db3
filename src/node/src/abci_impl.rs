@@ -34,7 +34,7 @@ use tendermint_proto::abci::{
     ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
     ResponseQuery,
 };
-use tracing::{debug, info, span, Level};
+use tracing::{debug, info, span, warn, Level};
 
 #[derive(Clone)]
 pub struct NodeState {
@@ -118,10 +118,12 @@ impl Application for AbciImpl {
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
         // decode the request
         if let Ok(request) = WriteRequest::decode(request.tx.as_ref()) {
-            // recover the account addr
-            if let Ok(_account_id) =
-                verifier::Verifier::verify(request.mutation.as_ref(), request.signature.as_ref())
-            {
+            // verify the mutation
+            if let Ok(_account_id) = verifier::Verifier::verify(
+                request.mutation.as_ref(),
+                request.signature.as_ref(),
+                request.public_key.as_ref(),
+            ) {
                 if let Ok(mutation) = Mutation::decode(request.mutation.as_ref()) {
                     if KvStore::is_valid(&mutation) {
                         return ResponseCheckTx {
@@ -139,6 +141,7 @@ impl Application for AbciImpl {
                 }
             }
         }
+        warn!("invalid transaction has been checked");
         // the tx should be removed from mempool
         return ResponseCheckTx {
             code: 1,
@@ -158,21 +161,39 @@ impl Application for AbciImpl {
         let mutation_id = HashMessage::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(
             request.tx.as_ref(),
         );
-        let wrequest = WriteRequest::decode(request.tx.as_ref()).unwrap();
-        let account_id =
-            verifier::Verifier::verify(wrequest.mutation.as_ref(), wrequest.signature.as_ref())
-                .unwrap();
-        let mutation = Mutation::decode(wrequest.mutation.as_ref()).unwrap();
-        //TODO check nonce
-        match self.pending_mutation.lock() {
-            Ok(mut s) => {
-                //TODO add gas check
-                s.push((account_id.addr, mutation_id.as_ref().clone(), mutation));
+        if let Ok(wrequest) = WriteRequest::decode(request.tx.as_ref()) {
+            if let Ok(account_id) = verifier::Verifier::verify(
+                wrequest.mutation.as_ref(),
+                wrequest.signature.as_ref(),
+                wrequest.public_key.as_ref(),
+            ) {
+                if let Ok(mutation) = Mutation::decode(wrequest.mutation.as_ref()) {
+                    match self.pending_mutation.lock() {
+                        Ok(mut s) => {
+                            //TODO add gas check
+                            s.push((account_id.addr, mutation_id.as_ref().clone(), mutation));
+                            return ResponseDeliverTx {
+                                code: 0,
+                                data: Bytes::new(),
+                                log: "".to_string(),
+                                info: "".to_string(),
+                                gas_wanted: 0,
+                                gas_used: 0,
+                                events: vec![Event {
+                                    r#type: "deliver".to_string(),
+                                    attributes: vec![],
+                                }],
+                                codespace: "".to_string(),
+                            };
+                        }
+                        Err(_) => todo!(),
+                    }
+                }
             }
-            Err(_) => todo!(),
         }
+        warn!("invalid transaction has been checked");
         ResponseDeliverTx {
-            code: 0,
+            code: 1,
             data: Bytes::new(),
             log: "".to_string(),
             info: "".to_string(),

@@ -15,35 +15,29 @@
 // limitations under the License.
 //
 
+use ed25519_dalek::PublicKey;
 use ethereum_types::Address;
 use fastcrypto::hash::HashFunction;
 use fastcrypto::hash::Keccak256;
-use rust_secp256k1::PublicKey;
 
 pub fn get_address_from_pk(pk: &PublicKey) -> Address {
-    let hash = Keccak256::digest(&pk.serialize()[1..]);
+    let hash = Keccak256::digest(&pk.to_bytes()[1..]);
     Address::from_slice(&hash.as_ref()[12..])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fastcrypto::secp256k1::Secp256k1PublicKey;
-    use fastcrypto::traits::ToFromBytes;
-    use hex;
+    use crate::test_base;
     use std::str::FromStr;
     #[test]
     fn test_get_address_from_pk() {
-        let pk = Secp256k1PublicKey::from_bytes(
-            &hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
-                .unwrap(),
-        )
-        .unwrap();
+        let kp = test_base::get_a_static_keypair();
         assert_eq!(
-            "0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2",
-            format!("{:?}", get_address_from_pk(&pk.pubkey))
+            "0xffddb10906d3602e7b2059b38034899f70318e17",
+            format!("{:?}", get_address_from_pk(&kp.public))
         );
-        let addr = Address::from_str("0x15566fc79a283a3fe6e5e48e6a1c95b36871dca2");
-        assert_eq!(addr.unwrap(), get_address_from_pk(&pk.pubkey));
+        let addr = Address::from_str("0xffddb10906d3602e7b2059b38034899f70318e17");
+        assert_eq!(addr.unwrap(), get_address_from_pk(&kp.public));
     }
 }

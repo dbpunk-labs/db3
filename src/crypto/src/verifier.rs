@@ -17,24 +17,23 @@
 //
 
 use super::account_id::AccountId;
-#[cfg(test)]
-use super::signer::Db3Signer;
 use db3_error::{DB3Error, Result};
-use fastcrypto::secp256k1::Secp256k1Signature;
-use fastcrypto::traits::ToFromBytes;
-use rust_secp256k1::Message;
+use ed25519_dalek::{PublicKey, Signature, Verifier as EdVerifier};
 
 pub struct Verifier {}
 
 impl Verifier {
-    pub fn verify(msg: &[u8], signature_raw: &[u8]) -> Result<AccountId> {
-        let signature = <Secp256k1Signature as ToFromBytes>::from_bytes(signature_raw)
+    pub fn verify(msg: &[u8], signature_raw: &[u8], public_key_raw: &[u8]) -> Result<AccountId> {
+        let public_key = PublicKey::from_bytes(&public_key_raw)
             .map_err(|e| DB3Error::VerifyFailed(format!("{}", e)))?;
-        let message = Message::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(msg);
-        if let Ok(rpk) = signature.sig.recover(&message) {
-            Ok(AccountId::new(rpk))
-        } else {
-            Err(DB3Error::VerifyFailed("invalid signature".to_string()))
+        let signature = Signature::try_from(signature_raw)
+            .map_err(|e| DB3Error::VerifyFailed(format!("{}", e)))?;
+        match public_key.verify(msg, &signature) {
+            Ok(_) => Ok(AccountId::new(public_key)),
+            Err(e) => Err(DB3Error::VerifyFailed(format!(
+                "invalid signature for err {}",
+                e
+            ))),
         }
     }
 }
@@ -42,18 +41,15 @@ impl Verifier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::signer::Db3Signer;
     use bytes::BytesMut;
+    use db3_base::get_a_static_keypair;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
-    use fastcrypto::secp256k1::Secp256k1KeyPair;
-    use fastcrypto::traits::KeyPair;
     use prost::Message;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
     #[test]
     fn test_verify() -> Result<()> {
-        let mut rng = StdRng::from_seed([0; 32]);
-        let kp = Secp256k1KeyPair::generate(&mut rng);
+        let kp = get_a_static_keypair();
         let kv = KvPair {
             key: "k1".as_bytes().to_vec(),
             value: "value1".as_bytes().to_vec(),
@@ -72,10 +68,12 @@ mod tests {
         mutation.encode(&mut buf).unwrap();
         let buf = buf.freeze();
         let signer = Db3Signer::new(kp);
-        let signature = signer.sign(buf.as_ref())?;
-        let account_id = Verifier::verify(buf.as_ref(), signature.as_ref());
-        if let Err(e) = account_id {
-            println!("{}", e);
+        let (signature_raw, public_key_raw) = signer.sign(buf.as_ref())?;
+        if let Err(_) = Verifier::verify(
+            buf.as_ref(),
+            signature_raw.as_ref(),
+            public_key_raw.as_ref(),
+        ) {
             assert!(false);
         }
         Ok(())
