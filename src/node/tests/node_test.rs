@@ -111,62 +111,50 @@ mod node_integration {
         let mut store_sdk = get_store_sdk();
         let ns = "test_ns";
 
-        let mut session_id_1: String = String::new();
-        // session restart
-        {
-            let res = store_sdk.open_session().await;
-            assert!(res.is_ok());
-            let session_info = res.unwrap();
-            session_id_1 = session_info.session_token.clone();
-            assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
-            assert_eq!(session_info.session_timeout_second, DEFAULT_SESSION_PERIOD);
-        }
+        let res = store_sdk.open_session().await;
+        assert!(res.is_ok());
+        let session_info = res.unwrap();
+        let session_id_1 = session_info.session_token.clone();
+        assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
+        assert_eq!(session_info.session_timeout_second, DEFAULT_SESSION_PERIOD);
+        let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
+        assert_eq!(
+            SessionStatus::from_i32(info.status).unwrap(),
+            SessionStatus::Running
+        );
+        assert_eq!(info.query_count, 0);
+        let pairs = vec![
+            KvPair {
+                key: "k1".as_bytes().to_vec(),
+                value: "v1".as_bytes().to_vec(),
+                action: MutationAction::InsertKv.into(),
+            },
+            KvPair {
+                key: "k2".as_bytes().to_vec(),
+                value: "v2".as_bytes().to_vec(),
+                action: MutationAction::InsertKv.into(),
+            },
+            KvPair {
+                key: "k3".as_bytes().to_vec(),
+                value: "v3".as_bytes().to_vec(),
+                action: MutationAction::InsertKv.into(),
+            },
+        ];
+        let mutation = Mutation {
+            ns: ns.as_bytes().to_vec(),
+            kv_pairs: pairs.to_owned(),
+            nonce: current_seconds(),
+            gas_price: Some(Units {
+                utype: UnitType::Tai.into(),
+                amount: 100,
+            }),
+            gas: 100,
+            chain_id: ChainId::DevNet.into(),
+            chain_role: ChainRole::StorageShardChain.into(),
+        };
 
-        // session info
-        {
-            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
-            assert_eq!(
-                SessionStatus::from_i32(info.status).unwrap(),
-                SessionStatus::Running
-            );
-            assert_eq!(info.query_count, 0);
-        }
-
-        // put test_ns k1 v1 k2 v2 k3 v4
-        {
-            let pairs = vec![
-                KvPair {
-                    key: "k1".as_bytes().to_vec(),
-                    value: "v1".as_bytes().to_vec(),
-                    action: MutationAction::InsertKv.into(),
-                },
-                KvPair {
-                    key: "k2".as_bytes().to_vec(),
-                    value: "v2".as_bytes().to_vec(),
-                    action: MutationAction::InsertKv.into(),
-                },
-                KvPair {
-                    key: "k3".as_bytes().to_vec(),
-                    value: "v3".as_bytes().to_vec(),
-                    action: MutationAction::InsertKv.into(),
-                },
-            ];
-            let mutation = Mutation {
-                ns: ns.as_bytes().to_vec(),
-                kv_pairs: pairs.to_owned(),
-                nonce: current_seconds(),
-                gas_price: Some(Units {
-                    utype: UnitType::Tai.into(),
-                    amount: 100,
-                }),
-                gas: 100,
-                chain_id: ChainId::DevNet.into(),
-                chain_role: ChainRole::StorageShardChain.into(),
-            };
-
-            assert!(sdk.submit_mutation(&mutation).await.is_ok());
-            thread::sleep(time::Duration::from_secs(2));
-        }
+        assert!(sdk.submit_mutation(&mutation).await.is_ok());
+        thread::sleep(time::Duration::from_secs(2));
 
         // get ns_test k1
         {
@@ -228,17 +216,42 @@ mod node_integration {
         }
 
         // open another session 2
-        let mut session_id_2 = String::new();
-        {
-            let res = store_sdk.open_session().await;
-            assert!(res.is_ok());
-            let session_info = res.unwrap();
-            // verify session id increase 1
-            assert_ne!(session_info.session_token, session_id_1.clone());
-            assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
+        let res = store_sdk.open_session().await;
+        assert!(res.is_ok());
+        let session_info = res.unwrap();
+        // verify session id increase 1
+        assert_ne!(session_info.session_token, session_id_1.clone());
+        assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
 
-            // update current session id
-            session_id_2 = session_info.session_token;
+        // update current session id
+        let session_id_2 = session_info.session_token;
+        let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
+        assert_eq!(
+            SessionStatus::from_i32(info.status).unwrap(),
+            SessionStatus::Running
+        );
+        assert_eq!(info.query_count, 0);
+        // delete k1
+        {
+            let pairs = vec![KvPair {
+                key: "k1".as_bytes().to_vec(),
+                value: vec![],
+                action: MutationAction::DeleteKv.into(),
+            }];
+            let mutation = Mutation {
+                ns: ns.as_bytes().to_vec(),
+                kv_pairs: pairs.to_owned(),
+                nonce: current_seconds(),
+                gas_price: Some(Units {
+                    utype: UnitType::Tai.into(),
+                    amount: 100,
+                }),
+                gas: 100,
+                chain_id: ChainId::DevNet.into(),
+                chain_role: ChainRole::StorageShardChain.into(),
+            };
+            assert!(sdk.submit_mutation(&mutation).await.is_ok());
+            thread::sleep(time::Duration::from_secs(4));
         }
         {
             let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
@@ -248,58 +261,22 @@ mod node_integration {
             );
             assert_eq!(info.query_count, 0);
         }
-        // delete k1
         {
-            {
-                let pairs = vec![KvPair {
-                    key: "k1".as_bytes().to_vec(),
-                    value: vec![],
-                    action: MutationAction::DeleteKv.into(),
-                }];
-                let mutation = Mutation {
-                    ns: ns.as_bytes().to_vec(),
-                    kv_pairs: pairs.to_owned(),
-                    nonce: current_seconds(),
-                    gas_price: Some(Units {
-                        utype: UnitType::Tai.into(),
-                        amount: 100,
-                    }),
-                    gas: 100,
-                    chain_id: ChainId::DevNet.into(),
-                    chain_role: ChainRole::StorageShardChain.into(),
-                };
-                assert!(sdk.submit_mutation(&mutation).await.is_ok());
-                thread::sleep(time::Duration::from_secs(4));
-            }
-            {
-                let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
-                assert_eq!(
-                    SessionStatus::from_i32(info.status).unwrap(),
-                    SessionStatus::Running
-                );
-                assert_eq!(info.query_count, 0);
-            }
-            {
-                let result = store_sdk
-                    .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], &session_id_2)
-                    .await;
-                assert!(result.is_ok());
-                if let Ok(Some(values)) = result {
-                    assert_eq!(values.values.len(), 0);
-                } else {
-                    assert!(false);
-                }
+            let result = store_sdk
+                .batch_get(ns.as_bytes(), vec!["k1".as_bytes().to_vec()], &session_id_2)
+                .await;
+            assert!(result.is_ok());
+            if let Ok(Some(values)) = result {
+                assert_eq!(values.values.len(), 0);
+            } else {
+                assert!(false);
             }
         }
 
         // close session 1
-        {
-            assert!(store_sdk.close_session(&session_id_1).await.is_ok())
-        }
+        assert!(store_sdk.close_session(&session_id_1).await.is_ok());
         // close session 2
-        {
-            assert!(store_sdk.close_session(&session_id_2).await.is_ok());
-        }
+        assert!(store_sdk.close_session(&session_id_2).await.is_ok());
         // close session 3
         {
             let res = store_sdk

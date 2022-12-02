@@ -34,7 +34,7 @@ use tendermint_proto::abci::{
     ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
     ResponseQuery,
 };
-use tracing::{debug, info, span, Level};
+use tracing::{debug, info, span, warn, Level};
 
 #[derive(Clone)]
 pub struct NodeState {
@@ -141,6 +141,7 @@ impl Application for AbciImpl {
                 }
             }
         }
+        warn!("invalid transaction has been checked");
         // the tx should be removed from mempool
         return ResponseCheckTx {
             code: 1,
@@ -190,6 +191,7 @@ impl Application for AbciImpl {
                 }
             }
         }
+        warn!("invalid transaction has been checked");
         ResponseDeliverTx {
             code: 1,
             data: Bytes::new(),

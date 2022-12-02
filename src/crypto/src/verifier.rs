@@ -69,7 +69,7 @@ mod tests {
         let buf = buf.freeze();
         let signer = Db3Signer::new(kp);
         let (signature_raw, public_key_raw) = signer.sign(buf.as_ref())?;
-        if let Err(e) = Verifier::verify(
+        if let Err(_) = Verifier::verify(
             buf.as_ref(),
             signature_raw.as_ref(),
             public_key_raw.as_ref(),

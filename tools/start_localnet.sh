@@ -1,6 +1,7 @@
 #! /bin/base
 #
 # start_localnet.sh
+killall db3 tendermint
 test_dir=`pwd`
 if [ -e ./tendermint ]
 then
@@ -26,7 +27,7 @@ if [ -e ./db ]
 then
     rm -rf db
 fi
-../target/debug/db3 node >>db3.log 2>&1  &
+../target/debug/db3 node >db3.log 2>&1  &
 sleep 1
 ./tendermint init && ./tendermint unsafe_reset_all && ./tendermint start
 sleep 1

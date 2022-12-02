@@ -264,9 +264,6 @@ mod tests {
     use db3_base::get_a_static_keypair;
     use db3_base::get_address_from_pk;
     use db3_proto::db3_node_proto::SessionStatus;
-    use fastcrypto::secp256k1::Secp256k1PublicKey;
-    use fastcrypto::traits::ToFromBytes;
-    use hex;
 
     #[test]
     fn test_new_session() {
@@ -320,31 +317,20 @@ mod tests {
         let mut sess_store = SessionStore::new();
         let kp = get_a_static_keypair();
         let addr = get_address_from_pk(&kp.public);
-        let mut token1 = String::new();
         // add session and create new session pool
-        {
-            let res = sess_store.add_new_session(addr);
-            assert!(res.is_ok());
-            token1 = res.unwrap().0;
-            assert_eq!(token1.len(), 36);
-        }
-        // add session into existing session pool
-        let mut token2 = String::new();
-        {
-            let res = sess_store.add_new_session(addr);
-            assert!(res.is_ok());
-            token2 = res.unwrap().0;
-            assert_ne!(token1, token2);
-        }
-        {
-            let res = sess_store.get_session_mut(&token1);
-            assert!(res.is_some());
-            assert_eq!(res.unwrap().get_session_id(), 1);
-        }
-        {
-            let res = sess_store.get_session_mut(&"token_unknow".to_string());
-            assert!(res.is_none());
-        }
+        let res = sess_store.add_new_session(addr);
+        assert!(res.is_ok());
+        let token1 = res.unwrap().0;
+        assert_eq!(token1.len(), 36);
+        let res = sess_store.add_new_session(addr);
+        assert!(res.is_ok());
+        let token2 = res.unwrap().0;
+        assert_ne!(token1, token2);
+        let res = sess_store.get_session_mut(&token1);
+        assert!(res.is_some());
+        assert_eq!(res.unwrap().get_session_id(), 1);
+        let res = sess_store.get_session_mut(&"token_unknow".to_string());
+        assert!(res.is_none());
     }
 
     #[test]
@@ -353,31 +339,19 @@ mod tests {
         let kp = get_a_static_keypair();
         let addr = get_address_from_pk(&kp.public);
 
-        let mut token1 = String::new();
-        // add session and create new session pool
-        {
-            let res = sess_store.add_new_session(addr);
-            assert!(res.is_ok());
-            token1 = res.unwrap().0;
-            assert_eq!(token1.len(), 36);
-        }
-        // add session into existing session pool
-        let mut token2 = String::new();
-        {
-            let res = sess_store.add_new_session(addr);
-            assert!(res.is_ok());
-            token2 = res.unwrap().0;
-            assert_ne!(token1, token2);
-        }
-        {
-            let res = sess_store.remove_session(&token2);
-            assert!(res.is_ok());
-            assert_eq!(2, res.unwrap().get_session_id());
-        }
-        {
-            let res = sess_store.remove_session(&token2);
-            assert!(res.is_err());
-        }
+        let res = sess_store.add_new_session(addr);
+        assert!(res.is_ok());
+        let token1 = res.unwrap().0;
+        assert_eq!(token1.len(), 36);
+        let res = sess_store.add_new_session(addr);
+        assert!(res.is_ok());
+        let token2 = res.unwrap().0;
+        assert_ne!(token1, token2);
+        let res = sess_store.remove_session(&token2);
+        assert!(res.is_ok());
+        assert_eq!(2, res.unwrap().get_session_id());
+        let res = sess_store.remove_session(&token2);
+        assert!(res.is_err());
     }
 
     #[test]
