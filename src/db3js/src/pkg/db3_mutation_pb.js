@@ -15,7 +15,6 @@ import * as jspb from "google-protobuf";
 import db3_base_pb from "./db3_base_pb.js";
 var goog = jspb;
 var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);
-
 goog.object.extend(proto, db3_base_pb);
 goog.exportSymbol('proto.db3_mutation_proto.KVPair', null, global);
 goog.exportSymbol('proto.db3_mutation_proto.Mutation', null, global);
@@ -740,7 +739,8 @@ proto.db3_mutation_proto.WriteRequest.prototype.toObject = function(opt_includeI
 proto.db3_mutation_proto.WriteRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
     signature: msg.getSignature_asB64(),
-    mutation: msg.getMutation_asB64()
+    mutation: msg.getMutation_asB64(),
+    publicKey: msg.getPublicKey_asB64()
   };
 
   if (includeInstance) {
@@ -785,6 +785,10 @@ proto.db3_mutation_proto.WriteRequest.deserializeBinaryFromReader = function(msg
       var value = /** @type {!Uint8Array} */ (reader.readBytes());
       msg.setMutation(value);
       break;
+    case 3:
+      var value = /** @type {!Uint8Array} */ (reader.readBytes());
+      msg.setPublicKey(value);
+      break;
     default:
       reader.skipField();
       break;
@@ -825,6 +829,13 @@ proto.db3_mutation_proto.WriteRequest.serializeBinaryToWriter = function(message
   if (f.length > 0) {
     writer.writeBytes(
       2,
+      f
+    );
+  }
+  f = message.getPublicKey_asU8();
+  if (f.length > 0) {
+    writer.writeBytes(
+      3,
       f
     );
   }
@@ -916,6 +927,48 @@ proto.db3_mutation_proto.WriteRequest.prototype.setMutation = function(value) {
 
 
 /**
+ * optional bytes public_key = 3;
+ * @return {string}
+ */
+proto.db3_mutation_proto.WriteRequest.prototype.getPublicKey = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 3, ""));
+};
+
+
+/**
+ * optional bytes public_key = 3;
+ * This is a type-conversion wrapper around `getPublicKey()`
+ * @return {string}
+ */
+proto.db3_mutation_proto.WriteRequest.prototype.getPublicKey_asB64 = function() {
+  return /** @type {string} */ (jspb.Message.bytesAsB64(
+      this.getPublicKey()));
+};
+
+
+/**
+ * optional bytes public_key = 3;
+ * Note that Uint8Array is not supported on all browsers.
+ * @see http://caniuse.com/Uint8Array
+ * This is a type-conversion wrapper around `getPublicKey()`
+ * @return {!Uint8Array}
+ */
+proto.db3_mutation_proto.WriteRequest.prototype.getPublicKey_asU8 = function() {
+  return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+      this.getPublicKey()));
+};
+
+
+/**
+ * @param {!(string|Uint8Array)} value
+ * @return {!proto.db3_mutation_proto.WriteRequest} returns this
+ */
+proto.db3_mutation_proto.WriteRequest.prototype.setPublicKey = function(value) {
+  return jspb.Message.setProto3BytesField(this, 3, value);
+};
+
+
+/**
  * @enum {number}
  */
 proto.db3_mutation_proto.MutationAction = {
@@ -923,5 +976,4 @@ proto.db3_mutation_proto.MutationAction = {
   DELETEKV: 1,
   NONCE: 2
 };
-
 export default proto.db3_mutation_proto;

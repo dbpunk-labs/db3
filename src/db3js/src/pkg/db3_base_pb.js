@@ -10,7 +10,6 @@
 // GENERATED CODE -- DO NOT EDIT!
 /* eslint-disable */
 // @ts-nocheck
-
 import * as jspb from 'google-protobuf';
 var goog = jspb;
 var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);

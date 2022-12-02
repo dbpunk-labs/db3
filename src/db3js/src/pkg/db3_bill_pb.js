@@ -13,6 +13,7 @@
 
 import * as jspb from "google-protobuf";
 import db3_base_pb from "./db3_base_pb.js";
+
 var goog = jspb;
 var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);
 
@@ -692,5 +693,4 @@ proto.db3_bill_proto.BillType = {
   BILLFORMUTATION: 0,
   BILLFORQUERY: 1
 };
-
 export default proto.db3_bill_proto;

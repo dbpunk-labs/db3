@@ -92,6 +92,11 @@ export class WriteRequest extends jspb.Message {
   getMutation_asB64(): string;
   setMutation(value: Uint8Array | string): WriteRequest;
 
+  getPublicKey(): Uint8Array | string;
+  getPublicKey_asU8(): Uint8Array;
+  getPublicKey_asB64(): string;
+  setPublicKey(value: Uint8Array | string): WriteRequest;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): WriteRequest.AsObject;
   static toObject(includeInstance: boolean, msg: WriteRequest): WriteRequest.AsObject;
@@ -104,6 +109,7 @@ export namespace WriteRequest {
   export type AsObject = {
     signature: Uint8Array | string,
     mutation: Uint8Array | string,
+    publicKey: Uint8Array | string,
   }
 }
 

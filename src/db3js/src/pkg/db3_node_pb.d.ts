@@ -328,6 +328,11 @@ export class OpenSessionRequest extends jspb.Message {
   getSignature_asB64(): string;
   setSignature(value: Uint8Array | string): OpenSessionRequest;
 
+  getPublicKey(): Uint8Array | string;
+  getPublicKey_asU8(): Uint8Array;
+  getPublicKey_asB64(): string;
+  setPublicKey(value: Uint8Array | string): OpenSessionRequest;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): OpenSessionRequest.AsObject;
   static toObject(includeInstance: boolean, msg: OpenSessionRequest): OpenSessionRequest.AsObject;
@@ -340,6 +345,7 @@ export namespace OpenSessionRequest {
   export type AsObject = {
     header: Uint8Array | string,
     signature: Uint8Array | string,
+    publicKey: Uint8Array | string,
   }
 }
 
@@ -410,6 +416,11 @@ export class CloseSessionRequest extends jspb.Message {
   getSignature_asB64(): string;
   setSignature(value: Uint8Array | string): CloseSessionRequest;
 
+  getPublicKey(): Uint8Array | string;
+  getPublicKey_asU8(): Uint8Array;
+  getPublicKey_asB64(): string;
+  setPublicKey(value: Uint8Array | string): CloseSessionRequest;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): CloseSessionRequest.AsObject;
   static toObject(includeInstance: boolean, msg: CloseSessionRequest): CloseSessionRequest.AsObject;
@@ -422,6 +433,7 @@ export namespace CloseSessionRequest {
   export type AsObject = {
     payload: Uint8Array | string,
     signature: Uint8Array | string,
+    publicKey: Uint8Array | string,
   }
 }
 

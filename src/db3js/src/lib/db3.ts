@@ -50,7 +50,7 @@ export class DB3 {
 		mutationObj.setGasPrice();
 		mutationObj.setGas(mutation.gasLimit);
 
-		const signature = sign(mutationObj.serializeBinary());
+		const signature = await sign(mutationObj.serializeBinary());
 		const writeRequest = new db3_mutation_pb.WriteRequest();
 		writeRequest.setMutation(mutationObj.serializeBinary());
 		writeRequest.setSignature(signature);
