@@ -28,9 +28,10 @@ export class DB3 {
 	constructor(node: string, options?: DB3_Options) {
 		this.client = new StorageNodeClient(node, null, null);
 	}
+
 	async submitMutaition(
 		mutation: Mutation,
-		sign: (target: Uint8Array) => Uint8Array,
+		sign: (target: Uint8Array) => [Uint8Array, Uint8Array],
 	) {
 		const kvPairsList: KVPair[] = [];
 		Object.keys(mutation.data).forEach((key: string) => {
@@ -50,10 +51,12 @@ export class DB3 {
 		mutationObj.setGasPrice();
 		mutationObj.setGas(mutation.gasLimit);
 
-		const signature = await sign(mutationObj.serializeBinary());
+		const [signature, public_key] = await sign(mutationObj.serializeBinary());
+
 		const writeRequest = new db3_mutation_pb.WriteRequest();
 		writeRequest.setMutation(mutationObj.serializeBinary());
 		writeRequest.setSignature(signature);
+        writeRequest.setPublicKey(public_key);
 
 		const broadcastRequest = new db3_node_pb.BroadcastRequest();
 		broadcastRequest.setBody(writeRequest.serializeBinary());

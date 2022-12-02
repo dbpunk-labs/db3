@@ -7,11 +7,13 @@ global.TextDecoder = TextDecoder;
 
 describe("test db3js api", () => {
 	test("test submitMutation", async () => {
-		const [sk] = await generateKey();
+		const [sk, public_key] = await generateKey();
 		const db3_instance = new DB3("http://127.0.0.1:26659");
+
 		async function _sign(data: Uint8Array) {
-			return await sign(data, sk);
+			return [await sign(data, sk), public_key];
 		}
+
         const result = await db3_instance.submitMutaition(
             {
                 ns: "my_twitter",
