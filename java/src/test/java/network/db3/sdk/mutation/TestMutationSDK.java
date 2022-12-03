@@ -8,14 +8,15 @@ import db3_node_proto.StorageNodeGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import network.db3.crypto.Ed25519Signer;
+import org.junit.Test;
 
 import java.security.SecureRandom;
 
 public class TestMutationSDK {
 
-
+    @Test
     public void smokeTest() {
-        ManagedChannel mchannel = ManagedChannelBuilder.forAddress("localhost", 26659).build();
+        ManagedChannel mchannel = ManagedChannelBuilder.forTarget("127.0.0.1:26659").usePlaintext().build();
         StorageNodeGrpc.StorageNodeBlockingStub stub = StorageNodeGrpc.newBlockingStub(mchannel);
         SecureRandom random = new SecureRandom();
         Ed25519PrivateKey privateKey = Ed25519PrivateKey.generate(random);
@@ -31,10 +32,9 @@ public class TestMutationSDK {
         mBuilder.setNs(ByteString.copyFromUtf8("ns2"));
         mBuilder.setGas(1000);
         mBuilder.setNonce(111);
-        mBuilder.setKvPairs(0, kvBuilder.build());
+        mBuilder.addKvPairs(kvBuilder.build());
         Db3Mutation.Mutation mutation = mBuilder.build();
         String id = sdk.submit(mutation);
         System.out.println(id);
     }
-
 }

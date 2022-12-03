@@ -30,4 +30,5 @@ public class MutationSDK {
         Db3Node.BroadcastResponse response = stub.broadcast(broadcastBuilder.build());
         return Base64.getEncoder().encodeToString(response.getHash().toByteArray());
     }
+
 }
