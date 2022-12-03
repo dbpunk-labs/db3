@@ -2,7 +2,6 @@ package network.db3.protocol.document;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.protobuf.ByteString;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

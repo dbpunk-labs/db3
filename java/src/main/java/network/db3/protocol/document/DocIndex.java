@@ -11,11 +11,9 @@ public class DocIndex {
         this.keys = keys;
         this.docName = docName;
     }
-
     public String getDocName() {
         return docName;
     }
-
     public List<Key> getKeys() {
         return keys;
     }
