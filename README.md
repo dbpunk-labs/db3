@@ -108,7 +108,7 @@ k1 -> v1
 ![db3_arch](./docs/images/db3-architecture.svg)
 
 # Archtecture
-![db3_arch](./docs/images/db3_arch.png)
+![db3_arch](./docs/images/db3_arch.svg)
 # Media
 * [all in web3探索个人数据主权](https://www.muran.me/%E7%A6%BB%E8%81%8C%E9%98%BF%E9%87%8Call-in-web3%E6%8E%A2%E7%B4%A2%E4%B8%AA%E4%BA%BA%E6%95%B0%E6%8D%AE%E4%B8%BB%E6%9D%83)
 # License
