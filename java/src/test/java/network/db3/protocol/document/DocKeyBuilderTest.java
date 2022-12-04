@@ -2,6 +2,7 @@ package network.db3.protocol.document;
 
 import com.google.gson.JsonObject;
 import com.google.protobuf.ByteString;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
@@ -27,6 +28,6 @@ public class DocKeyBuilderTest {
         object2.addProperty("k1", "k");
         object2.addProperty("k2", 11);
         ByteBuffer bs2 = DocKeyBuilder.gen(index, object2);
-        System.out.println(bs.compareTo(bs2));
+        Assert.assertTrue(bs.compareTo(bs2) < 0 );
     }
 }
