@@ -176,8 +176,6 @@ k1 -> v1
 
 ![roadmap](./docs/images/db3-roadmap.svg)
 
-# Architecture
-![db3_arch](./docs/images/db3-architecture.svg)
 
 # Archtecture
 ![db3_arch](./docs/images/db3_arch.svg)
