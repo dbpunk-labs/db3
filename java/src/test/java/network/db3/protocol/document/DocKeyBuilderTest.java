@@ -1,8 +1,6 @@
 package network.db3.protocol.document;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -32,7 +30,7 @@ public class DocKeyBuilderTest {
         object2.addProperty("k1", "k");
         object2.addProperty("k2", 11);
         ByteBuffer bs2 = DocKeyBuilder.gen(index, object2);
-        Assert.assertTrue(bs.compareTo(bs2) < 0 );
+        Assert.assertTrue(bs.compareTo(bs2) < 0);
     }
 
     @Test
@@ -52,7 +50,7 @@ public class DocKeyBuilderTest {
         ByteBuffer bs2 = Base64.getEncoder().encode(bs);
         byte[] bytes = new byte[bs2.remaining()];
         bs2.get(bytes);
-        Assert.assertEquals("dHJhbnNhY3Rpb24weDExMTExAAAAAAAAJTc=", new String(bytes, Charset.forName("UTF-8")));
+        Assert.assertEquals("dHJhbnNhY3Rpb24weDExMTExAAAAAAAAJTc=", new String(bytes, StandardCharsets.UTF_8));
         // the expect comes from typescript sdk
         Assert.assertEquals("eyJhZGRyZXNzIjoiMHgxMTExMSIsInRzIjo5NTI3fQ==", Base64.getEncoder().encodeToString(object1.toString().getBytes(StandardCharsets.UTF_8)));
     }

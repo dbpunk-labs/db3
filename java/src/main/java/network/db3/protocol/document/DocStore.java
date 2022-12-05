@@ -24,7 +24,7 @@ public class DocStore {
         // fetch doc index descriptor
     }
 
-    public String insertDoc(String ns,  String table,  List<JsonObject> objects) {
+    public String insertDocs(String ns, String table, List<JsonObject> objects) {
         List<Db3Mutation.KVPair> kvPairs = new ArrayList<>();
         for (int i = 0; i < objects.size(); i++) {
             ByteBuffer bb = DocKeyBuilder.gen(index, objects.get(i));

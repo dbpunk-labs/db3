@@ -17,6 +17,7 @@
 //
 
 package network.db3.crypto;
+
 import cafe.cryptography.ed25519.Ed25519ExpandedPrivateKey;
 import cafe.cryptography.ed25519.Ed25519PrivateKey;
 import cafe.cryptography.ed25519.Ed25519PublicKey;
@@ -37,6 +38,6 @@ public class Ed25519Signer {
     }
 
     public Ed25519Signature sign(byte[] message) {
-        return  this.extendPrivateKey.sign(message, this.publicKey);
+        return this.extendPrivateKey.sign(message, this.publicKey);
     }
 }

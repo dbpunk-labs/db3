@@ -12,6 +12,7 @@ import java.util.Base64;
 public class MutationSDK {
     private final StorageNodeGrpc.StorageNodeBlockingStub stub;
     private final Ed25519Signer signer;
+
     public MutationSDK(StorageNodeGrpc.StorageNodeBlockingStub stub, Ed25519Signer signer) {
         this.stub = stub;
         this.signer = signer;

@@ -38,7 +38,7 @@ public class DocStoreTest {
         JsonObject object1 = new JsonObject();
         object1.addProperty("k1", "k");
         object1.addProperty("k2", 10);
-        String id = store.insertDoc("ns1", index.getDocName(), Arrays.asList(object1));
+        String id = store.insertDocs("ns1", index.getDocName(), Arrays.asList(object1));
         Assert.assertEquals("UNx6mqfvb8lsu+//neQ9gX5jYucIvzi1nzHQULu+/QE=", id);
     }
 }

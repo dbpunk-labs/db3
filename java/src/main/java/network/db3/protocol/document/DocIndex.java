@@ -7,13 +7,16 @@ public class DocIndex {
     public final static String DOC_KEY = "_doc_decriptor";
     private final List<Key> keys;
     private final String docName;
+
     public DocIndex(List<Key> keys, String docName) {
         this.keys = keys;
         this.docName = docName;
     }
+
     public String getDocName() {
         return docName;
     }
+
     public List<Key> getKeys() {
         return keys;
     }
