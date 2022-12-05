@@ -30,9 +30,10 @@ impl<'a> Key<'a> {
     ///
     pub fn encode(&self) -> Result<Vec<u8>> {
         if self.1.len() > MAX_NAMESPACE_LEN || self.2.len() > MAX_USE_KEY_LEN {
-            return Err(DB3Error::KeyCodecError(
-                format!("the length {} of namespace or key exceeds the limit", self.2.len())
-            ));
+            return Err(DB3Error::KeyCodecError(format!(
+                "the length {} of namespace or key exceeds the limit",
+                self.2.len()
+            )));
         }
         let mut encoded_key = self.0.as_ref().to_vec();
         encoded_key.extend_from_slice(NAMESPACE.as_bytes());

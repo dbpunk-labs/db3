@@ -226,12 +226,13 @@ impl Application for AbciImpl {
                 for item in pending_mutation {
                     match s.apply_mutation(&item.0, &item.1, &item.2) {
                         Ok((_gas, total_bytes)) => {
-                        self.node_state
-                            .total_mutations
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        self.node_state
-                            .total_storage_bytes
-                            .fetch_add(total_bytes as u64, std::sync::atomic::Ordering::Relaxed);
+                            self.node_state
+                                .total_mutations
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            self.node_state.total_storage_bytes.fetch_add(
+                                total_bytes as u64,
+                                std::sync::atomic::Ordering::Relaxed,
+                            );
                         }
                         Err(e) => {
                             info!("fail to apply mutation for {}", e);
