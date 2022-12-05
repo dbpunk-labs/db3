@@ -49,6 +49,7 @@ describe("test db3js api", () => {
             .join('')
     );
         expect(uint8ToBase64(pk)).toBe("dHJhbnNhY3Rpb24weDExMTExAAAAAAAAJTc=");
+        expect(uint8ToBase64(object2Buffer(transacion))).toBe("eyJhZGRyZXNzIjoiMHgxMTExMSIsInRzIjo5NTI3fQ==");
     });
     test("test submitMutation", async () => {
 		const [sk, public_key] = await getATestStaticKeypair();
