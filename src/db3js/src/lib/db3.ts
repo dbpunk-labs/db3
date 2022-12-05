@@ -31,7 +31,7 @@ export class DB3 {
 
 	async submitMutaition(
 		mutation: Mutation,
-		sign: (target: Uint8Array) => [Uint8Array, Uint8Array],
+		sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
 	) {
 		const kvPairsList: KVPair[] = [];
 		Object.keys(mutation.data).forEach((key: string) => {
@@ -62,6 +62,17 @@ export class DB3 {
 		broadcastRequest.setBody(writeRequest.serializeBinary());
 
 		const res = await this.client.broadcast(broadcastRequest, {});
+		return res.toObject();
+	}
+	async openQuerySession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
+		const sessionRequest = new db3_node_pb.OpenSessionRequest();
+		// const header = window.crypto.getRandomValues(new Uint8Array(32));
+		const header = encodeUint8Array('Header');
+		const [signature, public_key] = await sign(header);
+		sessionRequest.setHeader(header);
+		sessionRequest.setSignature(signature);
+		sessionRequest.setPublicKey(public_key);
+		const res = await this.client.openQuerySession(sessionRequest, {});
 		return res.toObject();
 	}
 }
