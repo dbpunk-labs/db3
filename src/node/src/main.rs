@@ -259,7 +259,7 @@ async fn start_node(cmd: Commands) {
         //TODO recover storage
         let (_node_state, abci_handler) =
             start_abci_service(abci_port, read_buf_size, node_store.clone());
-        let tm_addr = format!("http://127.0.0.1:{}", tm_port);
+        let tm_addr = format!("http://0.0.0.0:{}", tm_port);
         info!("db3 json rpc server will connect to tendermint {}", tm_addr);
         let client = HttpClient::new(tm_addr.as_str()).unwrap();
         let context = Context {
