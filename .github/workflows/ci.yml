@@ -85,7 +85,7 @@ jobs:
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
       - name: Rust java sdk test
         run: |
-          cd java & mvn test
+          cd java && mvn test
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}
