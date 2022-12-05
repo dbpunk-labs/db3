@@ -21,28 +21,41 @@ export interface DocIndex {
     docName:string,
 }
 
-function genPrimaryKey(index:DocIndex, doc:Object) {
+export function genPrimaryKey(index:DocIndex, doc:Object) {
     const buff = new SmartBuffer();
     type ObjectKey = keyof typeof doc;
     // write the doc name to the key
-    buff.writeString(index.docName);
+    var offset = 0;
+    buff.writeString(index.docName, offset);
+    offset += index.docName.length;
     index.keys.forEach((key: DocKey)=> {
         switch (key.keyType) {
             case DocKeyType.STRING: {
                 const objectKey = key.name as ObjectKey;
                 let value = doc[objectKey]
-                buff.writeString(value as unknown as string);
+                buff.writeString(value as unknown as string, offset);
+                offset += (value as unknown as string).length;
                 break;
             }
             case DocKeyType.NUMBER: {
                 const objectKey = key.name as ObjectKey;
                 let value = doc[objectKey];
-                buff.writeBigInt64BE(BigInt(value as unknown as number));
+                buff.writeBigInt64BE(BigInt(value as unknown as number), offset);
+                offset += 8;
                 break;
             }
         }
     });
-    return buff.toBuffer();
+    const buffer = buff.toBuffer().buffer;
+    return new Uint8Array(buffer, 0, offset);
+}
+
+export function object2Buffer(doc:Object) {
+    const buff = new SmartBuffer();
+    const json_str = JSON.stringify(doc);
+    buff.writeString(json_str);
+    const buffer = buff.toBuffer().buffer;
+    return new Uint8Array(buffer, 0, json_str.length);
 }
 
 export class DocStore {
@@ -51,16 +64,17 @@ export class DocStore {
 		this.db3 = db3;
 	}
 
-    async insertDocs(index:DocIndex, docs:Object[], sign: (target: Uint8Array) => [Uint8Array, Uint8Array]) {
+    async insertDocs(index:DocIndex, docs:Object[], sign: (target: Uint8Array) => [Uint8Array, Uint8Array],
+    nonce?:number) {
         const kvPairs: db3_mutation_pb.KVPair[] = [];
         docs.forEach((doc:Object)=>{
-            const key = genPrimaryKey(index, doc);
+            const key = genPrimaryKey(index, doc) as Uint8Array;
 			const kvPair = new db3_mutation_pb.KVPair();
             kvPair.setKey(key);
-			kvPair.setValue(JSON.stringify(doc));
+			kvPair.setValue(object2Buffer(doc));
 			kvPair.setAction(db3_mutation_pb.MutationAction.INSERTKV);
             kvPairs.push(kvPair);
         });
-        return await this.db3.submitRawMutation(index.ns, kvPairs, sign);
+        return await this.db3.submitRawMutation(index.ns, kvPairs, sign, nonce);
     }
 }

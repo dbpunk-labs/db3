@@ -33,11 +33,16 @@ export class DB3 {
 		                   ns:string,
 						   kv_pairs:KVPair[],
 		                   sign: (target: Uint8Array) => [Uint8Array, Uint8Array],	
+						   nonce?:number
 	) {
 		const mutation = new db3_mutation_pb.Mutation();
 		mutation.setNs(encodeUint8Array(ns));
 		mutation.setKvPairsList(kv_pairs);
-		mutation.setNonce(Date.now());
+		if (typeof nonce !== 'undefined') {
+			mutation.setNonce(nonce);
+		}else {
+			mutation.setNonce(Date.now());
+		}
 		mutation.setChainId(db3_base_pb.ChainId.MAINNET);
 		mutation.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN);
 		mutation.setGasPrice();
@@ -57,6 +62,7 @@ export class DB3 {
 	async submitMutaition(
 		mutation: Mutation,
 		sign: (target: Uint8Array) => [Uint8Array, Uint8Array],
+		nonce?:number
 	) {
 		const kvPairsList: KVPair[] = [];
 		Object.keys(mutation.data).forEach((key: string) => {
@@ -69,7 +75,11 @@ export class DB3 {
 		const mutationObj = new db3_mutation_pb.Mutation();
 		mutationObj.setNs(encodeUint8Array(mutation.ns));
 		mutationObj.setKvPairsList(kvPairsList);
-		mutationObj.setNonce(Date.now());
+		if (typeof nonce !== 'undefined') {
+			mutationObj.setNonce(nonce);
+		}else {
+			mutationObj.setNonce(Date.now());
+		}
 		mutationObj.setChainId(db3_base_pb.ChainId.MAINNET);
 		mutationObj.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN);
 		mutationObj.setGasPrice();

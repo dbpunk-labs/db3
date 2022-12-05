@@ -224,15 +224,19 @@ impl Application for AbciImpl {
                 let span = span!(Level::INFO, "commit").entered();
                 let pending_mutation_len = pending_mutation.len();
                 for item in pending_mutation {
-                    if let Ok((_gas, total_bytes)) = s.apply_mutation(&item.0, &item.1, &item.2) {
+                    match s.apply_mutation(&item.0, &item.1, &item.2) {
+                        Ok((_gas, total_bytes)) => {
                         self.node_state
                             .total_mutations
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         self.node_state
                             .total_storage_bytes
                             .fetch_add(total_bytes as u64, std::sync::atomic::Ordering::Relaxed);
-                    } else {
-                        todo!();
+                        }
+                        Err(e) => {
+                            info!("fail to apply mutation for {}", e);
+                            todo!();
+                        }
                     }
                 }
                 if pending_mutation_len > 0 {

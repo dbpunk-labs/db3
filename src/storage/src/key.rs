@@ -17,7 +17,7 @@
 use db3_error::{DB3Error, Result};
 use ethereum_types::Address as AccountAddress;
 const NAMESPACE: &str = "_NAMESPACE_";
-const MAX_USE_KEY_LEN: usize = 32;
+const MAX_USE_KEY_LEN: usize = 128;
 const MAX_NAMESPACE_LEN: usize = 16;
 const MIN_KEY_TOTAL_LEN: usize = AccountAddress::len_bytes() + NAMESPACE.len();
 
@@ -31,7 +31,7 @@ impl<'a> Key<'a> {
     pub fn encode(&self) -> Result<Vec<u8>> {
         if self.1.len() > MAX_NAMESPACE_LEN || self.2.len() > MAX_USE_KEY_LEN {
             return Err(DB3Error::KeyCodecError(
-                "the length of namespace or key exceeds the limit".to_string(),
+                format!("the length {} of namespace or key exceeds the limit", self.2.len())
             ));
         }
         let mut encoded_key = self.0.as_ref().to_vec();
