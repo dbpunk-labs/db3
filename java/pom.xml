@@ -20,18 +20,20 @@
             <artifactId>grpc-all</artifactId>
             <version>1.51.0</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/cafe.cryptography/ed25519-elisabeth -->
+
         <dependency>
             <groupId>cafe.cryptography</groupId>
             <artifactId>ed25519-elisabeth</artifactId>
             <version>0.1.0</version>
         </dependency>
+
         <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
-            <version>7.4.0</version>
+            <version>6.14.3</version>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>de.undercouch</groupId>
             <artifactId>bson4jackson</artifactId>
@@ -43,6 +45,7 @@
             <artifactId>gson</artifactId>
             <version>2.10</version>
         </dependency>
+
     </dependencies>
 
     <build>

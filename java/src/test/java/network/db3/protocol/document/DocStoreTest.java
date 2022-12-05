@@ -8,13 +8,12 @@ import io.grpc.ManagedChannelBuilder;
 import network.db3.common.Utils;
 import network.db3.crypto.Ed25519Signer;
 import network.db3.sdk.mutation.MutationSDK;
-import org.junit.Assert;
-import org.junit.Test;
 
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.List;
-
+import org.testng.Assert;
+import org.testng.annotations.Test;
 public class DocStoreTest {
 
     @Test

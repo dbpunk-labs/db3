@@ -1,17 +1,18 @@
 package network.db3.protocol.document;
 
 import com.google.gson.JsonObject;
-import org.junit.Assert;
-import org.junit.Test;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 public class DocKeyBuilderTest {
+
     @Test
     public void testOrder() {
         Key k1 = new Key();
