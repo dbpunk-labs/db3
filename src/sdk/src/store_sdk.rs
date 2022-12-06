@@ -21,9 +21,9 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionPayload,
-    CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest,
-    GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
-    QuerySessionInfo, SessionIdentifier,
+    CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetRangeRequest,
+    GetRangeResponse, GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey,
+    QueryBillRequest, QuerySessionInfo, Range as DB3Range, RangeKey, RangeValue, SessionIdentifier,
 };
 use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
@@ -180,11 +180,49 @@ impl StoreSDK {
         Ok(response.session_info.unwrap())
     }
 
+    pub async fn get_range(
+        &mut self,
+        ns: &[u8],
+        range: &std::ops::Range<Vec<u8>>,
+        token: &str,
+    ) -> std::result::Result<Option<RangeValue>, Status> {
+        match self.session_pool.get_session_mut(token) {
+            Some(session) => {
+                if session.check_session_running() {
+                    let db3_range = DB3Range {
+                        start: range.start.to_vec(),
+                        end: range.end.to_vec(),
+                    };
+                    let range_keys = Some(RangeKey {
+                        ns: ns.to_vec(),
+                        range: Some(db3_range),
+                        session_token: token.to_string(),
+                    });
+                    let r = GetRangeRequest { range_keys };
+                    let request = tonic::Request::new(r);
+                    let mut client = self.client.as_ref().clone();
+                    let response = client.get_range(request).await?.into_inner();
+                    // TODO(cj): batch keys query should be count as a query or multi queries?
+                    session.increase_query(1);
+                    Ok(response.range_value)
+                } else {
+                    Err(Status::permission_denied(
+                        "Fail to query in this session. Please restart query session",
+                    ))
+                }
+            }
+            None => Err(Status::not_found(format!(
+                "Fail to query, session with token {} not found",
+                token
+            ))),
+        }
+    }
+
     pub async fn batch_get(
         &mut self,
         ns: &[u8],
         keys: Vec<Vec<u8>>,
-        token: &String,
+        token: &str,
     ) -> std::result::Result<Option<BatchGetValue>, Status> {
         match self.session_pool.get_session_mut(token) {
             Some(session) => {
@@ -192,11 +230,10 @@ impl StoreSDK {
                     let batch_get = Some(BatchGetKey {
                         ns: ns.to_vec(),
                         keys,
-                        session_token: token.clone(),
+                        session_token: token.to_string(),
                     });
                     let r = GetKeyRequest { batch_get };
                     let request = tonic::Request::new(r);
-
                     let mut client = self.client.as_ref().clone();
                     let response = client.get_key(request).await?.into_inner();
                     // TODO(cj): batch keys query should be count as a query or multi queries?
