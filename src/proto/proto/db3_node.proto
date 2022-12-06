@@ -67,11 +67,13 @@ message BatchGetValue {
 message SessionIdentifier {
     string session_token = 1;
 }
+
 enum SessionStatus {
     Running = 0;
     Blocked = 1;
     Stop = 2;
 }
+
 message QuerySessionInfo {
     // the hex encoded string
     int32 id = 1;

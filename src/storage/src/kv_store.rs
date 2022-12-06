@@ -159,6 +159,27 @@ mod tests {
     use merkdb::proofs::Node;
     use std::boxed::Box;
     use tempdir::TempDir;
+
+    #[test]
+    fn test_range_empty() {
+        let tmp_dir_path = TempDir::new("get range").expect("create temp dir");
+        let addr = get_a_static_address();
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let db = Box::pin(merk);
+        let range = DB3Range {
+            start: "k0".as_bytes().to_vec(),
+            end: "k4".as_bytes().to_vec(),
+        };
+        let ns: &str = "my_twitter";
+        let range_key = RangeKey {
+            ns: ns.as_bytes().to_vec(),
+            range: Some(range),
+            session_token: "token".to_string(),
+        };
+        let result = KvStore::get_range(db.as_ref(), &addr, &range_key);
+        assert!(result.is_err());
+    }
+
     #[test]
     fn test_get_range_smoke() {
         let tmp_dir_path = TempDir::new("get range").expect("create temp dir");
