@@ -21,8 +21,8 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionPayload,
     CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse,
-    GetSessionInfoRequest, GetSessionInfoResponse, OpenSessionRequest, OpenSessionResponse,
-    QueryBillRequest, QueryBillResponse,
+    GetRangeRequest, GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse,
+    OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse,
 };
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
@@ -45,6 +45,12 @@ impl StorageNodeImpl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeImpl {
+    async fn get_range(
+        &self,
+        request: Request<GetRangeRequest>,
+    ) -> std::result::Result<Response<GetRangeResponse>, Status> {
+        Err(Status::internal("err".to_string()))
+    }
     async fn open_query_session(
         &self,
         request: Request<OpenSessionRequest>,
