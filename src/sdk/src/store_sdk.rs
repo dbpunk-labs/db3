@@ -22,8 +22,8 @@ use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionPayload,
     CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetRangeRequest,
-    GetRangeResponse, GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey,
-    QueryBillRequest, QuerySessionInfo, Range as DB3Range, RangeKey, RangeValue, SessionIdentifier,
+    GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
+    QuerySessionInfo, Range as DB3Range, RangeKey, RangeValue, SessionIdentifier,
 };
 use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
@@ -313,6 +313,67 @@ mod tests {
         }
         assert!(result.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_get_range() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let mclient = client.clone();
+        let ns_vec = "my_data".as_bytes().to_vec();
+        let kp = get_a_static_keypair();
+        let signer = Db3Signer::new(kp);
+        let msdk = MutationSDK::new(mclient, signer);
+        let k1 = KvPair {
+            key: "k1".as_bytes().to_vec(),
+            value: "v1".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let k2 = KvPair {
+            key: "k2".as_bytes().to_vec(),
+            value: "v2".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let k3 = KvPair {
+            key: "k3".as_bytes().to_vec(),
+            value: "v3".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let mutation = Mutation {
+            ns: ns_vec.clone(),
+            kv_pairs: vec![k1, k2, k3],
+            nonce: 11000,
+            chain_id: ChainId::MainNet.into(),
+            chain_role: ChainRole::StorageShardChain.into(),
+            gas_price: None,
+            gas: 10,
+        };
+        let result = msdk.submit_mutation(&mutation).await;
+        assert!(result.is_ok(), "{}", result.err().unwrap());
+        let ten_millis = time::Duration::from_millis(1000);
+        std::thread::sleep(ten_millis);
+        let kp = get_a_static_keypair();
+        let signer = Db3Signer::new(kp);
+        let mut sdk = StoreSDK::new(client, signer);
+        let res = sdk.open_session().await;
+        assert!(res.is_ok());
+        let session_info = res.unwrap();
+        let range = std::ops::Range {
+            start: "k0".as_bytes().to_vec(),
+            end: "k4".as_bytes().to_vec(),
+        };
+        let range_result = sdk
+            .get_range(ns_vec.as_ref(), &range, &session_info.session_token)
+            .await;
+        if let Ok(Some(range_value)) = range_result {
+            assert_eq!(3, range_value.values.len());
+            assert_eq!(range_value.values[2].value, "v3".as_bytes());
+        } else {
+            assert!(false);
+        }
+    }
+
     #[tokio::test]
     async fn close_session_happy_path() {
         let ep = "http://127.0.0.1:26659";
