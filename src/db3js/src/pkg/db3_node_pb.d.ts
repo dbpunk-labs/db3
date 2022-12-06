@@ -101,33 +101,33 @@ export namespace Range {
   }
 }
 
-export class BatchRangeKey extends jspb.Message {
+export class RangeKey extends jspb.Message {
   getNs(): Uint8Array | string;
   getNs_asU8(): Uint8Array;
   getNs_asB64(): string;
-  setNs(value: Uint8Array | string): BatchRangeKey;
+  setNs(value: Uint8Array | string): RangeKey;
 
-  getRangeList(): Array<Range>;
-  setRangeList(value: Array<Range>): BatchRangeKey;
-  clearRangeList(): BatchRangeKey;
-  addRange(value?: Range, index?: number): Range;
+  getRange(): Range | undefined;
+  setRange(value?: Range): RangeKey;
+  hasRange(): boolean;
+  clearRange(): RangeKey;
 
-  getSession(): number;
-  setSession(value: number): BatchRangeKey;
+  getSessionToken(): string;
+  setSessionToken(value: string): RangeKey;
 
   serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): BatchRangeKey.AsObject;
-  static toObject(includeInstance: boolean, msg: BatchRangeKey): BatchRangeKey.AsObject;
-  static serializeBinaryToWriter(message: BatchRangeKey, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): BatchRangeKey;
-  static deserializeBinaryFromReader(message: BatchRangeKey, reader: jspb.BinaryReader): BatchRangeKey;
+  toObject(includeInstance?: boolean): RangeKey.AsObject;
+  static toObject(includeInstance: boolean, msg: RangeKey): RangeKey.AsObject;
+  static serializeBinaryToWriter(message: RangeKey, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): RangeKey;
+  static deserializeBinaryFromReader(message: RangeKey, reader: jspb.BinaryReader): RangeKey;
 }
 
-export namespace BatchRangeKey {
+export namespace RangeKey {
   export type AsObject = {
     ns: Uint8Array | string,
-    rangeList: Array<Range.AsObject>,
-    session: number,
+    range?: Range.AsObject,
+    sessionToken: string,
   }
 }
 
@@ -158,6 +158,36 @@ export namespace BatchGetKey {
     ns: Uint8Array | string,
     keysList: Array<Uint8Array | string>,
     sessionToken: string,
+  }
+}
+
+export class RangeValue extends jspb.Message {
+  getValuesList(): Array<db3_mutation_pb.KVPair>;
+  setValuesList(value: Array<db3_mutation_pb.KVPair>): RangeValue;
+  clearValuesList(): RangeValue;
+  addValues(value?: db3_mutation_pb.KVPair, index?: number): db3_mutation_pb.KVPair;
+
+  getSessionToken(): string;
+  setSessionToken(value: string): RangeValue;
+
+  getNs(): Uint8Array | string;
+  getNs_asU8(): Uint8Array;
+  getNs_asB64(): string;
+  setNs(value: Uint8Array | string): RangeValue;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): RangeValue.AsObject;
+  static toObject(includeInstance: boolean, msg: RangeValue): RangeValue.AsObject;
+  static serializeBinaryToWriter(message: RangeValue, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): RangeValue;
+  static deserializeBinaryFromReader(message: RangeValue, reader: jspb.BinaryReader): RangeValue;
+}
+
+export namespace RangeValue {
+  export type AsObject = {
+    valuesList: Array<db3_mutation_pb.KVPair.AsObject>,
+    sessionToken: string,
+    ns: Uint8Array | string,
   }
 }
 
@@ -276,6 +306,46 @@ export class GetKeyResponse extends jspb.Message {
 export namespace GetKeyResponse {
   export type AsObject = {
     batchGetValues?: BatchGetValue.AsObject,
+  }
+}
+
+export class GetRangeRequest extends jspb.Message {
+  getRangeKeys(): RangeKey | undefined;
+  setRangeKeys(value?: RangeKey): GetRangeRequest;
+  hasRangeKeys(): boolean;
+  clearRangeKeys(): GetRangeRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetRangeRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetRangeRequest): GetRangeRequest.AsObject;
+  static serializeBinaryToWriter(message: GetRangeRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetRangeRequest;
+  static deserializeBinaryFromReader(message: GetRangeRequest, reader: jspb.BinaryReader): GetRangeRequest;
+}
+
+export namespace GetRangeRequest {
+  export type AsObject = {
+    rangeKeys?: RangeKey.AsObject,
+  }
+}
+
+export class GetRangeResponse extends jspb.Message {
+  getRangeValue(): RangeValue | undefined;
+  setRangeValue(value?: RangeValue): GetRangeResponse;
+  hasRangeValue(): boolean;
+  clearRangeValue(): GetRangeResponse;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetRangeResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: GetRangeResponse): GetRangeResponse.AsObject;
+  static serializeBinaryToWriter(message: GetRangeResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetRangeResponse;
+  static deserializeBinaryFromReader(message: GetRangeResponse, reader: jspb.BinaryReader): GetRangeResponse;
+}
+
+export namespace GetRangeResponse {
+  export type AsObject = {
+    rangeValue?: RangeValue.AsObject,
   }
 }
 
