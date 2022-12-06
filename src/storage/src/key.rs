@@ -17,7 +17,7 @@
 use db3_error::{DB3Error, Result};
 use ethereum_types::Address as AccountAddress;
 const NAMESPACE: &str = "_NAMESPACE_";
-const MAX_USE_KEY_LEN: usize = 128;
+const MAX_USE_KEY_LEN: usize = 128 * 4;
 const MAX_NAMESPACE_LEN: usize = 16;
 const MIN_KEY_TOTAL_LEN: usize = AccountAddress::len_bytes() + NAMESPACE.len();
 

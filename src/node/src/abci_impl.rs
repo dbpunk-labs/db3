@@ -117,31 +117,42 @@ impl Application for AbciImpl {
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
         // decode the request
-        if let Ok(request) = WriteRequest::decode(request.tx.as_ref()) {
-            // verify the mutation
-            if let Ok(_account_id) = verifier::Verifier::verify(
+        match WriteRequest::decode(request.tx.as_ref()) {
+            Ok(request) => match verifier::Verifier::verify(
                 request.mutation.as_ref(),
                 request.signature.as_ref(),
                 request.public_key.as_ref(),
             ) {
-                if let Ok(mutation) = Mutation::decode(request.mutation.as_ref()) {
-                    if KvStore::is_valid(&mutation) {
-                        return ResponseCheckTx {
-                            code: 0,
-                            data: Bytes::new(),
-                            log: "".to_string(),
-                            info: "".to_string(),
-                            gas_wanted: 1,
-                            gas_used: 0,
-                            events: vec![],
-                            codespace: "".to_string(),
-                            ..Default::default()
-                        };
+                Ok(_) => match Mutation::decode(request.mutation.as_ref()) {
+                    Ok(mutation) => {
+                        if KvStore::is_valid(&mutation) {
+                            return ResponseCheckTx {
+                                code: 0,
+                                data: Bytes::new(),
+                                log: "".to_string(),
+                                info: "".to_string(),
+                                gas_wanted: 1,
+                                gas_used: 0,
+                                events: vec![],
+                                codespace: "".to_string(),
+                                ..Default::default()
+                            };
+                        } else {
+                            warn!("invalid mutation for kv store");
+                        }
                     }
+                    Err(e) => {
+                        warn!("invalid transaction has been checked for error {}", e);
+                    }
+                },
+                Err(e) => {
+                    warn!("invalid transaction has been checked for error {}", e);
                 }
+            },
+            Err(e) => {
+                warn!("invalid transaction has been checked for error {}", e);
             }
         }
-        warn!("invalid transaction has been checked");
         // the tx should be removed from mempool
         return ResponseCheckTx {
             code: 1,
