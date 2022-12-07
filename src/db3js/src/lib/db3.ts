@@ -157,7 +157,7 @@ export class DB3 {
         const getAccountRequest = new db3_node_pb.GetAccountRequest()
         getAccountRequest.setAddr(address)
         try {
-            const response = await this.client.getAccount(request, {})
+            const response = await this.client.getAccount(getAccountRequest, {})
             return response.toObject()
         } catch (error) {
             throw error
