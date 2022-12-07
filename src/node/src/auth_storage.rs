@@ -20,7 +20,7 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
-use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue};
+use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
 use db3_storage::commit_store::CommitStore;
@@ -107,6 +107,31 @@ impl AuthStorage {
     #[inline]
     pub fn get_last_block_state(&self) -> &BlockState {
         &self.last_block_state
+    }
+
+    pub fn get_range(&self, addr: &AccountAddress, range_key: &RangeKey) -> Result<RangeValue> {
+        let proofs_ops = KvStore::get_range(self.db.as_ref(), addr, range_key)?;
+        let ns = range_key.ns.as_ref();
+        let mut kv_pairs: Vec<KvPair> = Vec::new();
+        for op in proofs_ops {
+            match op {
+                ProofOp::Push(Node::KV(k, v)) => {
+                    let new_key = Key::decode(k.as_ref(), ns)?;
+                    kv_pairs.push(KvPair {
+                        key: new_key.2.to_owned(),
+                        value: v,
+                        action: MutationAction::Nonce.into(),
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        Ok(RangeValue {
+            values: kv_pairs.to_owned(),
+            ns: ns.to_vec(),
+            session_token: range_key.session_token.clone(),
+        })
     }
 
     pub fn batch_get(

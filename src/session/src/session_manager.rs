@@ -62,7 +62,7 @@ impl SessionPool {
     pub fn create_new_session(
         &mut self,
         sid: i32,
-        token: &String,
+        token: &str,
     ) -> Result<(String, QuerySessionInfo), String> {
         if self.need_cleanup() {
             self.cleanup_session();
@@ -74,39 +74,39 @@ impl SessionPool {
                 DEFAULT_SESSION_POOL_SIZE_LIMIT
             ));
         }
-
         let sess = SessionManager::create_session(sid);
-        self.session_pool.insert(token.clone(), sess.clone());
-        return Ok((token.clone(), sess.session_info));
+        self.session_pool.insert(token.to_string(), sess.clone());
+        return Ok((token.to_string(), sess.session_info));
     }
+
     pub fn insert_session_with_token(
         &mut self,
         session_info: &QuerySessionInfo,
-        token: &String,
+        token: &str,
     ) -> Result<String, String> {
         if self.session_pool.contains_key(token) {
             Err(format!("Fail to create session. Token already exist."))
         } else {
             self.session_pool.insert(
-                token.clone(),
+                token.to_string(),
                 SessionManager {
                     session_info: session_info.clone(),
                 },
             );
-            Ok(token.clone())
+            Ok(token.to_string())
         }
     }
-    pub fn remove_session(&mut self, token: &String) -> Result<SessionManager, String> {
+    pub fn remove_session(&mut self, token: &str) -> Result<SessionManager, String> {
         match self.session_pool.remove(token) {
             Some(session) => Ok(session),
             None => Err(format!("session {} not exist in session pool", token)),
         }
     }
 
-    pub fn get_session(&self, token: &String) -> Option<&SessionManager> {
+    pub fn get_session(&self, token: &str) -> Option<&SessionManager> {
         self.session_pool.get(token)
     }
-    pub fn get_session_mut(&mut self, token: &String) -> Option<&mut SessionManager> {
+    pub fn get_session_mut(&mut self, token: &str) -> Option<&mut SessionManager> {
         self.session_pool.get_mut(token)
     }
 
@@ -167,7 +167,7 @@ impl SessionStore {
     /// remove session with given token
     /// 1. verify token exsit
     /// 2. verify session exist with given (token, addr)
-    pub fn remove_session(&mut self, token: &String) -> Result<SessionManager, String> {
+    pub fn remove_session(&mut self, token: &str) -> Result<SessionManager, String> {
         match self.token_account_map.remove(token) {
             Some(addr) => match self.session_pools.get_mut(&addr) {
                 Some(sess_pool) => sess_pool.remove_session(token),
@@ -176,7 +176,7 @@ impl SessionStore {
             None => Err(format!("Fail to remove session, token not exist {}", token)),
         }
     }
-    pub fn is_session_exist(&self, token: &String) -> bool {
+    pub fn is_session_exist(&self, token: &str) -> bool {
         match self.token_account_map.get(token) {
             Some(addr) => match self.session_pools.get(&addr) {
                 Some(sess_pool) => sess_pool.session_pool.contains_key(token),
@@ -185,13 +185,13 @@ impl SessionStore {
             None => false,
         }
     }
-    pub fn get_address(&self, token: &String) -> Option<Address> {
+    pub fn get_address(&self, token: &str) -> Option<Address> {
         match self.token_account_map.get(token).clone() {
             Some(addr) => Some(addr.clone()),
             None => None,
         }
     }
-    pub fn get_session_mut(&mut self, token: &String) -> Option<&mut SessionManager> {
+    pub fn get_session_mut(&mut self, token: &str) -> Option<&mut SessionManager> {
         match self.token_account_map.get(token) {
             Some(addr) => match self.session_pools.get_mut(&addr) {
                 Some(sess_pool) => sess_pool.session_pool.get_mut(token),

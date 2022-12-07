@@ -224,5 +224,4 @@ proto.db3_base_proto.ChainId = {
   TESTNET: 10,
   DEVNET: 20
 };
-
 export default proto.db3_base_proto;

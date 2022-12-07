@@ -19,7 +19,7 @@ use super::key::Key;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
-use db3_proto::db3_node_proto::BatchGetKey;
+use db3_proto::db3_node_proto::{BatchGetKey, RangeKey};
 use db3_types::cost;
 use ethereum_types::Address as AccountAddress;
 use merkdb::proofs::{query::Query, Op as ProofOp};
@@ -122,6 +122,35 @@ impl KvStore {
             .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
         Ok(ops)
     }
+
+    pub fn get_range(
+        db: Pin<&Merk>,
+        account_addr: &AccountAddress,
+        range_key: &RangeKey,
+    ) -> Result<LinkedList<ProofOp>> {
+        let mut query = Query::new();
+        match &range_key.range {
+            Some(range) => {
+                if range.start.cmp(&range.end) < std::cmp::Ordering::Less {
+                    return Err(DB3Error::QueryKvError("bad range order".to_string()));
+                }
+                let start_key =
+                    Key(*account_addr, range_key.ns.as_ref(), range.start.as_ref()).encode()?;
+                let end_key =
+                    Key(*account_addr, range_key.ns.as_ref(), range.end.as_ref()).encode()?;
+                let std_range = std::ops::Range {
+                    start: start_key,
+                    end: end_key,
+                };
+                query.insert_range(std_range);
+                let ops = db
+                    .execute_query(query)
+                    .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
+                Ok(ops)
+            }
+            None => Err(DB3Error::QueryKvError("bad input range key".to_string())),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -129,9 +158,91 @@ mod tests {
     use super::*;
     use db3_base::get_a_static_address;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
+    use db3_proto::db3_node_proto::Range as DB3Range;
     use merkdb::proofs::Node;
     use std::boxed::Box;
     use tempdir::TempDir;
+
+    #[test]
+    fn test_range_empty() {
+        let tmp_dir_path = TempDir::new("get range").expect("create temp dir");
+        let addr = get_a_static_address();
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let db = Box::pin(merk);
+        let range = DB3Range {
+            start: "k0".as_bytes().to_vec(),
+            end: "k4".as_bytes().to_vec(),
+        };
+        let ns: &str = "my_twitter";
+        let range_key = RangeKey {
+            ns: ns.as_bytes().to_vec(),
+            range: Some(range),
+            session_token: "token".to_string(),
+        };
+        let result = KvStore::get_range(db.as_ref(), &addr, &range_key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_range_smoke() {
+        let tmp_dir_path = TempDir::new("get range").expect("create temp dir");
+        let addr = get_a_static_address();
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let mut db = Box::pin(merk);
+        let kv1 = KvPair {
+            key: "k1".as_bytes().to_vec(),
+            value: "value1".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let kv2 = KvPair {
+            key: "k2".as_bytes().to_vec(),
+            value: "value2".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let kv3 = KvPair {
+            key: "k3".as_bytes().to_vec(),
+            value: "value3".as_bytes().to_vec(),
+            action: MutationAction::InsertKv.into(),
+        };
+        let mutation = Mutation {
+            ns: "my_twitter".as_bytes().to_vec(),
+            kv_pairs: vec![kv1, kv2, kv3],
+            nonce: 1,
+            chain_id: ChainId::MainNet.into(),
+            chain_role: ChainRole::StorageShardChain.into(),
+            gas_price: None,
+            gas: 10,
+        };
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result = KvStore::apply(db_m, &addr, &mutation);
+        assert!(result.is_ok());
+        let range = DB3Range {
+            start: "k0".as_bytes().to_vec(),
+            end: "k4".as_bytes().to_vec(),
+        };
+        let ns: &str = "my_twitter";
+        let range_key = RangeKey {
+            ns: ns.as_bytes().to_vec(),
+            range: Some(range),
+            session_token: "token".to_string(),
+        };
+        let result = KvStore::get_range(db.as_ref(), &addr, &range_key);
+        if let Ok(r) = result {
+            assert_eq!(3, r.len());
+            match r.back() {
+                Some(ProofOp::Push(Node::KV(k, v))) => {
+                    let new_key = Key::decode(k.as_ref(), ns.as_bytes().as_ref()).unwrap();
+                    assert_eq!("k3".as_bytes().as_ref(), new_key.2);
+                    assert_eq!("value3".as_bytes(), v);
+                }
+                _ => {
+                    assert!(false);
+                }
+            }
+        } else {
+            assert!(false);
+        }
+    }
 
     #[test]
     fn it_batch_get_empty() {

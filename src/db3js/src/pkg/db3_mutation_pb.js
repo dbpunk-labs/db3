@@ -15,6 +15,7 @@ import * as jspb from "google-protobuf";
 import db3_base_pb from "./db3_base_pb.js";
 var goog = jspb;
 var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);
+
 goog.object.extend(proto, db3_base_pb);
 goog.exportSymbol('proto.db3_mutation_proto.KVPair', null, global);
 goog.exportSymbol('proto.db3_mutation_proto.Mutation', null, global);
@@ -977,3 +978,4 @@ proto.db3_mutation_proto.MutationAction = {
   NONCE: 2
 };
 export default proto.db3_mutation_proto;
+
