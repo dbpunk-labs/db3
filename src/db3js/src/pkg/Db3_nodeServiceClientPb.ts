@@ -14,12 +14,10 @@
 /* eslint-disable */
 // @ts-nocheck
 
-
 import * as grpcWeb from 'grpc-web';
 
 import db3_account_pb from './db3_account_pb';
 import db3_node_pb from './db3_node_pb';
-
 
 export class StorageNodeClient {
   client_: grpcWeb.AbstractClientBase;
@@ -124,6 +122,49 @@ export class StorageNodeClient {
     request,
     metadata || {},
     this.methodDescriptorGetKey);
+  }
+
+  methodDescriptorGetRange = new grpcWeb.MethodDescriptor(
+    '/db3_node_proto.StorageNode/GetRange',
+    grpcWeb.MethodType.UNARY,
+    db3_node_pb.GetRangeRequest,
+    db3_node_pb.GetRangeResponse,
+    (request: db3_node_pb.GetRangeRequest) => {
+      return request.serializeBinary();
+    },
+    db3_node_pb.GetRangeResponse.deserializeBinary
+  );
+
+  getRange(
+    request: db3_node_pb.GetRangeRequest,
+    metadata: grpcWeb.Metadata | null): Promise<db3_node_pb.GetRangeResponse>;
+
+  getRange(
+    request: db3_node_pb.GetRangeRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: db3_node_pb.GetRangeResponse) => void): grpcWeb.ClientReadableStream<db3_node_pb.GetRangeResponse>;
+
+  getRange(
+    request: db3_node_pb.GetRangeRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: db3_node_pb.GetRangeResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/db3_node_proto.StorageNode/GetRange',
+        request,
+        metadata || {},
+        this.methodDescriptorGetRange,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/db3_node_proto.StorageNode/GetRange',
+    request,
+    metadata || {},
+    this.methodDescriptorGetRange);
   }
 
   methodDescriptorOpenQuerySession = new grpcWeb.MethodDescriptor(

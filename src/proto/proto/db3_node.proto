@@ -40,16 +40,22 @@ message Range {
     bytes end = 2;
 }
 
-message BatchRangeKey {
+message RangeKey {
     bytes ns = 1;
-    repeated Range range = 2;
-    int32 session = 3;
+    Range range = 2;
+    string session_token = 3;
 }
 
 message BatchGetKey {
     bytes ns = 1;
     repeated bytes keys = 2;
     string session_token = 3;
+}
+
+message RangeValue {
+    repeated db3_mutation_proto.KVPair values = 1;
+    string session_token = 2;
+    bytes ns = 3;
 }
 
 message BatchGetValue {
@@ -61,11 +67,13 @@ message BatchGetValue {
 message SessionIdentifier {
     string session_token = 1;
 }
+
 enum SessionStatus {
     Running = 0;
     Blocked = 1;
     Stop = 2;
 }
+
 message QuerySessionInfo {
     // the hex encoded string
     int32 id = 1;
@@ -80,6 +88,14 @@ message GetKeyRequest {
 
 message GetKeyResponse {
     BatchGetValue batch_get_values = 2;
+}
+
+message GetRangeRequest {
+    RangeKey range_keys = 1;
+}
+
+message GetRangeResponse {
+    RangeValue range_value = 1;
 }
 
 message GetAccountRequest {
@@ -103,20 +119,21 @@ message OpenSessionResponse {
     int32 max_query_limit = 3;
     string session_token = 4;
 }
+
 message CloseSessionPayload {
     QuerySessionInfo session_info = 1;
     string session_token = 2;
 }
+
 message CloseSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
     bytes public_key = 3;
 }
+
 message CloseSessionResponse {
     QuerySessionInfo query_session_info = 1;
 }
-
-
 
 message GetSessionInfoResponse {
     QuerySessionInfo session_info = 2;
@@ -135,9 +152,9 @@ service StorageNode {
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
     // method for querying kv data
     rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
+    rpc GetRange(GetRangeRequest) returns (GetRangeResponse) {}
     // method for open query session
     rpc OpenQuerySession(OpenSessionRequest) returns (OpenSessionResponse) {}
-
     // method for close query session
     rpc CloseQuerySession(CloseSessionRequest) returns (CloseSessionResponse) {}
     // method for querying account
