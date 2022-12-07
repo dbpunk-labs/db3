@@ -152,4 +152,25 @@ export class DB3 {
 		}
 		
 	}
+	async queryBill(height: number, startId: number, endId: number) {
+		if (!this.sessionToken) {
+			throw new Error('SessionToken is not defined');
+		}
+		const queryBillKey = new db3_node_pb.QueryBillKey();
+		queryBillKey.setHeight(height);
+		queryBillKey.setStartId(startId);
+		queryBillKey.setEndId(endId);
+		queryBillKey.setSessionToken(this.sessionToken);
+
+		const queryBillRequest = new db3_node_pb.QueryBillRequest();
+		queryBillRequest.setQueryBillKey(queryBillKey);
+
+		try {
+			const res = await this.client.queryBill(queryBillRequest, {});
+			this.querySessionInfo && this.querySessionInfo.queryCount++;
+		return res.toObject();
+		} catch (error) {
+			throw error;
+		}
+	}
 }

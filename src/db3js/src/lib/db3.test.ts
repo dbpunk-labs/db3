@@ -95,4 +95,16 @@ describe("test db3js api", () => {
 			throw error;
 		}
 	});
+
+	test("test db3 queryBill", async () => {
+		const db3_instance = new DB3("http://127.0.0.1:26659");
+		const _sign = await getSign();
+		try {
+			await db3_instance.openQuerySession(_sign);
+			const res = db3_instance.queryBill(1, 0, 10);
+			expect(res).toBeDefined();
+		} catch (error) {
+			throw error;
+		}
+	});
 });
