@@ -33,17 +33,14 @@ export function genPrimaryKey(index: DocIndex, doc: Object) {
             case DocKeyType.STRING: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeString((value as unknown) as string, offset)
-                offset += ((value as unknown) as string).length
+                buff.writeString(value as unknown as string, offset)
+                offset += (value as unknown as string).length
                 break
             }
             case DocKeyType.NUMBER: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeBigInt64BE(
-                    BigInt((value as unknown) as number),
-                    offset
-                )
+                buff.writeBigInt64BE(BigInt(value as unknown as number), offset)
                 offset += 8
                 break
             }

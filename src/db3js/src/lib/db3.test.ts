@@ -8,15 +8,14 @@ import {
     genPrimaryKey,
     object2Buffer,
 } from './doc_store'
-import { sign, getATestStaticKeypair } from './keys'
+import { sign, getATestStaticKeypair, getAddress } from './keys'
 import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
 
 describe('test db3js api', () => {
     async function getSign() {
-        const [sk, public_key] = await getATestStaticKeypair()
-
+        const [sk, public_key] = await getATestStaticKeypair();
         async function _sign(
             data: Uint8Array
         ): Promise<[Uint8Array, Uint8Array]> {
@@ -61,7 +60,7 @@ describe('test db3js api', () => {
                 _sign
             )
             const { sessionToken } = await db3_instance.openQuerySession(_sign)
-            await new Promise(r => setTimeout(r, 2000))
+            await new Promise((r) => setTimeout(r, 2000))
             const queryRes = await db3_instance.getKey({
                 ns: 'my_twitter',
                 keyList: ['key123'],
@@ -86,11 +85,9 @@ describe('test db3js api', () => {
                 },
                 _sign
             )
-            await new Promise(r => setTimeout(r, 2000))
-            const {
-                sessionToken,
-                querySessionInfo,
-            } = await db3_instance.openQuerySession(_sign)
+            await new Promise((r) => setTimeout(r, 2000))
+            const { sessionToken, querySessionInfo } =
+                await db3_instance.openQuerySession(_sign)
             if (!querySessionInfo) {
                 throw new Error('querySessionInfo is not defined')
             }
@@ -173,7 +170,7 @@ describe('test db3js api', () => {
             1
         )
         expect(result.hash).toBe('ZBv3EfQajYQ9ibANS/SMl9X2FYwvqG11+8B4eTH5mUA=')
-        await new Promise(r => setTimeout(r, 2000))
+        await new Promise((r) => setTimeout(r, 2000))
         const query = {
             address: '0x11111',
             ts: 9527,

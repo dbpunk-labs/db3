@@ -112,6 +112,7 @@ export class DB3 {
             throw error
         }
     }
+
     async keepSession(
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
@@ -152,6 +153,17 @@ export class DB3 {
         }
     }
 
+    async getAccount(address:string) {
+        const getAccountRequest = new db3_node_pb.GetAccountRequest()
+        getAccountRequest.setAddr(address)
+        try {
+            const response = await this.client.getAccount(request, {})
+            return response.toObject()
+        } catch (error) {
+            throw error
+        }
+    }
+
     async getKey(batchGetRequest: BatchGetKeyRequest) {
         const getKeyRequest = new db3_node_pb.GetKeyRequest()
         const batchGetKey = new db3_node_pb.BatchGetKey()
@@ -177,12 +189,8 @@ export class DB3 {
             throw new Error('SessionToken is not defined')
         }
         const querySessionInfo = new db3_node_pb.QuerySessionInfo()
-        const {
-            id,
-            startTime,
-            status,
-            queryCount,
-        } = this.querySessionInfo?.toObject()
+        const { id, startTime, status, queryCount } =
+            this.querySessionInfo?.toObject()
         querySessionInfo.setId(id)
         querySessionInfo.setStatus(status)
         querySessionInfo.setStartTime(startTime)
