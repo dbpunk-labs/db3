@@ -3,7 +3,7 @@ import * as dcrypto from "@deliberative/crypto";
 export async function generateKey() {
     const mnemonic = await dcrypto.generateMnemonic();
     const keypair = await dcrypto.keyPairFromMnemonic(mnemonic);
-	return [keypair.secretKey, keypair.publicKey];
+	  return [keypair.secretKey, keypair.publicKey];
 }
 
 export async function getATestStaticKeypair() {

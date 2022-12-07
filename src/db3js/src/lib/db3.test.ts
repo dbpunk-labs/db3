@@ -9,7 +9,7 @@ global.TextDecoder = TextDecoder;
 describe("test db3js api", () => {
 
 	async function getSign() {
-		const [sk, public_key] = await generateKey();
+		const [sk, public_key] = await getATestStaticKeypair();
 
 		async function _sign(
 			data: Uint8Array,
@@ -61,7 +61,7 @@ describe("test db3js api", () => {
 				keyList: ["key123"],
 				sessionToken,
 			});
-			expect(queryRes.batchGetValues?.valuesList[0].value).toBe(
+			expect(queryRes.toObject().batchGetValues?.valuesList[0].value).toBe(
 				"value123",
 			);
 		} catch (error) {
@@ -94,11 +94,10 @@ describe("test db3js api", () => {
 				sessionToken,
 			});
 			querySessionInfo.queryCount++;
-			expect(queryRes.batchGetValues?.valuesList[0].value).toBe(
+			expect(queryRes.toObject().batchGetValues?.valuesList[0].value).toBe(
 				"value123",
 			);
 			const closeRes = await db3_instance.closeQuerySession(
-				querySessionInfo,
 				_sign,
 			);
 			expect(closeRes).toBeDefined();
@@ -135,13 +134,11 @@ describe("test db3js api", () => {
         expect(uint8ToBase64(pk)).toBe("dHJhbnNhY3Rpb24weDExMTExAAAAAAAAJTc=");
         expect(uint8ToBase64(object2Buffer(transacion))).toBe("eyJhZGRyZXNzIjoiMHgxMTExMSIsInRzIjo5NTI3fQ==");
     });
-    test("test submitMutation", async () => {
+    test("test insert a doc", async () => {
 		const [sk, public_key] = await getATestStaticKeypair();
 		const db3_instance = new DB3("http://127.0.0.1:26659");
-		async function _sign(data: Uint8Array) {
-			return [await sign(data, sk), public_key];
-		}
         const doc_store = new DocStore(db3_instance);
+		const _sign = await getSign();
         const doc_index = {
             keys:[{
                name:"address",
@@ -156,10 +153,18 @@ describe("test db3js api", () => {
         const transacion = {
             address:"0x11111",
             ts:9527,
+			amount:10,
         };
         const result = await doc_store.insertDocs(doc_index, [transacion], _sign, 1);
-        expect(result.hash).toBe("loC+lmjceq5tQCTBcHDe5/+OiNxgqZLmJR9daudVtH8=");
+        expect(result.hash).toBe("ZBv3EfQajYQ9ibANS/SMl9X2FYwvqG11+8B4eTH5mUA=");
+		await new Promise((r) => setTimeout(r, 2000));
+		const query = {
+			address:"0x11111",
+			ts:9527
+		};
+		const docs = await doc_store.getDocs(doc_index, [query], _sign);
+		expect(docs.length).toBe(1);
+		expect(docs[0].amount).toBe(10);
 	});
-
 
 });

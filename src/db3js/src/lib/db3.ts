@@ -37,10 +37,12 @@ function encodeUint8Array(text: string) {
 export class DB3 {
 	private client: StorageNodeClient;
 	private sessionToken?: string;
-	private querySessionInfo?: db3_node_pb.QuerySessionInfo.AsObject; 
+	private querySessionInfo?: db3_node_pb.QuerySessionInfo;
 	constructor(node: string, options?: DB3_Options) {
 		this.client = new StorageNodeClient(node, null, null);
 	}
+
+
 
 	async submitRawMutation(
 		                   ns:string,
@@ -114,6 +116,19 @@ export class DB3 {
 		}
 		
 	}
+	async keepSession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
+		if (!this.querySessionInfo) {
+			// try to open session
+			await this.openQuerySession(sign);
+		}
+		//TODO handle exeception
+		if (this.querySessionInfo?.getQueryCount() > 1000) {
+			await this.closeQuerySession(sign);
+			await this.openQuerySession(sign);
+		}
+		return this.sessionToken;
+	}
+
 	async openQuerySession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
 		if (this.querySessionInfo) {
 			throw new Error("The current db3js instance has already opened a session, so do not open it repeatedly");
@@ -128,34 +143,38 @@ export class DB3 {
 		try {
 			const res = await this.client.openQuerySession(sessionRequest, {});
 			this.sessionToken = res.getSessionToken();
-			this.querySessionInfo = res.getQuerySessionInfo()?.toObject();
+			this.querySessionInfo = res.getQuerySessionInfo();
 			return res.toObject();
 		} catch (error) {
 			throw error;
 		}
 		
 	}
-	async getKey(request: BatchGetKeyRequest) {
+
+	async getKey(batchGetRequest: BatchGetKeyRequest) {
 		const getKeyRequest = new db3_node_pb.GetKeyRequest();
-		const batchGetKeyRequest = new db3_node_pb.BatchGetKey();
-		batchGetKeyRequest.setNs(request.ns);
-		batchGetKeyRequest.setKeysList(request.keyList);
-		batchGetKeyRequest.setSessionToken(request.sessionToken);
-		getKeyRequest.setBatchGet(batchGetKeyRequest)
+		const batchGetKey = new db3_node_pb.BatchGetKey();
+		batchGetKey.setNs(batchGetRequest.ns);
+		batchGetKey.setKeysList(batchGetRequest.keyList);
+		//todo handle null session token
+		batchGetKey.setSessionToken(batchGetRequest.sessionToken);
+		getKeyRequest.setBatchGet(batchGetKey);
 		try {
 			const res = await this.client.getKey(getKeyRequest, {});
-			return res.toObject();
+			const count = this.querySessionInfo?.getQueryCount() + 1;
+			this.querySessionInfo?.setQueryCount(count);
+			return res;
 		} catch (error) {
 			throw error;
-		}
-		
+		}	
 	}
-	async closeQuerySession(querySessionInfoAsObject: db3_node_pb.QuerySessionInfo.AsObject, sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>){
+
+	async closeQuerySession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>){
 		if (!this.sessionToken) {
 			throw new Error('SessionToken is not defined');
 		}
 		const querySessionInfo = new db3_node_pb.QuerySessionInfo();
-		const {id, startTime, status, queryCount} = querySessionInfoAsObject;
+		const {id, startTime, status, queryCount} = this.querySessionInfo?.toObject();
 		querySessionInfo.setId(id);
 		querySessionInfo.setStatus(status);
 		querySessionInfo.setStartTime(startTime);

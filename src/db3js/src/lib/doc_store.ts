@@ -1,5 +1,5 @@
 import { DB3} from "./db3"
-import db3_mutation_pb from "../pkg/db3_mutation_pb";
+import db3_mutation_pb, { KVPair } from "../pkg/db3_mutation_pb";
 import { SmartBuffer, SmartBufferOptions} from "smart-buffer";
 import * as jspb from 'google-protobuf';
 
@@ -64,7 +64,7 @@ export class DocStore {
 		this.db3 = db3;
 	}
 
-    async insertDocs(index:DocIndex, docs:Object[], sign: (target: Uint8Array) => [Uint8Array, Uint8Array],
+    async insertDocs(index:DocIndex, docs:Object[], sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
     nonce?:number) {
         const kvPairs: db3_mutation_pb.KVPair[] = [];
         docs.forEach((doc:Object)=>{
@@ -76,5 +76,26 @@ export class DocStore {
             kvPairs.push(kvPair);
         });
         return await this.db3.submitRawMutation(index.ns, kvPairs, sign, nonce);
+    }
+
+    async getDocs(index:DocIndex, queries:Object[],sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
+    nonce?:number ) {
+        const keys: Uint8Array[] = [];
+        queries.forEach((doc:Object)=>{
+            const key = genPrimaryKey(index, doc) as Uint8Array;
+            keys.push(key);
+        }); 
+        const session = await this.db3.keepSession(sign);
+        const response = await this.db3.getKey({
+            ns: index.ns,
+            keyList:keys,
+            sessionToken:session
+        });
+        const docs: Object[] = [];
+        response.getBatchGetValues()?.getValuesList().forEach((kvPair:db3_mutation_pb.KVPair)=> {
+            docs.push(JSON.parse(new TextDecoder("utf-8").decode(kvPair.getValue_asU8())));
+        })
+        
+        return docs;
     }
 }
