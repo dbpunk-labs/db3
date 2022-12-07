@@ -88,8 +88,7 @@ export class DocStore {
     async getDocs(
         index: DocIndex,
         queries: Object[],
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
-        nonce?: number
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         const keys: Uint8Array[] = []
         queries.forEach((doc: Object) => {
