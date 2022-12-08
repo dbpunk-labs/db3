@@ -24,14 +24,14 @@ public class DocStore {
         // fetch doc index descriptor
     }
 
-    public String insertDoc(String ns,  String table,  List<JsonObject> objects) {
+    public String insertDocs(String ns, List<JsonObject> objects) {
         List<Db3Mutation.KVPair> kvPairs = new ArrayList<>();
-        for (int i = 0; i < objects.size(); i++) {
-            ByteBuffer bb = DocKeyBuilder.gen(index, objects.get(i));
+        for (JsonObject object : objects) {
+            ByteBuffer bb = DocKeyBuilder.gen(index, object);
             Db3Mutation.KVPair.Builder kvPairBuilder = Db3Mutation.KVPair.newBuilder();
             kvPairBuilder.setActionValue(Db3Mutation.MutationAction.InsertKv.getNumber());
             kvPairBuilder.setKey(ByteString.copyFrom(bb));
-            kvPairBuilder.setValue(ByteString.copyFrom(objects.get(i).toString().getBytes(StandardCharsets.UTF_8)));
+            kvPairBuilder.setValue(ByteString.copyFrom(object.toString().getBytes(StandardCharsets.UTF_8)));
             kvPairs.add(kvPairBuilder.build());
         }
         Db3Mutation.Mutation.Builder mbuilder = Db3Mutation.Mutation.newBuilder();

@@ -33,6 +33,7 @@ use std::str::FromStr;
 use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
 
+use tracing::info;
 pub struct StorageNodeImpl {
     context: Context,
 }
@@ -280,6 +281,10 @@ impl StorageNode for StorageNodeImpl {
         request: Request<GetAccountRequest>,
     ) -> std::result::Result<Response<Account>, Status> {
         let r = request.into_inner();
+        if r.addr.len() <= 0 {
+            info!("empty account");
+            return Err(Status::invalid_argument("empty address".to_string()));
+        }
         let addr = AccountAddress::from_str(r.addr.as_str())
             .map_err(|e| Status::internal(format!("{}", e)))?;
         match self.context.node_store.lock() {

@@ -31,6 +31,14 @@ mod tests {
     use crate::test_base;
     use std::str::FromStr;
     #[test]
+    fn test_get_ts_address() {
+        let kp = test_base::get_a_ts_static_keypair();
+        assert_eq!(
+            "0xfab8a023ba3939b232dfde57f4faaf0389fc6c58",
+            format!("{:?}", get_address_from_pk(&kp.public))
+        );
+    }
+    #[test]
     fn test_get_address_from_pk() {
         let kp = test_base::get_a_static_keypair();
         assert_eq!(

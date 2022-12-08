@@ -9,9 +9,8 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import network.db3.common.Utils;
 import network.db3.crypto.Ed25519Signer;
-import org.junit.Assert;
-import org.junit.Test;
-
+import org.testng.Assert;
+import org.testng.annotations.Test;
 import java.security.SecureRandom;
 
 public class TestMutationSDK {

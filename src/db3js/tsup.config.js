@@ -1,7 +1,7 @@
-import { defineConfig } from "tsup";
+import { defineConfig } from 'tsup'
 
 export default defineConfig({
-	entry: ["src/index.ts"],
-	shims: true,
-	format: ["esm", "cjs", "iife"],
-});
+    entry: ['src/index.ts'],
+    shims: true,
+    format: ['esm', 'cjs', 'iife'],
+})

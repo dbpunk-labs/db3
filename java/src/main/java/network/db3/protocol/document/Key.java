@@ -2,8 +2,9 @@ package network.db3.protocol.document;
 
 public class Key {
     public enum KeyType {
-        DocNumber,DocString
+        DocNumber, DocString
     }
+
     private String name;
     private KeyType type;
 

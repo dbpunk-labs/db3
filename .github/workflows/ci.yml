@@ -73,7 +73,7 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Setup test env
         run: |
-          sudo apt-get install protobuf-compiler
+          sudo apt-get install protobuf-compiler openjdk-8-jdk maven
           protoc --version
           cargo build
           cd tools
@@ -83,6 +83,9 @@ jobs:
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
+      - name: Rust java sdk test
+        run: |
+          cd java && mvn test
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}

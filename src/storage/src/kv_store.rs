@@ -27,6 +27,7 @@ use merkdb::{BatchEntry, Merk, Op};
 use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::pin::Pin;
+use tracing::{info, warn};
 
 pub struct KvStore {}
 impl KvStore {
@@ -36,11 +37,13 @@ impl KvStore {
 
     pub fn is_valid(mutation: &Mutation) -> bool {
         if mutation.ns.len() <= 0 {
+            warn!("empty namespace");
             return false;
         }
         let mut keys: HashSet<&[u8]> = HashSet::new();
         for ref kv in &mutation.kv_pairs {
             if keys.contains(&kv.key.as_ref()) {
+                warn!("deplicated key");
                 return false;
             }
             keys.insert(kv.key.as_ref());
