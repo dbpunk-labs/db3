@@ -107,7 +107,7 @@ export class DocStore {
 
         return docs
     }
-    async queryDocumentByRange(
+    async queryDocsByRange(
         ns: string,
         startKey: [DocIndex, Record<string, any>],
         endKey: [DocIndex, Record<string, any>],

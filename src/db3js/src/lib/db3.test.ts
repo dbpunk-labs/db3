@@ -50,7 +50,7 @@ describe('test db3js api', () => {
                 },
                 _sign
             )
-            const { sessionToken } = await db3_instance.openQuerySession(_sign)
+            await db3_instance.openQuerySession(_sign)
             await new Promise(r => setTimeout(r, 2000))
             const queryRes = await db3_instance.getKey({
                 ns: 'my_twitter',
@@ -177,34 +177,29 @@ describe('test db3js api', () => {
             {
                 address: '0x11111',
                 ts: 9529,
-                amount: 10,
             },
             {
                 address: '0x11112',
                 ts: 9530,
-                amount: 10,
             },
             {
                 address: '0x11113',
                 ts: 9533,
-                amount: 10,
             },
             {
                 address: '0x11114',
                 ts: 9534,
-                amount: 10,
             },
         ]
         await doc_store.insertDocs(doc_index, transacions, _sign, 1)
         await new Promise(r => setTimeout(r, 2000))
-        const res = await doc_store.queryDocumentByRange(
+        const res = await doc_store.queryDocsByRange(
             'ns1',
             [
                 doc_index,
                 {
                     address: '0x11111',
                     ts: 9529,
-                    amount: 10,
                 },
             ],
             [
@@ -212,7 +207,6 @@ describe('test db3js api', () => {
                 {
                     address: '0x11114',
                     ts: 9534,
-                    amount: 10,
                 },
             ],
             _sign
