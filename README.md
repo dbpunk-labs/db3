@@ -1,6 +1,6 @@
 ![db3_logo](./docs/images/db3_logo.png)
 
-[![CI](https://github.com/db3-teams/db3/workflows/CI/badge.svg)](https://github.com/db3-teams/db3/actions)
+![CI](https://img.shields.io/github/workflow/status/dbpunk-labs/db3/ci?style=flat-square)
 ![coverage](https://img.shields.io/codecov/c/github/dbpunk-labs/db3?style=flat-square)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3?style=flat-square)
 ![contribution](https://img.shields.io/github/contributors/dbpunk-labs/db3?style=flat-square)
