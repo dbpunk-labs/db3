@@ -1,6 +1,5 @@
 {
     "name": "db3js",
-    "private": true,
     "version": "0.1.6",
     "main": "./dist/index.js",
     "module": "./dist/esm/index.js",
