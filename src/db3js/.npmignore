@@ -1,2 +1,3 @@
-./src
+src
 *.config.*
+yarn.lock
