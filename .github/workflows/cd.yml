@@ -103,6 +103,6 @@ jobs:
                 yarn build
             - uses: JS-DevTools/npm-publish@v1
               with:
-                  token: ${{ secrets.NPM_TOKEN }}
+                  token: ${{ secrets.NMP_TOKEN }}
                   package: src/db3js/package.json
 
