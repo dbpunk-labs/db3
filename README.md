@@ -1,11 +1,13 @@
 ![db3_logo](./docs/images/db3_logo.png)
 
 [![CI](https://github.com/db3-teams/db3/workflows/CI/badge.svg)](https://github.com/db3-teams/db3/actions)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3)
-![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3)
-![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3)
-![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=social)
-![Discord](https://img.shields.io/discord/1025017851179962408)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3?style=flat-square)
+![contribution](https://img.shields.io/github/contributors/dbpunk-labs/db3?style=flat-square)
+![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3?style=flat-square)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3?style=flat-square)
+![npm](https://img.shields.io/npm/v/db3js?style=flat-square)
+![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)
+![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
 # What's DB3?
 # Abstract
