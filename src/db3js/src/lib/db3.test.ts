@@ -1,13 +1,6 @@
 import { describe, expect, test } from '@jest/globals'
 import { DB3 } from './db3'
-import {
-    DocStore,
-    DocIndex,
-    DocKey,
-    DocKeyType,
-    genPrimaryKey,
-    object2Buffer,
-} from './doc_store'
+import { DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
 import { sign, getATestStaticKeypair, getAddress } from './keys'
 import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
@@ -15,10 +8,8 @@ global.TextDecoder = TextDecoder
 
 describe('test db3js api', () => {
     async function getSign() {
-        const [sk, public_key] = await getATestStaticKeypair();
-        async function _sign(
-            data: Uint8Array
-        ): Promise<[Uint8Array, Uint8Array]> {
+        const [sk, public_key] = await getATestStaticKeypair()
+        async function _sign(data: Uint8Array): Promise<[Uint8Array, Uint8Array]> {
             return [await sign(data, sk), public_key]
         }
         return _sign
@@ -60,15 +51,12 @@ describe('test db3js api', () => {
                 _sign
             )
             const { sessionToken } = await db3_instance.openQuerySession(_sign)
-            await new Promise((r) => setTimeout(r, 2000))
+            await new Promise(r => setTimeout(r, 2000))
             const queryRes = await db3_instance.getKey({
                 ns: 'my_twitter',
                 keyList: ['key123'],
-                sessionToken,
             })
-            expect(
-                queryRes.toObject().batchGetValues?.valuesList[0].value
-            ).toBe('value123')
+            expect(queryRes.toObject().batchGetValues?.valuesList[0].value).toBe('value123')
         } catch (error) {
             throw error
         }
@@ -85,21 +73,13 @@ describe('test db3js api', () => {
                 },
                 _sign
             )
-            await new Promise((r) => setTimeout(r, 2000))
-            const { sessionToken, querySessionInfo } =
-                await db3_instance.openQuerySession(_sign)
-            if (!querySessionInfo) {
-                throw new Error('querySessionInfo is not defined')
-            }
+            await new Promise(r => setTimeout(r, 2000))
+            await db3_instance.openQuerySession(_sign)
             const queryRes = await db3_instance.getKey({
                 ns: 'my_twitter',
                 keyList: ['test2'],
-                sessionToken,
             })
-            querySessionInfo.queryCount++
-            expect(
-                queryRes.toObject().batchGetValues?.valuesList[0].value
-            ).toBe('value123')
+            expect(queryRes.toObject().batchGetValues?.valuesList[0].value).toBe('value123')
             const closeRes = await db3_instance.closeQuerySession(_sign)
             expect(closeRes).toBeDefined()
         } catch (error) {
@@ -163,14 +143,9 @@ describe('test db3js api', () => {
             ts: 9527,
             amount: 10,
         }
-        const result = await doc_store.insertDocs(
-            doc_index,
-            [transacion],
-            _sign,
-            1
-        )
+        const result = await doc_store.insertDocs(doc_index, [transacion], _sign, 1)
         expect(result.hash).toBe('ZBv3EfQajYQ9ibANS/SMl9X2FYwvqG11+8B4eTH5mUA=')
-        await new Promise((r) => setTimeout(r, 2000))
+        await new Promise(r => setTimeout(r, 2000))
         const query = {
             address: '0x11111',
             ts: 9527,
@@ -178,5 +153,70 @@ describe('test db3js api', () => {
         const docs = await doc_store.getDocs(doc_index, [query], _sign)
         expect(docs.length).toBe(1)
         expect(docs[0].amount).toBe(10)
+    })
+
+    test('query document range by keys', async () => {
+        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const doc_store = new DocStore(db3_instance)
+        const _sign = await getSign()
+        const doc_index = {
+            keys: [
+                {
+                    name: 'address',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+            ns: 'ns1',
+            docName: 'transaction',
+        }
+        const transacions = [
+            {
+                address: '0x11111',
+                ts: 9529,
+                amount: 10,
+            },
+            {
+                address: '0x11112',
+                ts: 9530,
+                amount: 10,
+            },
+            {
+                address: '0x11113',
+                ts: 9533,
+                amount: 10,
+            },
+            {
+                address: '0x11114',
+                ts: 9534,
+                amount: 10,
+            },
+        ]
+        await doc_store.insertDocs(doc_index, transacions, _sign, 1)
+        await new Promise(r => setTimeout(r, 2000))
+        const res = await doc_store.queryDocumentByRange(
+            'ns1',
+            [
+                doc_index,
+                {
+                    address: '0x11111',
+                    ts: 9529,
+                    amount: 10,
+                },
+            ],
+            [
+                doc_index,
+                {
+                    address: '0x11114',
+                    ts: 9534,
+                    amount: 10,
+                },
+            ],
+            _sign
+        )
+        expect(res[2].address).toBe('0x11113')
     })
 })
