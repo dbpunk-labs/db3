@@ -33,14 +33,14 @@ export function genPrimaryKey(index: DocIndex, doc: Object) {
             case DocKeyType.STRING: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeString(value as unknown as string, offset)
-                offset += (value as unknown as string).length
+                buff.writeString((value as unknown) as string, offset)
+                offset += ((value as unknown) as string).length
                 break
             }
             case DocKeyType.NUMBER: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeBigInt64BE(BigInt(value as unknown as number), offset)
+                buff.writeBigInt64BE(BigInt((value as unknown) as number), offset)
                 offset += 8
                 break
             }
@@ -92,24 +92,44 @@ export class DocStore {
             const key = genPrimaryKey(index, doc) as Uint8Array
             keys.push(key)
         })
-        const session = await this.db3.keepSession(sign)
+        await this.db3.keepSession(sign)
         const response = await this.db3.getKey({
             ns: index.ns,
             keyList: keys,
-            sessionToken: session,
         })
         const docs: Object[] = []
         response
             .getBatchGetValues()
             ?.getValuesList()
             .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                docs.push(
-                    JSON.parse(
-                        new TextDecoder('utf-8').decode(kvPair.getValue_asU8())
-                    )
-                )
+                docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
             })
 
         return docs
+    }
+    async queryDocsByRange(
+        ns: string,
+        startKey: [DocIndex, Record<string, any>],
+        endKey: [DocIndex, Record<string, any>],
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
+        try {
+            await this.db3.keepSession(sign)
+            const docs: Record<string, any>[] = []
+            const res = await this.db3.getRange(
+                ns,
+                genPrimaryKey(...startKey),
+                genPrimaryKey(...endKey)
+            )
+
+            res.getRangeValue()
+                ?.getValuesList()
+                .forEach((kvPair: db3_mutation_pb.KVPair) => {
+                    docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                })
+            return docs
+        } catch (error) {
+            throw error
+        }
     }
 }

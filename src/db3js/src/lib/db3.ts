@@ -13,7 +13,6 @@ export interface Mutation {
 export interface BatchGetKeyRequest {
     ns: string
     keyList: string[]
-    sessionToken: string
 }
 
 export interface QuerySession {
@@ -35,7 +34,7 @@ function encodeUint8Array(text: string) {
 
 export class DB3 {
     private client: StorageNodeClient
-    private sessionToken?: string
+    public sessionToken?: string
     private querySessionInfo?: db3_node_pb.QuerySessionInfo
     constructor(node: string, options?: DB3_Options) {
         this.client = new StorageNodeClient(node, null, null)
@@ -113,9 +112,7 @@ export class DB3 {
         }
     }
 
-    async keepSession(
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
-    ) {
+    async keepSession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
         if (!this.querySessionInfo) {
             // try to open session
             await this.openQuerySession(sign)
@@ -128,9 +125,7 @@ export class DB3 {
         return this.sessionToken
     }
 
-    async openQuerySession(
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
-    ) {
+    async openQuerySession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
         if (this.querySessionInfo) {
             throw new Error(
                 'The current db3js instance has already opened a session, so do not open it repeatedly'
@@ -153,7 +148,7 @@ export class DB3 {
         }
     }
 
-    async getAccount(address:string) {
+    async getAccount(address: string) {
         const getAccountRequest = new db3_node_pb.GetAccountRequest()
         getAccountRequest.setAddr(address)
         try {
@@ -165,12 +160,15 @@ export class DB3 {
     }
 
     async getKey(batchGetRequest: BatchGetKeyRequest) {
+        if (!this.sessionToken) {
+            throw new Error('SessionToken is not defined')
+        }
         const getKeyRequest = new db3_node_pb.GetKeyRequest()
         const batchGetKey = new db3_node_pb.BatchGetKey()
         batchGetKey.setNs(batchGetRequest.ns)
         batchGetKey.setKeysList(batchGetRequest.keyList)
         //todo handle null session token
-        batchGetKey.setSessionToken(batchGetRequest.sessionToken)
+        batchGetKey.setSessionToken(this.sessionToken)
         getKeyRequest.setBatchGet(batchGetKey)
         try {
             const res = await this.client.getKey(getKeyRequest, {})
@@ -182,22 +180,13 @@ export class DB3 {
         }
     }
 
-    async closeQuerySession(
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
-    ) {
+    async closeQuerySession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        const querySessionInfo = new db3_node_pb.QuerySessionInfo()
-        const { id, startTime, status, queryCount } =
-            this.querySessionInfo?.toObject()
-        querySessionInfo.setId(id)
-        querySessionInfo.setStatus(status)
-        querySessionInfo.setStartTime(startTime)
-        querySessionInfo.setQueryCount(queryCount)
 
         const payload = new db3_node_pb.CloseSessionPayload()
-        payload.setSessionInfo(querySessionInfo)
+        payload.setSessionInfo(this.querySessionInfo)
         payload.setSessionToken(this.sessionToken)
 
         const payloadU8 = payload.serializeBinary()
@@ -208,12 +197,33 @@ export class DB3 {
         closeQuerySessionRequest.setSignature(signature)
         closeQuerySessionRequest.setPublicKey(public_key)
         try {
-            const res = await this.client.closeQuerySession(
-                closeQuerySessionRequest,
-                {}
-            )
+            const res = await this.client.closeQuerySession(closeQuerySessionRequest, {})
             this.querySessionInfo = undefined
             return res.toObject()
+        } catch (error) {
+            throw error
+        }
+    }
+    async getRange(ns: string, startKey: Uint8Array, endKey: Uint8Array) {
+        if (!this.sessionToken) {
+            throw new Error('SessionToken is not defined')
+        }
+        const _range = new db3_node_pb.Range()
+        _range.setStart(startKey)
+        _range.setEnd(endKey)
+
+        const rangeKeys = new db3_node_pb.RangeKey()
+        rangeKeys.setNs(ns)
+        rangeKeys.setRange(_range)
+        rangeKeys.setSessionToken(this.sessionToken)
+
+        const rangeRequest = new db3_node_pb.GetRangeRequest()
+        rangeRequest.setRangeKeys(rangeKeys)
+
+        try {
+            const res = await this.client.getRange(rangeRequest, {})
+            this.querySessionInfo?.setQueryCount(this.querySessionInfo.getQueryCount() + 1)
+            return res
         } catch (error) {
             throw error
         }
