@@ -213,4 +213,49 @@ describe('test db3js api', () => {
         )
         expect(res[2].address).toBe('0x11113')
     })
+
+    test('delete data by key', async () => {
+        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const _sign = await getSign()
+        await db3_instance.submitMutaition(
+            {
+                ns: 'my_twitter',
+                gasLimit: 10,
+                data: { user: 'tracy' },
+            },
+            _sign
+        )
+        await new Promise(r => setTimeout(r, 2000))
+        const res = await db3_instance.deleteKey('my_twitter', 'user', _sign)
+        console.log(res)
+        expect(res).toBeDefined()
+    })
+
+    test('delete doc', async () => {
+        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const doc_store = new DocStore(db3_instance)
+        const _sign = await getSign()
+        const doc_index = {
+            keys: [
+                {
+                    name: 'address',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+            ns: 'ns2',
+            docName: 'transaction',
+        }
+        const transacion = {
+            address: '0x11111',
+            ts: 9527,
+        }
+        await doc_store.insertDocs(doc_index, [transacion], _sign, 1)
+        await new Promise(r => setTimeout(r, 2000))
+        const res = await doc_store.deleteDoc('ns2', doc_index, transacion, _sign)
+        expect(res).toBeDefined()
+    })
 })

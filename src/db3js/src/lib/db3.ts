@@ -228,4 +228,44 @@ export class DB3 {
             throw error
         }
     }
+    async deleteKey(
+        ns: string,
+        key: string | Uint8Array,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
+        const kvPairsList: db3_mutation_pb.KVPair[] = []
+        const kv_pair = new db3_mutation_pb.KVPair()
+        if (typeof key === 'string') {
+            kv_pair.setKey(encodeUint8Array(key))
+        } else {
+            kv_pair.setKey(key)
+        }
+
+        kv_pair.setAction(db3_mutation_pb.MutationAction.DELETEKV)
+        kvPairsList.push(kv_pair)
+        const mutationObj = new db3_mutation_pb.Mutation()
+        mutationObj.setNs(encodeUint8Array(ns))
+        mutationObj.setKvPairsList(kvPairsList)
+        mutationObj.setNonce(Date.now())
+        mutationObj.setChainId(db3_base_pb.ChainId.MAINNET)
+        mutationObj.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN)
+        mutationObj.setGasPrice()
+        // mutationObj.setGas(0)
+
+        const mbuffer = mutationObj.serializeBinary()
+        const [signature, public_key] = await sign(mbuffer)
+        const writeRequest = new db3_mutation_pb.WriteRequest()
+        writeRequest.setMutation(mbuffer)
+        writeRequest.setSignature(signature)
+        writeRequest.setPublicKey(public_key)
+
+        const broadcastRequest = new db3_node_pb.BroadcastRequest()
+        broadcastRequest.setBody(writeRequest.serializeBinary())
+        try {
+            const res = await this.client.broadcast(broadcastRequest, {})
+            return res.toObject()
+        } catch (error) {
+            throw error
+        }
+    }
 }
