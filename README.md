@@ -11,22 +11,37 @@
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
 # What's DB3?
-# Abstract
 
-The distributed database system is significant to the massive adoption of web applications and the management of big data in a complex environment. Nevertheless, a conventional distributed database platform with centralized entities is always vulnerable and can confront serious threats when the central entity is compromised.
+DB3 is a community-driven decentralized database and also a layer two network.
 
-This paper describes a decentralized database DB3, a dedicated storage platform, for structured data on-chain storage and on-chain queryable and data on-chain programmable. DB3 inherits some desirable properties that traditional databases have, such as low latency, high throughput, and horizontal scalability. Whist, the attribute of decentralization gives users or the community control of the network.
-
-In this paper, we also introduce some novel concepts which are not general in existing blockchains but unique in DB3 such as Mutation, QuerySession, and account credit.
 # DB3 Main Features
 
 First of all, DB3 is a database. As a database, it should inherit some desirable properties that traditional databases have, such as low latency, high throughput, and high scalability. On the other hand, only decentralization can make this whole project community owned and enable every user in control of their own data. DB3 as a dedicated on-chain database contains the following main features:
 
-1. The dynamic structured data file can be mutated easily
-2. Decentralization.
-3. On-chain indexing which allows direct querying.
-4. A complete data ownership system based on the private key.
-5. Serverless: Data on-chain programmable.
+1. **Infinited storage space**
+   
+   db3 is preparing for landing 1B web3 users, so 
+   scalabilty the first consideration
+
+    * dynamic sharding strategy, increase storage space
+    * history blocks archive , reduce the storage  space of miner
+    * cold data state archive , reduce the storage space of miner
+
+2. **Blazed fast and provable on-chain query**
+
+	* merkdb 
+
+3. **Crypto native data ownership**,
+
+    only the private key can control the data
+
+4. **On-chain programable**
+
+	based assemlyscript
+
+5. **Security**
+	layer two
+
 
 What these features exactly mean? Let’s explain in detail. 
 
@@ -174,11 +189,6 @@ k1 -> v1
  total bills  | storage used | mutation | querys | credits
  0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
-
-# Roadmap
-
-![roadmap](./docs/images/db3-roadmap.svg)
-
 
 # Archtecture
 ![db3_arch](./docs/images/db3_arch.svg)
