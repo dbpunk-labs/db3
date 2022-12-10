@@ -18,7 +18,7 @@ DB3 is a community-driven decentralized database and also a layer two network.
 
 First of all, DB3 is a database. As a database, it should inherit some desirable properties that traditional databases have, such as low latency, high throughput, and high scalability. On the other hand, only decentralization can make this whole project community owned and enable every user in control of their own data. DB3 as a dedicated on-chain database contains the following main features:
 
-1. **Infinited storage space**
+1. **Infinite storage space**
    
    db3 is preparing for landing 1B web3 users, so 
    scalabilty the first consideration
