@@ -16,4 +16,5 @@
 // limitations under the License.
 //
 
+pub mod query_session_verifier;
 pub mod session_manager;

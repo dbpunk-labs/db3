@@ -16,6 +16,7 @@
 //
 use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
+use db3_proto::db3_session_proto::QuerySessionInfo;
 
 const COMPUTAION_GAS_PRICE: u64 = 10; // unit in tai
 const STORAGE_GAS_PRICE: u64 = 10; // unit in tai
@@ -38,7 +39,15 @@ pub fn estimate_gas(mutation: &Mutation) -> Units {
         amount: gas as i64,
     }
 }
-
+pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> Units {
+    let mut gas: u64 = 0;
+    gas += query_session_info.query_count as u64 * COMPUTAION_GAS_PRICE;
+    // TODO: estimate gas based on query count and weight
+    Units {
+        utype: UnitType::Tai.into(),
+        amount: gas as i64,
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

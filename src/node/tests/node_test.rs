@@ -4,10 +4,11 @@ mod node_integration {
     use bytes::BytesMut;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
-    use db3_proto::db3_mutation_proto::WriteRequest;
-    use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
+    use db3_proto::db3_mutation_proto::{
+        KvPair, Mutation, MutationAction, PayloadType, WriteRequest,
+    };
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-    use db3_proto::db3_node_proto::SessionStatus;
+    use db3_proto::db3_session_proto::SessionStatus;
     use db3_sdk::mutation_sdk::MutationSDK;
     use db3_sdk::store_sdk::StoreSDK;
     use db3_session::session_manager::{DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT};
@@ -76,6 +77,7 @@ mod node_integration {
             signature: signature.as_ref().to_vec(),
             mutation: mbuf.as_ref().to_vec().to_owned(),
             public_key: public_key.as_ref().to_vec(),
+            payload_type: PayloadType::MutationPayload.into(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf).unwrap();

@@ -10,8 +10,12 @@ keywords = ["database", "web3", "db3"]
 
 [dependencies]
 db3-proto={ path ="../proto" }
+db3-crypto={ path ="../crypto" }
+db3-error={ path ="../error" }
 ethereum-types = { version = "0.14.0", default-features = false }
 chrono = "0.4.22"
+prost = "0.11"
+prost-types = "0.11"
 
 [dependencies.uuid]
 version = "1.2.2"

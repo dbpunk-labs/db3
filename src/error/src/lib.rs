@@ -53,7 +53,7 @@ pub enum DB3Error {
     QueryKvError(String),
     #[error("fail to query, invalid session status {0}")]
     QuerySessionStatusError(String),
-    #[error("fail to verify query session")]
+    #[error("fail to verify query session {0}")]
     QuerySessionVerifyError(String),
 }
 

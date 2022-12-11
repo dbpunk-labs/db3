@@ -23,8 +23,9 @@ use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionPayload,
     CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetRangeRequest,
     GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
-    QuerySessionInfo, Range as DB3Range, RangeKey, RangeValue, SessionIdentifier,
+    Range as DB3Range, RangeKey, RangeValue, SessionIdentifier,
 };
+use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
 use prost::Message;

@@ -24,6 +24,7 @@ use db3_proto::db3_node_proto::{
     GetRangeRequest, GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse,
     OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse,
 };
+use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
 use ethereum_types::Address as AccountAddress;
@@ -149,7 +150,10 @@ impl StorageNode for StorageNodeImpl {
                 match sess_store.get_session_mut(&payload.session_token) {
                     Some(sess) => {
                         let query_session_info = &payload.session_info.unwrap();
-                        if sess.get_session_query_count() != query_session_info.query_count {
+                        if !query_session_verifier::check_query_session_info(
+                            &sess.get_session_info(),
+                            &query_session_info,
+                        ) {
                             return Err(Status::invalid_argument(format!(
                                 "query session verify fail. expect query count {} but {}",
                                 sess.get_session_query_count(),

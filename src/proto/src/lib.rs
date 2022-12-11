@@ -19,7 +19,9 @@
 pub mod db3_base_proto {
     tonic::include_proto!("db3_base_proto");
 }
-
+pub mod db3_session_proto {
+    tonic::include_proto!("db3_session_proto");
+}
 pub mod db3_mutation_proto {
     tonic::include_proto!("db3_mutation_proto");
 }

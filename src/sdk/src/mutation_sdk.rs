@@ -18,7 +18,7 @@
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
+use db3_proto::db3_mutation_proto::{Mutation, PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{storage_node_client::StorageNodeClient, BroadcastRequest};
 use prost::Message;
 use std::sync::Arc;
@@ -49,7 +49,9 @@ impl MutationSDK {
             signature: signature.as_ref().to_vec().to_owned(),
             mutation: mbuf.as_ref().to_vec().to_owned(),
             public_key: public_key.as_ref().to_vec().to_owned(),
+            payload_type: PayloadType::MutationPayload.into(),
         };
+
         //TODO add the capacity to mutation sdk configuration
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request

@@ -21,11 +21,13 @@ use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
+use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
 use db3_storage::commit_store::CommitStore;
 use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
+use db3_types::cost;
 use db3_types::gas;
 use ethereum_types::Address as AccountAddress;
 use hex;
@@ -188,6 +190,36 @@ impl AuthStorage {
         self.current_block_state.bill_id_counter = 0;
     }
 
+    pub fn apply_query_session(
+        &mut self,
+        addr: &AccountAddress,
+        query_addr: &AccountAddress,
+        mutation_id: &Hash,
+        query_session_info: &QuerySessionInfo,
+    ) -> Result<Units> {
+        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
+        self.current_block_state.bill_id_counter = self.current_block_state.bill_id_counter + 1;
+        let gas_fee = cost::estimate_query_session_gas(query_session_info);
+        let bill = Bill {
+            gas_fee: Some(gas_fee.clone()),
+            block_height: self.current_block_state.block_height as u64,
+            bill_id: self.current_block_state.bill_id_counter,
+            bill_type: BillType::BillForQuery.into(),
+            time: self.current_block_state.block_time,
+            bill_target_id: mutation_id.to_vec(),
+            owner: addr.as_bytes().to_vec(),
+            query_addr: query_addr.as_bytes().to_vec(),
+        };
+        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+        BillStore::apply(db, &bill)?;
+
+        let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
+        account.total_bills = Some(accumulate_gas);
+        account.total_query_session_count = account.total_mutation_count + 1;
+        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+        AccountStore::apply(db, &addr, &account)?;
+        Ok(gas_fee)
+    }
     pub fn apply_mutation(
         &mut self,
         addr: &AccountAddress,

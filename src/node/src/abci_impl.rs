@@ -19,7 +19,9 @@ use super::auth_storage::Hash;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::verifier;
-use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
+use db3_proto::db3_mutation_proto::{Mutation, PayloadType, WriteRequest};
+use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
+use db3_session::query_session_verifier;
 use db3_storage::kv_store::KvStore;
 use ethereum_types::Address as AccountAddress;
 use hex;
@@ -40,11 +42,14 @@ use tracing::{debug, info, span, warn, Level};
 pub struct NodeState {
     total_storage_bytes: Arc<AtomicU64>,
     total_mutations: Arc<AtomicU64>,
+    total_query_sessions: Arc<AtomicU64>,
 }
 #[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
     pending_mutation: Arc<Mutex<Vec<(AccountAddress, Hash, Mutation)>>>,
+    pending_query_session:
+        Arc<Mutex<Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)>>>,
     node_state: Arc<NodeState>,
 }
 
@@ -53,9 +58,11 @@ impl AbciImpl {
         Self {
             node_store,
             pending_mutation: Arc::new(Mutex::new(Vec::new())),
+            pending_query_session: Arc::new(Mutex::new(Vec::new())),
             node_state: Arc::new(NodeState {
                 total_storage_bytes: Arc::new(AtomicU64::new(0)),
                 total_mutations: Arc::new(AtomicU64::new(0)),
+                total_query_sessions: Arc::new(AtomicU64::new(0)),
             }),
         }
     }
@@ -123,28 +130,70 @@ impl Application for AbciImpl {
                 request.signature.as_ref(),
                 request.public_key.as_ref(),
             ) {
-                Ok(_) => match Mutation::decode(request.mutation.as_ref()) {
-                    Ok(mutation) => {
-                        if KvStore::is_valid(&mutation) {
-                            return ResponseCheckTx {
-                                code: 0,
-                                data: Bytes::new(),
-                                log: "".to_string(),
-                                info: "".to_string(),
-                                gas_wanted: 1,
-                                gas_used: 0,
-                                events: vec![],
-                                codespace: "".to_string(),
-                                ..Default::default()
-                            };
-                        } else {
-                            warn!("invalid mutation for kv store");
+                Ok(_) => {
+                    let payload_type = PayloadType::from_i32(request.payload_type);
+                    match payload_type {
+                        Some(PayloadType::MutationPayload) => {
+                            match Mutation::decode(request.mutation.as_ref()) {
+                                Ok(mutation) => {
+                                    if KvStore::is_valid(&mutation) {
+                                        return ResponseCheckTx {
+                                            code: 0,
+                                            data: Bytes::new(),
+                                            log: "".to_string(),
+                                            info: "".to_string(),
+                                            gas_wanted: 1,
+                                            gas_used: 0,
+                                            events: vec![],
+                                            codespace: "".to_string(),
+                                            ..Default::default()
+                                        };
+                                    } else {
+                                        warn!("invalid mutation for kv store");
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("invalid transaction has been checked for error {}", e);
+                                }
+                            }
+                        }
+                        Some(PayloadType::QuerySessionPayload) => {
+                            match QuerySession::decode(request.mutation.as_ref()) {
+                                Ok(query_session) => {
+                                    match query_session_verifier::verify_query_session(
+                                        &query_session,
+                                    ) {
+                                        Ok(_) => {
+                                            return ResponseCheckTx {
+                                                code: 0,
+                                                data: Bytes::new(),
+                                                log: "".to_string(),
+                                                info: "".to_string(),
+                                                gas_wanted: 1,
+                                                gas_used: 0,
+                                                events: vec![],
+                                                codespace: "".to_string(),
+                                                ..Default::default()
+                                            };
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                "invalid transaction has been checked for error {}",
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("invalid transaction has been checked for error {}", e);
+                                }
+                            }
+                        }
+                        None => {
+                            warn!("invalid transaction with null payload type");
                         }
                     }
-                    Err(e) => {
-                        warn!("invalid transaction has been checked for error {}", e);
-                    }
-                },
+                }
                 Err(e) => {
                     warn!("invalid transaction has been checked for error {}", e);
                 }
@@ -178,26 +227,71 @@ impl Application for AbciImpl {
                 wrequest.signature.as_ref(),
                 wrequest.public_key.as_ref(),
             ) {
-                if let Ok(mutation) = Mutation::decode(wrequest.mutation.as_ref()) {
-                    match self.pending_mutation.lock() {
-                        Ok(mut s) => {
-                            //TODO add gas check
-                            s.push((account_id.addr, mutation_id.as_ref().clone(), mutation));
-                            return ResponseDeliverTx {
-                                code: 0,
-                                data: Bytes::new(),
-                                log: "".to_string(),
-                                info: "".to_string(),
-                                gas_wanted: 0,
-                                gas_used: 0,
-                                events: vec![Event {
-                                    r#type: "deliver".to_string(),
-                                    attributes: vec![],
-                                }],
-                                codespace: "".to_string(),
-                            };
+                let payload_type = PayloadType::from_i32(wrequest.payload_type);
+                match payload_type {
+                    Some(PayloadType::MutationPayload) => {
+                        if let Ok(mutation) = Mutation::decode(wrequest.mutation.as_ref()) {
+                            match self.pending_mutation.lock() {
+                                Ok(mut s) => {
+                                    //TODO add gas check
+                                    s.push((
+                                        account_id.addr,
+                                        mutation_id.as_ref().clone(),
+                                        mutation,
+                                    ));
+                                    return ResponseDeliverTx {
+                                        code: 0,
+                                        data: Bytes::new(),
+                                        log: "".to_string(),
+                                        info: "deliver_mutation".to_string(),
+                                        gas_wanted: 0,
+                                        gas_used: 0,
+                                        events: vec![Event {
+                                            r#type: "deliver".to_string(),
+                                            attributes: vec![],
+                                        }],
+                                        codespace: "".to_string(),
+                                    };
+                                }
+                                Err(_) => todo!(),
+                            }
                         }
-                        Err(_) => todo!(),
+                    }
+                    Some(PayloadType::QuerySessionPayload) => {
+                        if let Ok(query_session) = QuerySession::decode(wrequest.mutation.as_ref())
+                        {
+                            if let Ok((client_account_id, _)) =
+                                query_session_verifier::verify_query_session(&query_session)
+                            {
+                                match self.pending_query_session.lock() {
+                                    Ok(mut s) => {
+                                        s.push((
+                                            account_id.addr,
+                                            client_account_id.addr,
+                                            mutation_id.as_ref().clone(),
+                                            query_session.node_query_session_info.unwrap(),
+                                        ));
+                                        return ResponseDeliverTx {
+                                            code: 0,
+                                            data: Bytes::new(),
+                                            log: "".to_string(),
+                                            info: "deliver_query_session".to_string(),
+                                            gas_wanted: 0,
+                                            gas_used: 0,
+                                            events: vec![Event {
+                                                r#type: "deliver".to_string(),
+                                                attributes: vec![],
+                                            }],
+                                            codespace: "".to_string(),
+                                        };
+                                    }
+                                    Err(_) => todo!(),
+                                }
+                            }
+                        }
+                    }
+                    None => {
+                        warn!("invalid transaction with null payload type");
                     }
                 }
             }
@@ -229,6 +323,16 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
+        let pending_query_session: Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)> =
+            match self.pending_query_session.lock() {
+                Ok(mut q) => {
+                    let clone_q = q.drain(..).collect();
+                    clone_q
+                }
+                Err(_) => {
+                    todo!();
+                }
+            };
         match self.node_store.lock() {
             Ok(mut store) => {
                 let s = store.get_auth_store();
@@ -251,7 +355,22 @@ impl Application for AbciImpl {
                         }
                     }
                 }
-                if pending_mutation_len > 0 {
+                let pending_query_session_len = pending_query_session.len();
+                for item in pending_query_session {
+                    match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
+                        Ok(_) => {
+                            self.node_state
+                                .total_query_sessions
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        Err(e) => {
+                            info!("fail to apply mutation for {}", e);
+                            todo!();
+                        }
+                    }
+                }
+
+                if pending_mutation_len > 0 || pending_query_session_len > 0 {
                     if let Ok(hash) = s.commit() {
                         span.exit();
                         ResponseCommit {
