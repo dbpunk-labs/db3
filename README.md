@@ -44,7 +44,8 @@ DB3 is a community-driven decentralized layer two database network.
 
     DB3 network is a layer2 network on ethereum and all the assets are guarded by ethereum
 
-What these features exactly mean? Let’s explain in detail. 
+If you want to know what these features exactly mean? go to the [background introduction](./docs/background.md)
+
 
 # License
 Apache License, Version 2.0
