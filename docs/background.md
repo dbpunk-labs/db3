@@ -1,4 +1,4 @@
-# Abstract
+# Background
 
 The distributed database system is significant to the massive adoption of web applications and the management of big data in a complex environment. Nevertheless, a conventional distributed database platform with centralized entities is always vulnerable and can confront serious threats when the central entity is compromised.
 
