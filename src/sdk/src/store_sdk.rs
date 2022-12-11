@@ -20,16 +20,17 @@ use db3_crypto::signer::Db3Signer;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
-    storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionPayload,
-    CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetRangeRequest,
-    GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
-    Range as DB3Range, RangeKey, RangeValue, SessionIdentifier,
+    storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
+    CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest,
+    OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest, Range as DB3Range,
+    RangeKey, RangeValue, SessionIdentifier,
 };
-use db3_proto::db3_session_proto::QuerySessionInfo;
+use db3_proto::db3_session_proto::{CloseSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
+use subtle_encoding::base64;
 use tonic::Status;
 
 pub struct StoreSDK {
@@ -80,7 +81,7 @@ impl StoreSDK {
     pub async fn close_session(
         &mut self,
         token: &String,
-    ) -> std::result::Result<(CloseSessionResponse, CloseSessionResponse), Status> {
+    ) -> std::result::Result<(QuerySessionInfo, QuerySessionInfo, String), Status> {
         match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
@@ -106,12 +107,15 @@ impl StoreSDK {
                 let mut client = self.client.as_ref().clone();
                 match client.close_query_session(request).await {
                     Ok(response) => match self.session_pool.remove_session(token) {
-                        Ok(_) => Ok((
-                            response.into_inner(),
-                            CloseSessionResponse {
-                                query_session_info: Some(query_session_info),
-                            },
-                        )),
+                        Ok(_) => {
+                            let response = response.into_inner();
+                            let base64_byte = base64::encode(response.hash);
+                            Ok((
+                                response.query_session_info.unwrap(),
+                                query_session_info,
+                                String::from_utf8_lossy(base64_byte.as_ref()).to_string(),
+                            ))
+                        }
                         Err(e) => Err(Status::internal(format!("{}", e))),
                     },
                     Err(e) => Err(e),

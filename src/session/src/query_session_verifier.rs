@@ -1,26 +1,26 @@
 use db3_crypto::account_id::AccountId;
 use db3_crypto::verifier;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
+use db3_proto::db3_session_proto::{CloseSessionPayload, QuerySession, QuerySessionInfo};
 use prost::Message;
 
 pub fn verify_query_session(
     query_session: &QuerySession,
 ) -> db3_error::Result<(AccountId, QuerySessionInfo)> {
-    match &query_session.node_query_session_info {
+    match query_session.node_query_session_info.as_ref() {
         Some(node_query_session_info) => match verifier::Verifier::verify(
-            query_session.client_query_session_info.as_ref(),
+            query_session.client_query_session.as_ref(),
             query_session.client_signature.as_ref(),
             query_session.client_public_key.as_ref(),
         ) {
             Ok(client_account) => {
-                match QuerySessionInfo::decode(query_session.client_query_session_info.as_ref()) {
-                    Ok(client_query_session_info) => {
+                match CloseSessionPayload::decode(query_session.client_query_session.as_ref()) {
+                    Ok(client_query_session) => {
                         if check_query_session_info(
-                            node_query_session_info,
-                            &client_query_session_info,
+                            &node_query_session_info,
+                            &client_query_session.session_info.as_ref().unwrap(),
                         ) {
-                            Ok((client_account, client_query_session_info))
+                            Ok((client_account, node_query_session_info.clone()))
                         } else {
                             Err(DB3Error::QuerySessionVerifyError(format!(
                                 "node query count and client query count inconsistent"
@@ -66,6 +66,10 @@ mod tests {
             query_count: 10,
             status: SessionStatus::Stop.into(),
         };
+        let client_query_session = CloseSessionPayload {
+            session_info: Some(client_query_session_info),
+            session_token: "DummyToken".to_string(),
+        };
         let node_query_session_info = QuerySessionInfo {
             id: 1,
             start_time: Utc::now().timestamp(),
@@ -75,7 +79,7 @@ mod tests {
         // encode and sign client_query_session_info
         let kp = get_a_static_keypair();
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        client_query_session_info.encode(&mut buf).unwrap();
+        client_query_session.encode(&mut buf).unwrap();
         let buf = buf.freeze();
         let signer = Db3Signer::new(kp);
         let (signature_raw, public_key_raw) = signer.sign(buf.as_ref())?;
@@ -84,7 +88,7 @@ mod tests {
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
             node_query_session_info: Some(node_query_session_info),
-            client_query_session_info: buf.as_ref().to_vec().to_owned(),
+            client_query_session: buf.as_ref().to_vec().to_owned(),
             client_signature: signature_raw.as_ref().to_vec().to_owned(),
             client_public_key: public_key_raw.as_ref().to_vec().to_owned(),
         };
@@ -119,7 +123,7 @@ mod tests {
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
             node_query_session_info: Some(node_query_session_info),
-            client_query_session_info: buf.as_ref().to_vec().to_owned(),
+            client_query_session: buf.as_ref().to_vec().to_owned(),
             client_signature: signature_raw.as_ref().to_vec().to_owned(),
             client_public_key: public_key_raw.as_ref().to_vec().to_owned(),
         };

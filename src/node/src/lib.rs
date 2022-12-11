@@ -21,5 +21,6 @@ pub mod context;
 mod hash_util;
 mod json_rpc;
 pub mod json_rpc_impl;
+pub mod node_key;
 pub mod node_storage;
 pub mod storage_node_impl;

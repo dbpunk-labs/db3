@@ -21,6 +21,8 @@ use thiserror::Error;
 pub enum DB3Error {
     #[error("fail to require lock from state")]
     StateLockBusyError,
+    #[error("fail to load key pair {0}")]
+    LoadKeyPairError(String),
     #[error("fail to sign a message with error {0}")]
     SignError(String),
     #[error("fail to verify the request with error {0}")]
@@ -29,8 +31,10 @@ pub enum DB3Error {
     KeyCodecError(String),
     #[error("fail to apply mutation with error {0}")]
     ApplyMutationError(String),
-    #[error("fail to submit mutation with error {0}")]
+    #[error("fail to submit query session with error {0}")]
     SubmitMutationError(String),
+    #[error("fail to submit request with error {0}")]
+    SubmitRequestError(String),
     #[error("fail to apply bill with error {0}")]
     ApplyBillError(String),
     #[error("fail to query bill with error {0}")]

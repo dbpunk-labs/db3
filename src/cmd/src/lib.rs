@@ -138,10 +138,10 @@ async fn close_session(
         .close_session(&session.as_ref().unwrap().session_token)
         .await
     {
-        Ok((sess_info_node, sess_info_client)) => {
+        Ok((sess_info_node, sess_info_client, hash)) => {
             println!(
-                "Close Session Successfully!\nNode session {:?}\nClient session: {:?}",
-                sess_info_node, sess_info_client
+                "Close Session Successfully!\nNode session {:?}\nClient session: {:?}\nSubmit query session tx: {}",
+                sess_info_node, sess_info_client, hash
             );
             // set session_id to 0
             *session = None;

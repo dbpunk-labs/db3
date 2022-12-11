@@ -18,12 +18,15 @@
 use super::context::Context;
 use db3_crypto::verifier::Verifier;
 use db3_proto::db3_account_proto::Account;
+use db3_proto::db3_base_proto::{ChainId, ChainRole};
+use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionPayload,
-    CloseSessionRequest, CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse,
-    GetRangeRequest, GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse,
-    OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse,
+    storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
+    CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse, GetRangeRequest,
+    GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse, OpenSessionRequest,
+    OpenSessionResponse, QueryBillRequest, QueryBillResponse,
 };
+use db3_proto::db3_session_proto::{CloseSessionPayload, QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
@@ -34,14 +37,24 @@ use std::str::FromStr;
 use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
 
+use bytes::BytesMut;
+use db3_crypto::signer::Db3Signer;
+use db3_error::DB3Error;
+use std::time::{SystemTime, UNIX_EPOCH};
+use subtle_encoding::base64;
 use tracing::info;
+
 pub struct StorageNodeImpl {
     context: Context,
+    signer: Db3Signer,
 }
 
 impl StorageNodeImpl {
-    pub fn new(context: Context) -> Self {
-        Self { context }
+    pub fn new(context: Context, singer: Db3Signer) -> Self {
+        Self {
+            context,
+            signer: singer,
+        }
     }
 }
 
@@ -134,14 +147,14 @@ impl StorageNode for StorageNodeImpl {
         request: Request<CloseSessionRequest>,
     ) -> std::result::Result<Response<CloseSessionResponse>, Status> {
         let r = request.into_inner();
-        Verifier::verify(
-            r.payload.as_ref(),
-            r.signature.as_ref(),
-            r.public_key.as_ref(),
-        )
-        .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        let client_query_session: &[u8] = r.payload.as_ref();
+        let client_signature: &[u8] = r.signature.as_ref();
+        let client_public_key: &[u8] = r.public_key.as_ref();
+        Verifier::verify(client_query_session, client_signature, client_public_key)
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = CloseSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
+        let mut node_query_session_info: Option<QuerySessionInfo> = None;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
@@ -168,21 +181,69 @@ impl StorageNode for StorageNodeImpl {
                         )));
                     }
                 }
-
-                // Submit query session
-
                 // Takes a reference and returns Option<&V>
                 let sess = sess_store
                     .remove_session(&payload.session_token)
                     .map_err(|e| Status::internal(format!("{}", e)))
                     .unwrap();
-                // TODO(chenjing): sign
-                Ok(Response::new(CloseSessionResponse {
-                    query_session_info: Some(sess.get_session_info()),
-                }))
+                node_query_session_info = Some(sess.get_session_info());
             }
-            Err(e) => Err(Status::internal(format!("{}", e))),
+            Err(e) => return Err(Status::internal(format!("{}", e))),
         }
+        // Generate Nonce
+        let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(n) => n.as_secs(),
+            Err(_) => 0,
+        };
+        let query_session = QuerySession {
+            nonce,
+            chain_id: ChainId::MainNet.into(),
+            chain_role: ChainRole::StorageShardChain.into(),
+            node_query_session_info: node_query_session_info.clone(),
+            client_query_session: client_query_session.to_vec().to_owned(),
+            client_signature: client_signature.to_vec().to_owned(),
+            client_public_key: client_public_key.to_vec().to_owned(),
+        };
+        // Submit query session
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        query_session.encode(&mut mbuf).map_err(|e| {
+            Status::internal(format!("fail to submit query session with error {}", e))
+        })?;
+        let mbuf = mbuf.freeze();
+        let (signature, public_key) = self.signer.sign(mbuf.as_ref()).map_err(|e| {
+            Status::internal(format!("fail to submit query session with error {}", e))
+        })?;
+        let request = WriteRequest {
+            signature: signature.as_ref().to_vec().to_owned(),
+            mutation: mbuf.as_ref().to_vec().to_owned(),
+            public_key: public_key.as_ref().to_vec().to_owned(),
+            payload_type: PayloadType::QuerySessionPayload.into(),
+        };
+
+        //TODO add the capacity to mutation sdk configuration
+        let mut buf = BytesMut::with_capacity(1024 * 4);
+        request.encode(&mut buf).map_err(|e| {
+            Status::internal(format!("fail to submit query session with error {}", e))
+        })?;
+        let buf = buf.freeze();
+        let r = BroadcastRequest {
+            body: buf.as_ref().to_vec(),
+        };
+        let request = tonic::Request::new(r);
+        let response = self
+            .broadcast(request)
+            .await
+            .map_err(|e| {
+                Status::internal(format!("fail to submit query session with error {}", e))
+            })?
+            .into_inner();
+        // let base64_byte = base64::encode(response.hash);
+        // let hash = String::from_utf8_lossy(base64_byte.as_ref()).to_string();
+        // TODO(chenjing): sign
+        Ok(Response::new(CloseSessionResponse {
+            query_session_info: node_query_session_info.clone(),
+            hash: response.hash,
+        }))
     }
 
     async fn query_bill(

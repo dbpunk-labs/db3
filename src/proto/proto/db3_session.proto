@@ -33,6 +33,13 @@ message QuerySessionInfo {
     SessionStatus status = 3;
     int32 query_count = 4;
 }
+
+
+message CloseSessionPayload {
+    QuerySessionInfo session_info = 1;
+    string session_token = 2;
+}
+
 message QuerySession {
     // the counter of account
     uint64 nonce = 1;
@@ -43,10 +50,9 @@ message QuerySession {
     // node query session info
     QuerySessionInfo node_query_session_info = 4;
     // client query session info
-    bytes client_query_session_info = 5;
+    bytes client_query_session = 5;
     // client signature
     bytes client_signature = 6;
     // client public key
     bytes client_public_key = 7;
 }
-

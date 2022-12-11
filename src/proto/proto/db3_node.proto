@@ -107,10 +107,7 @@ message OpenSessionResponse {
     string session_token = 4;
 }
 
-message CloseSessionPayload {
-    db3_session_proto.QuerySessionInfo session_info = 1;
-    string session_token = 2;
-}
+
 
 message CloseSessionRequest {
     bytes payload = 1;
@@ -120,6 +117,7 @@ message CloseSessionRequest {
 
 message CloseSessionResponse {
     db3_session_proto.QuerySessionInfo query_session_info = 1;
+    bytes hash = 2;
 }
 
 message GetSessionInfoResponse {
