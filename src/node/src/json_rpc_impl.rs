@@ -185,7 +185,7 @@ async fn handle_broadcast(
                 .map_err(|e| json_rpc::ErrorData::new(-32602, format!("{}", e).as_str()))?;
             let response = context
                 .client
-                .broadcast_tx_async(tx.into())
+                .broadcast_tx_async(tx)
                 .await
                 .map_err(|e| json_rpc::ErrorData::new(-32603, format!("{}", e).as_str()))?;
             let external_id = match id {
@@ -315,7 +315,7 @@ async fn handle_mutation(
         Err(json_rpc::ErrorData::new(-32601, err))
     } else {
         if let Value::String(s) = &params[0] {
-            let tx_hash_ret = hash_util::base64_to_byte(s.as_str());
+            let tx_hash_ret = hash_util::base64_to_hash(s.as_str());
             if let Ok(tx_hash) = tx_hash_ret {
                 let response = context.client.tx(tx_hash, false).await.unwrap();
                 let wrequest = WriteRequest::decode(response.tx.as_ref()).unwrap();

@@ -16,15 +16,10 @@
 
 use db3_error::{DB3Error, Result};
 use subtle_encoding::base64;
-use tendermint_rpc::abci::transaction::{Hash, HASH_LENGTH};
+use tendermint::hash::Hash;
 
 #[warn(dead_code)]
-pub fn base64_to_byte(data: &str) -> Result<Hash> {
+pub fn base64_to_hash(data: &str) -> Result<Hash> {
     let decoded = base64::decode(data).map_err(|_| DB3Error::HashCodecError)?;
-    if decoded.len() != HASH_LENGTH {
-        return Err(DB3Error::HashCodecError);
-    }
-    let mut decoded_bytes = [0u8; HASH_LENGTH];
-    decoded_bytes.copy_from_slice(decoded.as_ref());
-    Ok(Hash::new(decoded_bytes))
+    Hash::try_from(decoded).map_err(|_| DB3Error::HashCodecError)
 }
