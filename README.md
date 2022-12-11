@@ -48,6 +48,7 @@ If you want to know what these features exactly mean? go to the [background intr
 
 # Getting Started
 
+### Start A Local Testnet
 
 ```shell
 git clone https://github.com/dbpunk-labs/db3.git
@@ -65,6 +66,8 @@ k1 -> v1
  total bills  | storage used | mutation | querys | credits
  0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
+
+### Use Typescript SDK
 
 ```typescript
 // connect to db3 node
