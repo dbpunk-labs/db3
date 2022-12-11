@@ -71,11 +71,11 @@ more examples
 * [helloworld in typescript](./examples/helloworld)
 
 
-# The relationship between roles
+# The Relationship Between Roles
 
 ![relationship](./docs/images/db3-overview.svg)
 
-# The architecture
+# The Architecture
 
 ![arch](./docs/images/db3-architecture.svg)
 
