@@ -57,8 +57,6 @@ cd tools &&  sh start_localnet.sh
 # open another terminal , enter db3 dir and run db3 shell
 ./target/debug/db3 shell
 >get ns1 k1
-Open Session Successfully!
-Some(OpenSessionResponse { session_id: 2, session_timeout_second: 3600, max_query_limit: 1000 })
 >put ns1 k1 v1
 submit mutation to mempool done!
 >get ns1 k1
