@@ -47,6 +47,16 @@ DB3 is a community-driven decentralized layer two database network.
 If you want to know what these features exactly mean? go to the [background introduction](./docs/background.md)
 
 
+# The relationship in DB3 Network
+
+
+![relationship](./docs/images/db3-overview.svg)
+
+# The Architecture
+
+!{arch](./docs/images/db3_arch.svg)
+
+
 # License
 Apache License, Version 2.0
    ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
