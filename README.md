@@ -29,8 +29,8 @@ DB3 is a community-driven decentralized layer two database network.
    Currently decentralization means bad performance but db3 is trying to make a big improvement on performance
 
 	* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of db3 network and it not only has high performance but also fast proof generation
-	* geo distribution, the nodes in every storage shard are geo distributed and the clients can execute querys against the nearest storage node
-    * [query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly
+	* Geo distribution, the nodes in every storage shard are geo distributed and the clients can execute querys against the nearest storage node
+    * [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly
 
 3. **Crypto Native Data Ownership**
 
@@ -38,10 +38,11 @@ DB3 is a community-driven decentralized layer two database network.
 
 4. **On-chain Programable**
 
+    Dapp developers can develop data processing contracts and deploy it to db3 network just like developing data backend in web2
 
-5. **Ethereum Guarded Security **
+5. **Ethereum Guarded Security**
 
-
+    DB3 network is a layer2 network on ethereum and all the assets are guarded by ethereum
 
 What these features exactly mean? Let’s explain in detail. 
 
