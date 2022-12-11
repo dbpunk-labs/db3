@@ -6,7 +6,6 @@ use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::fs;
 use std::option::Option;
-use std::path::Path;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,7 +37,7 @@ pub fn get_mock_key_pair() -> Result<Keypair> {
     Ok(get_a_static_keypair())
 }
 
-pub fn get_key_pair() -> Result<Keypair> {
+pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
     let mut home_dir = std::env::home_dir().unwrap();
     let key_path = match file_path {
         Some(path) => {

@@ -39,9 +39,7 @@ use tonic::{Request, Response, Status};
 
 use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
-use db3_error::DB3Error;
 use std::time::{SystemTime, UNIX_EPOCH};
-use subtle_encoding::base64;
 use tracing::info;
 
 pub struct StorageNodeImpl {
