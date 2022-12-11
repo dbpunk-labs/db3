@@ -20,8 +20,9 @@ DB3 is a community-driven decentralized layer two database network.
 
    Scalability is the key for the web3 explosion, db3 will use the following strategies to achieve web3 scale
 
-    * `dynamic sharding` to achieve scale out, when a storage shard chain has not enough space to store [mutation](), it will split itself into two subchains.
-    * `cold data archive` to recycle storage space, history cold blocks and cold state data will be archived to FileCoin and the storage node will always has storage space to store new data.
+    * PC can neet minimum system requirements so everyone can join the db3 network to provide storage space.
+    * Using dynamic sharding to achieve scale out. when a storage shard chain has not enough space to store [mutation](), it will split itself into two subchains.
+    * Using cold data archive to recycle storage space. history cold blocks and cold state data will be archived to FileCoin and the storage node will always has storage space to store new data.
 
 2. **Blazed Fast and Provable On-chain Query**
 
