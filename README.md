@@ -54,7 +54,7 @@ If you want to know what these features exactly mean? go to the [background intr
 
 # The Architecture
 
-!{arch](./docs/images/db3_arch.svg)
+![arch](./docs/images/db3-architecture.svg)
 
 
 # License
