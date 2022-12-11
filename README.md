@@ -46,13 +46,13 @@ DB3 is a community-driven decentralized layer two database network.
 
 If you want to know what these features exactly mean? go to the [background introduction](./docs/background.md)
 
+# Getting Started
 
-# The relationship in DB3 Network
-
+# The relationship
 
 ![relationship](./docs/images/db3-overview.svg)
 
-# The Architecture
+# The architecture
 
 ![arch](./docs/images/db3-architecture.svg)
 
