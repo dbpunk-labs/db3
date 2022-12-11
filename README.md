@@ -66,6 +66,39 @@ k1 -> v1
  0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
 
+```typescript
+// connect to db3 node
+const db3_instance = new DB3("http://127.0.0.1:26659");
+const doc_store = new DocStore(db3_instance);
+const doc_index = {
+    keys: [
+        {
+            name: 'address',
+            keyType: DocKeyType.STRING,
+        },
+        {
+            name: 'ts',
+            keyType: DocKeyType.NUMBER,
+        },
+    ],
+    ns: 'ns1',
+    docName: 'transaction',
+};
+const transacion = {
+    address: '0x11111',
+    ts: 9527,
+    amount: 10,
+};
+// insert a document
+const result = await doc_store.insertDocs(doc_index, [transacion], _sign, 1);
+// query a document
+const query = {
+    address: '0x11111',
+    ts: 9527,
+};
+const docs = await doc_store.getDocs(doc_index, [query], _sign);
+```
+
 more examples
 
 * [helloworld in typescript](./examples/helloworld)

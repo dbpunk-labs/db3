@@ -71,7 +71,7 @@ function App() {
             ns: 'ns1',
             docName: 'transaction',
         };
-         const query = {
+        const query = {
             address: '0x11111',
             ts: 9527,
         };
