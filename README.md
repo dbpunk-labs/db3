@@ -73,13 +73,19 @@ more examples
 * [helloworld in typescript](./examples/helloworld)
 
 
-# The relationship
+# The relationship between roles
 
 ![relationship](./docs/images/db3-overview.svg)
 
 # The architecture
 
 ![arch](./docs/images/db3-architecture.svg)
+
+more technical details
+* [mutation](./docs/mutation.md)
+* [query session](./docs/query.md)
+* [dvm](./docs/dvm.md)
+* [merkdb](https://github.com/dbpunk-labs/db3/issues/100)
 
 
 # License
