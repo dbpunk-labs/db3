@@ -88,6 +88,13 @@ more technical details
 * [merkdb](https://github.com/dbpunk-labs/db3/issues/100)
 
 
+# Other Decentralized Database
+
+* [Locutus](https://github.com/freenet/locutus), a decentralized key-value database
+* [ceramic network](https://github.com/ceramicnetwork/ceramic), a decentralized data network that brings unlimited data composability to Web3 applications
+* [kwil](https://github.com/kwilteam), the first permissionless SQL database for the decentralized internet
+* [spaceandtime](https://www.spaceandtime.io/), a decentralized data Warehouse
+
 # License
 Apache License, Version 2.0
    ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
