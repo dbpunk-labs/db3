@@ -20,17 +20,17 @@ DB3 is a community-driven decentralized layer2 database network.
 
    Scalability is the key for the web3 explosion, db3 will use the following strategies to achieve web3 scale
 
-    a. PC can neet minimum system requirements so everyone can join the db3 network to provide storage space.
-    b. Using dynamic sharding to achieve scale out. when a storage shard chain has not enough space to store [mutation](./docs/mutation.md), it will split itself into two subchains.
-    c. Using cold data archive to recycle storage space. history cold blocks and cold state data will be archived to FileCoin and the storage node will always has storage space to store new data.
+    * PC can neet minimum system requirements so everyone can join the db3 network to provide storage space.
+    * Using dynamic sharding to achieve scale out. when a storage shard chain has not enough space to store [mutation](./docs/mutation.md), it will split itself into two subchains.
+    * Using cold data archive to recycle storage space. history cold blocks and cold state data will be archived to FileCoin and the storage node will always has storage space to store new data.
 
 2. **Blazed Fast and Provable On-chain Query**
 
    Currently decentralization means bad performance but db3 is trying to make a big improvement on performance
 
-	a. [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of db3 network and it not only has high performance but also fast proof generation
-	b. Geo distribution, the nodes in every storage shard are geo distributed and the clients can execute querys against the nearest storage node
-    c. [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly
+	* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of db3 network and it not only has high performance but also fast proof generation
+	* Geo distribution, the nodes in every storage shard are geo distributed and the clients can execute querys against the nearest storage node
+    * [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly
 
 3. **Crypto Native Data Ownership**
 
