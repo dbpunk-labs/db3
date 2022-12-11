@@ -51,8 +51,11 @@ pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> Unit
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
+    use db3_proto::db3_session_proto::{QuerySessionInfo, SessionStatus};
+
     #[test]
     fn it_estimate_gas() {
         let kv = KvPair {
@@ -72,5 +75,19 @@ mod tests {
         let units = estimate_gas(&mutation);
         assert_eq!(1, units.utype);
         assert_eq!(190, units.amount);
+    }
+
+    #[test]
+    fn it_query_session_estimate_gas() {
+        let node_query_session_info = QuerySessionInfo {
+            id: 1,
+            start_time: Utc::now().timestamp(),
+            query_count: 10,
+            status: SessionStatus::Stop.into(),
+        };
+
+        let units = estimate_query_session_gas(&node_query_session_info);
+        assert_eq!(1, units.utype);
+        assert_eq!(100, units.amount);
     }
 }
