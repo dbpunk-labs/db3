@@ -213,7 +213,7 @@ impl StorageNode for StorageNodeImpl {
         })?;
         let request = WriteRequest {
             signature: signature.as_ref().to_vec().to_owned(),
-            mutation: mbuf.as_ref().to_vec().to_owned(),
+            payload: mbuf.as_ref().to_vec().to_owned(),
             public_key: public_key.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::QuerySessionPayload.into(),
         };

@@ -47,7 +47,7 @@ impl MutationSDK {
         let (signature, public_key) = self.signer.sign(mbuf.as_ref())?;
         let request = WriteRequest {
             signature: signature.as_ref().to_vec().to_owned(),
-            mutation: mbuf.as_ref().to_vec().to_owned(),
+            payload: mbuf.as_ref().to_vec().to_owned(),
             public_key: public_key.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::MutationPayload.into(),
         };
@@ -69,6 +69,7 @@ impl MutationSDK {
             .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?
             .into_inner();
         let base64_byte = base64::encode(response.hash);
+        use subtle_encoding::base64;
         Ok(String::from_utf8_lossy(base64_byte.as_ref()).to_string())
     }
 }

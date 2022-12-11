@@ -126,7 +126,7 @@ impl Application for AbciImpl {
         // decode the request
         match WriteRequest::decode(request.tx.as_ref()) {
             Ok(request) => match verifier::Verifier::verify(
-                request.mutation.as_ref(),
+                request.payload.as_ref(),
                 request.signature.as_ref(),
                 request.public_key.as_ref(),
             ) {
@@ -134,7 +134,7 @@ impl Application for AbciImpl {
                     let payload_type = PayloadType::from_i32(request.payload_type);
                     match payload_type {
                         Some(PayloadType::MutationPayload) => {
-                            match Mutation::decode(request.mutation.as_ref()) {
+                            match Mutation::decode(request.payload.as_ref()) {
                                 Ok(mutation) => {
                                     if KvStore::is_valid(&mutation) {
                                         return ResponseCheckTx {
@@ -158,7 +158,7 @@ impl Application for AbciImpl {
                             }
                         }
                         Some(PayloadType::QuerySessionPayload) => {
-                            match QuerySession::decode(request.mutation.as_ref()) {
+                            match QuerySession::decode(request.payload.as_ref()) {
                                 Ok(query_session) => {
                                     match query_session_verifier::verify_query_session(
                                         &query_session,
@@ -223,14 +223,14 @@ impl Application for AbciImpl {
         );
         if let Ok(wrequest) = WriteRequest::decode(request.tx.as_ref()) {
             if let Ok(account_id) = verifier::Verifier::verify(
-                wrequest.mutation.as_ref(),
+                wrequest.payload.as_ref(),
                 wrequest.signature.as_ref(),
                 wrequest.public_key.as_ref(),
             ) {
                 let payload_type = PayloadType::from_i32(wrequest.payload_type);
                 match payload_type {
                     Some(PayloadType::MutationPayload) => {
-                        if let Ok(mutation) = Mutation::decode(wrequest.mutation.as_ref()) {
+                        if let Ok(mutation) = Mutation::decode(wrequest.payload.as_ref()) {
                             match self.pending_mutation.lock() {
                                 Ok(mut s) => {
                                     //TODO add gas check
@@ -258,8 +258,7 @@ impl Application for AbciImpl {
                         }
                     }
                     Some(PayloadType::QuerySessionPayload) => {
-                        if let Ok(query_session) = QuerySession::decode(wrequest.mutation.as_ref())
-                        {
+                        if let Ok(query_session) = QuerySession::decode(wrequest.payload.as_ref()) {
                             if let Ok((client_account_id, _)) =
                                 query_session_verifier::verify_query_session(&query_session)
                             {

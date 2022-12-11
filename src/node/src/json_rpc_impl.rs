@@ -96,7 +96,7 @@ enum ResponseWrapper {
 
 fn convert_mutation_to_readable(request: &WriteRequest) -> ReadableMutation {
     let mut kv_pairs: Vec<ReadableKvPair> = Vec::new();
-    let mutation = Mutation::decode(request.mutation.as_ref()).unwrap();
+    let mutation = Mutation::decode(request.payload.as_ref()).unwrap();
     for kv in &mutation.kv_pairs {
         kv_pairs.push(ReadableKvPair {
             key: kv.key.to_owned(),

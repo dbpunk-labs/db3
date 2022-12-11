@@ -56,7 +56,7 @@ enum PayloadType {
 message WriteRequest {
     bytes signature = 1;
     // the protobuf binary format
-    bytes mutation = 2;
+    bytes payload = 2;
     bytes public_key = 3;
     PayloadType payload_type = 4;
 }

@@ -356,8 +356,8 @@ mod tests {
         };
         let result = msdk.submit_mutation(&mutation).await;
         assert!(result.is_ok(), "{}", result.err().unwrap());
-        let ten_millis = time::Duration::from_millis(1000);
-        std::thread::sleep(ten_millis);
+        let two_sec = time::Duration::from_millis(2000);
+        std::thread::sleep(two_sec);
         let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
@@ -409,8 +409,8 @@ mod tests {
             };
             let result = msdk.submit_mutation(&mutation).await;
             assert!(result.is_ok(), "{}", result.err().unwrap());
-            let ten_millis = time::Duration::from_millis(1000);
-            std::thread::sleep(ten_millis);
+            let two_sec = time::Duration::from_millis(2000);
+            std::thread::sleep(two_sec);
         }
         let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);
@@ -464,8 +464,8 @@ mod tests {
             };
             let result = msdk.submit_mutation(&mutation).await;
             assert!(result.is_ok(), "{}", result.err().unwrap());
-            let ten_millis = time::Duration::from_millis(1000);
-            std::thread::sleep(ten_millis);
+            let two_sec = time::Duration::from_millis(2000);
+            std::thread::sleep(two_sec);
         }
         let kp = get_a_static_keypair();
         let signer = Db3Signer::new(kp);

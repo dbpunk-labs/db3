@@ -75,7 +75,7 @@ mod node_integration {
         let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
         let request = WriteRequest {
             signature: signature.as_ref().to_vec(),
-            mutation: mbuf.as_ref().to_vec().to_owned(),
+            payload: mbuf.as_ref().to_vec().to_owned(),
             public_key: public_key.as_ref().to_vec(),
             payload_type: PayloadType::MutationPayload.into(),
         };
