@@ -2,6 +2,7 @@
 
 mod node_integration {
     use bytes::BytesMut;
+    use db3_base::get_a_random_nonce;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
     use db3_proto::db3_mutation_proto::{
@@ -18,7 +19,6 @@ mod node_integration {
     use std::{thread, time};
     use subtle_encoding::base64;
     use tonic::transport::Endpoint;
-    use db3_base::get_a_random_nonce;
 
     fn get_mutation_sdk() -> MutationSDK {
         let public_grpc_url = "http://127.0.0.1:26659";

@@ -81,14 +81,14 @@ mod tests {
     use super::MutationSDK;
     use crate::mutation_sdk::StorageNodeClient;
     use crate::store_sdk::StoreSDK;
-    use db3_base::get_a_static_keypair;
     use db3_base::get_a_random_nonce;
+    use db3_base::get_a_static_keypair;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
+    use rand::Rng;
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
-    use rand::Rng;
 
     #[tokio::test]
     async fn test_submit_duplicated_key_mutation() {

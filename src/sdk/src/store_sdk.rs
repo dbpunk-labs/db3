@@ -263,7 +263,7 @@ mod tests {
     use super::Db3Signer;
     use super::StoreSDK;
     use crate::mutation_sdk::MutationSDK;
-    use db3_base::{get_a_static_keypair, get_a_random_nonce};
+    use db3_base::{get_a_random_nonce, get_a_static_keypair};
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
@@ -271,7 +271,6 @@ mod tests {
     use std::sync::Arc;
     use std::time;
     use tonic::transport::Endpoint;
-
 
     #[tokio::test]
     async fn it_get_bills() {
