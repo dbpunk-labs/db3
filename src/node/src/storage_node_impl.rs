@@ -394,7 +394,7 @@ impl StorageNode for StorageNodeImpl {
         let response = self
             .context
             .client
-            .broadcast_tx_async(r.body.into())
+            .broadcast_tx_async(r.body)
             .await
             .map_err(|e| Status::internal(format!("{}", e)))?;
         Ok(Response::new(BroadcastResponse {
