@@ -133,4 +133,19 @@ export class DocStore {
             throw error
         }
     }
+
+    async deleteDoc(
+        ns: string,
+        index: DocIndex,
+        doc: Record<string, any>,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
+        const key = genPrimaryKey(index, doc)
+        try {
+            const res = await this.db3.deleteKey(ns, key, sign)
+            return res
+        } catch (error) {
+            throw error
+        }
+    }
 }
