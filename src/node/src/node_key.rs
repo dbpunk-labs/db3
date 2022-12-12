@@ -6,6 +6,7 @@ use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::fs;
 use std::option::Option;
+use tendermint_config::NodeKey;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,69 +33,47 @@ pub struct PrivKey {
     pub type_field: String,
     pub value: String,
 }
-
-pub fn get_mock_key_pair() -> Result<Keypair> {
-    Ok(get_a_static_keypair())
-}
-
 pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
     let mut home_dir = std::env::home_dir().unwrap();
     let key_path = match file_path {
         Some(path) => {
             home_dir.push(path);
-            home_dir.as_path()
+            home_dir
         }
         None => {
             home_dir.push(".tendermint");
             home_dir.push("config");
-            home_dir.push("priv_validator_key.json");
-            home_dir.as_path()
+            home_dir.push("node_key.json");
+            home_dir
         }
     };
 
-    if key_path.exists() {
-        let file_content = std::fs::read_to_string(key_path).expect("file should open read only");
-        let root: Root =
-            serde_json::from_str(file_content.as_str()).expect("JSON was not well-formatted");
-        println!("{:?}", root);
-
-        let public: PublicKey = match root.pub_key.type_field.as_str() {
-            "tendermint/PubKeyEd25519" => {
-                let public_key: &[u8] = root.pub_key.value.as_bytes();
-                let pub_bytes: Vec<u8> = FromHex::from_hex(public_key).unwrap();
-                PublicKey::from_bytes(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap()
-            }
-            _ => {
-                return Err(DB3Error::LoadKeyPairError(format!(
-                    "invalid pubic key type {}",
-                    root.pub_key.type_field
-                )));
-            }
-        };
-
-        let secret: SecretKey = match root.priv_key.type_field.as_str() {
-            "tendermint/PubKeyEd25519" => {
-                let secret_key: &[u8] = root.priv_key.value.as_bytes();
-                let sec_bytes: Vec<u8> = FromHex::from_hex(secret_key).unwrap();
-                SecretKey::from_bytes(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap()
-            }
-            _ => {
-                return Err(DB3Error::LoadKeyPairError(format!(
-                    "invalid private key type {}",
-                    root.priv_key.type_field
-                )));
-            }
-        };
-        println!("secret: {:?}", secret);
-        println!("public: {:?}", public);
-        Ok(Keypair { secret, public })
-    } else {
-        Err(DB3Error::LoadKeyPairError(format!(
-            "key file {:?} not exist ",
-            key_path
-        )))
+    match NodeKey::load_json_file(&key_path) {
+        Ok(key_node) => match key_node.priv_key.ed25519_keypair() {
+            Some(kp) => Ok(Keypair::from_bytes(kp.to_bytes().as_ref()).unwrap()),
+            None => Err(DB3Error::LoadKeyPairError(format!(
+                "parsed ed25519 keypair is null"
+            ))),
+        },
+        Err(e) => Err(DB3Error::LoadKeyPairError(format!("{:?}", e))),
     }
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use std::fs::File;
+
+    #[test]
+    fn it_get_key_pair_with_default_path() {
+        let res = get_key_pair(None);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn it_get_key_pair_file_not_exist() {
+        let res = get_key_pair(Some("/node_key_not_exist_file.json".to_string()));
+        assert!(res.is_err());
+        println!("{:?}", res.err())
+    }
+}
