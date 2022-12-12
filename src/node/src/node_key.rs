@@ -1,38 +1,8 @@
-use db3_base::{get_a_static_keypair, get_address_from_pk};
 use db3_error::{DB3Error, Result};
-use ed25519_dalek::{Keypair, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
-use hex::FromHex;
-use serde_derive::Deserialize;
-use serde_derive::Serialize;
-use std::fs;
+use ed25519_dalek::Keypair;
 use std::option::Option;
 use tendermint_config::NodeKey;
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Root {
-    pub address: String,
-    #[serde(rename = "pub_key")]
-    pub pub_key: PubKey,
-    #[serde(rename = "priv_key")]
-    pub priv_key: PrivKey,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PubKey {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    pub value: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrivKey {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    pub value: String,
-}
 pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
     let mut home_dir = std::env::home_dir().unwrap();
     let key_path = match file_path {
@@ -62,7 +32,6 @@ pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
 
     #[test]
     fn it_get_key_pair_with_default_path() {
