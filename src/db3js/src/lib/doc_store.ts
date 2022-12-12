@@ -109,8 +109,9 @@ export class DocStore {
     }
     async queryDocsByRange(
         ns: string,
-        startKey: [DocIndex, Record<string, any>],
-        endKey: [DocIndex, Record<string, any>],
+        index: DocIndex,
+        startKey: Record<string, any>,
+        endKey:Record<string, any>,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         try {
@@ -118,8 +119,8 @@ export class DocStore {
             const docs: Record<string, any>[] = []
             const res = await this.db3.getRange(
                 ns,
-                genPrimaryKey(...startKey),
-                genPrimaryKey(...endKey)
+                genPrimaryKey(index, startKey),
+                genPrimaryKey(index, endKey)
             )
 
             res.getRangeValue()

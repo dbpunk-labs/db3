@@ -195,20 +195,16 @@ describe('test db3js api', () => {
         await new Promise(r => setTimeout(r, 2000))
         const res = await doc_store.queryDocsByRange(
             'ns1',
-            [
-                doc_index,
+            doc_index,
                 {
                     address: '0x11111',
                     ts: 9529,
                 },
-            ],
-            [
-                doc_index,
                 {
                     address: '0x11114',
                     ts: 9534,
-                },
-            ],
+                }
+            ,
             _sign
         )
         expect(res[2].address).toBe('0x11113')
