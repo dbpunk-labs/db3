@@ -18,6 +18,8 @@ mod node_integration {
     use std::{thread, time};
     use subtle_encoding::base64;
     use tonic::transport::Endpoint;
+    use db3_base::get_a_random_nonce;
+
     fn get_mutation_sdk() -> MutationSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
         // create storage node sdk
@@ -51,6 +53,7 @@ mod node_integration {
 
     #[actix_web::test]
     async fn json_rpc_smoke_test() {
+        let nonce = get_a_random_nonce();
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
         let kp = db3_cmd::get_key_pair(false).unwrap();
@@ -63,7 +66,7 @@ mod node_integration {
         let mutation = Mutation {
             ns: "my_twitter".as_bytes().to_vec(),
             kv_pairs: vec![kv],
-            nonce: 1110,
+            nonce,
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
             gas_price: None,

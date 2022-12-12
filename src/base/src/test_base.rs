@@ -19,7 +19,7 @@ use super::get_address_from_pk;
 use ed25519_dalek::{Keypair, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 use ethereum_types::Address as AccountAddress;
 use hex::FromHex;
-
+use rand::{thread_rng, Rng};
 // this function is used for testing
 pub fn get_a_static_keypair() -> Keypair {
     let secret_key: &[u8] = b"833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42";
@@ -30,7 +30,12 @@ pub fn get_a_static_keypair() -> Keypair {
     let public: PublicKey = PublicKey::from_bytes(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap();
     Keypair { secret, public }
 }
-
+// this function is used for testing
+pub fn get_a_random_nonce() -> u64 {
+    let mut rng = rand::thread_rng();
+    let nonce = rng.gen_range(0..11000);
+    nonce
+}
 pub fn get_a_static_address() -> AccountAddress {
     let kp = get_a_static_keypair();
     get_address_from_pk(&kp.public)

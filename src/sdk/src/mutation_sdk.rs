@@ -82,14 +82,18 @@ mod tests {
     use crate::mutation_sdk::StorageNodeClient;
     use crate::store_sdk::StoreSDK;
     use db3_base::get_a_static_keypair;
+    use db3_base::get_a_random_nonce;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
+    use rand::Rng;
 
     #[tokio::test]
     async fn test_submit_duplicated_key_mutation() {
+        let mut rng = rand::thread_rng();
+        let nonce = get_a_random_nonce();
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -107,7 +111,7 @@ mod tests {
             let mutation = Mutation {
                 ns: ns.as_bytes().to_vec(),
                 kv_pairs: vec![kv],
-                nonce: 11000,
+                nonce,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,
@@ -124,7 +128,7 @@ mod tests {
             let mutation = Mutation {
                 ns: ns.as_bytes().to_vec(),
                 kv_pairs: vec![kv.clone(), kv],
-                nonce: 11000,
+                nonce,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,
@@ -155,6 +159,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_mutation() {
+        let mut rng = rand::thread_rng();
+        let nonce = rng.gen_range(0..11100);
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -172,7 +178,7 @@ mod tests {
             let mutation = Mutation {
                 ns: "my_twitter".as_bytes().to_vec(),
                 kv_pairs: vec![kv],
-                nonce: 11000,
+                nonce,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,

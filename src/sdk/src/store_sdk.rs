@@ -263,7 +263,7 @@ mod tests {
     use super::Db3Signer;
     use super::StoreSDK;
     use crate::mutation_sdk::MutationSDK;
-    use db3_base::get_a_static_keypair;
+    use db3_base::{get_a_static_keypair, get_a_random_nonce};
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
@@ -272,8 +272,10 @@ mod tests {
     use std::time;
     use tonic::transport::Endpoint;
 
+
     #[tokio::test]
     async fn it_get_bills() {
+        let nonce = get_a_random_nonce();
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -291,7 +293,7 @@ mod tests {
             let mutation = Mutation {
                 ns: "my_twitter".as_bytes().to_vec(),
                 kv_pairs: vec![kv],
-                nonce: 11000,
+                nonce,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,
@@ -299,7 +301,7 @@ mod tests {
             };
             let result = msdk.submit_mutation(&mutation).await;
             assert!(result.is_ok());
-            let ten_millis = time::Duration::from_millis(1000);
+            let ten_millis = time::Duration::from_millis(11000);
             std::thread::sleep(ten_millis);
         }
         let kp = get_a_static_keypair();
@@ -321,6 +323,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_range() {
+        let mut rng = rand::thread_rng();
+        let nonce = get_a_random_nonce();
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -348,7 +352,7 @@ mod tests {
         let mutation = Mutation {
             ns: ns_vec.clone(),
             kv_pairs: vec![k1, k2, k3],
-            nonce: 11000,
+            nonce,
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
             gas_price: None,
@@ -381,6 +385,9 @@ mod tests {
 
     #[tokio::test]
     async fn close_session_happy_path() {
+        let mut rng = rand::thread_rng();
+        let nonce = get_a_random_nonce();
+
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -401,7 +408,7 @@ mod tests {
             let mutation = Mutation {
                 ns: ns_vec.clone(),
                 kv_pairs: vec![kv],
-                nonce: 11000,
+                nonce,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,
@@ -436,6 +443,9 @@ mod tests {
 
     #[tokio::test]
     async fn close_session_wrong_path() {
+        let mut rng = rand::thread_rng();
+        let nonce = get_a_random_nonce();
+
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -456,7 +466,7 @@ mod tests {
             let mutation = Mutation {
                 ns: ns_vec.clone(),
                 kv_pairs: vec![kv],
-                nonce: 11000,
+                nonce,
                 chain_id: ChainId::MainNet.into(),
                 chain_role: ChainRole::StorageShardChain.into(),
                 gas_price: None,
