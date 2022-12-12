@@ -22,7 +22,8 @@ public class MutationSDK {
         byte[] message = mutation.toByteArray();
         Ed25519Signature signature = signer.sign(message);
         Db3Mutation.WriteRequest.Builder builder = Db3Mutation.WriteRequest.newBuilder();
-        builder.setMutation(ByteString.copyFrom(message));
+        builder.setPayload(ByteString.copyFrom(message));
+        builder.setPayloadType(Db3Mutation.PayloadType.MutationPayload);
         builder.setSignature(ByteString.copyFrom(signature.toByteArray()));
         builder.setPublicKey(ByteString.copyFrom(signer.getPublicKey().toByteArray()));
         Db3Mutation.WriteRequest request = builder.build();

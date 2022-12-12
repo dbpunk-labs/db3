@@ -31,7 +31,7 @@ pub enum DB3Error {
     KeyCodecError(String),
     #[error("fail to apply mutation with error {0}")]
     ApplyMutationError(String),
-    #[error("fail to submit query session with error {0}")]
+    #[error("fail to submit mutation session with error {0}")]
     SubmitMutationError(String),
     #[error("fail to submit request with error {0}")]
     SubmitRequestError(String),
