@@ -20,6 +20,58 @@ export interface DocIndex {
     ns: string
     docName: string
 }
+function genStartKey(index:DocIndex) {
+    const buff = new SmartBuffer()
+    type ObjectKey = keyof typeof doc
+    // write the doc name to the key
+    var offset = 0
+    buff.writeString(index.docName, offset)
+    offset += index.docName.length
+    index.keys.forEach((key: DocKey) => {
+        switch (key.keyType) {
+            case DocKeyType.STRING: {
+                const objectKey = key.name as ObjectKey
+                buff.writeString(("" as unknown) as string, offset)
+                offset += "".length
+                break
+            }
+            case DocKeyType.NUMBER: {
+                buff.writeBigInt64BE(BigInt((0 as unknown) as number), offset)
+                offset += 8
+                break
+            }
+        }
+    })
+    const buffer = buff.toBuffer().buffer
+    return new Uint8Array(buffer, 0, offset)
+}
+
+function genEndKey(index:DocIndex) {
+    const buff = new SmartBuffer()
+    type ObjectKey = keyof typeof doc
+    // write the doc name to the key
+    var offset = 0
+    buff.writeString(index.docName, offset)
+    offset += index.docName.length
+    index.keys.forEach((key: DocKey) => {
+        switch (key.keyType) {
+            case DocKeyType.STRING: {
+                const objectKey = key.name as ObjectKey
+                buff.writeString(("~" as unknown) as string, offset)
+                offset += "~".length
+                break
+            }
+            case DocKeyType.NUMBER: {
+                //TODO not the exaclty the end
+                buff.writeBigInt64BE(BigInt(Number.MAX_SAFE_INTEGER), offset)
+                offset += 8
+                break
+            }
+        }
+    })
+    const buffer = buff.toBuffer().buffer
+    return new Uint8Array(buffer, 0, offset)
+}
 
 export function genPrimaryKey(index: DocIndex, doc: Object) {
     const buff = new SmartBuffer()
@@ -108,6 +160,27 @@ export class DocStore {
         return docs
     }
 
+    async queryAllDocs(ns:String, index:DocIndex, 
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
+        try {
+            await this.db3.keepSession(sign)
+            const docs: Record<string, any>[] = []
+            const res = await this.db3.getRange(
+                ns,
+                genStartKey(index),
+                genEndKey(index),
+            )
+            res.getRangeValue()
+                ?.getValuesList()
+                .forEach((kvPair: db3_mutation_pb.KVPair) => {
+                    docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                })
+            return docs
+        } catch (error) {
+            throw error
+        }
+    }
+
     async queryDocsByRange(
         ns: string,
         index: DocIndex,
@@ -123,7 +196,6 @@ export class DocStore {
                 genPrimaryKey(index, startKey),
                 genPrimaryKey(index, endKey)
             )
-
             res.getRangeValue()
                 ?.getValuesList()
                 .forEach((kvPair: db3_mutation_pb.KVPair) => {
