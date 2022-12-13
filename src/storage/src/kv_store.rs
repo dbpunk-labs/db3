@@ -242,6 +242,32 @@ mod tests {
         } else {
             assert!(false);
         }
+        let all = DB3Range {
+            start: "".as_bytes().to_vec(),
+            end: "~".as_bytes().to_vec(),
+        };
+        let ns: &str = "my_twitter";
+        let range_key = RangeKey {
+            ns: ns.as_bytes().to_vec(),
+            range: Some(all),
+            session_token: "token".to_string(),
+        };
+        let result = KvStore::get_range(db.as_ref(), &addr, &range_key);
+        if let Ok(r) = result {
+            assert_eq!(3, r.len());
+            match r.back() {
+                Some(ProofOp::Push(Node::KV(k, v))) => {
+                    let new_key = Key::decode(k.as_ref(), ns.as_bytes().as_ref()).unwrap();
+                    assert_eq!("k3".as_bytes().as_ref(), new_key.2);
+                    assert_eq!("value3".as_bytes(), v);
+                }
+                _ => {
+                    assert!(false);
+                }
+            }
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]

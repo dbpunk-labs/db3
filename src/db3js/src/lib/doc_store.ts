@@ -107,6 +107,7 @@ export class DocStore {
 
         return docs
     }
+
     async queryDocsByRange(
         ns: string,
         index: DocIndex,
