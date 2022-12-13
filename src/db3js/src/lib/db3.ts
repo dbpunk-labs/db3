@@ -127,9 +127,7 @@ export class DB3 {
 
     async openQuerySession(sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
         if (this.querySessionInfo) {
-            throw new Error(
-                'The current db3js instance has already opened a session, so do not open it repeatedly'
-            )
+            return {}
         }
         const sessionRequest = new db3_node_pb.OpenSessionRequest()
         const header = window.crypto.getRandomValues(new Uint8Array(32))
