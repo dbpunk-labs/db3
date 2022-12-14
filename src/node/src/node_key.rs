@@ -1,7 +1,7 @@
 use db3_error::{DB3Error, Result};
 use ed25519_dalek::Keypair;
 use std::option::Option;
-use tendermint_config::NodeKey;
+use tendermint_config::{PrivValidatorKey};
 
 pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
     let mut home_dir = std::env::home_dir().unwrap();
@@ -13,13 +13,13 @@ pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
         None => {
             home_dir.push(".tendermint");
             home_dir.push("config");
-            home_dir.push("node_key.json");
+            home_dir.push("priv_validator_key.json");
             home_dir
         }
     };
 
-    match NodeKey::load_json_file(&key_path) {
-        Ok(key_node) => match key_node.priv_key.ed25519_keypair() {
+    match PrivValidatorKey::load_json_file(&key_path) {
+        Ok(key) => match key.priv_key.ed25519_keypair() {
             Some(kp) => Ok(Keypair::from_bytes(kp.to_bytes().as_ref()).unwrap()),
             None => Err(DB3Error::LoadKeyPairError(format!(
                 "parsed ed25519 keypair is null"
