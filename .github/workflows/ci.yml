@@ -89,6 +89,7 @@ jobs:
           name: db3-log-artifact
           path: |
             tools/db3.log
+            tools/tm.log
       - name: Rust java sdk test
         run: |
           cd java && mvn test
