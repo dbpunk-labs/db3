@@ -2,12 +2,14 @@
 
 mod node_integration {
     use bytes::BytesMut;
+    use db3_base::get_a_random_nonce;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
-    use db3_proto::db3_mutation_proto::WriteRequest;
-    use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
+    use db3_proto::db3_mutation_proto::{
+        KvPair, Mutation, MutationAction, PayloadType, WriteRequest,
+    };
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-    use db3_proto::db3_node_proto::SessionStatus;
+    use db3_proto::db3_session_proto::SessionStatus;
     use db3_sdk::mutation_sdk::MutationSDK;
     use db3_sdk::store_sdk::StoreSDK;
     use db3_session::session_manager::{DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT};
@@ -17,6 +19,7 @@ mod node_integration {
     use std::{thread, time};
     use subtle_encoding::base64;
     use tonic::transport::Endpoint;
+
     fn get_mutation_sdk() -> MutationSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
         // create storage node sdk
@@ -50,6 +53,7 @@ mod node_integration {
 
     #[actix_web::test]
     async fn json_rpc_smoke_test() {
+        let nonce = get_a_random_nonce();
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
         let kp = db3_cmd::get_key_pair(false).unwrap();
@@ -62,7 +66,7 @@ mod node_integration {
         let mutation = Mutation {
             ns: "my_twitter".as_bytes().to_vec(),
             kv_pairs: vec![kv],
-            nonce: 1110,
+            nonce,
             chain_id: ChainId::MainNet.into(),
             chain_role: ChainRole::StorageShardChain.into(),
             gas_price: None,
@@ -74,8 +78,9 @@ mod node_integration {
         let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
         let request = WriteRequest {
             signature: signature.as_ref().to_vec(),
-            mutation: mbuf.as_ref().to_vec().to_owned(),
+            payload: mbuf.as_ref().to_vec().to_owned(),
             public_key: public_key.as_ref().to_vec(),
+            payload_type: PayloadType::MutationPayload.into(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf).unwrap();

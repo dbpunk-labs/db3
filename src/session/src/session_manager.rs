@@ -16,7 +16,7 @@
 //
 
 use chrono::Utc;
-use db3_proto::db3_node_proto::{QuerySessionInfo, SessionStatus};
+use db3_proto::db3_session_proto::{QuerySessionInfo, SessionStatus};
 use ethereum_types::Address;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -263,7 +263,7 @@ mod tests {
     use super::*;
     use db3_base::get_a_static_keypair;
     use db3_base::get_address_from_pk;
-    use db3_proto::db3_node_proto::SessionStatus;
+    use db3_proto::db3_session_proto::SessionStatus;
 
     #[test]
     fn test_new_session() {

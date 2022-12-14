@@ -19,6 +19,7 @@ syntax = "proto3";
 import "db3_bill.proto";
 import "db3_mutation.proto";
 import "db3_account.proto";
+import "db3_session.proto";
 package db3_node_proto;
 
 message QueryBillKey {
@@ -68,20 +69,6 @@ message SessionIdentifier {
     string session_token = 1;
 }
 
-enum SessionStatus {
-    Running = 0;
-    Blocked = 1;
-    Stop = 2;
-}
-
-message QuerySessionInfo {
-    // the hex encoded string
-    int32 id = 1;
-    int64 start_time = 2;
-    SessionStatus status = 3;
-    int32 query_count = 4;
-}
-
 message GetKeyRequest {
     BatchGetKey batch_get = 1;
 }
@@ -114,16 +101,13 @@ message OpenSessionRequest {
 }
 
 message OpenSessionResponse {
-    QuerySessionInfo query_session_info = 1;
+    db3_session_proto.QuerySessionInfo query_session_info = 1;
     int64 session_timeout_second = 2;
     int32 max_query_limit = 3;
     string session_token = 4;
 }
 
-message CloseSessionPayload {
-    QuerySessionInfo session_info = 1;
-    string session_token = 2;
-}
+
 
 message CloseSessionRequest {
     bytes payload = 1;
@@ -132,11 +116,12 @@ message CloseSessionRequest {
 }
 
 message CloseSessionResponse {
-    QuerySessionInfo query_session_info = 1;
+    db3_session_proto.QuerySessionInfo query_session_info = 1;
+    bytes hash = 2;
 }
 
 message GetSessionInfoResponse {
-    QuerySessionInfo session_info = 2;
+    db3_session_proto.QuerySessionInfo session_info = 2;
 }
 
 message BroadcastRequest {

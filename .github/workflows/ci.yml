@@ -83,6 +83,13 @@ jobs:
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: db3-log-artifact
+          path: |
+            tools/db3.log
+            tools/tm.log
       - name: Rust java sdk test
         run: |
           cd java && mvn test

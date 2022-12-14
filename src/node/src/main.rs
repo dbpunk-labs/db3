@@ -156,7 +156,9 @@ async fn start_grpc_service(
     context: Context,
 ) {
     let addr = format!("{}:{}", public_host, public_grpc_port);
-    let storage_node = StorageNodeImpl::new(context);
+    let kp = db3_node::node_key::get_key_pair(None).unwrap();
+    let signer = Db3Signer::new(kp);
+    let storage_node = StorageNodeImpl::new(context, signer);
     info!("start db3 storage node on public addr {}", addr);
     if disable_grpc_web {
         Server::builder()
