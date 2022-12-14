@@ -452,7 +452,10 @@ mod tests {
         assert!(res.is_ok());
         println!("account1: {:?}", account1);
         println!("account2: {:?}", account2);
-        assert_eq!(account2.total_query_session_count - account1.total_query_session_count,  10);
+        assert_eq!(
+            account2.total_query_session_count - account1.total_query_session_count,
+            10
+        );
     }
 
     #[tokio::test]
