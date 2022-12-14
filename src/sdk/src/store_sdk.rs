@@ -263,7 +263,7 @@ mod tests {
     use super::Db3Signer;
     use super::StoreSDK;
     use crate::mutation_sdk::MutationSDK;
-    use db3_base::{get_a_random_nonce, get_a_static_keypair};
+    use db3_base::{get_a_random_nonce, get_a_static_keypair, get_address_from_pk};
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
@@ -419,25 +419,40 @@ mod tests {
             std::thread::sleep(two_sec);
         }
         let kp = get_a_static_keypair();
+        let addr = get_address_from_pk(&kp.public);
         let signer = Db3Signer::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
         let session_info = res.unwrap();
         assert_eq!(session_info.session_token.len(), 36);
-        if let Ok(Some(values)) = sdk
-            .batch_get(&ns_vec, vec![key_vec.clone()], &session_info.session_token)
-            .await
-        {
-            assert_eq!(values.values.len(), 1);
-            assert_eq!(values.values[0].key.to_vec(), key_vec);
-            assert_eq!(values.values[0].value.to_vec(), value_vec);
-        } else {
-            assert!(false);
+
+        let account_res = sdk.get_account(&addr).await;
+        assert!(account_res.is_ok());
+        let account1 = account_res.unwrap();
+        for _ in 0..10 {
+            if let Ok(Some(values)) = sdk
+                .batch_get(&ns_vec, vec![key_vec.clone()], &session_info.session_token)
+                .await
+            {
+                assert_eq!(values.values.len(), 1);
+                assert_eq!(values.values[0].key.to_vec(), key_vec);
+                assert_eq!(values.values[0].value.to_vec(), value_vec);
+            } else {
+                assert!(false);
+            }
         }
 
         let res = sdk.close_session(&session_info.session_token).await;
+        std::thread::sleep(time::Duration::from_millis(2000));
+
+        let account_res = sdk.get_account(&addr).await;
+        assert!(account_res.is_ok());
+        let account2 = account_res.unwrap();
         assert!(res.is_ok());
+        println!("account1: {:?}", account1);
+        println!("account2: {:?}", account2);
+        assert_eq!(account2.total_query_session_count - account1.total_query_session_count,  10);
     }
 
     #[tokio::test]

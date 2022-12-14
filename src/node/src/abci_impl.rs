@@ -265,8 +265,8 @@ impl Application for AbciImpl {
                                 match self.pending_query_session.lock() {
                                     Ok(mut s) => {
                                         s.push((
-                                            account_id.addr,
                                             client_account_id.addr,
+                                            account_id.addr,
                                             mutation_id.as_ref().clone(),
                                             query_session.node_query_session_info.unwrap(),
                                         ));
