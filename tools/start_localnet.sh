@@ -18,7 +18,6 @@ else
         exit 1
     fi
     tar -zxf tendermint.tar.gz
-    ./tendermint init
 fi
 
 # clean db3
@@ -27,8 +26,9 @@ if [ -e ./db ]
 then
     rm -rf db
 fi
-./tendermint init && ./tendermint unsafe_reset_all && ./tendermint start >tm.log 2>&1  &
-sleep 1
+./tendermint init
 ../target/debug/db3 node >db3.log 2>&1  &
+sleep 1
+./tendermint unsafe_reset_all && ./tendermint start
 sleep 1
 
