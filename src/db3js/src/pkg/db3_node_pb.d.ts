@@ -3,6 +3,8 @@ import * as jspb from 'google-protobuf'
 import * as db3_bill_pb from './db3_bill_pb';
 import * as db3_mutation_pb from './db3_mutation_pb';
 import * as db3_account_pb from './db3_account_pb';
+import * as db3_session_pb from './db3_session_pb';
+import * as db3_namespace_pb from './db3_namespace_pb';
 
 
 export class QueryBillKey extends jspb.Message {
@@ -239,36 +241,6 @@ export namespace SessionIdentifier {
   }
 }
 
-export class QuerySessionInfo extends jspb.Message {
-  getId(): number;
-  setId(value: number): QuerySessionInfo;
-
-  getStartTime(): number;
-  setStartTime(value: number): QuerySessionInfo;
-
-  getStatus(): SessionStatus;
-  setStatus(value: SessionStatus): QuerySessionInfo;
-
-  getQueryCount(): number;
-  setQueryCount(value: number): QuerySessionInfo;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): QuerySessionInfo.AsObject;
-  static toObject(includeInstance: boolean, msg: QuerySessionInfo): QuerySessionInfo.AsObject;
-  static serializeBinaryToWriter(message: QuerySessionInfo, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): QuerySessionInfo;
-  static deserializeBinaryFromReader(message: QuerySessionInfo, reader: jspb.BinaryReader): QuerySessionInfo;
-}
-
-export namespace QuerySessionInfo {
-  export type AsObject = {
-    id: number,
-    startTime: number,
-    status: SessionStatus,
-    queryCount: number,
-  }
-}
-
 export class GetKeyRequest extends jspb.Message {
   getBatchGet(): BatchGetKey | undefined;
   setBatchGet(value?: BatchGetKey): GetKeyRequest;
@@ -420,8 +392,8 @@ export namespace OpenSessionRequest {
 }
 
 export class OpenSessionResponse extends jspb.Message {
-  getQuerySessionInfo(): QuerySessionInfo | undefined;
-  setQuerySessionInfo(value?: QuerySessionInfo): OpenSessionResponse;
+  getQuerySessionInfo(): db3_session_pb.QuerySessionInfo | undefined;
+  setQuerySessionInfo(value?: db3_session_pb.QuerySessionInfo): OpenSessionResponse;
   hasQuerySessionInfo(): boolean;
   clearQuerySessionInfo(): OpenSessionResponse;
 
@@ -444,33 +416,9 @@ export class OpenSessionResponse extends jspb.Message {
 
 export namespace OpenSessionResponse {
   export type AsObject = {
-    querySessionInfo?: QuerySessionInfo.AsObject,
+    querySessionInfo?: db3_session_pb.QuerySessionInfo.AsObject,
     sessionTimeoutSecond: number,
     maxQueryLimit: number,
-    sessionToken: string,
-  }
-}
-
-export class CloseSessionPayload extends jspb.Message {
-  getSessionInfo(): QuerySessionInfo | undefined;
-  setSessionInfo(value?: QuerySessionInfo): CloseSessionPayload;
-  hasSessionInfo(): boolean;
-  clearSessionInfo(): CloseSessionPayload;
-
-  getSessionToken(): string;
-  setSessionToken(value: string): CloseSessionPayload;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): CloseSessionPayload.AsObject;
-  static toObject(includeInstance: boolean, msg: CloseSessionPayload): CloseSessionPayload.AsObject;
-  static serializeBinaryToWriter(message: CloseSessionPayload, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): CloseSessionPayload;
-  static deserializeBinaryFromReader(message: CloseSessionPayload, reader: jspb.BinaryReader): CloseSessionPayload;
-}
-
-export namespace CloseSessionPayload {
-  export type AsObject = {
-    sessionInfo?: QuerySessionInfo.AsObject,
     sessionToken: string,
   }
 }
@@ -508,10 +456,15 @@ export namespace CloseSessionRequest {
 }
 
 export class CloseSessionResponse extends jspb.Message {
-  getQuerySessionInfo(): QuerySessionInfo | undefined;
-  setQuerySessionInfo(value?: QuerySessionInfo): CloseSessionResponse;
+  getQuerySessionInfo(): db3_session_pb.QuerySessionInfo | undefined;
+  setQuerySessionInfo(value?: db3_session_pb.QuerySessionInfo): CloseSessionResponse;
   hasQuerySessionInfo(): boolean;
   clearQuerySessionInfo(): CloseSessionResponse;
+
+  getHash(): Uint8Array | string;
+  getHash_asU8(): Uint8Array;
+  getHash_asB64(): string;
+  setHash(value: Uint8Array | string): CloseSessionResponse;
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): CloseSessionResponse.AsObject;
@@ -523,13 +476,14 @@ export class CloseSessionResponse extends jspb.Message {
 
 export namespace CloseSessionResponse {
   export type AsObject = {
-    querySessionInfo?: QuerySessionInfo.AsObject,
+    querySessionInfo?: db3_session_pb.QuerySessionInfo.AsObject,
+    hash: Uint8Array | string,
   }
 }
 
 export class GetSessionInfoResponse extends jspb.Message {
-  getSessionInfo(): QuerySessionInfo | undefined;
-  setSessionInfo(value?: QuerySessionInfo): GetSessionInfoResponse;
+  getSessionInfo(): db3_session_pb.QuerySessionInfo | undefined;
+  setSessionInfo(value?: db3_session_pb.QuerySessionInfo): GetSessionInfoResponse;
   hasSessionInfo(): boolean;
   clearSessionInfo(): GetSessionInfoResponse;
 
@@ -543,7 +497,7 @@ export class GetSessionInfoResponse extends jspb.Message {
 
 export namespace GetSessionInfoResponse {
   export type AsObject = {
-    sessionInfo?: QuerySessionInfo.AsObject,
+    sessionInfo?: db3_session_pb.QuerySessionInfo.AsObject,
   }
 }
 
@@ -587,8 +541,41 @@ export namespace BroadcastResponse {
   }
 }
 
-export enum SessionStatus { 
-  RUNNING = 0,
-  BLOCKED = 1,
-  STOP = 2,
+export class GetNamespaceRequest extends jspb.Message {
+  getSessionToken(): string;
+  setSessionToken(value: string): GetNamespaceRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetNamespaceRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetNamespaceRequest): GetNamespaceRequest.AsObject;
+  static serializeBinaryToWriter(message: GetNamespaceRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetNamespaceRequest;
+  static deserializeBinaryFromReader(message: GetNamespaceRequest, reader: jspb.BinaryReader): GetNamespaceRequest;
 }
+
+export namespace GetNamespaceRequest {
+  export type AsObject = {
+    sessionToken: string,
+  }
+}
+
+export class GetNamespaceResponse extends jspb.Message {
+  getNsListList(): Array<db3_namespace_pb.Namespace>;
+  setNsListList(value: Array<db3_namespace_pb.Namespace>): GetNamespaceResponse;
+  clearNsListList(): GetNamespaceResponse;
+  addNsList(value?: db3_namespace_pb.Namespace, index?: number): db3_namespace_pb.Namespace;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetNamespaceResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: GetNamespaceResponse): GetNamespaceResponse.AsObject;
+  static serializeBinaryToWriter(message: GetNamespaceResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetNamespaceResponse;
+  static deserializeBinaryFromReader(message: GetNamespaceResponse, reader: jspb.BinaryReader): GetNamespaceResponse;
+}
+
+export namespace GetNamespaceResponse {
+  export type AsObject = {
+    nsListList: Array<db3_namespace_pb.Namespace.AsObject>,
+  }
+}
+

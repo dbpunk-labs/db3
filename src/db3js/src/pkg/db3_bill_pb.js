@@ -16,6 +16,7 @@ import db3_base_pb from "./db3_base_pb.js";
 
 var goog = jspb;
 var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);
+
 goog.object.extend(proto, db3_base_pb);
 goog.exportSymbol('proto.db3_bill_proto.Bill', null, global);
 goog.exportSymbol('proto.db3_bill_proto.BillQueryRequest', null, global);

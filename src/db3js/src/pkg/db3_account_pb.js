@@ -391,6 +391,4 @@ proto.db3_account_proto.Account.prototype.setBillNextId = function(value) {
   return jspb.Message.setProto3IntField(this, 7, value);
 };
 
-
 export default proto.db3_account_proto;
-
