@@ -52,7 +52,7 @@ pub struct AbciImpl {
     pending_query_session:
         Arc<Mutex<Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)>>>,
     node_state: Arc<NodeState>,
-    pending_namespace: Arc<Mutex<Vec(AccountAddress, Namespace)>>,
+    pending_namespace: Arc<Mutex<Vec<(AccountAddress, Namespace)>>>,
 }
 
 impl AbciImpl {
@@ -429,7 +429,7 @@ impl Application for AbciImpl {
                 }
                 let pending_namespace_len = pending_namespace.len();
                 for item in pending_namespace {
-                    match s.apply_namespace(item.0, item.1) {
+                    match s.apply_namespace(&item.0, &item.1) {
                         Ok(_) => {}
                         Err(_) => {
                             todo!()
@@ -439,7 +439,7 @@ impl Application for AbciImpl {
 
                 if pending_mutation_len > 0
                     || pending_query_session_len > 0
-                    || pending_namespace_len
+                    || pending_namespace_len > 0
                 {
                     //TODO how to revert
                     if let Ok(hash) = s.commit() {

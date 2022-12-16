@@ -20,6 +20,7 @@ import "db3_bill.proto";
 import "db3_mutation.proto";
 import "db3_account.proto";
 import "db3_session.proto";
+import "db3_namespace.proto";
 package db3_node_proto;
 
 message QueryBillKey {
@@ -107,8 +108,6 @@ message OpenSessionResponse {
     string session_token = 4;
 }
 
-
-
 message CloseSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
@@ -132,6 +131,15 @@ message BroadcastResponse {
     bytes hash = 2;
 }
 
+
+message GetNamespaceRequest {
+    string session_token = 1;
+}
+
+message GetNamespaceResponse {
+    repeated db3_namespace_proto.Namespace ns_list = 1;
+}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
@@ -147,4 +155,6 @@ service StorageNode {
     rpc GetSessionInfo(GetSessionInfoRequest) returns (GetSessionInfoResponse) {}
     // method for broadcast request
     rpc Broadcast(BroadcastRequest) returns (BroadcastResponse) {}
+    // method for get namespace
+    rpc GetNamespace(GetNamespaceRequest) returns (GetNamespaceResponse) {}
 }
