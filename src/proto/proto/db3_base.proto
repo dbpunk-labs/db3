@@ -57,3 +57,11 @@ message Price {
     string unit = 2;
     Erc20Token token = 3;
 }
+
+message BroadcastMeta {
+    uint64 nonce = 1;
+    // the chain id of db3
+    ChainId chain_id = 2;
+    // the chain role of db3
+    ChainRole chain_role = 3;
+}
