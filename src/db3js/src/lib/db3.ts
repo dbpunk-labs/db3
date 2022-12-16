@@ -40,6 +40,9 @@ export class DB3 {
         this.client = new StorageNodeClient(node, null, null)
     }
 
+
+    async createNs()
+
     async submitRawMutation(
         ns: string,
         kv_pairs: db3_mutation_pb.KVPair[],
