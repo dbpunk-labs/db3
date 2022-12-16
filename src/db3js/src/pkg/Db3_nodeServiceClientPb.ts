@@ -17,8 +17,8 @@
 
 import * as grpcWeb from 'grpc-web';
 
-import * as db3_account_pb from './db3_account_pb';
-import * as db3_node_pb from './db3_node_pb';
+import db3_account_pb from './db3_account_pb';
+import db3_node_pb from './db3_node_pb';
 
 
 export class StorageNodeClient {
