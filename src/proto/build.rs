@@ -28,6 +28,7 @@ fn main() {
                 "proto/db3_bill.proto",
                 "proto/db3_account.proto",
                 "proto/db3_node.proto",
+                "proto/db3_namespace.proto",
             ],
             &["proto"],
         )

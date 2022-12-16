@@ -42,3 +42,18 @@ enum ChainId {
     DevNet = 20;
 }
 
+
+message Erc20Token {
+    // for example USDT
+    string symbal = 1;
+    // for example cent, usdt
+    repeated string units = 2;
+    // for example 1, 10 which means 1 usdt = 10 cent
+    repeated uint64 scalar = 3;
+}
+
+message Price {
+    uint64 amount = 1;
+    string unit = 2;
+    Erc20Token token = 3;
+}

@@ -189,7 +189,7 @@ impl Application for AbciImpl {
                                 }
                             }
                         }
-                        None => {
+                        _ => {
                             warn!("invalid transaction with null payload type");
                         }
                     }
@@ -289,7 +289,7 @@ impl Application for AbciImpl {
                             }
                         }
                     }
-                    None => {
+                    _ => {
                         warn!("invalid transaction with null payload type");
                     }
                 }
