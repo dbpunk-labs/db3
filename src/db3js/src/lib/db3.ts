@@ -1,6 +1,8 @@
 import db3_mutation_pb from '../pkg/db3_mutation_pb'
 import db3_base_pb from '../pkg/db3_base_pb'
 import db3_node_pb from '../pkg/db3_node_pb'
+import db3_namespace_pb from '../pkg/db3_namespace_pb'
+import db3_session_pb from  '../pkg/db3_session_pb'
 import { StorageNodeClient } from '../pkg/Db3_nodeServiceClientPb'
 import * as jspb from 'google-protobuf'
 
@@ -40,8 +42,32 @@ export class DB3 {
         this.client = new StorageNodeClient(node, null, null)
     }
 
+    async createNs(ns:db3_namespace_pb.Namespace,
+                  sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
+                  nonce?: number) {
+        const mbuffer = ns.serializeBinary()
+        const [signature, public_key] = await sign(mbuffer)
+        const writeRequest = new db3_mutation_pb.WriteRequest()
+        writeRequest.setMutation(mbuffer)
+        writeRequest.setSignature(signature)
+        writeRequest.setPublicKey(public_key)
+        writeRequest.setPayloadType(db3_mutation_pb.PayloadType.NAMESPACEPAYLOAD)
+        const broadcastRequest = new db3_node_pb.BroadcastRequest()
+        broadcastRequest.setBody(writeRequest.serializeBinary())
+        const res = await this.client.broadcast(broadcastRequest, {})
+        return res.toObject()
+    }
 
-    async createNs()
+    async getNsList(
+
+                sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
+    ) {
+        this.keepSession(sign)
+        const getNsListRequest = new db3_node_pb.GetNamespaceRequest()
+        getNsListRequest.setSessionToken(this.sessionToken)
+        const res = await this.client.getNamespace(getNsListRequest, {})
+        return res.toObject()
+    }
 
     async submitRawMutation(
         ns: string,
@@ -64,9 +90,10 @@ export class DB3 {
         const mbuffer = mutation.serializeBinary()
         const [signature, public_key] = await sign(mbuffer)
         const writeRequest = new db3_mutation_pb.WriteRequest()
-        writeRequest.setMutation(mbuffer)
+        writeRequest.setPayload(mbuffer)
         writeRequest.setSignature(signature)
         writeRequest.setPublicKey(public_key)
+        writeRequest.setPayloadType(db3_mutation_pb.PayloadType.MUTATIONPAYLOAD)
         const broadcastRequest = new db3_node_pb.BroadcastRequest()
         broadcastRequest.setBody(writeRequest.serializeBinary())
         const res = await this.client.broadcast(broadcastRequest, {})
@@ -101,10 +128,10 @@ export class DB3 {
         const mbuffer = mutationObj.serializeBinary()
         const [signature, public_key] = await sign(mbuffer)
         const writeRequest = new db3_mutation_pb.WriteRequest()
-        writeRequest.setMutation(mbuffer)
+        writeRequest.setPayload(mbuffer)
         writeRequest.setSignature(signature)
         writeRequest.setPublicKey(public_key)
-
+        writeRequest.setPayloadType(db3_mutation_pb.PayloadType.MUTATIONPAYLOAD)
         const broadcastRequest = new db3_node_pb.BroadcastRequest()
         broadcastRequest.setBody(writeRequest.serializeBinary())
         try {
@@ -185,8 +212,7 @@ export class DB3 {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-
-        const payload = new db3_node_pb.CloseSessionPayload()
+        const payload = new db3_session_pb.CloseSessionPayload()
         payload.setSessionInfo(this.querySessionInfo)
         payload.setSessionToken(this.sessionToken)
 
@@ -256,10 +282,10 @@ export class DB3 {
         const mbuffer = mutationObj.serializeBinary()
         const [signature, public_key] = await sign(mbuffer)
         const writeRequest = new db3_mutation_pb.WriteRequest()
-        writeRequest.setMutation(mbuffer)
+        writeRequest.setPayload(mbuffer)
         writeRequest.setSignature(signature)
         writeRequest.setPublicKey(public_key)
-
+        writeRequest.setPayloadType(db3_mutation_pb.PayloadType.MUTATIONPAYLOAD)
         const broadcastRequest = new db3_node_pb.BroadcastRequest()
         broadcastRequest.setBody(writeRequest.serializeBinary())
         try {

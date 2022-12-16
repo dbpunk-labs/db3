@@ -15,6 +15,7 @@ import * as jspb from "google-protobuf";
 import db3_bill_pb from "./db3_bill_pb.js";
 import db3_mutation_pb from "./db3_mutation_pb.js";
 import db3_account_pb from "./db3_account_pb.js";
+import db3_session_pb from "./db3_session_pb.js";
 import db3_namespace_pb from "./db3_namespace_pb.js";
 
 var goog = jspb;
