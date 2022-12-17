@@ -20,7 +20,7 @@ export interface DocIndex {
     ns: string
     docName: string
 }
-function genStartKey(index:DocIndex) {
+function genStartKey(index: DocIndex) {
     const buff = new SmartBuffer()
     type ObjectKey = keyof typeof doc
     // write the doc name to the key
@@ -31,12 +31,12 @@ function genStartKey(index:DocIndex) {
         switch (key.keyType) {
             case DocKeyType.STRING: {
                 const objectKey = key.name as ObjectKey
-                buff.writeString(("" as unknown) as string, offset)
-                offset += "".length
+                buff.writeString('' as unknown as string, offset)
+                offset += ''.length
                 break
             }
             case DocKeyType.NUMBER: {
-                buff.writeBigInt64BE(BigInt((0 as unknown) as number), offset)
+                buff.writeBigInt64BE(BigInt(0 as unknown as number), offset)
                 offset += 8
                 break
             }
@@ -46,7 +46,7 @@ function genStartKey(index:DocIndex) {
     return new Uint8Array(buffer, 0, offset)
 }
 
-function genEndKey(index:DocIndex) {
+function genEndKey(index: DocIndex) {
     const buff = new SmartBuffer()
     type ObjectKey = keyof typeof doc
     // write the doc name to the key
@@ -57,8 +57,8 @@ function genEndKey(index:DocIndex) {
         switch (key.keyType) {
             case DocKeyType.STRING: {
                 const objectKey = key.name as ObjectKey
-                buff.writeString(("~" as unknown) as string, offset)
-                offset += "~".length
+                buff.writeString('~' as unknown as string, offset)
+                offset += '~'.length
                 break
             }
             case DocKeyType.NUMBER: {
@@ -85,14 +85,14 @@ export function genPrimaryKey(index: DocIndex, doc: Object) {
             case DocKeyType.STRING: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeString((value as unknown) as string, offset)
-                offset += ((value as unknown) as string).length
+                buff.writeString(value as unknown as string, offset)
+                offset += (value as unknown as string).length
                 break
             }
             case DocKeyType.NUMBER: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeBigInt64BE(BigInt((value as unknown) as number), offset)
+                buff.writeBigInt64BE(BigInt(value as unknown as number), offset)
                 offset += 8
                 break
             }
@@ -154,26 +154,39 @@ export class DocStore {
             .getBatchGetValues()
             ?.getValuesList()
             .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                docs.push(
+                    JSON.parse(
+                        new TextDecoder('utf-8').decode(kvPair.getValue_asU8())
+                    )
+                )
             })
 
         return docs
     }
 
-    async queryAllDocs(ns:String, index:DocIndex, 
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
+    async queryAllDocs(
+        ns: String,
+        index: DocIndex,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
         try {
             await this.db3.keepSession(sign)
             const docs: Record<string, any>[] = []
             const res = await this.db3.getRange(
                 ns,
                 genStartKey(index),
-                genEndKey(index),
+                genEndKey(index)
             )
             res.getRangeValue()
                 ?.getValuesList()
                 .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                    docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                    docs.push(
+                        JSON.parse(
+                            new TextDecoder('utf-8').decode(
+                                kvPair.getValue_asU8()
+                            )
+                        )
+                    )
                 })
             return docs
         } catch (error) {
@@ -185,7 +198,7 @@ export class DocStore {
         ns: string,
         index: DocIndex,
         startKey: Record<string, any>,
-        endKey:Record<string, any>,
+        endKey: Record<string, any>,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         try {
@@ -199,7 +212,13 @@ export class DocStore {
             res.getRangeValue()
                 ?.getValuesList()
                 .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                    docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                    docs.push(
+                        JSON.parse(
+                            new TextDecoder('utf-8').decode(
+                                kvPair.getValue_asU8()
+                            )
+                        )
+                    )
                 })
             return docs
         } catch (error) {

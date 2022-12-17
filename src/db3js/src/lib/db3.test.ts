@@ -15,6 +15,17 @@ describe('test db3js api', () => {
         return _sign
     }
 
+    test('namespace smoke test', async () => {
+        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const _sign = await getSign()
+        const result = await db3_instance.createSimpleNs(
+            "test_ns", "desc_ns", "usdt", 1, 100, _sign
+        )
+        await new Promise(r => setTimeout(r, 2000))
+        const nsList = await db3_instance.getNsList(_sign)
+        expect(nsList.nsListList[0].name).toBe("test_ns")
+    })
+
     test('test submitMutation', async () => {
         const db3_instance = new DB3('http://127.0.0.1:26659')
         const _sign = await getSign()
@@ -28,6 +39,7 @@ describe('test db3js api', () => {
         )
         expect(result).toBeDefined()
     })
+
     test('test openQuerySession', async () => {
         const db3_instance = new DB3('http://127.0.0.1:26659')
         const _sign = await getSign()
@@ -143,9 +155,14 @@ describe('test db3js api', () => {
             ts: 9527,
             amount: 10,
         }
-        const result = await doc_store.insertDocs(doc_index, [transacion], _sign, 1)
+        const result = await doc_store.insertDocs(
+            doc_index,
+            [transacion],
+            _sign,
+            1
+        )
         expect(result.hash).toBe('ZBv3EfQajYQ9ibANS/SMl9X2FYwvqG11+8B4eTH5mUA=')
-        await new Promise(r => setTimeout(r, 2000))
+        await new Promise((r) => setTimeout(r, 2000))
         const query = {
             address: '0x11111',
             ts: 9527,
@@ -192,22 +209,21 @@ describe('test db3js api', () => {
             },
         ]
         await doc_store.insertDocs(doc_index, transacions, _sign, 1)
-        await new Promise(r => setTimeout(r, 2000))
-        const res = await doc_store.queryDocsByRange(
+        await new Promise((r) => setTimeout(r, 2000))
+        const res1 = await doc_store.queryDocsByRange(
             'ns1',
             doc_index,
-                {
-                    address: '0x11111',
-                    ts: 9529,
-                },
-                {
-                    address: '0x11114',
-                    ts: 9534,
-                }
-            ,
+            {
+                address: '0x11111',
+                ts: 9529,
+            },
+            {
+                address: '0x11114',
+                ts: 9534,
+            },
             _sign
         )
-        expect(res[2].address).toBe('0x11113')
+        expect(res1[2].address).toBe('0x11113')
     })
 
     test('delete data by key', async () => {

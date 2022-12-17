@@ -1,5 +1,5 @@
 import * as dcrypto from '@deliberative/crypto'
-import sha3 from "js-sha3";
+import sha3 from 'js-sha3'
 
 export async function generateKey() {
     const mnemonic = await dcrypto.generateMnemonic()
@@ -19,6 +19,6 @@ export async function sign(data: Uint8Array, privateKey: Uint8Array) {
     return signature
 }
 
-export async function getAddress(publicKey:Uint8Array) {
-    return '0x' + sha3.keccak_256(publicKey.subarray(1)).substring(24);
+export async function getAddress(publicKey: Uint8Array) {
+    return '0x' + sha3.keccak_256(publicKey.subarray(1)).substring(24)
 }

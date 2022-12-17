@@ -88,9 +88,10 @@ impl StorageNode for StorageNodeImpl {
                         &get_namespace_req.session_token
                     )));
                 }
+                let real_addr = addr.unwrap();
                 let ns_list = node_store
                     .get_auth_store()
-                    .get_my_ns_list(&addr.unwrap())
+                    .get_my_ns_list(&real_addr)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 node_store
                     .get_session_store()
