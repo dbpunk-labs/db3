@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals'
 import { DB3 } from './db3'
-import { DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
+import { DocMetaManager, DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
 import { sign, getATestStaticKeypair, getAddress } from './keys'
 import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
@@ -14,6 +14,33 @@ describe('test db3js api', () => {
         }
         return _sign
     }
+
+    test("doc meta smoke test", async () => {
+        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const _sign = await getSign()
+        const doc_meta_mgr = new DocMetaManager(db3_instance)
+        const my_transaction_meta = {
+            keys: [
+                {
+                    name: 'address',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+           ns: 'my_trx',
+            docName: 'transaction',
+        }
+        const result = await doc_meta_mgr.create_doc_meta(my_transaction_meta, "test_transaction", _sign)
+        await new Promise(r => setTimeout(r, 2000))
+        const docs = await doc_meta_mgr.get_all_doc_metas("my_trx", _sign)
+        expect(docs.length).toBe(1)
+        expect(docs[0].doc_name).toBe("transaction")
+        expect(docs[0].desc).toBe("test_transaction")
+        expect(docs[0].index.ns).toBe("my_trx")
+    })
 
     test('namespace smoke test', async () => {
         const db3_instance = new DB3('http://127.0.0.1:26659')

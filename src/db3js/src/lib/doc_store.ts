@@ -20,6 +20,7 @@ export interface DocIndex {
     ns: string
     docName: string
 }
+
 function genStartKey(index: DocIndex) {
     const buff = new SmartBuffer()
     type ObjectKey = keyof typeof doc
@@ -108,6 +109,60 @@ export function object2Buffer(doc: Object) {
     buff.writeString(json_str)
     const buffer = buff.toBuffer().buffer
     return new Uint8Array(buffer, 0, json_str.length)
+}
+
+export class DocMetaManager {
+    private doc_store: DocStore
+    constructor(db3: DB3) {
+        this.doc_store = new DocStore(db3)
+    }
+
+    async get_all_doc_metas(ns:string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
+                          ) {
+        const static_doc_index = {
+            keys: [
+                {
+                    name: 'doc_name',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+            ns: ns,
+            docName: '_meta_',
+        }
+        return await this.doc_store.queryAllDocs(ns, static_doc_index, sign)
+    }
+
+    async create_doc_meta(doc_index: DocIndex, desc: string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
+                      ) {
+        const static_doc_index = {
+            keys: [
+                {
+                    name: 'doc_name',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+            ns: doc_index.ns,
+            docName: '_meta_',
+        }
+        const doc_meta = {
+            'doc_name': doc_index.docName,
+            'ts': Date.now(),
+            'index': doc_index,
+            'desc': desc
+        }
+        //TODO check if the doc meta exists
+        return await this.doc_store.insertDocs(static_doc_index, [doc_meta], sign)
+    }
 }
 
 export class DocStore {
