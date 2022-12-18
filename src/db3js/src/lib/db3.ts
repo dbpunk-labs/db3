@@ -12,6 +12,14 @@ export interface Mutation {
     data: Record<string, any>
 }
 
+export interface NsSimpleDesc {
+    name: string,
+    desc: string,
+    erc20Token: string,
+    price: number,
+    queryCount: number,
+}
+
 export interface BatchGetKeyRequest {
     ns: string
     keyList: string[]
@@ -43,31 +51,27 @@ export class DB3 {
     }
 
     async createSimpleNs(
-        name: string,
-        desc: string,
-        erc20Token: string,
-        price: number,
-        queryCount: number,
+        desc:NsSimpleDesc,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
         nonce?: number
     ) {
         const token = new db3_base_pb.Erc20Token()
         //TODO check if token is valid
-        token.setSymbal(erc20Token)
-        token.setUnitsList([erc20Token])
+        token.setSymbal(desc.erc20Token)
+        token.setUnitsList([desc.erc20Token])
         token.setScalarList([1])
         const priceProto = new db3_base_pb.Price()
-        priceProto.setAmount(price)
-        priceProto.setUnit(erc20Token)
+        priceProto.setAmount(desc.price)
+        priceProto.setUnit(desc.erc20Token)
         priceProto.setToken(token)
         const queryPrice = new db3_namespace_pb.QueryPrice()
         queryPrice.setPrice(priceProto)
-        queryPrice.setQueryCount(queryCount)
+        queryPrice.setQueryCount(desc.queryCount)
         const namespaceProto = new db3_namespace_pb.Namespace()
-        namespaceProto.setName(name)
+        namespaceProto.setName(desc.name)
         namespaceProto.setPrice(queryPrice)
         namespaceProto.setTs(Date.now())
-        namespaceProto.setDescription(desc)
+        namespaceProto.setDescription(desc.desc)
         return await this.createNs(namespaceProto, sign, nonce)
     }
 

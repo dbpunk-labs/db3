@@ -46,7 +46,9 @@ describe('test db3js api', () => {
         const db3_instance = new DB3('http://127.0.0.1:26659')
         const _sign = await getSign()
         const result = await db3_instance.createSimpleNs(
-            "test_ns", "desc_ns", "usdt", 1, 100, _sign
+            {name:"test_ns", desc:"desc_ns", 
+                erc20Token:"usdt", price:1, queryCount:100},
+            _sign
         )
         await new Promise(r => setTimeout(r, 2000))
         const nsList = await db3_instance.getNsList(_sign)
