@@ -14,10 +14,12 @@
 /* eslint-disable */
 // @ts-nocheck
 
+
 import * as grpcWeb from 'grpc-web';
 
 import db3_account_pb from './db3_account_pb';
 import db3_node_pb from './db3_node_pb';
+
 
 export class StorageNodeClient {
   client_: grpcWeb.AbstractClientBase;
@@ -380,6 +382,49 @@ export class StorageNodeClient {
     request,
     metadata || {},
     this.methodDescriptorBroadcast);
+  }
+
+  methodDescriptorGetNamespace = new grpcWeb.MethodDescriptor(
+    '/db3_node_proto.StorageNode/GetNamespace',
+    grpcWeb.MethodType.UNARY,
+    db3_node_pb.GetNamespaceRequest,
+    db3_node_pb.GetNamespaceResponse,
+    (request: db3_node_pb.GetNamespaceRequest) => {
+      return request.serializeBinary();
+    },
+    db3_node_pb.GetNamespaceResponse.deserializeBinary
+  );
+
+  getNamespace(
+    request: db3_node_pb.GetNamespaceRequest,
+    metadata: grpcWeb.Metadata | null): Promise<db3_node_pb.GetNamespaceResponse>;
+
+  getNamespace(
+    request: db3_node_pb.GetNamespaceRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: db3_node_pb.GetNamespaceResponse) => void): grpcWeb.ClientReadableStream<db3_node_pb.GetNamespaceResponse>;
+
+  getNamespace(
+    request: db3_node_pb.GetNamespaceRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: db3_node_pb.GetNamespaceResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/db3_node_proto.StorageNode/GetNamespace',
+        request,
+        metadata || {},
+        this.methodDescriptorGetNamespace,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/db3_node_proto.StorageNode/GetNamespace',
+    request,
+    metadata || {},
+    this.methodDescriptorGetNamespace);
   }
 
 }

@@ -42,3 +42,26 @@ enum ChainId {
     DevNet = 20;
 }
 
+
+message Erc20Token {
+    // for example USDT
+    string symbal = 1;
+    // for example cent, usdt
+    repeated string units = 2;
+    // for example 1, 10 which means 1 usdt = 10 cent
+    repeated uint64 scalar = 3;
+}
+
+message Price {
+    uint64 amount = 1;
+    string unit = 2;
+    Erc20Token token = 3;
+}
+
+message BroadcastMeta {
+    uint64 nonce = 1;
+    // the chain id of db3
+    ChainId chain_id = 2;
+    // the chain role of db3
+    ChainRole chain_role = 3;
+}

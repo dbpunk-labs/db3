@@ -69,7 +69,6 @@ impl MutationSDK {
             .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?
             .into_inner();
         let base64_byte = base64::encode(response.hash);
-        use subtle_encoding::base64;
         Ok(String::from_utf8_lossy(base64_byte.as_ref()).to_string())
     }
 }
@@ -92,7 +91,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_duplicated_key_mutation() {
-        let mut rng = rand::thread_rng();
         let nonce = get_a_random_nonce();
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();

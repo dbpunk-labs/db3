@@ -49,10 +49,13 @@ message Mutation {
     // the predicted gas
     uint64 gas = 7;
 }
+
 enum PayloadType {
     MutationPayload =0;
     QuerySessionPayload =1;
+    NamespacePayload = 2;
 }
+
 message WriteRequest {
     bytes signature = 1;
     // the protobuf binary format

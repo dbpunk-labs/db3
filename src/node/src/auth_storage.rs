@@ -20,6 +20,7 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
+use db3_proto::db3_namespace_proto::Namespace;
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
@@ -27,6 +28,7 @@ use db3_storage::bill_store::BillStore;
 use db3_storage::commit_store::CommitStore;
 use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
+use db3_storage::ns_store::NsStore;
 use db3_types::cost;
 use db3_types::gas;
 use ethereum_types::Address as AccountAddress;
@@ -168,6 +170,24 @@ impl AuthStorage {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
 
+    pub fn get_my_ns_list(&self, addr: &AccountAddress) -> Result<Vec<Namespace>> {
+        let ops = NsStore::get_my_ns_list(self.db.as_ref(), addr)?;
+        let mut ns_list: Vec<Namespace> = Vec::new();
+        for op in ops {
+            match op {
+                ProofOp::Push(Node::KV(_, v)) => {
+                    if let Ok(b) = Namespace::decode(v.as_ref()) {
+                        ns_list.push(b);
+                    } else {
+                        todo!();
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(ns_list)
+    }
+
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {
         let proofs_ops = BillStore::scan(self.db.as_ref(), height, start_id, end_id)?;
         let mut bills: Vec<Bill> = Vec::new();
@@ -221,6 +241,12 @@ impl AuthStorage {
         AccountStore::apply(db, &addr, &account)?;
         Ok(gas_fee)
     }
+
+    pub fn apply_namespace(&mut self, addr: &AccountAddress, namespace: &Namespace) -> Result<()> {
+        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+        NsStore::apply(db, addr, namespace)
+    }
+
     pub fn apply_mutation(
         &mut self,
         addr: &AccountAddress,

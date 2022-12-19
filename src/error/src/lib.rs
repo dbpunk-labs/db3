@@ -43,6 +43,8 @@ pub enum DB3Error {
     ApplyAccountError(String),
     #[error("fail to apply commit with error {0}")]
     ApplyCommitError(String),
+    #[error("fail to apply commit with error {0}")]
+    ApplyNamespaceError(String),
     #[error("fail to get commit with error {0}")]
     GetCommitError(String),
     #[error("fail to query account with error {0}")]
@@ -59,6 +61,8 @@ pub enum DB3Error {
     QuerySessionStatusError(String),
     #[error("fail to verify query session {0}")]
     QuerySessionVerifyError(String),
+    #[error("fail to query namespace {0}")]
+    QueryNamespaceError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

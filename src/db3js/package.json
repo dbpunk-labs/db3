@@ -1,6 +1,6 @@
 {
     "name": "db3js",
-    "version": "0.1.8",
+    "version": "0.1.9",
     "main": "./dist/index.js",
     "module": "./dist/esm/index.js",
     "type": "module",
@@ -38,7 +38,6 @@
         "jest": "^29.3.1",
         "jest-environment-jsdom": "^29.3.1",
         "jest-fetch-mock": "^3.0.3",
-        "prettier": "2.8.0",
         "rollup-plugin-wasm": "^3.0.0",
         "ts-jest": "^29.0.3",
         "ts-node": "^10.9.1",
