@@ -1,10 +1,11 @@
 ![db3_logo](./docs/images/db3_logo.png)
 
-![CI](https://img.shields.io/github/workflow/status/dbpunk-labs/db3/ci?style=flat-square)
+![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/dbpunk-labs/db3/ci.yml?branch=main&style=flat-square)
 ![coverage](https://img.shields.io/codecov/c/github/dbpunk-labs/db3?style=flat-square)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3?style=flat-square)
 ![contribution](https://img.shields.io/github/contributors/dbpunk-labs/db3?style=flat-square)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3?style=flat-square)
+![GitHub issues by-label](https://img.shields.io/github/issues/dbpunk-labs/db3/good%20first%20issue?style=flat-square)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3?style=flat-square)
 ![npm](https://img.shields.io/npm/v/db3js?style=flat-square)
 ![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)
