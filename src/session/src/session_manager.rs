@@ -18,7 +18,7 @@
 use chrono::Utc;
 use db3_proto::db3_session_proto::{QuerySessionInfo, SessionStatus};
 use ethereum_types::Address;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 // retry generate token
@@ -118,6 +118,7 @@ impl SessionPool {
 pub struct SessionStore {
     session_pools: HashMap<Address, SessionPool>,
     token_account_map: HashMap<String, Address>,
+    open_session_headers: HashSet<String>,
     sid: i32,
 }
 
@@ -126,6 +127,7 @@ impl SessionStore {
         SessionStore {
             session_pools: HashMap::new(),
             token_account_map: HashMap::new(),
+            open_session_headers: HashSet::new(),
             sid: 0,
         }
     }
@@ -143,14 +145,31 @@ impl SessionStore {
         Err(format!("Fail to generate unique token after retry"))
     }
 
+    fn is_session_header_exit(&self, header: &String) -> bool {
+        self.open_session_headers.contains(header)
+    }
+    fn add_session_header(&mut self, header: &String) {
+        self.open_session_headers.insert(header.clone());
+    }
     /// Add session into pool
-    pub fn add_new_session(&mut self, addr: Address) -> Result<(String, QuerySessionInfo), String> {
+    pub fn add_new_session(
+        &mut self,
+        header: &String,
+        addr: Address,
+    ) -> Result<(String, QuerySessionInfo), String> {
+        if self.is_session_header_exit(header) {
+            return Err(format!("Session HEADER {} already exist", header));
+        }
         self.sid += 1;
         let token = self.generate_unique_token().map_err(|e| e)?;
         match self.session_pools.get_mut(&addr) {
             Some(sess_pool) => {
                 self.token_account_map.insert(token.clone(), addr);
-                sess_pool.create_new_session(self.sid, &token)
+                let res = sess_pool.create_new_session(self.sid, &token);
+                if res.is_ok() {
+                    self.add_session_header(header);
+                }
+                res
             }
             None => {
                 let mut sess_pool = SessionPool::new();
@@ -158,6 +177,7 @@ impl SessionStore {
                 if res.is_ok() {
                     self.token_account_map.insert(token.clone(), addr);
                     self.session_pools.insert(addr, sess_pool);
+                    self.add_session_header(header);
                 }
                 res
             }
@@ -264,7 +284,7 @@ mod tests {
     use db3_base::get_a_static_keypair;
     use db3_base::get_address_from_pk;
     use db3_proto::db3_session_proto::SessionStatus;
-
+    use uuid::Uuid;
     #[test]
     fn test_new_session() {
         let mut session = SessionManager::new();
@@ -301,10 +321,12 @@ mod tests {
         let kp = get_a_static_keypair();
         let addr = get_address_from_pk(&kp.public);
         for _ in 0..DEFAULT_SESSION_POOL_SIZE_LIMIT {
-            assert!(sess_store.add_new_session(addr).is_ok())
+            assert!(sess_store
+                .add_new_session(&Uuid::new_v4().to_string(), addr)
+                .is_ok())
         }
 
-        let res = sess_store.add_new_session(addr);
+        let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), addr);
         assert!(res.is_err());
         assert_eq!(
             "Fail to create new session since session pool size exceed limit 1000",
@@ -318,11 +340,11 @@ mod tests {
         let kp = get_a_static_keypair();
         let addr = get_address_from_pk(&kp.public);
         // add session and create new session pool
-        let res = sess_store.add_new_session(addr);
+        let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), addr);
         assert!(res.is_ok());
         let token1 = res.unwrap().0;
         assert_eq!(token1.len(), 36);
-        let res = sess_store.add_new_session(addr);
+        let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), addr);
         assert!(res.is_ok());
         let token2 = res.unwrap().0;
         assert_ne!(token1, token2);
@@ -332,18 +354,31 @@ mod tests {
         let res = sess_store.get_session_mut(&"token_unknow".to_string());
         assert!(res.is_none());
     }
-
+    #[test]
+    fn add_session_wrong_path_duplicate_header() {
+        let mut sess_store = SessionStore::new();
+        let kp = get_a_static_keypair();
+        let addr = get_address_from_pk(&kp.public);
+        let header = Uuid::new_v4().to_string();
+        // add session and create new session pool
+        let res = sess_store.add_new_session(&header, addr);
+        assert!(res.is_ok());
+        let token1 = res.unwrap().0;
+        assert_eq!(token1.len(), 36);
+        let res = sess_store.add_new_session(&header, addr);
+        assert!(res.is_err());
+    }
     #[test]
     fn remove_session_test() {
         let mut sess_store = SessionStore::new();
         let kp = get_a_static_keypair();
         let addr = get_address_from_pk(&kp.public);
 
-        let res = sess_store.add_new_session(addr);
+        let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), addr);
         assert!(res.is_ok());
         let token1 = res.unwrap().0;
         assert_eq!(token1.len(), 36);
-        let res = sess_store.add_new_session(addr);
+        let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), addr);
         assert!(res.is_ok());
         let token2 = res.unwrap().0;
         assert_ne!(token1, token2);
@@ -360,7 +395,9 @@ mod tests {
         let kp = get_a_static_keypair();
         let addr = get_address_from_pk(&kp.public);
         for i in 0..100 {
-            let (token, _) = sess_store.add_new_session(addr).unwrap();
+            let (token, _) = sess_store
+                .add_new_session(&Uuid::new_v4().to_string(), addr)
+                .unwrap();
 
             // convert session with even id into blocked status
             if i % 2 == 0 {

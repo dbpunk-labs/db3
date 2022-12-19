@@ -121,10 +121,12 @@ impl StorageNode for StorageNodeImpl {
             r.public_key.as_ref(),
         )
         .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        let header =
+            String::from_utf8(r.header).map_err(|e| Status::internal(format!("{:?}", e)))?;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
-                match sess_store.add_new_session(account_id.addr) {
+                match sess_store.add_new_session(&header, account_id.addr) {
                     Ok((session_token, query_session_info)) => {
                         // Takes a reference and returns Option<&V>
                         Ok(Response::new(OpenSessionResponse {

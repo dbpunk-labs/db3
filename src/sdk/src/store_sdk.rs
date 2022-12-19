@@ -32,7 +32,7 @@ use prost::Message;
 use std::sync::Arc;
 use subtle_encoding::base64;
 use tonic::Status;
-
+use uuid::Uuid;
 pub struct StoreSDK {
     client: Arc<StorageNodeClient<tonic::transport::Channel>>,
     signer: Db3Signer,
@@ -52,7 +52,8 @@ impl StoreSDK {
     }
 
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
-        let buf = "Header".as_bytes();
+        let header_string = Uuid::new_v4().to_string();
+        let buf = header_string.as_bytes();
         let (signature, public_key) = self
             .signer
             .sign(buf.as_ref())
