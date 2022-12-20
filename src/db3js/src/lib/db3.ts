@@ -23,11 +23,11 @@ export interface NsSimpleDesc {
 
 export interface BatchGetKeyRequest {
     ns: string
-    keyList: string[]
+    keyList: string[] | Uint8Array[]
 }
 
 export interface QuerySession {
-    sessionInfo: db3_node_pb.QuerySessionInfo.AsObject
+    sessionInfo: db3_session_pb.QuerySessionInfo.AsObject
     sessionToken: string
 }
 
@@ -46,7 +46,7 @@ function encodeUint8Array(text: string) {
 export class DB3 {
     private client: StorageNodeClient
     public sessionToken?: string
-    private querySessionInfo?: db3_node_pb.QuerySessionInfo
+    private querySessionInfo?: db3_session_pb.QuerySessionInfo
     constructor(node: string, options?: DB3_Options) {
         this.client = new StorageNodeClient(node, null, null)
     }
@@ -101,16 +101,16 @@ export class DB3 {
     ) {
         const token = await this.keepSession(sign)
         const getNsListRequest = new db3_node_pb.GetNamespaceRequest()
-        getNsListRequest.setSessionToken(token)
+        getNsListRequest.setSessionToken(token!)
         const res = await this.client.getNamespace(getNsListRequest, {})
-        const count = this.querySessionInfo?.getQueryCount() + 1
+        const count = this.querySessionInfo!.getQueryCount() + 1
         return res.toObject()
     }
 
     async submitRawMutation(
         ns: string,
         kv_pairs: db3_mutation_pb.KVPair[],
-        sign: (target: Uint8Array) => [Uint8Array, Uint8Array],
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
         nonce?: number
     ) {
         const mutation = new db3_mutation_pb.Mutation()
@@ -153,11 +153,7 @@ export class DB3 {
         const mutationObj = new db3_mutation_pb.Mutation()
         mutationObj.setNs(encodeUint8Array(mutation.ns))
         mutationObj.setKvPairsList(kvPairsList)
-        if (typeof nonce !== 'undefined') {
-            mutationObj.setNonce(nonce)
-        } else {
-            mutationObj.setNonce(Date.now())
-        }
+        mutationObj.setNonce(Date.now())
         mutationObj.setChainId(db3_base_pb.ChainId.MAINNET)
         mutationObj.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN)
         mutationObj.setGasPrice()
@@ -187,7 +183,7 @@ export class DB3 {
             // try to open session
             await this.openQuerySession(sign)
         }
-        if (this.querySessionInfo?.getQueryCount() > 1000) {
+        if (this.querySessionInfo!.getQueryCount() > 1000) {
             await this.closeQuerySession(sign)
             await this.openQuerySession(sign)
         }
@@ -240,7 +236,7 @@ export class DB3 {
         getKeyRequest.setBatchGet(batchGetKey)
         try {
             const res = await this.client.getKey(getKeyRequest, {})
-            const count = this.querySessionInfo?.getQueryCount() + 1
+            const count = this.querySessionInfo!.getQueryCount() + 1
             this.querySessionInfo?.setQueryCount(count)
             return res
         } catch (error) {

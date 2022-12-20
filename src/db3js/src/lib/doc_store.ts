@@ -24,7 +24,6 @@ export interface DocIndex {
 
 function genStartKey(index: DocIndex) {
     const buff = new SmartBuffer()
-    type ObjectKey = keyof typeof doc
     // write the doc name to the key
     var offset = 0
     buff.writeString(index.docName, offset)
@@ -32,7 +31,6 @@ function genStartKey(index: DocIndex) {
     index.keys.forEach((key: DocKey) => {
         switch (key.keyType) {
             case DocKeyType.STRING: {
-                const objectKey = key.name as ObjectKey
                 buff.writeString('' as unknown as string, offset)
                 offset += ''.length
                 break
@@ -50,7 +48,6 @@ function genStartKey(index: DocIndex) {
 
 function genEndKey(index: DocIndex) {
     const buff = new SmartBuffer()
-    type ObjectKey = keyof typeof doc
     // write the doc name to the key
     var offset = 0
     buff.writeString(index.docName, offset)
@@ -58,7 +55,6 @@ function genEndKey(index: DocIndex) {
     index.keys.forEach((key: DocKey) => {
         switch (key.keyType) {
             case DocKeyType.STRING: {
-                const objectKey = key.name as ObjectKey
                 buff.writeString('~' as unknown as string, offset)
                 offset += '~'.length
                 break
@@ -221,7 +217,7 @@ export class DocStore {
     }
 
     async queryAllDocs(
-        ns: String,
+        ns: string,
         index: DocIndex,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
