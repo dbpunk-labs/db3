@@ -1,3 +1,4 @@
+// @ts-nocheck
 import db3_mutation_pb from '../pkg/db3_mutation_pb'
 import db3_base_pb from '../pkg/db3_base_pb'
 import db3_node_pb from '../pkg/db3_node_pb'
