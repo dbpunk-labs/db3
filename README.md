@@ -13,7 +13,7 @@
 
 # What's DB3?
 
-DB3 is a community-driven decentralized layer2 database network.
+DB3 is a community-driven layer2 decentralized database network.
 
 # Features
 
