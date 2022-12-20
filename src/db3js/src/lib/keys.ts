@@ -1,3 +1,5 @@
+
+// @ts-nocheck
 import * as dcrypto from '@deliberative/crypto'
 import sha3 from 'js-sha3'
 

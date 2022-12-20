@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DB3 } from './db3'
 import db3_mutation_pb, { KVPair } from '../pkg/db3_mutation_pb'
 import { SmartBuffer, SmartBufferOptions } from 'smart-buffer'
