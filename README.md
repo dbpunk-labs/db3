@@ -21,7 +21,7 @@ DB3 is a community-driven layer2 decentralized database network.
 
    Scalability is the key to the web3 explosion, db3 will use the following strategies to achieve web3 scale
 
-    * PC can meet minimum system requirements so everyone can join the db3 network to provide storage space.
+    * PC can meet the minimum system requirements so everyone can join the db3 network to provide storage space.
     * Using dynamic sharding to achieve scale out. when a storage shard chain has not enough space to store [mutation](./docs/mutation.md), it will split itself into two subchains.
     * Using cold data archive to recycle storage space. history cold blocks and cold state data will be archived to FileCoin and the storage node will always has storage space to store new data.
 
@@ -69,7 +69,7 @@ k1 -> v1
  0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
 
-### Use Typescript SDK
+### Developers Friendly SDK
 
 ```typescript
 // connect to db3 node
