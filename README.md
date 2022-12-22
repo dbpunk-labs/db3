@@ -11,11 +11,10 @@
 ![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
+
 # What's DB3?
 
 DB3 is a community-driven layer2 decentralized database network.
-
-# Features
 
 1. **Infinite Storage Space**
 
