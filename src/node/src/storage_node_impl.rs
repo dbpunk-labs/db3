@@ -122,7 +122,7 @@ impl StorageNode for StorageNodeImpl {
         )
         .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let header =
-            String::from_utf8(r.header).map_err(|e| Status::internal(format!("{:?}", e)))?;
+            String::from_utf8_lossy(r.header.as_ref()).to_string();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
