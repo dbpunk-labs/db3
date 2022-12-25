@@ -12,7 +12,7 @@
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
 
-# What's DB3?
+# What's DB3 Network?
 
 DB3 is a community-driven layer2 decentralized database network.
 
