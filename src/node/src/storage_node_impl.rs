@@ -27,7 +27,9 @@ use db3_proto::db3_node_proto::{
     GetSessionInfoResponse, OpenSessionRequest, OpenSessionResponse, QueryBillRequest,
     QueryBillResponse,
 };
-use db3_proto::db3_session_proto::{CloseSessionPayload, QuerySession, QuerySessionInfo};
+use db3_proto::db3_session_proto::{
+    CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
+};
 use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
@@ -163,15 +165,18 @@ impl StorageNode for StorageNodeImpl {
     ) -> std::result::Result<Response<OpenSessionResponse>, Status> {
         let r = request.into_inner();
         let account_id = Verifier::verify(
-            r.header.as_ref(),
+            r.payload.as_ref(),
             r.signature.as_ref(),
             r.public_key.as_ref(),
         )
         .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        let payload = OpenSessionPayload::decode(r.payload.as_ref())
+            .map_err(|_| Status::internal("fail to decode open session request ".to_string()))?;
+        let header = payload.header;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
-                match sess_store.add_new_session(account_id.addr) {
+                match sess_store.add_new_session(&header, payload.start_time, account_id.addr) {
                     Ok((session_token, query_session_info)) => {
                         // Takes a reference and returns Option<&V>
                         Ok(Response::new(OpenSessionResponse {

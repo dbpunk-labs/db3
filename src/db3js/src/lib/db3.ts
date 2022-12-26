@@ -196,12 +196,19 @@ export class DB3 {
         if (this.querySessionInfo) {
             return {}
         }
+
+
         const sessionRequest = new db3_node_pb.OpenSessionRequest()
         const header = window.crypto.getRandomValues(new Uint8Array(32))
-        const [signature, public_key] = await sign(header)
-        sessionRequest.setHeader(header)
+        const payload = new db3_session_pb.OpenSessionPayload()
+        payload.setHeader(header.toString())
+        payload.setStartTime(Math.floor(Date.now() / 1000))
+        const payloadU8 = payload.serializeBinary()
+        const [signature, public_key] = await sign(payloadU8)
+        sessionRequest.setPayload(payloadU8)
         sessionRequest.setSignature(signature)
         sessionRequest.setPublicKey(public_key)
+
         try {
             const res = await this.client.openQuerySession(sessionRequest, {})
             this.sessionToken = res.getSessionToken()

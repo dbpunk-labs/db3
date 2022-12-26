@@ -360,10 +360,10 @@ export namespace GetSessionInfoRequest {
 }
 
 export class OpenSessionRequest extends jspb.Message {
-  getHeader(): Uint8Array | string;
-  getHeader_asU8(): Uint8Array;
-  getHeader_asB64(): string;
-  setHeader(value: Uint8Array | string): OpenSessionRequest;
+  getPayload(): Uint8Array | string;
+  getPayload_asU8(): Uint8Array;
+  getPayload_asB64(): string;
+  setPayload(value: Uint8Array | string): OpenSessionRequest;
 
   getSignature(): Uint8Array | string;
   getSignature_asU8(): Uint8Array;
@@ -385,7 +385,7 @@ export class OpenSessionRequest extends jspb.Message {
 
 export namespace OpenSessionRequest {
   export type AsObject = {
-    header: Uint8Array | string,
+    payload: Uint8Array | string,
     signature: Uint8Array | string,
     publicKey: Uint8Array | string,
   }

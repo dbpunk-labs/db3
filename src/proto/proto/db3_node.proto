@@ -96,7 +96,7 @@ message GetSessionInfoRequest {
     SessionIdentifier session_identifier = 1;
 }
 message OpenSessionRequest {
-    bytes header = 1;
+    bytes payload = 1;
     bytes signature = 2;
     bytes public_key = 3;
 }

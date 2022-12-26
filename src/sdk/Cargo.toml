@@ -22,8 +22,15 @@ prost = "0.11"
 prost-types = "0.11"
 ethereum-types = { version = "0.14.0", default-features = false }
 subtle-encoding = { version = "0.5", default-features = false, features = ["bech32-preview"] }
-
+chrono = "0.4.22"
 [dev-dependencies]
 rand = "0.8.5"
 db3-base={path="../base", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
+[dependencies.uuid]
+version = "1.2.2"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
