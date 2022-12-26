@@ -39,7 +39,10 @@ message CloseSessionPayload {
     QuerySessionInfo session_info = 1;
     string session_token = 2;
 }
-
+message OpenSessionPayload {
+    string header = 1;
+    int64 start_time = 2;
+}
 message QuerySession {
     // the counter of account
     uint64 nonce = 1;
@@ -56,3 +59,4 @@ message QuerySession {
     // client public key
     bytes client_public_key = 7;
 }
+

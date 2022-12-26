@@ -16,6 +16,7 @@
 //
 
 use bytes::BytesMut;
+use chrono::Utc;
 use db3_crypto::signer::Db3Signer;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
@@ -25,7 +26,7 @@ use db3_proto::db3_node_proto::{
     OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest, Range as DB3Range,
     RangeKey, RangeValue, SessionIdentifier,
 };
-use db3_proto::db3_session_proto::{CloseSessionPayload, QuerySessionInfo};
+use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::SessionPool;
 use ethereum_types::Address as AccountAddress;
 use prost::Message;
@@ -52,14 +53,21 @@ impl StoreSDK {
     }
 
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
-        let header_string = Uuid::new_v4().to_string();
-        let buf = header_string.as_bytes();
+        let payload = OpenSessionPayload {
+            header: Uuid::new_v4().to_string(),
+            start_time: Utc::now().timestamp(),
+        };
+        let mut buf = BytesMut::with_capacity(1024 * 8);
+        payload
+            .encode(&mut buf)
+            .map_err(|e| Status::internal(format!("{}", e)))?;
+        let buf = buf.freeze();
         let (signature, public_key) = self
             .signer
             .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let r = OpenSessionRequest {
-            header: buf.to_vec(),
+            payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
             public_key: public_key.as_ref().to_vec(),
         };
@@ -72,7 +80,7 @@ impl StoreSDK {
             .insert_session_with_token(&result.query_session_info.unwrap(), &result.session_token)
         {
             Ok(_) => Ok(response.clone()),
-            Err(e) => Err(Status::internal(format!("Fail to create session {}", e))),
+            Err(e) => Err(Status::internal(format!("Fail to open session {}", e))),
         }
     }
     /// close session
@@ -263,15 +271,21 @@ impl StoreSDK {
 mod tests {
     use super::Db3Signer;
     use super::StoreSDK;
+    use super::*;
     use crate::mutation_sdk::MutationSDK;
+    use bytes::BytesMut;
+    use chrono::Utc;
     use db3_base::{get_a_random_nonce, get_a_static_keypair, get_address_from_pk};
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
+    use db3_proto::db3_node_proto::OpenSessionRequest;
+    use db3_proto::db3_session_proto::OpenSessionPayload;
     use std::sync::Arc;
     use std::time;
     use tonic::transport::Endpoint;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn it_get_bills() {
@@ -523,5 +537,74 @@ mod tests {
             res.err().unwrap().message(),
             "query session verify fail. expect query count 1 but 101"
         );
+    }
+
+    #[tokio::test]
+    async fn open_session_replay_attach() {
+        let mut rng = rand::thread_rng();
+        let nonce = get_a_random_nonce();
+
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let mut client = StorageNodeClient::new(channel);
+        let kp = get_a_static_keypair();
+        let signer = Db3Signer::new(kp);
+        let payload = OpenSessionPayload {
+            header: Uuid::new_v4().to_string(),
+            start_time: Utc::now().timestamp(),
+        };
+        let mut buf = BytesMut::with_capacity(1024 * 8);
+        payload.encode(&mut buf);
+        let buf = buf.freeze();
+        let (signature, public_key) = signer
+            .sign(buf.as_ref())
+            .map_err(|e| Status::internal(format!("{:?}", e)))
+            .unwrap();
+        let r = OpenSessionRequest {
+            payload: buf.as_ref().to_vec(),
+            signature: signature.as_ref().to_vec(),
+            public_key: public_key.as_ref().to_vec(),
+        };
+        let request = tonic::Request::new(r.clone());
+        let response = client.open_query_session(request).await;
+        assert!(response.is_ok());
+
+        // duplicate header
+        std::thread::sleep(time::Duration::from_millis(1000));
+        let request = tonic::Request::new(r.clone());
+        let response = client.open_query_session(request).await;
+        assert!(response.is_err());
+    }
+    #[tokio::test]
+    async fn open_session_ttl_expiered() {
+        let mut rng = rand::thread_rng();
+        let nonce = get_a_random_nonce();
+
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let mut client = StorageNodeClient::new(channel);
+        let kp = get_a_static_keypair();
+        let signer = Db3Signer::new(kp);
+        let payload = OpenSessionPayload {
+            header: Uuid::new_v4().to_string(),
+            start_time: Utc::now().timestamp() - 6,
+        };
+        let mut buf = BytesMut::with_capacity(1024 * 8);
+        payload.encode(&mut buf);
+        let buf = buf.freeze();
+        let (signature, public_key) = signer
+            .sign(buf.as_ref())
+            .map_err(|e| Status::internal(format!("{:?}", e)))
+            .unwrap();
+        let r = OpenSessionRequest {
+            payload: buf.as_ref().to_vec(),
+            signature: signature.as_ref().to_vec(),
+            public_key: public_key.as_ref().to_vec(),
+        };
+        let request = tonic::Request::new(r.clone());
+        let response = client.open_query_session(request).await;
+        assert!(response.is_err());
     }
 }
