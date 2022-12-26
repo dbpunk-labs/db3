@@ -3743,87 +3743,93 @@ proto.db3_node_proto.OpenSessionRequest.prototype.serializeBinary = function() {
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.db3_node_proto.OpenSessionRequest.serializeBinaryToWriter = function(
-	message,
-	writer,
-) {
-	var f = undefined;
-	f = message.getHeader_asU8();
-	if (f.length > 0) {
-		writer.writeBytes(1, f);
-	}
-	f = message.getSignature_asU8();
-	if (f.length > 0) {
-		writer.writeBytes(2, f);
-	}
-	f = message.getPublicKey_asU8();
-	if (f.length > 0) {
-		writer.writeBytes(3, f);
-	}
+proto.db3_node_proto.OpenSessionRequest.serializeBinaryToWriter = function (message, writer) {
+    var f = undefined;
+    f = message.getPayload_asU8();
+    if (f.length > 0) {
+        writer.writeBytes(
+            1,
+            f
+        );
+    }
+    f = message.getSignature_asU8();
+    if (f.length > 0) {
+        writer.writeBytes(
+            2,
+            f
+        );
+    }
+    f = message.getPublicKey_asU8();
+    if (f.length > 0) {
+        writer.writeBytes(
+            3,
+            f
+        );
+    }
 };
 
+
 /**
- * optional bytes header = 1;
+ * optional bytes payload = 1;
  * @return {string}
  */
-proto.db3_node_proto.OpenSessionRequest.prototype.getHeader = function() {
-	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
-		this,
-		1,
-		"",
-	));
+proto.db3_node_proto.OpenSessionRequest.prototype.getPayload = function () {
+    return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 1, ""));
 };
 
+
 /**
- * optional bytes header = 1;
- * This is a type-conversion wrapper around `getHeader()`
+ * optional bytes payload = 1;
+ * This is a type-conversion wrapper around `getPayload()`
  * @return {string}
  */
-proto.db3_node_proto.OpenSessionRequest.prototype.getHeader_asB64 = function() {
-	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getHeader()));
+proto.db3_node_proto.OpenSessionRequest.prototype.getPayload_asB64 = function () {
+    return /** @type {string} */ (jspb.Message.bytesAsB64(
+        this.getPayload()));
 };
 
+
 /**
- * optional bytes header = 1;
+ * optional bytes payload = 1;
  * Note that Uint8Array is not supported on all browsers.
  * @see http://caniuse.com/Uint8Array
- * This is a type-conversion wrapper around `getHeader()`
+ * This is a type-conversion wrapper around `getPayload()`
  * @return {!Uint8Array}
  */
-proto.db3_node_proto.OpenSessionRequest.prototype.getHeader_asU8 = function() {
-	return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
-		this.getHeader(),
-	));
+proto.db3_node_proto.OpenSessionRequest.prototype.getPayload_asU8 = function () {
+    return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
+        this.getPayload()));
 };
+
 
 /**
  * @param {!(string|Uint8Array)} value
  * @return {!proto.db3_node_proto.OpenSessionRequest} returns this
  */
-proto.db3_node_proto.OpenSessionRequest.prototype.setHeader = function(value) {
-	return jspb.Message.setProto3BytesField(this, 1, value);
+proto.db3_node_proto.OpenSessionRequest.prototype.setPayload = function (value) {
+    return jspb.Message.setProto3BytesField(this, 1, value);
 };
+
 
 /**
  * optional bytes signature = 2;
  * @return {string}
  */
-proto.db3_node_proto.OpenSessionRequest.prototype.getSignature = function() {
-	return /** @type {string} */ (jspb.Message.getFieldWithDefault(
-		this,
-		2,
-		"",
-	));
+proto.db3_node_proto.OpenSessionRequest.prototype.getSignature = function () {
+    return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 2, ""));
 };
+
 
 /**
  * optional bytes signature = 2;
  * This is a type-conversion wrapper around `getSignature()`
  * @return {string}
  */
-proto.db3_node_proto.OpenSessionRequest.prototype.getSignature_asB64 = function() {
-	return /** @type {string} */ (jspb.Message.bytesAsB64(this.getSignature()));
+proto.db3_node_proto.OpenSessionRequest.prototype.getSignature_asB64 = function () {
+    return /** @type {string} */ (jspb.Message.bytesAsB64(
+        this.getSignature()));
 };
+
 
 /**
  * optional bytes signature = 2;

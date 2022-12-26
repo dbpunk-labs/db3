@@ -57,6 +57,28 @@ export namespace CloseSessionPayload {
   }
 }
 
+export class OpenSessionPayload extends jspb.Message {
+  getHeader(): string;
+  setHeader(value: string): OpenSessionPayload;
+
+  getStartTime(): number;
+  setStartTime(value: number): OpenSessionPayload;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): OpenSessionPayload.AsObject;
+  static toObject(includeInstance: boolean, msg: OpenSessionPayload): OpenSessionPayload.AsObject;
+  static serializeBinaryToWriter(message: OpenSessionPayload, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): OpenSessionPayload;
+  static deserializeBinaryFromReader(message: OpenSessionPayload, reader: jspb.BinaryReader): OpenSessionPayload;
+}
+
+export namespace OpenSessionPayload {
+  export type AsObject = {
+    header: string,
+    startTime: number,
+  }
+}
+
 export class QuerySession extends jspb.Message {
   getNonce(): number;
   setNonce(value: number): QuerySession;
