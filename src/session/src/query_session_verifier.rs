@@ -4,9 +4,7 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_session_proto::{CloseSessionPayload, QuerySession, QuerySessionInfo};
 use prost::Message;
 
-pub fn verify_query_session(
-    query_session: &QuerySession,
-) -> db3_error::Result<(AccountId, QuerySessionInfo)> {
+pub fn verify_query_session(query_session: &QuerySession) -> Result<(AccountId, QuerySessionInfo)> {
     match query_session.node_query_session_info.as_ref() {
         Some(node_query_session_info) => match verifier::Verifier::verify(
             query_session.client_query_session.as_ref(),
