@@ -20,6 +20,7 @@ use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::verifier;
 use db3_proto::db3_mutation_proto::{Mutation, PayloadType, WriteRequest};
+use db3_proto::db3_namespace_proto::Namespace;
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_storage::kv_store::KvStore;
@@ -51,6 +52,7 @@ pub struct AbciImpl {
     pending_query_session:
         Arc<Mutex<Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)>>>,
     node_state: Arc<NodeState>,
+    pending_namespace: Arc<Mutex<Vec<(AccountAddress, Namespace)>>>,
 }
 
 impl AbciImpl {
@@ -64,6 +66,7 @@ impl AbciImpl {
                 total_mutations: Arc::new(AtomicU64::new(0)),
                 total_query_sessions: Arc::new(AtomicU64::new(0)),
             }),
+            pending_namespace: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -133,6 +136,26 @@ impl Application for AbciImpl {
                 Ok(_) => {
                     let payload_type = PayloadType::from_i32(request.payload_type);
                     match payload_type {
+                        Some(PayloadType::NamespacePayload) => {
+                            match Namespace::decode(request.payload.as_ref()) {
+                                Ok(_) => {
+                                    return ResponseCheckTx {
+                                        code: 0,
+                                        data: Bytes::new(),
+                                        log: "".to_string(),
+                                        info: "".to_string(),
+                                        gas_wanted: 1,
+                                        gas_used: 0,
+                                        events: vec![],
+                                        codespace: "".to_string(),
+                                        ..Default::default()
+                                    };
+                                }
+                                Err(_) => {
+                                    warn!("invalid namespace byte data");
+                                }
+                            }
+                        }
                         Some(PayloadType::MutationPayload) => {
                             match Mutation::decode(request.payload.as_ref()) {
                                 Ok(mutation) => {
@@ -189,7 +212,7 @@ impl Application for AbciImpl {
                                 }
                             }
                         }
-                        None => {
+                        _ => {
                             warn!("invalid transaction with null payload type");
                         }
                     }
@@ -229,6 +252,31 @@ impl Application for AbciImpl {
             ) {
                 let payload_type = PayloadType::from_i32(wrequest.payload_type);
                 match payload_type {
+                    Some(PayloadType::NamespacePayload) => {
+                        if let Ok(ns) = Namespace::decode(wrequest.payload.as_ref()) {
+                            match self.pending_namespace.lock() {
+                                Ok(mut s) => {
+                                    s.push((account_id.addr, ns));
+                                    return ResponseDeliverTx {
+                                        code: 0,
+                                        data: Bytes::new(),
+                                        log: "".to_string(),
+                                        info: "apply_namespace".to_string(),
+                                        gas_wanted: 0,
+                                        gas_used: 0,
+                                        events: vec![Event {
+                                            r#type: "apply".to_string(),
+                                            attributes: vec![],
+                                        }],
+                                        codespace: "".to_string(),
+                                    };
+                                }
+                                _ => {
+                                    todo!();
+                                }
+                            }
+                        }
+                    }
                     Some(PayloadType::MutationPayload) => {
                         if let Ok(mutation) = Mutation::decode(wrequest.payload.as_ref()) {
                             match self.pending_mutation.lock() {
@@ -289,7 +337,7 @@ impl Application for AbciImpl {
                             }
                         }
                     }
-                    None => {
+                    _ => {
                         warn!("invalid transaction with null payload type");
                     }
                 }
@@ -332,6 +380,17 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
+        let pending_namespace: Vec<(AccountAddress, Namespace)> =
+            match self.pending_namespace.lock() {
+                Ok(mut q) => {
+                    let clone_q = q.drain(..).collect();
+                    clone_q
+                }
+                Err(_) => {
+                    todo!();
+                }
+            };
+
         match self.node_store.lock() {
             Ok(mut store) => {
                 let s = store.get_auth_store();
@@ -368,8 +427,21 @@ impl Application for AbciImpl {
                         }
                     }
                 }
+                let pending_namespace_len = pending_namespace.len();
+                for item in pending_namespace {
+                    match s.apply_namespace(&item.0, &item.1) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            todo!()
+                        }
+                    }
+                }
 
-                if pending_mutation_len > 0 || pending_query_session_len > 0 {
+                if pending_mutation_len > 0
+                    || pending_query_session_len > 0
+                    || pending_namespace_len > 0
+                {
+                    //TODO how to revert
                     if let Ok(hash) = s.commit() {
                         span.exit();
                         ResponseCommit {

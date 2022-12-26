@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals'
 import { DB3 } from './db3'
-import { DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
+import { DocMetaManager, DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
 import { sign, getATestStaticKeypair, getAddress } from './keys'
 import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
@@ -15,6 +15,46 @@ describe('test db3js api', () => {
         return _sign
     }
 
+    test("doc meta smoke test", async () => {
+        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const _sign = await getSign()
+        const doc_meta_mgr = new DocMetaManager(db3_instance)
+        const my_transaction_meta = {
+            keys: [
+                {
+                    name: 'address',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+           ns: 'my_trx',
+            docName: 'transaction',
+        }
+        const result = await doc_meta_mgr.create_doc_meta(my_transaction_meta, "test_transaction", _sign)
+        await new Promise(r => setTimeout(r, 2000))
+        const docs = await doc_meta_mgr.get_all_doc_metas("my_trx", _sign)
+        expect(docs.length).toBe(1)
+        expect(docs[0].doc_name).toBe("transaction")
+        expect(docs[0].desc).toBe("test_transaction")
+        expect(docs[0].index.ns).toBe("my_trx")
+    })
+
+    test('namespace smoke test', async () => {
+        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const _sign = await getSign()
+        const result = await db3_instance.createSimpleNs(
+            {name:"test_ns", desc:"desc_ns", 
+                erc20Token:"usdt", price:1, queryCount:100},
+            _sign
+        )
+        await new Promise(r => setTimeout(r, 2000))
+        const nsList = await db3_instance.getNsList(_sign)
+        expect(nsList.nsListList[0].name).toBe("test_ns")
+    })
+
     test('test submitMutation', async () => {
         const db3_instance = new DB3('http://127.0.0.1:26659')
         const _sign = await getSign()
@@ -28,6 +68,7 @@ describe('test db3js api', () => {
         )
         expect(result).toBeDefined()
     })
+
     test('test openQuerySession', async () => {
         const db3_instance = new DB3('http://127.0.0.1:26659')
         const _sign = await getSign()
@@ -143,9 +184,14 @@ describe('test db3js api', () => {
             ts: 9527,
             amount: 10,
         }
-        const result = await doc_store.insertDocs(doc_index, [transacion], _sign, 1)
+        const result = await doc_store.insertDocs(
+            doc_index,
+            [transacion],
+            _sign,
+            1
+        )
         expect(result.hash).toBe('ZBv3EfQajYQ9ibANS/SMl9X2FYwvqG11+8B4eTH5mUA=')
-        await new Promise(r => setTimeout(r, 2000))
+        await new Promise((r) => setTimeout(r, 2000))
         const query = {
             address: '0x11111',
             ts: 9527,
@@ -192,22 +238,21 @@ describe('test db3js api', () => {
             },
         ]
         await doc_store.insertDocs(doc_index, transacions, _sign, 1)
-        await new Promise(r => setTimeout(r, 2000))
-        const res = await doc_store.queryDocsByRange(
+        await new Promise((r) => setTimeout(r, 2000))
+        const res1 = await doc_store.queryDocsByRange(
             'ns1',
             doc_index,
-                {
-                    address: '0x11111',
-                    ts: 9529,
-                },
-                {
-                    address: '0x11114',
-                    ts: 9534,
-                }
-            ,
+            {
+                address: '0x11111',
+                ts: 9529,
+            },
+            {
+                address: '0x11114',
+                ts: 9534,
+            },
             _sign
         )
-        expect(res[2].address).toBe('0x11113')
+        expect(res1[2].address).toBe('0x11113')
     })
 
     test('delete data by key', async () => {

@@ -1,26 +1,26 @@
 ![db3_logo](./docs/images/db3_logo.png)
 
-![CI](https://img.shields.io/github/workflow/status/dbpunk-labs/db3/ci?style=flat-square)
+![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/dbpunk-labs/db3/ci.yml?branch=main&style=flat-square)
 ![coverage](https://img.shields.io/codecov/c/github/dbpunk-labs/db3?style=flat-square)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3?style=flat-square)
 ![contribution](https://img.shields.io/github/contributors/dbpunk-labs/db3?style=flat-square)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3?style=flat-square)
+![GitHub issues by-label](https://img.shields.io/github/issues/dbpunk-labs/db3/good%20first%20issue?style=flat-square)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3?style=flat-square)
 ![npm](https://img.shields.io/npm/v/db3js?style=flat-square)
 ![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
-# What's DB3?
 
-DB3 is a community-driven decentralized layer2 database network.
+# What's DB3 Network?
 
-# Features
+DB3 is a community-driven layer2 decentralized database network.
 
 1. **Infinite Storage Space**
 
    Scalability is the key to the web3 explosion, db3 will use the following strategies to achieve web3 scale
 
-    * PC can meet minimum system requirements so everyone can join the db3 network to provide storage space.
+    * PC can meet the minimum system requirements so everyone can join the db3 network to provide storage space.
     * Using dynamic sharding to achieve scale out. when a storage shard chain has not enough space to store [mutation](./docs/mutation.md), it will split itself into two subchains.
     * Using cold data archive to recycle storage space. history cold blocks and cold state data will be archived to FileCoin and the storage node will always has storage space to store new data.
 
@@ -68,7 +68,7 @@ k1 -> v1
  0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
 
-### Use Typescript SDK
+### Developers Friendly SDK
 
 ```typescript
 // connect to db3 node

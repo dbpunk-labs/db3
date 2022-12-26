@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DB3 } from './db3'
 import db3_mutation_pb, { KVPair } from '../pkg/db3_mutation_pb'
 import { SmartBuffer, SmartBufferOptions } from 'smart-buffer'
@@ -20,9 +21,9 @@ export interface DocIndex {
     ns: string
     docName: string
 }
-function genStartKey(index:DocIndex) {
+
+function genStartKey(index: DocIndex) {
     const buff = new SmartBuffer()
-    type ObjectKey = keyof typeof doc
     // write the doc name to the key
     var offset = 0
     buff.writeString(index.docName, offset)
@@ -30,13 +31,12 @@ function genStartKey(index:DocIndex) {
     index.keys.forEach((key: DocKey) => {
         switch (key.keyType) {
             case DocKeyType.STRING: {
-                const objectKey = key.name as ObjectKey
-                buff.writeString(("" as unknown) as string, offset)
-                offset += "".length
+                buff.writeString('' as unknown as string, offset)
+                offset += ''.length
                 break
             }
             case DocKeyType.NUMBER: {
-                buff.writeBigInt64BE(BigInt((0 as unknown) as number), offset)
+                buff.writeBigInt64BE(BigInt(0 as unknown as number), offset)
                 offset += 8
                 break
             }
@@ -46,9 +46,8 @@ function genStartKey(index:DocIndex) {
     return new Uint8Array(buffer, 0, offset)
 }
 
-function genEndKey(index:DocIndex) {
+function genEndKey(index: DocIndex) {
     const buff = new SmartBuffer()
-    type ObjectKey = keyof typeof doc
     // write the doc name to the key
     var offset = 0
     buff.writeString(index.docName, offset)
@@ -56,9 +55,8 @@ function genEndKey(index:DocIndex) {
     index.keys.forEach((key: DocKey) => {
         switch (key.keyType) {
             case DocKeyType.STRING: {
-                const objectKey = key.name as ObjectKey
-                buff.writeString(("~" as unknown) as string, offset)
-                offset += "~".length
+                buff.writeString('~' as unknown as string, offset)
+                offset += '~'.length
                 break
             }
             case DocKeyType.NUMBER: {
@@ -85,14 +83,14 @@ export function genPrimaryKey(index: DocIndex, doc: Object) {
             case DocKeyType.STRING: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeString((value as unknown) as string, offset)
-                offset += ((value as unknown) as string).length
+                buff.writeString(value as unknown as string, offset)
+                offset += (value as unknown as string).length
                 break
             }
             case DocKeyType.NUMBER: {
                 const objectKey = key.name as ObjectKey
                 let value = doc[objectKey]
-                buff.writeBigInt64BE(BigInt((value as unknown) as number), offset)
+                buff.writeBigInt64BE(BigInt(value as unknown as number), offset)
                 offset += 8
                 break
             }
@@ -108,6 +106,60 @@ export function object2Buffer(doc: Object) {
     buff.writeString(json_str)
     const buffer = buff.toBuffer().buffer
     return new Uint8Array(buffer, 0, json_str.length)
+}
+
+export class DocMetaManager {
+    private doc_store: DocStore
+    constructor(db3: DB3) {
+        this.doc_store = new DocStore(db3)
+    }
+
+    async get_all_doc_metas(ns:string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
+                          ) {
+        const static_doc_index = {
+            keys: [
+                {
+                    name: 'doc_name',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+            ns: ns,
+            docName: '_meta_',
+        }
+        return await this.doc_store.queryAllDocs(ns, static_doc_index, sign)
+    }
+
+    async create_doc_meta(doc_index: DocIndex, desc: string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
+                      ) {
+        const static_doc_index = {
+            keys: [
+                {
+                    name: 'doc_name',
+                    keyType: DocKeyType.STRING,
+                },
+                {
+                    name: 'ts',
+                    keyType: DocKeyType.NUMBER,
+                },
+            ],
+            ns: doc_index.ns,
+            docName: '_meta_',
+        }
+        const doc_meta = {
+            'doc_name': doc_index.docName,
+            'ts': Date.now(),
+            'index': doc_index,
+            'desc': desc
+        }
+        //TODO check if the doc meta exists
+        return await this.doc_store.insertDocs(static_doc_index, [doc_meta], sign)
+    }
 }
 
 export class DocStore {
@@ -154,26 +206,39 @@ export class DocStore {
             .getBatchGetValues()
             ?.getValuesList()
             .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                docs.push(
+                    JSON.parse(
+                        new TextDecoder('utf-8').decode(kvPair.getValue_asU8())
+                    )
+                )
             })
 
         return docs
     }
 
-    async queryAllDocs(ns:String, index:DocIndex, 
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>) {
+    async queryAllDocs(
+        ns: string,
+        index: DocIndex,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
         try {
             await this.db3.keepSession(sign)
             const docs: Record<string, any>[] = []
             const res = await this.db3.getRange(
                 ns,
                 genStartKey(index),
-                genEndKey(index),
+                genEndKey(index)
             )
             res.getRangeValue()
                 ?.getValuesList()
                 .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                    docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                    docs.push(
+                        JSON.parse(
+                            new TextDecoder('utf-8').decode(
+                                kvPair.getValue_asU8()
+                            )
+                        )
+                    )
                 })
             return docs
         } catch (error) {
@@ -185,7 +250,7 @@ export class DocStore {
         ns: string,
         index: DocIndex,
         startKey: Record<string, any>,
-        endKey:Record<string, any>,
+        endKey: Record<string, any>,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         try {
@@ -199,7 +264,13 @@ export class DocStore {
             res.getRangeValue()
                 ?.getValuesList()
                 .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                    docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.getValue_asU8())))
+                    docs.push(
+                        JSON.parse(
+                            new TextDecoder('utf-8').decode(
+                                kvPair.getValue_asU8()
+                            )
+                        )
+                    )
                 })
             return docs
         } catch (error) {

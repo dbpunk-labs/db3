@@ -1,6 +1,6 @@
 //
 //
-// build.rs
+// db3_namespace.proto
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,21 +16,19 @@
 // limitations under the License.
 //
 
-fn main() {
-    tonic_build::configure()
-        .build_server(true)
-        .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
-        .compile(
-            &[
-                "proto/db3_base.proto",
-                "proto/db3_session.proto",
-                "proto/db3_mutation.proto",
-                "proto/db3_bill.proto",
-                "proto/db3_account.proto",
-                "proto/db3_node.proto",
-                "proto/db3_namespace.proto",
-            ],
-            &["proto"],
-        )
-        .unwrap();
+syntax = "proto3";
+import "db3_base.proto";
+package db3_namespace_proto;
+
+message QueryPrice {
+    db3_base_proto.Price price = 1;
+    uint64 query_count = 2;
+}
+
+message Namespace {
+    string name = 1;
+    QueryPrice price = 2;
+    uint64 ts = 3;
+    string description = 4;
+    db3_base_proto.BroadcastMeta meta = 5;
 }

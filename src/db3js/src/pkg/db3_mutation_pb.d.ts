@@ -87,15 +87,18 @@ export class WriteRequest extends jspb.Message {
   getSignature_asB64(): string;
   setSignature(value: Uint8Array | string): WriteRequest;
 
-  getMutation(): Uint8Array | string;
-  getMutation_asU8(): Uint8Array;
-  getMutation_asB64(): string;
-  setMutation(value: Uint8Array | string): WriteRequest;
+  getPayload(): Uint8Array | string;
+  getPayload_asU8(): Uint8Array;
+  getPayload_asB64(): string;
+  setPayload(value: Uint8Array | string): WriteRequest;
 
   getPublicKey(): Uint8Array | string;
   getPublicKey_asU8(): Uint8Array;
   getPublicKey_asB64(): string;
   setPublicKey(value: Uint8Array | string): WriteRequest;
+
+  getPayloadType(): PayloadType;
+  setPayloadType(value: PayloadType): WriteRequest;
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): WriteRequest.AsObject;
@@ -108,8 +111,9 @@ export class WriteRequest extends jspb.Message {
 export namespace WriteRequest {
   export type AsObject = {
     signature: Uint8Array | string,
-    mutation: Uint8Array | string,
+    payload: Uint8Array | string,
     publicKey: Uint8Array | string,
+    payloadType: PayloadType,
   }
 }
 
@@ -117,4 +121,9 @@ export enum MutationAction {
   INSERTKV = 0,
   DELETEKV = 1,
   NONCE = 2,
+}
+export enum PayloadType { 
+  MUTATIONPAYLOAD = 0,
+  QUERYSESSIONPAYLOAD = 1,
+  NAMESPACEPAYLOAD = 2,
 }

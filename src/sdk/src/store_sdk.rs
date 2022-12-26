@@ -337,7 +337,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_range() {
-        let mut rng = rand::thread_rng();
         let nonce = get_a_random_nonce();
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
@@ -399,7 +398,6 @@ mod tests {
 
     #[tokio::test]
     async fn close_session_happy_path() {
-        let mut rng = rand::thread_rng();
         let nonce = get_a_random_nonce();
 
         let ep = "http://127.0.0.1:26659";
@@ -475,9 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn close_session_wrong_path() {
-        let mut rng = rand::thread_rng();
         let nonce = get_a_random_nonce();
-
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
