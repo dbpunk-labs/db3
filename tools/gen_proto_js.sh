@@ -3,35 +3,12 @@
 #
 # gen_proto.sh
 
-protoc -I=src/proto/proto db3_base.proto \
---js_out=import_style=commonjs:src/db3js/src/pkg \
---grpc-web_out=import_style=typescript,mode=grpcwebtext:src/db3js/src/pkg
-
-protoc -I=src/proto/proto db3_mutation.proto \
---js_out=import_style=commonjs:src/db3js/src/pkg \
---grpc-web_out=import_style=typescript,mode=grpcwebtext:src/db3js/src/pkg
-
-protoc -I=src/proto/proto db3_bill.proto \
---js_out=import_style=commonjs:src/db3js/src/pkg \
---grpc-web_out=import_style=typescript,mode=grpcwebtext:src/db3js/src/pkg
-
-protoc -I=src/proto/proto db3_account.proto \
---js_out=import_style=commonjs:src/db3js/src/pkg \
---grpc-web_out=import_style=typescript,mode=grpcwebtext:src/db3js/src/pkg
-
-
-protoc -I=src/proto/proto db3_node.proto \
---js_out=import_style=commonjs:src/db3js/src/pkg \
---grpc-web_out=import_style=typescript,mode=grpcwebtext:src/db3js/src/pkg
-
-protoc -I=src/proto/proto db3_namespace.proto \
---js_out=import_style=commonjs:src/db3js/src/pkg \
---grpc-web_out=import_style=typescript,mode=grpcwebtext:src/db3js/src/pkg
-
-protoc -I=src/proto/proto db3_session.proto \
---js_out=import_style=commonjs:src/db3js/src/pkg \
---grpc-web_out=import_style=typescript,mode=grpcwebtext:src/db3js/src/pkg
-
-
-
+sudo npm install -g protoc-gen-ts
+protoc --ts_out ./src/db3js/src/pkg --proto_path src/proto/proto src/proto/proto/db3_base.proto
+protoc --ts_out ./src/db3js/src/pkg --proto_path src/proto/proto src/proto/proto/db3_mutation.proto
+protoc --ts_out ./src/db3js/src/pkg --proto_path src/proto/proto src/proto/proto/db3_bill.proto
+protoc --ts_out ./src/db3js/src/pkg --proto_path src/proto/proto src/proto/proto/db3_account.proto
+protoc --ts_out ./src/db3js/src/pkg --proto_path src/proto/proto src/proto/proto/db3_namespace.proto
+protoc --ts_out ./src/db3js/src/pkg --proto_path src/proto/proto src/proto/proto/db3_session.proto
+protoc --ts_out ./src/db3js/src/pkg --proto_path src/proto/proto src/proto/proto/db3_node.proto
 
