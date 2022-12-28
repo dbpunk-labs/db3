@@ -45,17 +45,22 @@ function encodeUint8Array(text: string) {
     return jspb.Message.bytesAsU8(text)
 }
 
-export class DB3 {
+function uint8ToBase64(arr:Uint8Array) {
+    return btoa(
+                Array(arr.length)
+                    .fill('')
+                    .map((_, i) => String.fromCharCode(arr[i]))
+                    .join('')
+           )
+}
 
+export class DB3 {
     private client: StorageNodeClient
     public sessionToken?: string
     private querySessionInfo?: QuerySessionInfo
     constructor(node: string, options?: DB3_Options) {
 	    const goptions:GrpcWebOptions =  {
 		baseUrl: node,
-		deadline: Date.now() + 2000,
-		format: 'binary',
-
 		// simple example for how to add auth headers to each request
 		// see `RpcInterceptor` for documentation
 		interceptors: [
@@ -115,9 +120,9 @@ export class DB3 {
         const broadcastRequest:BroadcastRequest = {
             body: WriteRequest.toBinary(writeRequest)
         }
-        const call = this.client.broadcast(broadcastRequest)
-        const response = await call.response
-        return response
+        const call = await this.client.broadcast(broadcastRequest)
+        const response = call.response
+        return uint8ToBase64(response.hash)
     }
 
     async getNsList(
@@ -128,8 +133,9 @@ export class DB3 {
             sessionToken: token!
         }
         const res = await this.client.getNamespace(getNsListRequest, {})
-        const count = this.querySessionInfo!.getQueryCount() + 1
-        return res.toObject()
+        const count = this.querySessionInfo!.queryCount + 1
+        this.querySessionInfo!.queryCount = count
+        return res.response
     }
 
     async submitRawMutation(
@@ -144,7 +150,7 @@ export class DB3 {
             nonce: Date.now(),
             chainId: ChainId.MainNet,
             chainRole: ChainRole.StorageShardChain,
-            gasPrice:null,
+            gas_price: null,
             gas:"100"
         }
         const mbuffer = Mutation.toBinary(mutation)
@@ -158,10 +164,9 @@ export class DB3 {
         const broadcastRequest :BroadcastRequest = {
             body: WriteRequest.toBinary(writeRequest)
         }
-        const call = this.client.broadcast(broadcastRequest)
-        const response = await call.response
-        console.log("response", response)
-        return response
+        const call = await this.client.broadcast(broadcastRequest)
+        const response = call.response
+        return uint8ToBase64(response.hash)
     }
 
     async submitMutaition(
@@ -170,36 +175,14 @@ export class DB3 {
     ) {
         const kvPairsList: KVPair[] = []
         Object.keys(mutation.data).forEach((key: string) => {
-            const kv_pair = new KVPair()
-            kv_pair.setKey(encodeUint8Array(key))
-            kv_pair.setValue(encodeUint8Array(mutation.data[key]))
-            kv_pair.setAction(MutationAction.INSERTKV)
-            kvPairsList.push(kv_pair)
+            const kvPair:KVPair = {
+                key:encodeUint8Array(key),
+                value: encodeUint8Array(mutation.data[key]),
+                action: MutationAction.InsertKv
+            }
+            kvPairsList.push(kvPair)
         })
-        const mutationObj = new Mutation()
-        mutationObj.setNs(encodeUint8Array(mutation.ns))
-        mutationObj.setKvPairsList(kvPairsList)
-        mutationObj.setNonce(Date.now())
-        mutationObj.setChainId(ChainId.MAINNET)
-        mutationObj.setChainRole(ChainRole.STORAGESHARDCHAIN)
-        mutationObj.setGasPrice()
-        mutationObj.setGas(mutation.gasLimit)
-
-        const mbuffer = mutationObj.serializeBinary()
-        const [signature, public_key] = await sign(mbuffer)
-        const writeRequest = new WriteRequest()
-        writeRequest.setPayload(mbuffer)
-        writeRequest.setSignature(signature)
-        writeRequest.setPublicKey(public_key)
-        writeRequest.setPayloadType(PayloadType.MUTATIONPAYLOAD)
-        const broadcastRequest = new BroadcastRequest()
-        broadcastRequest.setBody(writeRequest.serializeBinary())
-        try {
-            const res = await this.client.broadcast(broadcastRequest, {})
-            return res.toObject()
-        } catch (error) {
-            throw error
-        }
+        await this.submitRawMutation(mutation.ns, kvPairsList, sign)
     }
 
     async keepSession(
@@ -209,7 +192,7 @@ export class DB3 {
             // try to open session
             await this.openQuerySession(sign)
         }
-        if (this.querySessionInfo!.getQueryCount() > 1000) {
+        if (this.querySessionInfo!.queryCount > 1000) {
             await this.closeQuerySession(sign)
             await this.openQuerySession(sign)
         }
@@ -222,59 +205,59 @@ export class DB3 {
         if (this.querySessionInfo) {
             return {}
         }
-
-
-        const sessionRequest = new OpenSessionRequest()
         const header = window.crypto.getRandomValues(new Uint8Array(32))
-        const payload = new OpenSessionPayload()
-        payload.setHeader(header.toString())
-        payload.setStartTime(Math.floor(Date.now() / 1000))
-        const payloadU8 = payload.serializeBinary()
-        const [signature, public_key] = await sign(payloadU8)
-        sessionRequest.setPayload(payloadU8)
-        sessionRequest.setSignature(signature)
-        sessionRequest.setPublicKey(public_key)
-
-        try {
-            const res = await this.client.openQuerySession(sessionRequest, {})
-            this.sessionToken = res.getSessionToken()
-            this.querySessionInfo = res.getQuerySessionInfo()
-            return res.toObject()
-        } catch (error) {
-            throw error
+        const payload:OpenSessionPayload = {
+            header: header.toString(),
+            startTime: Math.floor(Date.now() / 1000)
         }
+        const payloadU8 = OpenSessionPayload.toBinary(payload)
+        const [signature, public_key] = await sign(payloadU8)
+        const sessionRequest:OpenSessionRequest = {
+            payload:payloadU8,
+            signature: signature,
+            publicKey: public_key
+        }
+        const res = await this.client.openQuerySession(sessionRequest)
+        const response = res.response
+        this.sessionToken = response.sessionToken
+        this.querySessionInfo = response.querySessionInfo
+        return response
     }
 
     async getAccount(address: string) {
-        const getAccountRequest = new GetAccountRequest()
-        getAccountRequest.setAddr(address)
-        try {
-            const response = await this.client.getAccount(getAccountRequest, {})
-            return response.toObject()
-        } catch (error) {
-            throw error
+        const getAccountRequest:GetAccountRequest = {
+            addr:address
         }
+        const response = await this.client.getAccount(getAccountRequest)
+        return response.response
     }
 
     async getKey(batchGetRequest: BatchGetKeyRequest) {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        const getKeyRequest = new GetKeyRequest()
-        const batchGetKey = new BatchGetKey()
-        batchGetKey.setNs(batchGetRequest.ns)
-        batchGetKey.setKeysList(batchGetRequest.keyList)
-        //todo handle null session token
-        batchGetKey.setSessionToken(this.sessionToken)
-        getKeyRequest.setBatchGet(batchGetKey)
-        try {
-            const res = await this.client.getKey(getKeyRequest, {})
-            const count = this.querySessionInfo!.getQueryCount() + 1
-            this.querySessionInfo?.setQueryCount(count)
-            return res
-        } catch (error) {
-            throw error
+        const keys:Uint8Array[] = []
+        batchGetRequest.keyList.forEach((key:string | Uint8Array)=> {
+            if (typeof key === 'string') {
+                keys.push(encodeUint8Array(key))
+            } else {
+                keys.push(key)
+            }
+        })
+        const batchGetKey:BatchGetKey = {
+            ns: encodeUint8Array(batchGetRequest.ns),
+            keys: keys,
+            sessionToken: this.sessionToken
         }
+
+        const getKeyRequest:GetKeyRequest = {
+            batchGet: batchGetKey,
+        }
+
+        const res = await this.client.getKey(getKeyRequest)
+        const count = this.querySessionInfo!.queryCount() + 1
+        this.querySessionInfo!.queryCount = count
+        return res.response
     }
 
     async closeQuerySession(
@@ -283,93 +266,71 @@ export class DB3 {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        const payload = new CloseSessionPayload()
-        payload.setSessionInfo(this.querySessionInfo)
-        payload.setSessionToken(this.sessionToken)
-
-        const payloadU8 = payload.serializeBinary()
-        const [signature, public_key] = await sign(payloadU8)
-
-        const closeQuerySessionRequest = new CloseSessionRequest()
-        closeQuerySessionRequest.setPayload(payloadU8)
-        closeQuerySessionRequest.setSignature(signature)
-        closeQuerySessionRequest.setPublicKey(public_key)
-        try {
-            const res = await this.client.closeQuerySession(
-                closeQuerySessionRequest,
-                {}
-            )
-            this.querySessionInfo = undefined
-            return res.toObject()
-        } catch (error) {
-            throw error
+        const payload:CloseSessionPayload = {
+            sessionInfo: this.querySessionInfo,
+            sessionToke: this.sessionToken
         }
+        const payloadU8 = CloseSessionPayload.toBinary(payload)
+        const [signature, public_key] = await sign(payloadU8)
+        const closeQuerySessionRequest :CloseSessionRequest = {
+            payload: payloadU8,
+            signature: signature,
+            publicKey: public_key
+        }
+        const res = await this.client.closeQuerySession(
+            closeQuerySessionRequest
+        )
+        this.querySessionInfo = undefined
+        this.sessionToken = undefined
+        return res.response
     }
 
     async getRange(ns: string, startKey: Uint8Array, endKey: Uint8Array) {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        const range = new Range()
-        range.setStart(startKey)
-        range.setEnd(endKey)
-
-        const rangeKeys = new RangeKey()
-        rangeKeys.setNs(ns)
-        rangeKeys.setRange(range)
-        rangeKeys.setSessionToken(this.sessionToken)
-
-        const rangeRequest = new GetRangeRequest()
-        rangeRequest.setRangeKeys(rangeKeys)
-
-        try {
-            const res = await this.client.getRange(rangeRequest, {})
-            this.querySessionInfo?.setQueryCount(
-                this.querySessionInfo.getQueryCount() + 1
-            )
-            return res
-        } catch (error) {
-            throw error
+        const range:Range = {
+            start: startKey,
+            end: endKey
         }
+
+        const rangeKeys:RangeKey = {
+            ns: ns,
+            range: range,
+            sessionToken: this.sessionToken
+        }
+        const rangeRequest:GetRangeRequest = {
+            rangeKeys: rangeKeys
+        }
+        const res = await this.client.getRange(rangeRequest)
+        const count = this.querySessionInfo!.queryCount() + 1
+        this.querySessionInfo!.queryCount = count
+        return res.response
     }
+
     async deleteKey(
         ns: string,
         key: string | Uint8Array,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         const kvPairsList: KVPair[] = []
-        const kv_pair = new KVPair()
         if (typeof key === 'string') {
-            kv_pair.setKey(encodeUint8Array(key))
+            console.log("string key")
+            const kv_pair:KVPair = {
+                action: MutationAction.DeleteKv,
+                key: encodeUint8Array(key),
+                value: new Uint8Array(0)
+            }
+            kvPairsList.push(kv_pair)
         } else {
-            kv_pair.setKey(key)
+            console.log("Uint8Array key")
+            const kv_pair:KVPair = {
+                action: MutationAction.DeleteKv,
+                key: key,
+                value: new Uint8Array(0)
+            }
+            kvPairsList.push(kv_pair)
         }
-
-        kv_pair.setAction(MutationAction.DELETEKV)
-        kvPairsList.push(kv_pair)
-        const mutationObj = new Mutation()
-        mutationObj.setNs(encodeUint8Array(ns))
-        mutationObj.setKvPairsList(kvPairsList)
-        mutationObj.setNonce(Date.now())
-        mutationObj.setChainId(ChainId.MAINNET)
-        mutationObj.setChainRole(ChainRole.STORAGESHARDCHAIN)
-        mutationObj.setGasPrice()
-        // mutationObj.setGas(0)
-
-        const mbuffer = mutationObj.serializeBinary()
-        const [signature, public_key] = await sign(mbuffer)
-        const writeRequest = new WriteRequest()
-        writeRequest.setPayload(mbuffer)
-        writeRequest.setSignature(signature)
-        writeRequest.setPublicKey(public_key)
-        writeRequest.setPayloadType(PayloadType.MUTATIONPAYLOAD)
-        const broadcastRequest = new BroadcastRequest()
-        broadcastRequest.setBody(writeRequest.serializeBinary())
-        try {
-            const res = await this.client.broadcast(broadcastRequest, {})
-            return res.toObject()
-        } catch (error) {
-            throw error
-        }
+        this.submitRawMutation(ns, kvPairsList, sign)
     }
 }

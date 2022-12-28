@@ -203,16 +203,15 @@ export class DocStore {
         })
         const docs: Object[] = []
         response
-            .getBatchGetValues()
-            ?.getValuesList()
+            .batchGetValues
+            ?.values
             .forEach((kvPair: KVPair) => {
                 docs.push(
                     JSON.parse(
-                        new TextDecoder('utf-8').decode(kvPair.getValue_asU8())
+                        new TextDecoder('utf-8').decode(kvPair.value)
                     )
                 )
             })
-
         return docs
     }
 
@@ -221,29 +220,25 @@ export class DocStore {
         index: DocIndex,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
-        try {
-            await this.db3.keepSession(sign)
-            const docs: Record<string, any>[] = []
-            const res = await this.db3.getRange(
-                ns,
-                genStartKey(index),
-                genEndKey(index)
-            )
-            res.getRangeValue()
-                ?.getValuesList()
-                .forEach((kvPair: KVPair) => {
-                    docs.push(
-                        JSON.parse(
-                            new TextDecoder('utf-8').decode(
-                                kvPair.getValue_asU8()
-                            )
+        await this.db3.keepSession(sign)
+        const docs: Record<string, any>[] = []
+        const res = await this.db3.getRange(
+            ns,
+            genStartKey(index),
+            genEndKey(index)
+        )
+        res.rangeValue
+            ?.values
+            .forEach((kvPair: KVPair) => {
+                docs.push(
+                    JSON.parse(
+                        new TextDecoder('utf-8').decode(
+                            kvPair.value
                         )
                     )
-                })
-            return docs
-        } catch (error) {
-            throw error
-        }
+                )
+         })
+        return docs
     }
 
     async queryDocsByRange(
@@ -253,29 +248,25 @@ export class DocStore {
         endKey: Record<string, any>,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
-        try {
-            await this.db3.keepSession(sign)
-            const docs: Record<string, any>[] = []
-            const res = await this.db3.getRange(
-                ns,
-                genPrimaryKey(index, startKey),
-                genPrimaryKey(index, endKey)
-            )
-            res.getRangeValue()
-                ?.getValuesList()
-                .forEach((kvPair: KVPair) => {
-                    docs.push(
-                        JSON.parse(
-                            new TextDecoder('utf-8').decode(
-                                kvPair.getValue_asU8()
-                            )
+        await this.db3.keepSession(sign)
+        const docs: Record<string, any>[] = []
+        const res = await this.db3.getRange(
+            ns,
+            genPrimaryKey(index, startKey),
+            genPrimaryKey(index, endKey)
+        )
+        res.rangeValue
+            ?.values
+            .forEach((kvPair: KVPair) => {
+                docs.push(
+                    JSON.parse(
+                        new TextDecoder('utf-8').decode(
+                            kvPair.value
                         )
                     )
-                })
-            return docs
-        } catch (error) {
-            throw error
-        }
+                )
+            })
+        return docs
     }
 
     async deleteDoc(
@@ -285,11 +276,7 @@ export class DocStore {
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         const key = genPrimaryKey(index, doc)
-        try {
-            const res = await this.db3.deleteKey(ns, key, sign)
-            return res
-        } catch (error) {
-            throw error
-        }
+        const res = await this.db3.deleteKey(ns, key, sign)
+        return res
     }
 }

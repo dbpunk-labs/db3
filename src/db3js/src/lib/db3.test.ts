@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals'
 import { DB3 } from './db3'
 import { DocMetaManager, DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
 import { sign, getATestStaticKeypair, getAddress } from './keys'
+import 'jest-fetch-mock'
 import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
@@ -34,8 +35,7 @@ describe('test db3js api', () => {
            docName: 'transaction',
         }
         const result = await doc_meta_mgr.create_doc_meta(my_transaction_meta, "test_transaction", _sign)
-        console.log(result)
-        await new Promise(r => setTimeout(r, 2000))
+        await new Promise(r => setTimeout(r, 1000))
         const docs = await doc_meta_mgr.get_all_doc_metas("my_trx", _sign)
         expect(docs.length).toBe(1)
         expect(docs[0].doc_name).toBe("transaction")
@@ -121,7 +121,7 @@ describe('test db3js api', () => {
                 ns: 'my_twitter',
                 keyList: ['test2'],
             })
-            expect(queryRes.toObject().batchGetValues?.valuesList[0].value).toBe('value123')
+            expect(queryRes.batchGetValues?.values[0].value).toBe('value123')
             const closeRes = await db3_instance.closeQuerySession(_sign)
             expect(closeRes).toBeDefined()
         } catch (error) {
@@ -129,6 +129,7 @@ describe('test db3js api', () => {
             throw error
         }
     })
+
     test('gen primary key', async () => {
         const doc_index = {
             keys: [
@@ -269,7 +270,6 @@ describe('test db3js api', () => {
         )
         await new Promise(r => setTimeout(r, 2000))
         const res = await db3_instance.deleteKey('my_twitter', 'user', _sign)
-        console.log(res)
         expect(res).toBeDefined()
     })
 
