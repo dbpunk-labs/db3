@@ -31,9 +31,10 @@ describe('test db3js api', () => {
                 },
             ],
            ns: 'my_trx',
-            docName: 'transaction',
+           docName: 'transaction',
         }
         const result = await doc_meta_mgr.create_doc_meta(my_transaction_meta, "test_transaction", _sign)
+        console.log(result)
         await new Promise(r => setTimeout(r, 2000))
         const docs = await doc_meta_mgr.get_all_doc_metas("my_trx", _sign)
         expect(docs.length).toBe(1)

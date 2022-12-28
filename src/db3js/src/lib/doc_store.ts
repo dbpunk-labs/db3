@@ -1,8 +1,7 @@
 // @ts-nocheck
 import { DB3 } from './db3'
-import db3_mutation_pb, { KVPair } from '../pkg/db3_mutation_pb'
+import {KVPair, MutationAction} from '../pkg/db3_mutation'
 import { SmartBuffer, SmartBufferOptions } from 'smart-buffer'
-import * as jspb from 'google-protobuf'
 
 // the type of doc key
 // the string and number are supported
@@ -174,13 +173,14 @@ export class DocStore {
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
         nonce?: number
     ) {
-        const kvPairs: db3_mutation_pb.KVPair[] = []
+        const kvPairs: KVPair[] = []
         docs.forEach((doc: Object) => {
             const key = genPrimaryKey(index, doc) as Uint8Array
-            const kvPair = new db3_mutation_pb.KVPair()
-            kvPair.setKey(key)
-            kvPair.setValue(object2Buffer(doc))
-            kvPair.setAction(db3_mutation_pb.MutationAction.INSERTKV)
+            const kvPair:KVPair = {
+                key: key,
+                value: object2Buffer(doc),
+                action: MutationAction.InsertKv
+            }
             kvPairs.push(kvPair)
         })
         return await this.db3.submitRawMutation(index.ns, kvPairs, sign, nonce)
@@ -205,7 +205,7 @@ export class DocStore {
         response
             .getBatchGetValues()
             ?.getValuesList()
-            .forEach((kvPair: db3_mutation_pb.KVPair) => {
+            .forEach((kvPair: KVPair) => {
                 docs.push(
                     JSON.parse(
                         new TextDecoder('utf-8').decode(kvPair.getValue_asU8())
@@ -231,7 +231,7 @@ export class DocStore {
             )
             res.getRangeValue()
                 ?.getValuesList()
-                .forEach((kvPair: db3_mutation_pb.KVPair) => {
+                .forEach((kvPair: KVPair) => {
                     docs.push(
                         JSON.parse(
                             new TextDecoder('utf-8').decode(
@@ -263,7 +263,7 @@ export class DocStore {
             )
             res.getRangeValue()
                 ?.getValuesList()
-                .forEach((kvPair: db3_mutation_pb.KVPair) => {
+                .forEach((kvPair: KVPair) => {
                     docs.push(
                         JSON.parse(
                             new TextDecoder('utf-8').decode(

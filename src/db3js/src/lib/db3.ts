@@ -1,9 +1,10 @@
 // @ts-nocheck
-import db3_mutation_pb from '../pkg/db3_mutation'
-import db3_base_pb from '../pkg/db3_base'
-import db3_node_pb from '../pkg/db3_node'
-import db3_namespace_pb from '../pkg/db3_namespace'
-import db3_session_pb from '../pkg/db3_session'
+import {WriteRequest, PayloadType, KVPair, Mutation, MutationAction} from '../pkg/db3_mutation'
+import {Erc20Token, Price} from '../pkg/db3_base'
+import {ChainId, ChainRole} from '../pkg/db3_base'
+import {GetRangeRequest, RangeKey, Range, CloseSessionRequest, BatchGetKey, GetKeyRequest, BroadcastRequest, GetNamespaceRequest, OpenSessionRequest, GetAccountRequest} from '../pkg/db3_node'
+import {QueryPrice, Namespace} from '../pkg/db3_namespace'
+import {CloseSessionPayload, QuerySessionInfo, OpenSessionPayload} from '../pkg/db3_session'
 import {GrpcWebFetchTransport, GrpcWebOptions} from '@protobuf-ts/grpcweb-transport';
 import { StorageNodeClient } from '../pkg/db3_node.client'
 import * as jspb from 'google-protobuf'
@@ -28,7 +29,7 @@ export interface BatchGetKeyRequest {
 }
 
 export interface QuerySession {
-    sessionInfo: db3_session_pb.QuerySessionInfo.AsObject
+    sessionInfo: QuerySessionInfo.AsObject
     sessionToken: string
 }
 
@@ -48,7 +49,7 @@ export class DB3 {
 
     private client: StorageNodeClient
     public sessionToken?: string
-    private querySessionInfo?: db3_session_pb.QuerySessionInfo
+    private querySessionInfo?: QuerySessionInfo
     constructor(node: string, options?: DB3_Options) {
 	    const goptions:GrpcWebOptions =  {
 		baseUrl: node,
@@ -71,52 +72,61 @@ export class DB3 {
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
         nonce?: number
     ) {
-        const token = new db3_base_pb.Erc20Token()
-        //TODO check if token is valid
-        token.setSymbal(desc.erc20Token)
-        token.setUnitsList([desc.erc20Token])
-        token.setScalarList([1])
-        const priceProto = new db3_base_pb.Price()
-        priceProto.setAmount(desc.price)
-        priceProto.setUnit(desc.erc20Token)
-        priceProto.setToken(token)
-        const queryPrice = new db3_namespace_pb.QueryPrice()
-        queryPrice.setPrice(priceProto)
-        queryPrice.setQueryCount(desc.queryCount)
-        const namespaceProto = new db3_namespace_pb.Namespace()
-        namespaceProto.setName(desc.name)
-        namespaceProto.setPrice(queryPrice)
-        namespaceProto.setTs(Date.now())
-        namespaceProto.setDescription(desc.desc)
+        const token:Erc20Token = {
+            symbal:desc.erc20Token,
+            units: [desc.erc20Token],
+            scalar: ["1"]
+        }
+
+        const priceProto:Price = {
+            amount: desc.price,
+            unit:desc.erc20Token,
+            token:token
+        }
+
+        const queryPrice:QueryPrice = {
+            price: priceProto,
+            queryCount: desc.queryCount
+        }
+
+        const namespaceProto:Namespace = {
+            name: desc.name,
+            price: queryPrice,
+            ts: Date.now(),
+            description: desc.desc
+        }
+
         return await this.createNs(namespaceProto, sign, nonce)
     }
 
     async createNs(
-        ns: db3_namespace_pb.Namespace,
+        ns: Namespace,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
         nonce?: number
     ) {
-        const mbuffer = ns.serializeBinary()
+        const mbuffer =Namespace.toBinary(ns)
         const [signature, public_key] = await sign(mbuffer)
-        const writeRequest = new db3_mutation_pb.WriteRequest()
-        writeRequest.setPayload(mbuffer)
-        writeRequest.setSignature(signature)
-        writeRequest.setPublicKey(public_key)
-        writeRequest.setPayloadType(
-            db3_mutation_pb.PayloadType.NAMESPACEPAYLOAD
-        )
-        const broadcastRequest = new db3_node_pb.BroadcastRequest()
-        broadcastRequest.setBody(writeRequest.serializeBinary())
-        const res = await this.client.broadcast(broadcastRequest, {})
-        return res.toObject()
+        const writeRequest:WriteRequest = {
+            payload: mbuffer,
+            signature: signature,
+            publicKey: public_key,
+            payloadType:PayloadType.NamespacePayload
+        }
+        const broadcastRequest:BroadcastRequest = {
+            body: WriteRequest.toBinary(writeRequest)
+        }
+        const call = this.client.broadcast(broadcastRequest)
+        const response = await call.response
+        return response
     }
 
     async getNsList(
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         const token = await this.keepSession(sign)
-        const getNsListRequest = new db3_node_pb.GetNamespaceRequest()
-        getNsListRequest.setSessionToken(token!)
+        const getNsListRequest:GetNamespaceRequest = {
+            sessionToken: token!
+        }
         const res = await this.client.getNamespace(getNsListRequest, {})
         const count = this.querySessionInfo!.getQueryCount() + 1
         return res.toObject()
@@ -124,64 +134,65 @@ export class DB3 {
 
     async submitRawMutation(
         ns: string,
-        kv_pairs: db3_mutation_pb.KVPair[],
+        kv_pairs: KVPair[],
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
         nonce?: number
     ) {
-        const mutation = new db3_mutation_pb.Mutation()
-        mutation.setNs(encodeUint8Array(ns))
-        mutation.setKvPairsList(kv_pairs)
-        if (typeof nonce !== 'undefined') {
-            mutation.setNonce(nonce)
-        } else {
-            mutation.setNonce(Date.now())
+        const mutation:Mutation = {
+            ns: encodeUint8Array(ns),
+            kvPairs: kv_pairs,
+            nonce: Date.now(),
+            chainId: ChainId.MainNet,
+            chainRole: ChainRole.StorageShardChain,
+            gasPrice:null,
+            gas:"100"
         }
-        mutation.setChainId(db3_base_pb.ChainId.MAINNET)
-        mutation.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN)
-        mutation.setGasPrice()
-        mutation.setGas(100)
-        const mbuffer = mutation.serializeBinary()
+        const mbuffer = Mutation.toBinary(mutation)
         const [signature, public_key] = await sign(mbuffer)
-        const writeRequest = new db3_mutation_pb.WriteRequest()
-        writeRequest.setPayload(mbuffer)
-        writeRequest.setSignature(signature)
-        writeRequest.setPublicKey(public_key)
-        writeRequest.setPayloadType(db3_mutation_pb.PayloadType.MUTATIONPAYLOAD)
-        const broadcastRequest = new db3_node_pb.BroadcastRequest()
-        broadcastRequest.setBody(writeRequest.serializeBinary())
-        const res = await this.client.broadcast(broadcastRequest, {})
-        return res.toObject()
+        const writeRequest:WriteRequest = {
+            payload: mbuffer,
+            signature: signature,
+            publicKey: public_key,
+            payloadType:PayloadType.MutationPayload
+        }
+        const broadcastRequest :BroadcastRequest = {
+            body: WriteRequest.toBinary(writeRequest)
+        }
+        const call = this.client.broadcast(broadcastRequest)
+        const response = await call.response
+        console.log("response", response)
+        return response
     }
 
     async submitMutaition(
         mutation: Mutation,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
-        const kvPairsList: db3_mutation_pb.KVPair[] = []
+        const kvPairsList: KVPair[] = []
         Object.keys(mutation.data).forEach((key: string) => {
-            const kv_pair = new db3_mutation_pb.KVPair()
+            const kv_pair = new KVPair()
             kv_pair.setKey(encodeUint8Array(key))
             kv_pair.setValue(encodeUint8Array(mutation.data[key]))
-            kv_pair.setAction(db3_mutation_pb.MutationAction.INSERTKV)
+            kv_pair.setAction(MutationAction.INSERTKV)
             kvPairsList.push(kv_pair)
         })
-        const mutationObj = new db3_mutation_pb.Mutation()
+        const mutationObj = new Mutation()
         mutationObj.setNs(encodeUint8Array(mutation.ns))
         mutationObj.setKvPairsList(kvPairsList)
         mutationObj.setNonce(Date.now())
-        mutationObj.setChainId(db3_base_pb.ChainId.MAINNET)
-        mutationObj.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN)
+        mutationObj.setChainId(ChainId.MAINNET)
+        mutationObj.setChainRole(ChainRole.STORAGESHARDCHAIN)
         mutationObj.setGasPrice()
         mutationObj.setGas(mutation.gasLimit)
 
         const mbuffer = mutationObj.serializeBinary()
         const [signature, public_key] = await sign(mbuffer)
-        const writeRequest = new db3_mutation_pb.WriteRequest()
+        const writeRequest = new WriteRequest()
         writeRequest.setPayload(mbuffer)
         writeRequest.setSignature(signature)
         writeRequest.setPublicKey(public_key)
-        writeRequest.setPayloadType(db3_mutation_pb.PayloadType.MUTATIONPAYLOAD)
-        const broadcastRequest = new db3_node_pb.BroadcastRequest()
+        writeRequest.setPayloadType(PayloadType.MUTATIONPAYLOAD)
+        const broadcastRequest = new BroadcastRequest()
         broadcastRequest.setBody(writeRequest.serializeBinary())
         try {
             const res = await this.client.broadcast(broadcastRequest, {})
@@ -213,9 +224,9 @@ export class DB3 {
         }
 
 
-        const sessionRequest = new db3_node_pb.OpenSessionRequest()
+        const sessionRequest = new OpenSessionRequest()
         const header = window.crypto.getRandomValues(new Uint8Array(32))
-        const payload = new db3_session_pb.OpenSessionPayload()
+        const payload = new OpenSessionPayload()
         payload.setHeader(header.toString())
         payload.setStartTime(Math.floor(Date.now() / 1000))
         const payloadU8 = payload.serializeBinary()
@@ -235,7 +246,7 @@ export class DB3 {
     }
 
     async getAccount(address: string) {
-        const getAccountRequest = new db3_node_pb.GetAccountRequest()
+        const getAccountRequest = new GetAccountRequest()
         getAccountRequest.setAddr(address)
         try {
             const response = await this.client.getAccount(getAccountRequest, {})
@@ -249,8 +260,8 @@ export class DB3 {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        const getKeyRequest = new db3_node_pb.GetKeyRequest()
-        const batchGetKey = new db3_node_pb.BatchGetKey()
+        const getKeyRequest = new GetKeyRequest()
+        const batchGetKey = new BatchGetKey()
         batchGetKey.setNs(batchGetRequest.ns)
         batchGetKey.setKeysList(batchGetRequest.keyList)
         //todo handle null session token
@@ -272,14 +283,14 @@ export class DB3 {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        const payload = new db3_session_pb.CloseSessionPayload()
+        const payload = new CloseSessionPayload()
         payload.setSessionInfo(this.querySessionInfo)
         payload.setSessionToken(this.sessionToken)
 
         const payloadU8 = payload.serializeBinary()
         const [signature, public_key] = await sign(payloadU8)
 
-        const closeQuerySessionRequest = new db3_node_pb.CloseSessionRequest()
+        const closeQuerySessionRequest = new CloseSessionRequest()
         closeQuerySessionRequest.setPayload(payloadU8)
         closeQuerySessionRequest.setSignature(signature)
         closeQuerySessionRequest.setPublicKey(public_key)
@@ -299,16 +310,16 @@ export class DB3 {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        const range = new db3_node_pb.Range()
+        const range = new Range()
         range.setStart(startKey)
         range.setEnd(endKey)
 
-        const rangeKeys = new db3_node_pb.RangeKey()
+        const rangeKeys = new RangeKey()
         rangeKeys.setNs(ns)
         rangeKeys.setRange(range)
         rangeKeys.setSessionToken(this.sessionToken)
 
-        const rangeRequest = new db3_node_pb.GetRangeRequest()
+        const rangeRequest = new GetRangeRequest()
         rangeRequest.setRangeKeys(rangeKeys)
 
         try {
@@ -326,33 +337,33 @@ export class DB3 {
         key: string | Uint8Array,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
-        const kvPairsList: db3_mutation_pb.KVPair[] = []
-        const kv_pair = new db3_mutation_pb.KVPair()
+        const kvPairsList: KVPair[] = []
+        const kv_pair = new KVPair()
         if (typeof key === 'string') {
             kv_pair.setKey(encodeUint8Array(key))
         } else {
             kv_pair.setKey(key)
         }
 
-        kv_pair.setAction(db3_mutation_pb.MutationAction.DELETEKV)
+        kv_pair.setAction(MutationAction.DELETEKV)
         kvPairsList.push(kv_pair)
-        const mutationObj = new db3_mutation_pb.Mutation()
+        const mutationObj = new Mutation()
         mutationObj.setNs(encodeUint8Array(ns))
         mutationObj.setKvPairsList(kvPairsList)
         mutationObj.setNonce(Date.now())
-        mutationObj.setChainId(db3_base_pb.ChainId.MAINNET)
-        mutationObj.setChainRole(db3_base_pb.ChainRole.STORAGESHARDCHAIN)
+        mutationObj.setChainId(ChainId.MAINNET)
+        mutationObj.setChainRole(ChainRole.STORAGESHARDCHAIN)
         mutationObj.setGasPrice()
         // mutationObj.setGas(0)
 
         const mbuffer = mutationObj.serializeBinary()
         const [signature, public_key] = await sign(mbuffer)
-        const writeRequest = new db3_mutation_pb.WriteRequest()
+        const writeRequest = new WriteRequest()
         writeRequest.setPayload(mbuffer)
         writeRequest.setSignature(signature)
         writeRequest.setPublicKey(public_key)
-        writeRequest.setPayloadType(db3_mutation_pb.PayloadType.MUTATIONPAYLOAD)
-        const broadcastRequest = new db3_node_pb.BroadcastRequest()
+        writeRequest.setPayloadType(PayloadType.MUTATIONPAYLOAD)
+        const broadcastRequest = new BroadcastRequest()
         broadcastRequest.setBody(writeRequest.serializeBinary())
         try {
             const res = await this.client.broadcast(broadcastRequest, {})
