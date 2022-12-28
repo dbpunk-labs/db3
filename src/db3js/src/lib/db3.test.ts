@@ -2,10 +2,11 @@ import { describe, expect, test } from '@jest/globals'
 import { DB3 } from './db3'
 import { DocMetaManager, DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
 import { sign, getATestStaticKeypair, getAddress } from './keys'
-import 'jest-fetch-mock'
 import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
+import 'whatwg-fetch'
+
 
 describe('test db3js api', () => {
     async function getSign() {
@@ -17,43 +18,55 @@ describe('test db3js api', () => {
     }
 
     test("doc meta smoke test", async () => {
-        const db3_instance = new DB3('http://127.0.0.1:26659')
-        const _sign = await getSign()
-        const doc_meta_mgr = new DocMetaManager(db3_instance)
-        const my_transaction_meta = {
-            keys: [
-                {
-                    name: 'address',
-                    keyType: DocKeyType.STRING,
-                },
-                {
-                    name: 'ts',
-                    keyType: DocKeyType.NUMBER,
-                },
-            ],
-           ns: 'my_trx',
-           docName: 'transaction',
+        try {
+
+            const db3_instance = new DB3('http://127.0.0.1:26659')
+            const _sign = await getSign()
+            const doc_meta_mgr = new DocMetaManager(db3_instance)
+            const my_transaction_meta = {
+                keys: [
+                    {
+                        name: 'address',
+                        keyType: DocKeyType.STRING,
+                    },
+                    {
+                        name: 'ts',
+                        keyType: DocKeyType.NUMBER,
+                    },
+                ],
+               ns: 'my_trx',
+               docName: 'transaction',
+            }
+            const result = await doc_meta_mgr.create_doc_meta(my_transaction_meta, "test_transaction", _sign)
+            await new Promise(r => setTimeout(r, 1000))
+            const docs = await doc_meta_mgr.get_all_doc_metas("my_trx", _sign)
+            expect(docs.length).toBe(1)
+            expect(docs[0].doc_name).toBe("transaction")
+            expect(docs[0].desc).toBe("test_transaction")
+            expect(docs[0].index.ns).toBe("my_trx")
+        } catch(error) {
+            console.log("doc meta smoke test error", error)
+            expect(1).toBe(0)
         }
-        const result = await doc_meta_mgr.create_doc_meta(my_transaction_meta, "test_transaction", _sign)
-        await new Promise(r => setTimeout(r, 1000))
-        const docs = await doc_meta_mgr.get_all_doc_metas("my_trx", _sign)
-        expect(docs.length).toBe(1)
-        expect(docs[0].doc_name).toBe("transaction")
-        expect(docs[0].desc).toBe("test_transaction")
-        expect(docs[0].index.ns).toBe("my_trx")
     })
 
     test('namespace smoke test', async () => {
-        const db3_instance = new DB3('http://127.0.0.1:26659')
-        const _sign = await getSign()
-        const result = await db3_instance.createSimpleNs(
-            {name:"test_ns", desc:"desc_ns", 
-                erc20Token:"usdt", price:1, queryCount:100},
-            _sign
-        )
-        await new Promise(r => setTimeout(r, 2000))
-        const nsList = await db3_instance.getNsList(_sign)
-        expect(nsList.nsListList[0].name).toBe("test_ns")
+        try {
+
+            const db3_instance = new DB3('http://127.0.0.1:26659')
+            const _sign = await getSign()
+            const result = await db3_instance.createSimpleNs(
+                {name:"test_ns", desc:"desc_ns", 
+                    erc20Token:"usdt", price:1, queryCount:100},
+                _sign
+            )
+            await new Promise(r => setTimeout(r, 2000))
+            const nsList = await db3_instance.getNsList(_sign)
+            expect(nsList.nsListList[0].name).toBe("test_ns")
+        } catch (error) {
+            console.log("namespace smoke test error", error)
+            expect(1).toBe(0)
+        }
     })
 
     test('test submitMutation', async () => {
@@ -80,6 +93,7 @@ describe('test db3js api', () => {
             throw error
         }
     })
+
     test('test getKey', async () => {
         const db3_instance = new DB3('http://127.0.0.1:26659')
         const _sign = await getSign()
