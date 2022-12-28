@@ -1,10 +1,11 @@
 // @ts-nocheck
-import db3_mutation_pb from '../pkg/db3_mutation_pb'
-import db3_base_pb from '../pkg/db3_base_pb'
-import db3_node_pb from '../pkg/db3_node_pb'
-import db3_namespace_pb from '../pkg/db3_namespace_pb'
-import db3_session_pb from '../pkg/db3_session_pb'
-import { StorageNodeClient } from '../pkg/Db3_nodeServiceClientPb'
+import db3_mutation_pb from '../pkg/db3_mutation'
+import db3_base_pb from '../pkg/db3_base'
+import db3_node_pb from '../pkg/db3_node'
+import db3_namespace_pb from '../pkg/db3_namespace'
+import db3_session_pb from '../pkg/db3_session'
+import {GrpcWebFetchTransport, GrpcWebOptions} from '@protobuf-ts/grpcweb-transport';
+import { StorageNodeClient } from '../pkg/db3_node.client'
 import * as jspb from 'google-protobuf'
 
 export interface Mutation {
@@ -44,11 +45,25 @@ function encodeUint8Array(text: string) {
 }
 
 export class DB3 {
+
     private client: StorageNodeClient
     public sessionToken?: string
     private querySessionInfo?: db3_session_pb.QuerySessionInfo
     constructor(node: string, options?: DB3_Options) {
-        this.client = new StorageNodeClient(node, null, null)
+	    const goptions:GrpcWebOptions =  {
+		baseUrl: node,
+		deadline: Date.now() + 2000,
+		format: 'binary',
+
+		// simple example for how to add auth headers to each request
+		// see `RpcInterceptor` for documentation
+		interceptors: [
+		],
+		// you can set global request headers here
+		meta: {}
+	   }
+       const transport = new GrpcWebFetchTransport(goptions)
+       this.client = new StorageNodeClient(transport)
     }
 
     async createSimpleNs(
