@@ -151,8 +151,8 @@ export class DB3 {
             sessionToken: token,
         }
         const { response } = await this.client.getNamespace(request)
-        //const count = this.querySessionInfo!.queryCount + 1
-        //this.querySessionInfo!.queryCount = count
+        const count = this.querySessionInfo!.queryCount + 1
+        this.querySessionInfo!.queryCount = count
         return response
     }
 
