@@ -100,6 +100,7 @@ jobs:
             - run: |
                 cd src/db3js
                 yarn install
+                make
                 yarn build
             - uses: JS-DevTools/npm-publish@v1
               with:

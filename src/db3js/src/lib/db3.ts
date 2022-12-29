@@ -42,7 +42,7 @@ export interface DB3_Options {
 }
 
 function encodeUint8Array(text: string) {
-    return jspb.Message.bytesAsU8(text)
+    return new TextEncoder("utf-8").encode(text);
 }
 
 function uint8ToBase64(arr:Uint8Array) {
@@ -120,8 +120,7 @@ export class DB3 {
         const broadcastRequest:BroadcastRequest = {
             body: WriteRequest.toBinary(writeRequest)
         }
-        const call = await this.client.broadcast(broadcastRequest)
-        const response = call.response
+        const {response} = await this.client.broadcast(broadcastRequest)
         return uint8ToBase64(response.hash)
     }
 
@@ -129,13 +128,13 @@ export class DB3 {
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         const token = await this.keepSession(sign)
-        const getNsListRequest:GetNamespaceRequest = {
-            sessionToken: token!
+        const request: GetNamespaceRequest = {
+            sessionToken: token
         }
-        const res = await this.client.getNamespace(getNsListRequest, {})
-        const count = this.querySessionInfo!.queryCount + 1
-        this.querySessionInfo!.queryCount = count
-        return res.response
+        const {response} = await this.client.getNamespace(request)
+        //const count = this.querySessionInfo!.queryCount + 1
+        //this.querySessionInfo!.queryCount = count
+        return response
     }
 
     async submitRawMutation(
@@ -164,9 +163,9 @@ export class DB3 {
         const broadcastRequest :BroadcastRequest = {
             body: WriteRequest.toBinary(writeRequest)
         }
-        const call = await this.client.broadcast(broadcastRequest)
-        const response = call.response
-        return uint8ToBase64(response.hash)
+        const {response} = await this.client.broadcast(broadcastRequest)
+        const id = uint8ToBase64(response.hash)
+        return id
     }
 
     async submitMutaition(
@@ -182,7 +181,7 @@ export class DB3 {
             }
             kvPairsList.push(kvPair)
         })
-        await this.submitRawMutation(mutation.ns, kvPairsList, sign)
+        return await this.submitRawMutation(mutation.ns, kvPairsList, sign)
     }
 
     async keepSession(
@@ -217,8 +216,7 @@ export class DB3 {
             signature: signature,
             publicKey: public_key
         }
-        const res = await this.client.openQuerySession(sessionRequest)
-        const response = res.response
+        const {response} = await this.client.openQuerySession(sessionRequest)
         this.sessionToken = response.sessionToken
         this.querySessionInfo = response.querySessionInfo
         return response
@@ -228,14 +226,15 @@ export class DB3 {
         const getAccountRequest:GetAccountRequest = {
             addr:address
         }
-        const response = await this.client.getAccount(getAccountRequest)
-        return response.response
+        const {response} = await this.client.getAccount(getAccountRequest)
+        return response
     }
 
     async getKey(batchGetRequest: BatchGetKeyRequest) {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
+
         const keys:Uint8Array[] = []
         batchGetRequest.keyList.forEach((key:string | Uint8Array)=> {
             if (typeof key === 'string') {
@@ -244,6 +243,7 @@ export class DB3 {
                 keys.push(key)
             }
         })
+
         const batchGetKey:BatchGetKey = {
             ns: encodeUint8Array(batchGetRequest.ns),
             keys: keys,
@@ -254,10 +254,10 @@ export class DB3 {
             batchGet: batchGetKey,
         }
 
-        const res = await this.client.getKey(getKeyRequest)
+        const {response} = await this.client.getKey(getKeyRequest)
         const count = this.querySessionInfo!.queryCount + 1
         this.querySessionInfo!.queryCount = count
-        return res.response
+        return response
     }
 
     async closeQuerySession(
@@ -277,35 +277,37 @@ export class DB3 {
             signature: signature,
             publicKey: public_key
         }
-        const res = await this.client.closeQuerySession(
+        const {response} =  await this.client.closeQuerySession(
             closeQuerySessionRequest
         )
         this.querySessionInfo = undefined
         this.sessionToken = undefined
-        return res.response
+        return response
     }
 
     async getRange(ns: string, startKey: Uint8Array, endKey: Uint8Array) {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
+        console.log("range session token ", this.sessionToken)
         const range:Range = {
             start: startKey,
             end: endKey
         }
-
         const rangeKeys:RangeKey = {
-            ns: ns,
+            ns: encodeUint8Array(ns),
             range: range,
             sessionToken: this.sessionToken
         }
+
         const rangeRequest:GetRangeRequest = {
             rangeKeys: rangeKeys
         }
-        const res = await this.client.getRange(rangeRequest)
+
+        const {response} = await this.client.getRange(rangeRequest)
         const count = this.querySessionInfo!.queryCount + 1
         this.querySessionInfo!.queryCount = count
-        return res.response
+        return response
     }
 
     async deleteKey(
@@ -331,6 +333,7 @@ export class DB3 {
             }
             kvPairsList.push(kv_pair)
         }
-        this.submitRawMutation(ns, kvPairsList, sign)
+        const {response} =  await this.submitRawMutation(ns, kvPairsList, sign)
+        return response
     }
 }

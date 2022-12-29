@@ -104,5 +104,6 @@ jobs:
         run: |
           cd src/db3js
           yarn install
+          make
           yarn test
 
