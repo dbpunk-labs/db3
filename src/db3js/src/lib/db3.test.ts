@@ -61,13 +61,12 @@ describe('test db3js api', () => {
         try {
             const db3 = new DB3('http://127.0.0.1:26659')
             const _sign = await getSign()
-            //const result = await db3_instance.createSimpleNs(
-            //    {name:"test_ns", desc:"desc_ns", 
-            //        erc20Token:"usdt", price:1, queryCount:100},
-            //    _sign
-            //)
-            //console.log("namespace smoke", result)
-            //await new Promise(r => setTimeout(r, 2000))
+            const result = await db3.createSimpleNs(
+                {name:"test_ns", desc:"desc_ns", 
+                    erc20Token:"usdt", price:1, queryCount:100},
+                _sign
+            )
+            await new Promise(r => setTimeout(r, 2000))
             const nsList = await db3.getNsList(_sign)
             expect(nsList.nsList[0].name).toBe("test_ns")
         } catch (error) {
