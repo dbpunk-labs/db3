@@ -238,8 +238,10 @@ impl StoreSDK {
         keys: Vec<Vec<u8>>,
         token: &str,
     ) -> std::result::Result<Option<BatchGetValue>, Status> {
+        println!("batch_get >>");
         match self.session_pool.get_session_mut(token) {
             Some(session) => {
+                println!("try to check session running");
                 if session.check_session_running() {
                     let batch_get = Some(BatchGetKey {
                         ns: ns.to_vec(),
@@ -249,11 +251,25 @@ impl StoreSDK {
                     let r = GetKeyRequest { batch_get };
                     let request = tonic::Request::new(r);
                     let mut client = self.client.as_ref().clone();
-                    let response = client.get_key(request).await?.into_inner();
-                    // TODO(cj): batch keys query should be count as a query or multi queries?
-                    session.increase_query(1);
-                    Ok(response.batch_get_values)
+                    println!("client.get_key >> ");
+                    // let response = client.get_key(request).await?.into_inner();
+                    match client.get_key(request).await {
+                        Ok(response) => {
+                            // TODO(cj): batch keys query should be count as a query or multi queries?
+                            println!("client.get_key done! ");
+                            println!("response: {:?}", response);
+                            session.increase_query(1);
+                            println!("batch_get ok");
+                            Ok(response.into_inner().batch_get_values)
+                        }
+                        Err(err) => {
+                            println!("{:?}", err);
+                            Err(Status::internal(format!("{:?}", err)))
+                        }
+                    }
+
                 } else {
+                    println!("permission denied");
                     Err(Status::permission_denied(
                         "Fail to query in this session. Please restart query session",
                     ))

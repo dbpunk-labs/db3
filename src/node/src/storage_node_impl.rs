@@ -342,6 +342,7 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetKeyRequest>,
     ) -> std::result::Result<Response<GetKeyResponse>, Status> {
+        println!("enter get_key >>");
         if let Some(batch_get_key) = request.into_inner().batch_get {
             match self.context.node_store.lock() {
                 Ok(mut node_store) => {
@@ -379,6 +380,7 @@ impl StorageNode for StorageNodeImpl {
                         .get_session_mut(&batch_get_key.session_token)
                         .unwrap()
                         .increase_query(1);
+                    println!("exit get_key >>");
                     Ok(Response::new(GetKeyResponse {
                         batch_get_values: Some(values.to_owned()),
                     }))
@@ -386,6 +388,7 @@ impl StorageNode for StorageNodeImpl {
                 Err(e) => Err(Status::internal(format!("Fail to get key {}", e))),
             }
         } else {
+            println!("Err get key");
             Err(Status::invalid_argument(
                 "batch key is empty or none".to_string(),
             ))
