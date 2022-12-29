@@ -255,7 +255,7 @@ export class DB3 {
         }
 
         const res = await this.client.getKey(getKeyRequest)
-        const count = this.querySessionInfo!.queryCount() + 1
+        const count = this.querySessionInfo!.queryCount + 1
         this.querySessionInfo!.queryCount = count
         return res.response
     }
@@ -303,7 +303,7 @@ export class DB3 {
             rangeKeys: rangeKeys
         }
         const res = await this.client.getRange(rangeRequest)
-        const count = this.querySessionInfo!.queryCount() + 1
+        const count = this.querySessionInfo!.queryCount + 1
         this.querySessionInfo!.queryCount = count
         return res.response
     }
