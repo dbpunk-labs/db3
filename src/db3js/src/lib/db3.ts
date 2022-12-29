@@ -10,31 +10,27 @@ import { StorageNodeClient } from '../pkg/db3_node.client'
 import * as jspb from 'google-protobuf'
 
 export interface Mutation {
-    ns: string
-    gasLimit: number
-    data: Record<string, any>
+    ns: string;
+    gasLimit: number;
+    data: Record<string, any>;
 }
 
 export interface NsSimpleDesc {
-    name: string,
-    desc: string,
-    erc20Token: string,
-    price: number,
-    queryCount: number,
+    name: string;
+    desc: string;
+    erc20Token: string;
+    price: number;
+    queryCount: number;
 }
 
 export interface BatchGetKeyRequest {
-    ns: string
-    keyList: string[] | Uint8Array[]
+    ns: string;
+    keyList: string[] | Uint8Array[];
 }
 
 export interface QuerySession {
-    sessionInfo: QuerySessionInfo.AsObject
-    sessionToken: string
-}
-
-export interface DB3_Instance {
-    submitMutation(mutation: Mutation, signature?: Uint8Array | string): any
+    sessionInfo: QuerySessionInfo;
+    sessionToken: string;
 }
 
 export interface DB3_Options {
