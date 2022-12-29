@@ -325,7 +325,6 @@ export class DB3 {
         }
 
         const { response } = await this.client.getRange(rangeRequest)
-        console.log('del key ', response)
         const count = this.querySessionInfo!.queryCount + 1
         this.querySessionInfo!.queryCount = count
         return response
