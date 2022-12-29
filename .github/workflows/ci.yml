@@ -103,6 +103,8 @@ jobs:
       - name: test db3js
         run: |
           cd src/db3js
+          mkdir -p src/pkg
           yarn install
+          make
           yarn test
 

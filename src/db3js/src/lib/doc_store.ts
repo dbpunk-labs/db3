@@ -1,8 +1,7 @@
 // @ts-nocheck
 import { DB3 } from './db3'
-import db3_mutation_pb, { KVPair } from '../pkg/db3_mutation_pb'
+import { KVPair, MutationAction } from '../pkg/db3_mutation'
 import { SmartBuffer, SmartBufferOptions } from 'smart-buffer'
-import * as jspb from 'google-protobuf'
 
 // the type of doc key
 // the string and number are supported
@@ -114,9 +113,10 @@ export class DocMetaManager {
         this.doc_store = new DocStore(db3)
     }
 
-    async get_all_doc_metas(ns:string,
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
-                          ) {
+    async get_all_doc_metas(
+        ns: string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
         const static_doc_index = {
             keys: [
                 {
@@ -134,9 +134,11 @@ export class DocMetaManager {
         return await this.doc_store.queryAllDocs(ns, static_doc_index, sign)
     }
 
-    async create_doc_meta(doc_index: DocIndex, desc: string,
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
-                      ) {
+    async create_doc_meta(
+        doc_index: DocIndex,
+        desc: string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
         const static_doc_index = {
             keys: [
                 {
@@ -152,13 +154,17 @@ export class DocMetaManager {
             docName: '_meta_',
         }
         const doc_meta = {
-            'doc_name': doc_index.docName,
-            'ts': Date.now(),
-            'index': doc_index,
-            'desc': desc
+            doc_name: doc_index.docName,
+            ts: Date.now(),
+            index: doc_index,
+            desc: desc,
         }
         //TODO check if the doc meta exists
-        return await this.doc_store.insertDocs(static_doc_index, [doc_meta], sign)
+        return await this.doc_store.insertDocs(
+            static_doc_index,
+            [doc_meta],
+            sign
+        )
     }
 }
 
@@ -174,13 +180,14 @@ export class DocStore {
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
         nonce?: number
     ) {
-        const kvPairs: db3_mutation_pb.KVPair[] = []
+        const kvPairs: KVPair[] = []
         docs.forEach((doc: Object) => {
             const key = genPrimaryKey(index, doc) as Uint8Array
-            const kvPair = new db3_mutation_pb.KVPair()
-            kvPair.setKey(key)
-            kvPair.setValue(object2Buffer(doc))
-            kvPair.setAction(db3_mutation_pb.MutationAction.INSERTKV)
+            const kvPair: KVPair = {
+                key: key,
+                value: object2Buffer(doc),
+                action: MutationAction.InsertKv,
+            }
             kvPairs.push(kvPair)
         })
         return await this.db3.submitRawMutation(index.ns, kvPairs, sign, nonce)
@@ -202,17 +209,9 @@ export class DocStore {
             keyList: keys,
         })
         const docs: Object[] = []
-        response
-            .getBatchGetValues()
-            ?.getValuesList()
-            .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                docs.push(
-                    JSON.parse(
-                        new TextDecoder('utf-8').decode(kvPair.getValue_asU8())
-                    )
-                )
-            })
-
+        response.batchGetValues?.values.forEach((kvPair: KVPair) => {
+            docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.value)))
+        })
         return docs
     }
 
@@ -221,29 +220,17 @@ export class DocStore {
         index: DocIndex,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
-        try {
-            await this.db3.keepSession(sign)
-            const docs: Record<string, any>[] = []
-            const res = await this.db3.getRange(
-                ns,
-                genStartKey(index),
-                genEndKey(index)
-            )
-            res.getRangeValue()
-                ?.getValuesList()
-                .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                    docs.push(
-                        JSON.parse(
-                            new TextDecoder('utf-8').decode(
-                                kvPair.getValue_asU8()
-                            )
-                        )
-                    )
-                })
-            return docs
-        } catch (error) {
-            throw error
-        }
+        await this.db3.keepSession(sign)
+        const docs: Record<string, any>[] = []
+        const res = await this.db3.getRange(
+            ns,
+            genStartKey(index),
+            genEndKey(index)
+        )
+        res.rangeValue?.values.forEach((kvPair: KVPair) => {
+            docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.value)))
+        })
+        return docs
     }
 
     async queryDocsByRange(
@@ -253,29 +240,17 @@ export class DocStore {
         endKey: Record<string, any>,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
-        try {
-            await this.db3.keepSession(sign)
-            const docs: Record<string, any>[] = []
-            const res = await this.db3.getRange(
-                ns,
-                genPrimaryKey(index, startKey),
-                genPrimaryKey(index, endKey)
-            )
-            res.getRangeValue()
-                ?.getValuesList()
-                .forEach((kvPair: db3_mutation_pb.KVPair) => {
-                    docs.push(
-                        JSON.parse(
-                            new TextDecoder('utf-8').decode(
-                                kvPair.getValue_asU8()
-                            )
-                        )
-                    )
-                })
-            return docs
-        } catch (error) {
-            throw error
-        }
+        await this.db3.keepSession(sign)
+        const docs: Record<string, any>[] = []
+        const res = await this.db3.getRange(
+            ns,
+            genPrimaryKey(index, startKey),
+            genPrimaryKey(index, endKey)
+        )
+        res.rangeValue?.values.forEach((kvPair: KVPair) => {
+            docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.value)))
+        })
+        return docs
     }
 
     async deleteDoc(
@@ -285,11 +260,7 @@ export class DocStore {
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         const key = genPrimaryKey(index, doc)
-        try {
-            const res = await this.db3.deleteKey(ns, key, sign)
-            return res
-        } catch (error) {
-            throw error
-        }
+        const res = await this.db3.deleteKey(ns, key, sign)
+        return res
     }
 }

@@ -99,7 +99,9 @@ jobs:
             - uses: CultureHQ/actions-yarn@v1.0.1
             - run: |
                 cd src/db3js
+                mkdir -p src/pkg
                 yarn install
+                make
                 yarn build
             - uses: JS-DevTools/npm-publish@v1
               with:
