@@ -289,7 +289,6 @@ export class DB3 {
         if (!this.sessionToken) {
             throw new Error('SessionToken is not defined')
         }
-        console.log("range session token ", this.sessionToken)
         const range:Range = {
             start: startKey,
             end: endKey
@@ -317,7 +316,6 @@ export class DB3 {
     ) {
         const kvPairsList: KVPair[] = []
         if (typeof key === 'string') {
-            console.log("string key")
             const kv_pair:KVPair = {
                 action: MutationAction.DeleteKv,
                 key: encodeUint8Array(key),
@@ -325,7 +323,6 @@ export class DB3 {
             }
             kvPairsList.push(kv_pair)
         } else {
-            console.log("Uint8Array key")
             const kv_pair:KVPair = {
                 action: MutationAction.DeleteKv,
                 key: key,
