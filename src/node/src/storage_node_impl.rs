@@ -65,7 +65,6 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetNamespaceRequest>,
     ) -> std::result::Result<Response<GetNamespaceResponse>, Status> {
-        info!("get namespace");
         let get_namespace_req = request.into_inner();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
@@ -92,7 +91,6 @@ impl StorageNode for StorageNodeImpl {
                     )));
                 }
                 let real_addr = addr.unwrap();
-                info!("get namespace with addr {}", real_addr);
                 let ns_list = node_store
                     .get_auth_store()
                     .get_my_ns_list(&real_addr)
@@ -113,7 +111,6 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetRangeRequest>,
     ) -> std::result::Result<Response<GetRangeResponse>, Status> {
-        info!("get range");
         if let Some(range_key) = request.into_inner().range_keys {
             match self.context.node_store.lock() {
                 Ok(mut node_store) => {
@@ -130,7 +127,6 @@ impl StorageNode for StorageNodeImpl {
                         }
                         None => return Err(Status::internal("Fail to create session")),
                     }
-                    info!("range key {:?}", &range_key);
                     let addr = node_store
                         .get_session_store()
                         .get_address(&range_key.session_token);
@@ -145,7 +141,6 @@ impl StorageNode for StorageNodeImpl {
                         .get_range(&addr.unwrap(), &range_key)
                         .map_err(|e| Status::internal(format!("{:?}", e)))?;
 
-                    info!("batch get range {:?}", &values);
                     node_store
                         .get_session_store()
                         .get_session_mut(&range_key.session_token)

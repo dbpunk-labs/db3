@@ -1,32 +1,40 @@
 import { describe, expect, test } from '@jest/globals'
 import { DB3 } from './db3'
-import { DocMetaManager, DocStore, DocIndex, DocKey, DocKeyType, genPrimaryKey, object2Buffer } from './doc_store'
+import {
+    DocMetaManager,
+    DocStore,
+    DocIndex,
+    DocKey,
+    DocKeyType,
+    genPrimaryKey,
+    object2Buffer,
+} from './doc_store'
 import { sign, getATestStaticKeypair, getAddress } from './keys'
 import { TextEncoder, TextDecoder } from 'util'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
-import fetch, { Headers, Request, Response } from "node-fetch";
+import fetch, { Headers, Request, Response } from 'node-fetch'
 
 if (!globalThis.fetch) {
-	globalThis.fetch = fetch;
-	globalThis.Headers = Headers;
-	globalThis.Request = Request;
-	globalThis.Response = Response;
+    globalThis.fetch = fetch
+    globalThis.Headers = Headers
+    globalThis.Request = Request
+    globalThis.Response = Response
 }
-
 
 describe('test db3js api', () => {
     async function getSign() {
         const [sk, public_key] = await getATestStaticKeypair()
-        async function _sign(data: Uint8Array): Promise<[Uint8Array, Uint8Array]> {
+        async function _sign(
+            data: Uint8Array
+        ): Promise<[Uint8Array, Uint8Array]> {
             return [await sign(data, sk), public_key]
         }
         return _sign
     }
 
-    test("doc meta smoke test", async () => {
+    test('doc meta smoke test', async () => {
         try {
-
             const db3_instance = new DB3('http://127.0.0.1:26659')
             const _sign = await getSign()
             const doc_meta_mgr = new DocMetaManager(db3_instance)
@@ -41,18 +49,22 @@ describe('test db3js api', () => {
                         keyType: DocKeyType.NUMBER,
                     },
                 ],
-               ns: 'my_trx',
-               docName: 'transaction',
+                ns: 'my_trx',
+                docName: 'transaction',
             }
-            const result = await doc_meta_mgr.create_doc_meta(my_transaction_meta, "test_transaction", _sign)
-            await new Promise(r => setTimeout(r, 1000))
-            const docs = await doc_meta_mgr.get_all_doc_metas("my_trx", _sign)
+            const result = await doc_meta_mgr.create_doc_meta(
+                my_transaction_meta,
+                'test_transaction',
+                _sign
+            )
+            await new Promise((r) => setTimeout(r, 1000))
+            const docs = await doc_meta_mgr.get_all_doc_metas('my_trx', _sign)
             expect(docs.length).toBe(1)
-            expect(docs[0].doc_name).toBe("transaction")
-            expect(docs[0].desc).toBe("test_transaction")
-            expect(docs[0].index.ns).toBe("my_trx")
-        } catch(error) {
-            console.log("doc meta smoke test error", error)
+            expect(docs[0].doc_name).toBe('transaction')
+            expect(docs[0].desc).toBe('test_transaction')
+            expect(docs[0].index.ns).toBe('my_trx')
+        } catch (error) {
+            console.log('doc meta smoke test error', error)
             expect(1).toBe(0)
         }
     })
@@ -62,15 +74,20 @@ describe('test db3js api', () => {
             const db3 = new DB3('http://127.0.0.1:26659')
             const _sign = await getSign()
             const result = await db3.createSimpleNs(
-                {name:"test_ns", desc:"desc_ns", 
-                    erc20Token:"usdt", price:1, queryCount:100},
+                {
+                    name: 'test_ns',
+                    desc: 'desc_ns',
+                    erc20Token: 'usdt',
+                    price: 1,
+                    queryCount: 100,
+                },
                 _sign
             )
-            await new Promise(r => setTimeout(r, 2000))
+            await new Promise((r) => setTimeout(r, 2000))
             const nsList = await db3.getNsList(_sign)
-            expect(nsList.nsList[0].name).toBe("test_ns")
+            expect(nsList.nsList[0].name).toBe('test_ns')
         } catch (error) {
-            console.log("namespace smoke test error", error)
+            console.log('namespace smoke test error', error)
             expect(1).toBe(0)
         }
     })
@@ -95,6 +112,8 @@ describe('test db3js api', () => {
         try {
             const { sessionToken } = await db3_instance.openQuerySession(_sign)
             expect(typeof sessionToken).toBe('string')
+            const response = await db3_instance.closeQuerySession(_sign)
+            expect(response).toBeDefined()
         } catch (error) {
             throw error
         }
@@ -113,12 +132,14 @@ describe('test db3js api', () => {
                 _sign
             )
             await db3_instance.openQuerySession(_sign)
-            await new Promise(r => setTimeout(r, 2000))
+            await new Promise((r) => setTimeout(r, 2000))
             const queryRes = await db3_instance.getKey({
                 ns: 'my_twitter',
                 keyList: ['key123'],
             })
-            const value = new TextDecoder('utf-8').decode(queryRes.batchGetValues!.values[0].value)
+            const value = new TextDecoder('utf-8').decode(
+                queryRes.batchGetValues!.values[0].value
+            )
             expect(value).toBe('value123')
         } catch (error) {
             throw error
@@ -137,13 +158,15 @@ describe('test db3js api', () => {
                 },
                 _sign
             )
-            await new Promise(r => setTimeout(r, 2000))
+            await new Promise((r) => setTimeout(r, 2000))
             await db3_instance.openQuerySession(_sign)
             const queryRes = await db3_instance.getKey({
                 ns: 'my_twitter',
                 keyList: ['test2'],
             })
-            const value = new TextDecoder('utf-8').decode(queryRes.batchGetValues!.values[0].value)
+            const value = new TextDecoder('utf-8').decode(
+                queryRes.batchGetValues!.values[0].value
+            )
             expect(value).toBe('value123')
             const closeRes = await db3_instance.closeQuerySession(_sign)
             expect(closeRes).toBeDefined()
@@ -280,11 +303,10 @@ describe('test db3js api', () => {
         expect(res1[2].address).toBe('0x11113')
     })
 
-
     test('delete data by key', async () => {
-        const db3_instance = new DB3('http://127.0.0.1:26659')
+        const db3 = new DB3('http://127.0.0.1:26659')
         const _sign = await getSign()
-        await db3_instance.submitMutaition(
+        await db3.submitMutaition(
             {
                 ns: 'my_twitter',
                 gasLimit: 10,
@@ -292,8 +314,8 @@ describe('test db3js api', () => {
             },
             _sign
         )
-        await new Promise(r => setTimeout(r, 2000))
-        const res = await db3_instance.deleteKey('my_twitter', 'user', _sign)
+        await new Promise((r) => setTimeout(r, 2000))
+        const res = await db3.deleteKey('my_twitter', 'user', _sign)
         expect(res).toBeDefined()
     })
 
@@ -320,8 +342,13 @@ describe('test db3js api', () => {
             ts: 9527,
         }
         await doc_store.insertDocs(doc_index, [transacion], _sign, 1)
-        await new Promise(r => setTimeout(r, 2000))
-        const res = await doc_store.deleteDoc('ns2', doc_index, transacion, _sign)
+        await new Promise((r) => setTimeout(r, 2000))
+        const res = await doc_store.deleteDoc(
+            'ns2',
+            doc_index,
+            transacion,
+            _sign
+        )
         expect(res).toBeDefined()
     })
 })

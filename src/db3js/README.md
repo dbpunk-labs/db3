@@ -7,4 +7,6 @@ yarn
 make
 # run test
 yarn test
+# format the code
+yarn prettier --write src/lib
 ```

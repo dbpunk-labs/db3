@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { DB3 } from './db3'
-import {KVPair, MutationAction} from '../pkg/db3_mutation'
+import { KVPair, MutationAction } from '../pkg/db3_mutation'
 import { SmartBuffer, SmartBufferOptions } from 'smart-buffer'
 
 // the type of doc key
@@ -113,9 +113,10 @@ export class DocMetaManager {
         this.doc_store = new DocStore(db3)
     }
 
-    async get_all_doc_metas(ns:string,
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
-                          ) {
+    async get_all_doc_metas(
+        ns: string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
         const static_doc_index = {
             keys: [
                 {
@@ -133,9 +134,11 @@ export class DocMetaManager {
         return await this.doc_store.queryAllDocs(ns, static_doc_index, sign)
     }
 
-    async create_doc_meta(doc_index: DocIndex, desc: string,
-        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>,
-                      ) {
+    async create_doc_meta(
+        doc_index: DocIndex,
+        desc: string,
+        sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
+    ) {
         const static_doc_index = {
             keys: [
                 {
@@ -151,13 +154,17 @@ export class DocMetaManager {
             docName: '_meta_',
         }
         const doc_meta = {
-            'doc_name': doc_index.docName,
-            'ts': Date.now(),
-            'index': doc_index,
-            'desc': desc
+            doc_name: doc_index.docName,
+            ts: Date.now(),
+            index: doc_index,
+            desc: desc,
         }
         //TODO check if the doc meta exists
-        return await this.doc_store.insertDocs(static_doc_index, [doc_meta], sign)
+        return await this.doc_store.insertDocs(
+            static_doc_index,
+            [doc_meta],
+            sign
+        )
     }
 }
 
@@ -176,10 +183,10 @@ export class DocStore {
         const kvPairs: KVPair[] = []
         docs.forEach((doc: Object) => {
             const key = genPrimaryKey(index, doc) as Uint8Array
-            const kvPair:KVPair = {
+            const kvPair: KVPair = {
                 key: key,
                 value: object2Buffer(doc),
-                action: MutationAction.InsertKv
+                action: MutationAction.InsertKv,
             }
             kvPairs.push(kvPair)
         })
@@ -202,16 +209,9 @@ export class DocStore {
             keyList: keys,
         })
         const docs: Object[] = []
-        response
-            .batchGetValues
-            ?.values
-            .forEach((kvPair: KVPair) => {
-                docs.push(
-                    JSON.parse(
-                        new TextDecoder('utf-8').decode(kvPair.value)
-                    )
-                )
-            })
+        response.batchGetValues?.values.forEach((kvPair: KVPair) => {
+            docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.value)))
+        })
         return docs
     }
 
@@ -227,17 +227,9 @@ export class DocStore {
             genStartKey(index),
             genEndKey(index)
         )
-        res.rangeValue
-            ?.values
-            .forEach((kvPair: KVPair) => {
-                docs.push(
-                    JSON.parse(
-                        new TextDecoder('utf-8').decode(
-                            kvPair.value
-                        )
-                    )
-                )
-         })
+        res.rangeValue?.values.forEach((kvPair: KVPair) => {
+            docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.value)))
+        })
         return docs
     }
 
@@ -255,17 +247,9 @@ export class DocStore {
             genPrimaryKey(index, startKey),
             genPrimaryKey(index, endKey)
         )
-        res.rangeValue
-            ?.values
-            .forEach((kvPair: KVPair) => {
-                docs.push(
-                    JSON.parse(
-                        new TextDecoder('utf-8').decode(
-                            kvPair.value
-                        )
-                    )
-                )
-            })
+        res.rangeValue?.values.forEach((kvPair: KVPair) => {
+            docs.push(JSON.parse(new TextDecoder('utf-8').decode(kvPair.value)))
+        })
         return docs
     }
 
