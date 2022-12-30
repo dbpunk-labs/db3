@@ -8,6 +8,7 @@
 ![GitHub issues by-label](https://img.shields.io/github/issues/dbpunk-labs/db3/good%20first%20issue?style=flat-square)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3?style=flat-square)
 ![npm](https://img.shields.io/npm/v/db3js?style=flat-square)
+![npm](https://img.shields.io/npm/dw/db3js?style=flat-square)
 ![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
