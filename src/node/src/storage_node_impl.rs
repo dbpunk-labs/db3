@@ -343,7 +343,6 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetKeyRequest>,
     ) -> std::result::Result<Response<GetKeyResponse>, Status> {
-        info!("get key");
         if let Some(batch_get_key) = request.into_inner().batch_get {
             match self.context.node_store.lock() {
                 Ok(mut node_store) => {
@@ -370,7 +369,6 @@ impl StorageNode for StorageNodeImpl {
                             &batch_get_key.session_token
                         )));
                     }
-                    info!("batch get key {:?}", &batch_get_key);
                     let values = node_store
                         .get_auth_store()
                         .batch_get(&addr.unwrap(), &batch_get_key)
@@ -382,7 +380,6 @@ impl StorageNode for StorageNodeImpl {
                         .get_session_mut(&batch_get_key.session_token)
                         .unwrap()
                         .increase_query(1);
-                    info!("get key ok");
                     Ok(Response::new(GetKeyResponse {
                         batch_get_values: Some(values.to_owned()),
                     }))
@@ -446,7 +443,6 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<BroadcastRequest>,
     ) -> std::result::Result<Response<BroadcastResponse>, Status> {
-        info!("receive the broadcast request");
         let r = request.into_inner();
         let response = self
             .context
