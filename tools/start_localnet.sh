@@ -3,6 +3,12 @@
 # start_localnet.sh
 killall db3 tendermint
 test_dir=`pwd`
+BUILD_MODE='debug'
+if [[ $1 == 'release' ]] ; then
+  BUILD_MODE='release'
+fi
+
+echo "BUILD MODE: ${BUILD_MODE}"
 if [ -e ./tendermint ]
 then
     echo "tendermint exist"
@@ -27,7 +33,7 @@ then
     rm -rf db
 fi
 ./tendermint init
-../target/debug/db3 node >db3.log 2>&1  &
+../target/${BUILD_MODE}/db3 node >db3.log 2>&1  &
 sleep 1
 ./tendermint unsafe_reset_all && ./tendermint start
 sleep 1
