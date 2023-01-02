@@ -2,7 +2,7 @@ import b from 'benny';
 b.suite(
     'Batch Get Query',
 
-    b.add('Batch Get Key/1', () => {
+    b.add('Reduce two elements', () => {
 
         ;[1, 2].reduce((a, b) => a + b)
     }),
