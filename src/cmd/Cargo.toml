@@ -17,7 +17,7 @@ db3-proto={ path = "../proto" }
 ethereum-types = { version = "0.14.0", default-features = false }
 prost = "0.11"
 prost-types = "0.11"
-prettytable-rs = "^0.9"
+prettytable-rs = "^0.10"
 ed25519-dalek = "1.0.1"
 rand = "0.7"
 rand_core = "0.6"
