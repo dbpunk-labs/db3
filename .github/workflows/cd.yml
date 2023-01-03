@@ -86,25 +86,4 @@ jobs:
                       target/${{ matrix.job.target }}/release/db3*.sha256
               env:
                   GITHUB_TOKEN: ${{ secrets.CR_PAT }}
-    npm_publish:
-        name: Publish Package to npmjs
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/setup-node@v3.5.1
-              with:
-                  node-version: "16.x"
-                  # registry-url: "https://registry.npmmirror.com/"
-                  path: ./src/db3js
-            - uses: CultureHQ/actions-yarn@v1.0.1
-            - run: |
-                cd src/db3js
-                mkdir -p src/pkg
-                yarn install
-                make
-                yarn build
-            - uses: JS-DevTools/npm-publish@v1
-              with:
-                  token: ${{ secrets.NMP_TOKEN }}
-                  package: src/db3js/package.json
 

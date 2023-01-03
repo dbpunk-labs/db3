@@ -98,13 +98,4 @@ jobs:
           token: ${{secrets.COV_TOKEN}}
           directory: .
           flags: rust
-      - uses: actions/setup-node@v3.5.1
-      - uses: CultureHQ/actions-yarn@v1.0.1
-      - name: test db3js
-        run: |
-          cd src/db3js
-          mkdir -p src/pkg
-          yarn install
-          make
-          yarn test
 
