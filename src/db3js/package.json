@@ -7,7 +7,7 @@
     "scripts": {
         "build": "tsup --legacy-output --loader .wasm=file --minify",
         "test": "jest",
-        "benny-sdk": "ts-node-esm ./src/benches/sdk_query.ts",
+        "benny-sdk": "ts-node-esm --experimental-specifier-resolution=node ./src/benches/sdk_query.ts",
         "benny-demo": "ts-node-esm ./src/benches/reduce.ts"
     },
     "dependencies": {
