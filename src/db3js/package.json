@@ -6,7 +6,9 @@
     "type": "module",
     "scripts": {
         "build": "tsup --legacy-output --loader .wasm=file --minify",
-        "test": "jest"
+        "test": "jest",
+        "benny-sdk": "ts-node-esm --experimental-specifier-resolution=node ./src/benches/sdk_query.ts",
+        "benny-demo": "ts-node-esm ./src/benches/reduce.ts"
     },
     "dependencies": {
         "@deliberative/crypto": "^0.6.18",
@@ -38,6 +40,7 @@
         "@types/react-dom": "^18.0.8",
         "@types/secp256k1": "^4.0.3",
         "babel-jest": "^29.3.1",
+        "benny": "^3.7.1",
         "jest": "^29.3.1",
         "jest-environment-jsdom": "^29.3.1",
         "node-fetch": "2.6.6",

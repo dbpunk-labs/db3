@@ -33,7 +33,7 @@ import {
 import { StorageNodeClient } from '../pkg/db3_node.client'
 import * as jspb from 'google-protobuf'
 
-export interface Mutation {
+export interface KvMutation {
     ns: string
     gasLimit: number
     data: Record<string, any>
@@ -188,7 +188,7 @@ export class DB3 {
     }
 
     async submitMutaition(
-        mutation: Mutation,
+        mutation: KvMutation,
         sign: (target: Uint8Array) => Promise<[Uint8Array, Uint8Array]>
     ) {
         const kvPairsList: KVPair[] = []
@@ -223,7 +223,16 @@ export class DB3 {
         if (this.querySessionInfo) {
             return {}
         }
-        const header = window.crypto.getRandomValues(new Uint8Array(32))
+        let header = ''
+        if (typeof window === 'undefined') {
+            header =
+                new Date().getTime() +
+                '' +
+                '_Header_' +
+                Math.floor(Math.random() * 1000)
+        } else {
+            header = window.crypto.getRandomValues(new Uint8Array(32))
+        }
         const payload: OpenSessionPayload = {
             header: header.toString(),
             startTime: Math.floor(Date.now() / 1000),
