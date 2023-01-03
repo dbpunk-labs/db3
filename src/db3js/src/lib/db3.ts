@@ -223,9 +223,13 @@ export class DB3 {
         if (this.querySessionInfo) {
             return {}
         }
-        let header = "";
-        if (typeof window === "undefined") {
-            header = new Date().getTime() + "" + "_Header_" + Math.floor(Math.random() * 1000);
+        let header = ''
+        if (typeof window === 'undefined') {
+            header =
+                new Date().getTime() +
+                '' +
+                '_Header_' +
+                Math.floor(Math.random() * 1000)
         } else {
             header = window.crypto.getRandomValues(new Uint8Array(32))
         }
