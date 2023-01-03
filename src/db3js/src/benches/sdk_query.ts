@@ -1,16 +1,14 @@
 // @ts-ignore
-import { DB3} from '../lib/db3'
+import { DB3 } from '../lib/db3'
 import { sign, getATestStaticKeypair, getAddress } from '../lib/keys'
-import b from 'benny';
-import {TextDecoder} from "util";
+import b from 'benny'
+import { TextDecoder } from 'util'
 
 const delay = (seconds: number) =>
     new Promise((resolve) => setTimeout(resolve, seconds * 1000))
 async function getSign() {
     const [sk, public_key] = await getATestStaticKeypair()
-    async function _sign(
-        data: Uint8Array
-    ): Promise<[Uint8Array, Uint8Array]> {
+    async function _sign(data: Uint8Array): Promise<[Uint8Array, Uint8Array]> {
         return [await sign(data, sk), public_key]
     }
     return _sign
@@ -126,5 +124,5 @@ b.suite(
         minDisplayPrecision: 3,
     }),
     b.save({ file: 'js_sdk_benchmark', details: true, version: '1.0.0' }),
-    b.save({ file: 'js_sdk_benchmark', details: true, format: 'chart.html' }),
+    b.save({ file: 'js_sdk_benchmark', details: true, format: 'chart.html' })
 )

@@ -1,9 +1,8 @@
-import b from 'benny';
+import b from 'benny'
 b.suite(
     'Batch Get Query',
 
     b.add('Reduce two elements', () => {
-
         ;[1, 2].reduce((a, b) => a + b)
     }),
 
@@ -14,5 +13,5 @@ b.suite(
     b.cycle(),
     b.complete(),
     b.save({ file: 'reduce', version: '1.0.0' }),
-    b.save({ file: 'reduce', format: 'chart.html' }),
+    b.save({ file: 'reduce', format: 'chart.html' })
 )

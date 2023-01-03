@@ -1,4 +1,4 @@
-import b from 'benny';
+import b from 'benny'
 const delay = (seconds: number) =>
     new Promise((resolve) => setTimeout(resolve, seconds * 1000))
 
@@ -16,5 +16,5 @@ b.suite(
     b.cycle(),
     b.complete(),
     b.save({ file: 'async_bench_example', version: '1.0.0' }),
-    b.save({ file: 'async_bench_example', format: 'chart.html' }),
+    b.save({ file: 'async_bench_example', format: 'chart.html' })
 )
