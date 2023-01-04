@@ -5,9 +5,9 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3?style=flat-square)
 ![contribution](https://img.shields.io/github/contributors/dbpunk-labs/db3?style=flat-square)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3?style=flat-square)
-![GitHub issues by-label](https://img.shields.io/github/issues/dbpunk-labs/db3/good%20first%20issue?style=flat-square)
+[![GitHub issues by-label](https://img.shields.io/github/issues/dbpunk-labs/db3/good%20first%20issue?style=flat-square)](https://github.com/dbpunk-labs/db3/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3?style=flat-square)
-![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)
+[![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)](https://twitter.com/Db3Network)
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
 
