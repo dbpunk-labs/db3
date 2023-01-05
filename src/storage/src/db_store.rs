@@ -48,7 +48,21 @@ impl DbStore {
         ))
     }
 
-    pub fn apply(
+    pub fn apply_del(db: Pin<&mut Merk>, account_addr: &AccountAddress, name: &str) -> Result<()> {
+        let mut entries: Vec<BatchEntry> = Vec::new();
+        let key = DbKey(*account_addr, name.as_bytes().as_ref());
+        let encoded_key = key.encode()?;
+        let entry = (encoded_key, Op::Delete);
+        entries.push(entry);
+        unsafe {
+            Pin::get_unchecked_mut(db)
+                .apply(&entries, &[])
+                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{}", e)))?;
+        }
+        Ok(())
+    }
+
+    pub fn apply_add(
         db: Pin<&mut Merk>,
         account_addr: &AccountAddress,
         database: &Database,

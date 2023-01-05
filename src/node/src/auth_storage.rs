@@ -250,12 +250,12 @@ impl AuthStorage {
         database: &DatabaseRequest,
     ) -> Result<()> {
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        match database.body {
+        match &database.body {
             Some(Body::Name(name)) => {
-                //TODO delete database
-                Ok(())
+                DbStore::apply_del(db, addr, &name)
+                //TODO delete data in kv_store
             }
-            Some(Body::Database(d)) => DbStore::apply(db, addr, &d),
+            Some(Body::Database(d)) => DbStore::apply_add(db, addr, &d),
             _ => {
                 todo!()
             }

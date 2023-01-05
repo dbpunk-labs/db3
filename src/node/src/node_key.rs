@@ -1,10 +1,11 @@
 use db3_error::{DB3Error, Result};
+use dirs;
 use ed25519_dalek::Keypair;
 use std::option::Option;
 use tendermint_config::PrivValidatorKey;
 
 pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
-    let mut home_dir = std::env::home_dir().unwrap();
+    let mut home_dir = dirs::home_dir().unwrap();
     let key_path = match file_path {
         Some(path) => {
             home_dir.push(path);

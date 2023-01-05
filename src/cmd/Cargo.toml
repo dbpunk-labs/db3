@@ -21,6 +21,7 @@ prettytable-rs = "^0.10"
 ed25519-dalek = "1.0.1"
 rand = "0.7"
 rand_core = "0.6"
+dirs = "4.0.0"
 
 [dev-dependencies]
 db3-session={ path = "../session"}
