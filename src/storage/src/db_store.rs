@@ -107,7 +107,7 @@ mod tests {
     use tempdir::TempDir;
 
     #[test]
-    fn ns_store_smoke_test() {
+    fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
         let addr = get_a_static_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
@@ -133,12 +133,17 @@ mod tests {
             description: "test".to_string(),
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = DbStore::apply(db_m, &addr, &ns);
+        let result = DbStore::apply_add(db_m, &addr, &ns);
         assert!(result.is_ok());
         if let Ok(ops) = DbStore::get_databases(db.as_ref(), &addr) {
             assert_eq!(1, ops.len());
         } else {
             assert!(false);
         }
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result = DbStore::apply_del(db_m, &addr, "test1");
+        assert!(result.is_ok());
+        let result = DbStore::get_databases(db.as_ref(), &addr);
+        assert!(result.is_err());
     }
 }

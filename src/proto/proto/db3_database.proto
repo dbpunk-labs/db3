@@ -30,7 +30,6 @@ message QueryPrice {
     uint64 query_count = 2;
 }
 
-
 //
 // the definition of database
 //

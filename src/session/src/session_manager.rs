@@ -441,7 +441,7 @@ mod tests {
     }
     #[test]
     fn is_ttl_expired_test() {
-        let mut sess_store = SessionStore::new();
+        let sess_store = SessionStore::new();
         assert!(!sess_store.is_ttl_expired(Utc::now().timestamp() - 1));
         assert!(sess_store.is_ttl_expired(Utc::now().timestamp() - 5));
         assert!(sess_store.is_ttl_expired(Utc::now().timestamp() - 10));

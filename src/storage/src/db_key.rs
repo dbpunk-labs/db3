@@ -62,7 +62,7 @@ mod tests {
         let key = DbKey(addr, ns.as_bytes());
         let key_encoded = key.encode();
         assert!(key_encoded.is_ok());
-        let key_decoded = NsKey::decode(key_encoded.as_ref().unwrap());
+        let key_decoded = DbKey::decode(key_encoded.as_ref().unwrap());
         assert!(key_decoded.is_ok());
         let key2 = key_decoded.unwrap();
         assert_eq!(key2.0, addr);

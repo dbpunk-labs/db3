@@ -5,10 +5,11 @@ mod node_integration {
     use db3_base::get_a_random_nonce;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, Erc20Token, Price, UnitType, Units};
+    use db3_proto::db3_database_proto::{Database, QueryPrice};
     use db3_proto::db3_mutation_proto::{
-        KvPair, Mutation, MutationAction, PayloadType, WriteRequest,
+        database_request::Body, DatabaseRequest, KvPair, Mutation, MutationAction, PayloadType,
+        WriteRequest,
     };
-    use db3_proto::db3_namespace_proto::{Namespace, QueryPrice};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_proto::db3_session_proto::SessionStatus;
     use db3_sdk::mutation_sdk::MutationSDK;
@@ -53,7 +54,7 @@ mod node_integration {
     }
 
     #[actix_web::test]
-    async fn json_rpc_namespace_smoke_test() {
+    async fn json_rpc_database_smoke_test() {
         let nonce = get_a_random_nonce();
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
@@ -73,22 +74,27 @@ mod node_integration {
             price: Some(price),
             query_count: 1000,
         };
-        let ns = Namespace {
+        let database = Database {
             name: "test1".to_string(),
             price: Some(query_price),
             ts: 1000,
             description: "test".to_string(),
+        };
+
+        let db = Body::Database(database);
+        let request = DatabaseRequest {
+            body: Some(db),
             meta: None,
         };
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
-        ns.encode(&mut mbuf).unwrap();
+        request.encode(&mut mbuf).unwrap();
         let mbuf = mbuf.freeze();
         let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
         let request = WriteRequest {
             signature: signature.as_ref().to_vec(),
             payload: mbuf.as_ref().to_vec().to_owned(),
             public_key: public_key.as_ref().to_vec(),
-            payload_type: PayloadType::MutationPayload.into(),
+            payload_type: PayloadType::DatabasePayload.into(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf).unwrap();
