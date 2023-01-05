@@ -27,18 +27,12 @@ enum MutationAction {
     Nonce= 2;
 }
 
-enum DatabaseAction {
-    AddDatabase = 0;
-    DeleteDatabase = 1;
-}
-
 message DatabaseRequest {
-    DatabaseAction action = 1;
     oneof body {
-        string name = 2;
-        db3_database_proto.Database database = 3;
+        string name = 1;
+        db3_database_proto.Database database = 2;
     }
-    db3_base_proto.BroadcastMeta meta = 4;
+    db3_base_proto.BroadcastMeta meta = 3;
 }
 
 message KVPair {

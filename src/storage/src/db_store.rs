@@ -38,7 +38,7 @@ impl DbStore {
         let key = DbKey(*account_addr, db.name.as_bytes().as_ref());
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024 * 4);
-        ns.encode(&mut buf)
+        db.encode(&mut buf)
             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{}", e)))?;
         let buf = buf.freeze();
         let total_in_bytes = encoded_key.len() + buf.as_ref().len();
@@ -59,7 +59,7 @@ impl DbStore {
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
-                .map_err(|e| DB3Error::ApplyNamespaceError(format!("{}", e)))?;
+                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{}", e)))?;
         }
         Ok(())
     }

@@ -131,7 +131,6 @@ message BroadcastResponse {
     bytes hash = 2;
 }
 
-
 message ShowDatabaseRequest {
     string session_token = 1;
     repeated string names = 2;
