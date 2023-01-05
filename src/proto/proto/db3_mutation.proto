@@ -18,12 +18,27 @@
 
 syntax = "proto3";
 import "db3_base.proto";
+import "db3_database.proto";
 package db3_mutation_proto;
 
 enum MutationAction {
     InsertKv=0;
     DeleteKv=1;
     Nonce= 2;
+}
+
+enum DatabaseAction {
+    AddDatabase = 0;
+    DeleteDatabase = 1;
+}
+
+message DatabaseRequest {
+    DatabaseAction action = 1;
+    oneof body {
+        string name = 2;
+        db3_database_proto.Database database = 3;
+    }
+    db3_base_proto.BroadcastMeta meta = 4;
 }
 
 message KVPair {
@@ -53,7 +68,7 @@ message Mutation {
 enum PayloadType {
     MutationPayload =0;
     QuerySessionPayload =1;
-    NamespacePayload = 2;
+    DatabasePayload = 2;
 }
 
 message WriteRequest {

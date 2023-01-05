@@ -1,5 +1,5 @@
 //
-// key.rs
+// db_key.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,18 +16,18 @@
 
 use db3_error::{DB3Error, Result};
 use ethereum_types::Address as AccountAddress;
-const NAMESPACE: &str = "_NS_";
-const MIN_KEY_TOTAL_LEN: usize = AccountAddress::len_bytes() + NAMESPACE.len();
+const DATABASE: &str = "_DB_";
+const MIN_KEY_TOTAL_LEN: usize = AccountAddress::len_bytes() + DATABASE.len();
 /// account_address + _NS_ + ns
-pub struct NsKey<'a>(pub AccountAddress, pub &'a [u8]);
+pub struct DbKey<'a>(pub AccountAddress, pub &'a [u8]);
 
-impl<'a> NsKey<'a> {
+impl<'a> DbKey<'a> {
     ///
     /// encode the key
     ///
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut encoded_key = self.0.as_ref().to_vec();
-        encoded_key.extend_from_slice(NAMESPACE.as_bytes());
+        encoded_key.extend_from_slice(DATABASE.as_bytes());
         encoded_key.extend_from_slice(self.1);
         Ok(encoded_key)
     }
@@ -59,7 +59,7 @@ mod tests {
     fn it_key_serde() {
         let addr = get_a_static_address();
         let ns: &str = "ns1";
-        let key = NsKey(addr, ns.as_bytes());
+        let key = DbKey(addr, ns.as_bytes());
         let key_encoded = key.encode();
         assert!(key_encoded.is_ok());
         let key_decoded = NsKey::decode(key_encoded.as_ref().unwrap());
@@ -73,10 +73,10 @@ mod tests {
     fn it_key_serde_cmp() -> Result<()> {
         let addr = get_a_static_address();
         let ns: &str = "ns1";
-        let key = NsKey(addr, ns.as_bytes());
+        let key = DbKey(addr, ns.as_bytes());
         let key_encoded1 = key.encode()?;
         let ns: &str = "ns2";
-        let key = NsKey(addr, ns.as_bytes());
+        let key = DbKey(addr, ns.as_bytes());
         let key_encoded2 = key.encode()?;
         assert!(key_encoded1.cmp(&key_encoded1) == std::cmp::Ordering::Equal);
         assert!(key_encoded1.cmp(&key_encoded2) == std::cmp::Ordering::Less);

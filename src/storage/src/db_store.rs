@@ -15,10 +15,10 @@
 // limitations under the License.
 //
 
-use super::ns_key::NsKey;
+use super::db_key::DbKey;
 use bytes::BytesMut;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_namespace_proto::Namespace;
+use db3_proto::db3_database_proto::Database;
 use ethereum_types::Address as AccountAddress;
 use merkdb::proofs::{query::Query, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
@@ -27,19 +27,19 @@ use std::collections::LinkedList;
 use std::ops::Range;
 use std::pin::Pin;
 
-pub struct NsStore {}
+pub struct DbStore {}
 
-impl NsStore {
+impl DbStore {
     pub fn new() -> Self {
         Self {}
     }
 
-    fn convert(ns: &Namespace, account_addr: &AccountAddress) -> Result<(BatchEntry, usize)> {
-        let key = NsKey(*account_addr, ns.name.as_bytes().as_ref());
+    fn convert(db: &Database, account_addr: &AccountAddress) -> Result<(BatchEntry, usize)> {
+        let key = DbKey(*account_addr, db.name.as_bytes().as_ref());
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024 * 4);
         ns.encode(&mut buf)
-            .map_err(|e| DB3Error::ApplyNamespaceError(format!("{}", e)))?;
+            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{}", e)))?;
         let buf = buf.freeze();
         let total_in_bytes = encoded_key.len() + buf.as_ref().len();
         Ok((
@@ -51,10 +51,10 @@ impl NsStore {
     pub fn apply(
         db: Pin<&mut Merk>,
         account_addr: &AccountAddress,
-        namespace: &Namespace,
+        database: &Database,
     ) -> Result<()> {
         let mut entries: Vec<BatchEntry> = Vec::new();
-        let (batch_entry, _) = Self::convert(namespace, account_addr)?;
+        let (batch_entry, _) = Self::convert(database, account_addr)?;
         entries.push(batch_entry);
         unsafe {
             Pin::get_unchecked_mut(db)
@@ -64,12 +64,12 @@ impl NsStore {
         Ok(())
     }
 
-    pub fn get_my_ns_list(
+    pub fn get_databases(
         db: Pin<&Merk>,
         account_addr: &AccountAddress,
     ) -> Result<LinkedList<ProofOp>> {
-        let start_key = NsKey(*account_addr, "".as_bytes().as_ref());
-        let end_key = NsKey(*account_addr, "~~".as_bytes().as_ref());
+        let start_key = DbKey(*account_addr, "".as_bytes().as_ref());
+        let end_key = DbKey(*account_addr, "~~".as_bytes().as_ref());
         let range = Range {
             start: start_key.encode()?,
             end: end_key.encode()?,
@@ -78,7 +78,7 @@ impl NsStore {
         query.insert_range(range);
         let ops = db
             .execute_query(query)
-            .map_err(|e| DB3Error::QueryNamespaceError(format!("{}", e)))?;
+            .map_err(|e| DB3Error::QueryDatabaseError(format!("{}", e)))?;
         Ok(ops)
     }
 }
@@ -88,7 +88,7 @@ mod tests {
     use super::*;
     use db3_base::get_a_static_address;
     use db3_proto::db3_base_proto::{Erc20Token, Price};
-    use db3_proto::db3_namespace_proto::QueryPrice;
+    use db3_proto::db3_database_proto::QueryPrice;
     use std::boxed::Box;
     use tempdir::TempDir;
 
@@ -112,17 +112,16 @@ mod tests {
             price: Some(price),
             query_count: 1000,
         };
-        let ns = Namespace {
+        let ns = Database {
             name: "test1".to_string(),
             price: Some(query_price),
             ts: 1000,
             description: "test".to_string(),
-            meta: None,
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = NsStore::apply(db_m, &addr, &ns);
+        let result = DbStore::apply(db_m, &addr, &ns);
         assert!(result.is_ok());
-        if let Ok(ops) = NsStore::get_my_ns_list(db.as_ref(), &addr) {
+        if let Ok(ops) = DbStore::get_databases(db.as_ref(), &addr) {
             assert_eq!(1, ops.len());
         } else {
             assert!(false);

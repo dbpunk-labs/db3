@@ -18,7 +18,7 @@
 pub mod account_store;
 pub mod bill_store;
 pub mod commit_store;
+mod db_key;
+pub mod db_store;
 pub mod key;
 pub mod kv_store;
-mod ns_key;
-pub mod ns_store;

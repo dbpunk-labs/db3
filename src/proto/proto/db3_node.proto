@@ -20,7 +20,7 @@ import "db3_bill.proto";
 import "db3_mutation.proto";
 import "db3_account.proto";
 import "db3_session.proto";
-import "db3_namespace.proto";
+import "db3_database.proto";
 package db3_node_proto;
 
 message QueryBillKey {
@@ -132,12 +132,13 @@ message BroadcastResponse {
 }
 
 
-message GetNamespaceRequest {
+message ShowDatabaseRequest {
     string session_token = 1;
+    repeated string names = 2;
 }
 
-message GetNamespaceResponse {
-    repeated db3_namespace_proto.Namespace ns_list = 1;
+message ShowDatabaseResponse {
+    repeated db3_database_proto.Database db_list = 1;
 }
 
 service StorageNode {
@@ -155,6 +156,7 @@ service StorageNode {
     rpc GetSessionInfo(GetSessionInfoRequest) returns (GetSessionInfoResponse) {}
     // method for broadcast request
     rpc Broadcast(BroadcastRequest) returns (BroadcastResponse) {}
-    // method for get namespace
-    rpc GetNamespace(GetNamespaceRequest) returns (GetNamespaceResponse) {}
+    // method for show database
+    rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
 }
+
