@@ -23,6 +23,7 @@ use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_proto::db3_session_proto::SessionStatus;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
+use dirs;
 use ed25519_dalek::Keypair;
 use rand::rngs::OsRng;
 use std::fs::File;
@@ -53,7 +54,7 @@ fn current_seconds() -> u64 {
 }
 
 pub fn get_key_pair(warning: bool) -> std::io::Result<Keypair> {
-    let mut home_dir = std::env::home_dir().unwrap();
+    let mut home_dir = dirs::home_dir().unwrap();
     home_dir.push(".db3");
     let user_dir = home_dir.as_path();
     std::fs::create_dir_all(user_dir)?;

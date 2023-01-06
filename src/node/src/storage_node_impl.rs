@@ -22,10 +22,10 @@ use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
-    CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse, GetNamespaceRequest,
-    GetNamespaceResponse, GetRangeRequest, GetRangeResponse, GetSessionInfoRequest,
-    GetSessionInfoResponse, OpenSessionRequest, OpenSessionResponse, QueryBillRequest,
-    QueryBillResponse,
+    CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse, GetRangeRequest,
+    GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse, OpenSessionRequest,
+    OpenSessionResponse, QueryBillRequest, QueryBillResponse, ShowDatabaseRequest,
+    ShowDatabaseResponse,
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
@@ -61,16 +61,16 @@ impl StorageNodeImpl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeImpl {
-    async fn get_namespace(
+    async fn show_database(
         &self,
-        request: Request<GetNamespaceRequest>,
-    ) -> std::result::Result<Response<GetNamespaceResponse>, Status> {
-        let get_namespace_req = request.into_inner();
+        request: Request<ShowDatabaseRequest>,
+    ) -> std::result::Result<Response<ShowDatabaseResponse>, Status> {
+        let show_database_req = request.into_inner();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 match node_store
                     .get_session_store()
-                    .get_session_mut(&get_namespace_req.session_token)
+                    .get_session_mut(&show_database_req.session_token)
                 {
                     Some(session) => {
                         if !session.check_session_running() {
@@ -83,24 +83,25 @@ impl StorageNode for StorageNodeImpl {
                 }
                 let addr = node_store
                     .get_session_store()
-                    .get_address(&get_namespace_req.session_token);
+                    .get_address(&show_database_req.session_token);
                 if addr.is_none() {
                     return Err(Status::internal(format!(
                         "not address found related to current token {}",
-                        &get_namespace_req.session_token
+                        &show_database_req.session_token
                     )));
                 }
                 let real_addr = addr.unwrap();
-                let ns_list = node_store
+                let db_list = node_store
                     .get_auth_store()
-                    .get_my_ns_list(&real_addr)
+                    .get_database(&real_addr)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
+
                 node_store
                     .get_session_store()
-                    .get_session_mut(&get_namespace_req.session_token)
+                    .get_session_mut(&show_database_req.session_token)
                     .unwrap()
                     .increase_query(1);
-                Ok(Response::new(GetNamespaceResponse { ns_list }))
+                Ok(Response::new(ShowDatabaseResponse { db_list }))
             }
 
             Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
