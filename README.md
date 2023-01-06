@@ -28,7 +28,7 @@ DB3 is a community-driven layer2 decentralized database network.
    Currently, decentralization means bad performance but db3 is trying to make a big improvement in performance
 
 	* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of db3 network and it not only has high performance but also the fast-proof generation
-	* Geo distribution, the nodes in every storage shard are geo-distributed and the clients can execute querys against the nearest storage node
+	* Geo distribution, the nodes in every storage shard are geo-distributed and the clients can execute queries against the nearest storage node
 
     * [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly
 
@@ -63,7 +63,7 @@ submit mutation to mempool done!
 >get ns1 k1
 k1 -> v1
 >account
- total bills  | storage used | mutation | querys | credits
+ total bills  | storage used | mutation | queries | credits
  0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
 
@@ -87,13 +87,13 @@ const doc_index = {
     ns: 'ns1',
     docName: 'transaction',
 };
-const transacion = {
+const transaction = {
     address: '0x11111',
     ts: 9527,
     amount: 10,
 };
 // insert a document
-const result = await doc_store.insertDocs(doc_index, [transacion], _sign, 1);
+const result = await doc_store.insertDocs(doc_index, [transaction], _sign, 1);
 // query a document
 const query = {
     address: '0x11111',
