@@ -31,11 +31,8 @@ use std::pin::Pin;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use tendermint_abci::Application;
-use tendermint_proto::abci::{
-    Event, RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
-    ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
-    ResponseQuery,
-};
+use tendermint_proto::abci::{Event, RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery, ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo, ResponseQuery,
+                             RequestEndBlock, ResponseEndBlock};
 use tracing::{debug, info, span, warn, Level};
 
 #[derive(Clone)]
@@ -102,6 +99,7 @@ impl Application for AbciImpl {
     }
 
     fn begin_block(&self, request: RequestBeginBlock) -> ResponseBeginBlock {
+        info!("begin block");
         match self.node_store.lock() {
             Ok(mut store) => {
                 let s = store.get_auth_store();
@@ -117,6 +115,10 @@ impl Application for AbciImpl {
             }
             Err(_) => todo!(),
         }
+        Default::default()
+    }
+    fn end_block(&self, request: RequestEndBlock) -> ResponseEndBlock {
+        info!("end block");
         Default::default()
     }
 
@@ -360,6 +362,7 @@ impl Application for AbciImpl {
     }
 
     fn commit(&self) -> ResponseCommit {
+        info!("commit start");
         let pending_mutation: Vec<(AccountAddress, Hash, Mutation)> =
             match self.pending_mutation.lock() {
                 Ok(mut q) => {
@@ -391,11 +394,12 @@ impl Application for AbciImpl {
                 }
             };
 
-        match self.node_store.lock() {
+        let commit = match self.node_store.lock() {
             Ok(mut store) => {
                 let s = store.get_auth_store();
                 let span = span!(Level::INFO, "commit").entered();
                 let pending_mutation_len = pending_mutation.len();
+                info!("pending mutation len {}", pending_mutation_len);
                 for item in pending_mutation {
                     match s.apply_mutation(&item.0, &item.1, &item.2) {
                         Ok((_gas, total_bytes)) => {
@@ -414,6 +418,7 @@ impl Application for AbciImpl {
                     }
                 }
                 let pending_query_session_len = pending_query_session.len();
+                info!("pending query session len {}", pending_query_session_len);
                 for item in pending_query_session {
                     match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
                         Ok(_) => {
@@ -428,6 +433,7 @@ impl Application for AbciImpl {
                     }
                 }
                 let pending_databases_len = pending_databases.len();
+                info!("pending database len {}", pending_databases_len);
                 for item in pending_databases {
                     match s.apply_database(&item.0, &item.1) {
                         Ok(_) => {}
@@ -463,7 +469,9 @@ impl Application for AbciImpl {
             Err(_) => {
                 todo!();
             }
-        }
+        };
+        info!("commit done!");
+        commit
     }
 }
 
