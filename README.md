@@ -108,6 +108,16 @@ more examples
 
 * [helloworld in typescript](./examples/helloworld)
 
+# Project assistance
+
+If you want to say thank you or/and support active development of DB3 Network
+
+* Add a GitHub Star to the project.
+* Tweet about how to use db3 network.
+* Write interesting articles about the project on Dev.to, Medium or your personal blog.
+
+Together, we can make db3 network better!
+
 
 # The Relationship Between Roles
 
