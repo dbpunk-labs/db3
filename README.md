@@ -148,6 +148,7 @@ more technical details
 * [ceramic network](https://github.com/ceramicnetwork/ceramic), a decentralized data network that brings unlimited data composability to Web3 applications
 * [kwil](https://github.com/kwilteam), the first permissionless SQL database for the decentralized internet
 * [spaceandtime](https://www.spaceandtime.io/), a decentralized data Warehouse
+* [OrbitDB](https://github.com/orbitdb/orbit-db) is a serverless, distributed, peer-to-peer database
 
 # License
 Apache License, Version 2.0
