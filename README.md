@@ -13,7 +13,9 @@
 
 # What's DB3 Network?
 
-DB3 is a community-driven layer2 decentralized database network.
+DB3 is a community-driven layer2 decentralized database network. and if you are a frontend developer, you can think db3 is a decentralized firebase firestore alternative.
+
+## Features
 
 1. **Infinite Storage Space**
 
