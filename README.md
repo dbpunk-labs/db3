@@ -15,6 +15,12 @@
 
 DB3 is a community-driven layer2 decentralized database network. and if you are a developer, you can think db3 is a decentralized firebase firestore alternative.
 
+## Why DB3 Network
+
+db3 network will provide data management for web3 applications, you can store and query documents against the db3 network with a firestore-like [SDK](https://github.com/dbpunk-labs/db3.js).
+
+![position](./docs/images/position_web3.jpg)
+
 ## Features
 
 1. **Infinite Storage Space**
@@ -36,7 +42,8 @@ DB3 is a community-driven layer2 decentralized database network. and if you are 
 
 3. **Crypto Native Data Ownership**
 
-    In the decentralized network, only the private key owners can update their data and they can keep privacy by encrypting their data with the public key
+
+    We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271) and every document has its owner and only the owner which holds the private key can update/delete the document. and the db3 network can generate the proofs and provide signatures to prove the membership(db3 has the specific document) and ownership
 
 4. **On-chain Programmable**
 
