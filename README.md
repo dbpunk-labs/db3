@@ -17,6 +17,10 @@ DB3 is a community-driven layer2 decentralized database network. and if you are 
 
 ## Why DB3 Network
 
+db3 network will provide data management for web3 applications, you can store and query documents against the db3 network with a firestore-like SDK
+
+![position](./docs/images/position_web3.jpg)
+
 ## Features
 
 1. **Infinite Storage Space**
