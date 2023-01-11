@@ -19,6 +19,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DB3Error {
+    #[error("invalid db3 address")]
+    InvalidAddress,
     #[error("fail to require lock from state")]
     StateLockBusyError,
     #[error("fail to load key pair {0}")]

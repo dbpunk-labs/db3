@@ -1,0 +1,91 @@
+//
+// address.rs
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+
+use db3_error::DB3Error;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use serde_with::Bytes;
+use fastcrypto::encoding::{Base58, Base64, Encoding, Hex};
+use fastcrypto::hash::{HashFunction, Sha3_256};
+use crate::db3_serde::Readable;
+
+const DB3_ADDRESS_LENGTH:u32 = 20;
+
+#[serde_as]
+#[derive(
+    Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema,
+)]
+pub struct DB3Address( 
+    #[schemars(with = "Hex")]
+    #[serde_as(as = "Readable<Hex, _>")]
+    [u8; DB3_ADDRESS_LENGTH],
+);
+
+impl DB3Address {
+
+    pub const ZERO: Self = Self([0u8, DB3_ADDRESS_LENGTH]);
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+
+ 	pub fn optional_address_as_hex<S>(
+        key: &Option<DB3Address>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&key.map(Hex::encode).unwrap_or_default())
+    }
+
+    pub fn optional_address_from_hex<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<DB3Address>, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let value = decode_bytes_hex(&s).map_err(serde::de::Error::custom)?;
+        Ok(Some(value))
+    }
+
+    pub fn to_inner(self) -> [u8; DB3_ADDRESS_LENGTH] {
+        self.0
+    }
+}
+
+
+impl TryFrom<Vec<u8>> for DB3Address {
+    type Error = DB3Error;
+    fn try_from(bytes: Vec<u8>) -> Result<Self, SuiError> {
+        let arr: [u8; DB3_ADDRESS_LENGTH] =
+            bytes.try_into().map_err(|_| DB3Error::InvalidAddress)?;
+        Ok(Self(arr))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn it_works() {
+	}
+}

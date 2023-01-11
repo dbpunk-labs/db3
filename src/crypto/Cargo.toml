@@ -14,8 +14,12 @@ db3-error={ path = "../error" }
 db3-base={ path = "../base" }
 ethereum-types = { version = "0.14.0", default-features = false }
 ed25519-dalek = "1.0.1"
+anyhow = "1.0.68"
+fastcrypto = "0.1.4"
 prost = "0.11"
 prost-types = "0.11"
 rand = "0.8.5"
 bytes = "1"
 hex = "0.4.3"
+serde_with = "2.1.0"
+schemars ="0.8.10"
