@@ -64,16 +64,6 @@ git clone https://github.com/dbpunk-labs/db3.git
 cd db3 && bash install_env.sh && cargo build
 # start localnet
 cd tools &&  sh start_localnet.sh
-# open another terminal , enter db3 dir and run db3 shell
-./target/debug/db3 shell
->get ns1 k1
->put ns1 k1 v1
-submit mutation to mempool done!
->get ns1 k1
-k1 -> v1
->account
- total bills  | storage used | mutation | queries | credits
- 0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
 
 ### Developers Friendly SDK
