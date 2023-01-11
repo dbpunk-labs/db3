@@ -42,7 +42,8 @@ db3 network will provide data management for web3 applications, you can store an
 
 3. **Crypto Native Data Ownership**
 
-    We proposed [the document level owership](https://github.com/dbpunk-labs/db3/issues/271) and every document has its owner and only the owner which holds the private key can update/delete the document, also the db3 network can generate the proofs and signature to prove the membership(db3 has the specific document) and ownership
+
+    We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271) and every document has its owner and only the owner which holds the private key can update/delete the document. and the db3 network can generate the proofs and provide signatures to prove the membership(db3 has the specific document) and ownership
 
 4. **On-chain Programmable**
 
