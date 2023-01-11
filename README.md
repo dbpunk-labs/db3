@@ -5,17 +5,23 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/db3-teams/db3?style=flat-square)
 ![contribution](https://img.shields.io/github/contributors/dbpunk-labs/db3?style=flat-square)
 ![GitHub issues](https://img.shields.io/github/issues/db3-teams/db3?style=flat-square)
-![GitHub issues by-label](https://img.shields.io/github/issues/dbpunk-labs/db3/good%20first%20issue?style=flat-square)
+[![GitHub issues by-label](https://img.shields.io/github/issues/dbpunk-labs/db3/good%20first%20issue?style=flat-square)](https://github.com/dbpunk-labs/db3/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3?style=flat-square)
-![npm](https://img.shields.io/npm/v/db3js?style=flat-square)
-![npm](https://img.shields.io/npm/dw/db3js?style=flat-square)
-![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)
+[![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)](https://twitter.com/Db3Network)
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 
 
 # What's DB3 Network?
 
-DB3 is a community-driven layer2 decentralized database network.
+DB3 is a community-driven layer2 decentralized database network. and if you are a developer, you can think db3 is a decentralized firebase firestore alternative.
+
+## Why DB3 Network
+
+db3 network will provide data management for web3 applications, you can store and query documents against the db3 network with a firestore-like [SDK](https://github.com/dbpunk-labs/db3.js).
+
+![position](./docs/images/position_web3.jpg)
+
+## Features
 
 1. **Infinite Storage Space**
 
@@ -30,13 +36,14 @@ DB3 is a community-driven layer2 decentralized database network.
    Currently, decentralization means bad performance but db3 is trying to make a big improvement in performance
 
 	* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of db3 network and it not only has high performance but also the fast-proof generation
-	* Geo distribution, the nodes in every storage shard are geo-distributed and the clients can execute querys against the nearest storage node
+	* Geo distribution, the nodes in every storage shard are geo-distributed and the clients can execute queries against the nearest storage node
 
     * [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly
 
 3. **Crypto Native Data Ownership**
 
-    In the decentralized network, only the private key owners can update their data and they can keep privacy by encrypting their data with the public key
+
+    We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271) and every document has its owner and only the owner which holds the private key can update/delete the document. and the db3 network can generate the proofs and provide signatures to prove the membership(db3 has the specific document) and ownership
 
 4. **On-chain Programmable**
 
@@ -57,16 +64,6 @@ git clone https://github.com/dbpunk-labs/db3.git
 cd db3 && bash install_env.sh && cargo build
 # start localnet
 cd tools &&  sh start_localnet.sh
-# open another terminal , enter db3 dir and run db3 shell
-./target/debug/db3 shell
->get ns1 k1
->put ns1 k1 v1
-submit mutation to mempool done!
->get ns1 k1
-k1 -> v1
->account
- total bills  | storage used | mutation | querys | credits
- 0.000000 db3 | 38.00        | 2        | 0      | 10 db3
 ```
 
 ### Developers Friendly SDK
@@ -89,13 +86,13 @@ const doc_index = {
     ns: 'ns1',
     docName: 'transaction',
 };
-const transacion = {
+const transaction = {
     address: '0x11111',
     ts: 9527,
     amount: 10,
 };
 // insert a document
-const result = await doc_store.insertDocs(doc_index, [transacion], _sign, 1);
+const result = await doc_store.insertDocs(doc_index, [transaction], _sign, 1);
 // query a document
 const query = {
     address: '0x11111',
@@ -107,6 +104,16 @@ const docs = await doc_store.getDocs(doc_index, [query], _sign);
 more examples
 
 * [helloworld in typescript](./examples/helloworld)
+
+# Project assistance
+
+If you want to say thank you or/and support active development of DB3 Network
+
+* Add a GitHub Star to the project.
+* Tweet about how to use db3 network.
+* Write interesting articles about the project on Dev.to, Medium or your personal blog.
+
+Together, we can make db3 network better!
 
 
 # The Relationship Between Roles
@@ -131,6 +138,7 @@ more technical details
 * [ceramic network](https://github.com/ceramicnetwork/ceramic), a decentralized data network that brings unlimited data composability to Web3 applications
 * [kwil](https://github.com/kwilteam), the first permissionless SQL database for the decentralized internet
 * [spaceandtime](https://www.spaceandtime.io/), a decentralized data Warehouse
+* [OrbitDB](https://github.com/orbitdb/orbit-db) is a serverless, distributed, peer-to-peer database
 
 # License
 Apache License, Version 2.0

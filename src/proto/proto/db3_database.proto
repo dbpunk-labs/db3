@@ -1,7 +1,7 @@
 //
 //
-// db3_namespace.proto
-// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+// db3_database.proto
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,17 +18,25 @@
 
 syntax = "proto3";
 import "db3_base.proto";
-package db3_namespace_proto;
+package db3_database_proto;
 
+//
+// the definition of price for query
+//
 message QueryPrice {
+    // the price
     db3_base_proto.Price price = 1;
+    // the count of query
     uint64 query_count = 2;
 }
 
-message Namespace {
+//
+// the definition of database
+//
+message Database {
     string name = 1;
     QueryPrice price = 2;
+    // the time when database was created
     uint64 ts = 3;
     string description = 4;
-    db3_base_proto.BroadcastMeta meta = 5;
 }

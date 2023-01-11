@@ -19,16 +19,18 @@ use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
-use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
-use db3_proto::db3_namespace_proto::Namespace;
+use db3_proto::db3_database_proto::Database;
+use db3_proto::db3_mutation_proto::{
+    database_request::Body, DatabaseRequest, KvPair, Mutation, MutationAction,
+};
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
 use db3_storage::commit_store::CommitStore;
+use db3_storage::db_store::DbStore;
 use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
-use db3_storage::ns_store::NsStore;
 use db3_types::cost;
 use db3_types::gas;
 use ethereum_types::Address as AccountAddress;
@@ -38,7 +40,7 @@ use merkdb::Merk;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
-use tracing::info;
+use tracing::{info, warn};
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
 
@@ -170,14 +172,14 @@ impl AuthStorage {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
 
-    pub fn get_my_ns_list(&self, addr: &AccountAddress) -> Result<Vec<Namespace>> {
-        let ops = NsStore::get_my_ns_list(self.db.as_ref(), addr)?;
-        let mut ns_list: Vec<Namespace> = Vec::new();
+    pub fn get_database(&self, addr: &AccountAddress) -> Result<Vec<Database>> {
+        let ops = DbStore::get_databases(self.db.as_ref(), addr)?;
+        let mut db_list: Vec<Database> = Vec::new();
         for op in ops {
             match op {
                 ProofOp::Push(Node::KV(_, v)) => {
-                    if let Ok(b) = Namespace::decode(v.as_ref()) {
-                        ns_list.push(b);
+                    if let Ok(b) = Database::decode(v.as_ref()) {
+                        db_list.push(b);
                     } else {
                         todo!();
                     }
@@ -185,7 +187,7 @@ impl AuthStorage {
                 _ => {}
             }
         }
-        Ok(ns_list)
+        Ok(db_list)
     }
 
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {
@@ -242,9 +244,22 @@ impl AuthStorage {
         Ok(gas_fee)
     }
 
-    pub fn apply_namespace(&mut self, addr: &AccountAddress, namespace: &Namespace) -> Result<()> {
+    pub fn apply_database(
+        &mut self,
+        addr: &AccountAddress,
+        database: &DatabaseRequest,
+    ) -> Result<()> {
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        NsStore::apply(db, addr, namespace)
+        match &database.body {
+            Some(Body::Name(name)) => {
+                DbStore::apply_del(db, addr, &name)
+                //TODO delete data in kv_store
+            }
+            Some(Body::Database(d)) => DbStore::apply_add(db, addr, &d),
+            _ => {
+                todo!()
+            }
+        }
     }
 
     pub fn apply_mutation(

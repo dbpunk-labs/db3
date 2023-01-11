@@ -19,8 +19,7 @@ use super::auth_storage::Hash;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::verifier;
-use db3_proto::db3_mutation_proto::{Mutation, PayloadType, WriteRequest};
-use db3_proto::db3_namespace_proto::Namespace;
+use db3_proto::db3_mutation_proto::{DatabaseRequest, Mutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_storage::kv_store::KvStore;
@@ -52,7 +51,7 @@ pub struct AbciImpl {
     pending_query_session:
         Arc<Mutex<Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)>>>,
     node_state: Arc<NodeState>,
-    pending_namespace: Arc<Mutex<Vec<(AccountAddress, Namespace)>>>,
+    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseRequest)>>>,
 }
 
 impl AbciImpl {
@@ -66,7 +65,7 @@ impl AbciImpl {
                 total_mutations: Arc::new(AtomicU64::new(0)),
                 total_query_sessions: Arc::new(AtomicU64::new(0)),
             }),
-            pending_namespace: Arc::new(Mutex::new(Vec::new())),
+            pending_databases: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -136,8 +135,8 @@ impl Application for AbciImpl {
                 Ok(_) => {
                     let payload_type = PayloadType::from_i32(request.payload_type);
                     match payload_type {
-                        Some(PayloadType::NamespacePayload) => {
-                            match Namespace::decode(request.payload.as_ref()) {
+                        Some(PayloadType::DatabasePayload) => {
+                            match DatabaseRequest::decode(request.payload.as_ref()) {
                                 Ok(_) => {
                                     return ResponseCheckTx {
                                         code: 0,
@@ -152,7 +151,8 @@ impl Application for AbciImpl {
                                     };
                                 }
                                 Err(_) => {
-                                    warn!("invalid namespace byte data");
+                                    //TODO add event ?
+                                    warn!("invalid database byte data");
                                 }
                             }
                         }
@@ -252,16 +252,16 @@ impl Application for AbciImpl {
             ) {
                 let payload_type = PayloadType::from_i32(wrequest.payload_type);
                 match payload_type {
-                    Some(PayloadType::NamespacePayload) => {
-                        if let Ok(ns) = Namespace::decode(wrequest.payload.as_ref()) {
-                            match self.pending_namespace.lock() {
+                    Some(PayloadType::DatabasePayload) => {
+                        if let Ok(dr) = DatabaseRequest::decode(wrequest.payload.as_ref()) {
+                            match self.pending_databases.lock() {
                                 Ok(mut s) => {
-                                    s.push((account_id.addr, ns));
+                                    s.push((account_id.addr, dr));
                                     return ResponseDeliverTx {
                                         code: 0,
                                         data: Bytes::new(),
                                         log: "".to_string(),
-                                        info: "apply_namespace".to_string(),
+                                        info: "apply_database".to_string(),
                                         gas_wanted: 0,
                                         gas_used: 0,
                                         events: vec![Event {
@@ -380,8 +380,8 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
-        let pending_namespace: Vec<(AccountAddress, Namespace)> =
-            match self.pending_namespace.lock() {
+        let pending_databases: Vec<(AccountAddress, DatabaseRequest)> =
+            match self.pending_databases.lock() {
                 Ok(mut q) => {
                     let clone_q = q.drain(..).collect();
                     clone_q
@@ -408,7 +408,7 @@ impl Application for AbciImpl {
                             );
                         }
                         Err(e) => {
-                            info!("fail to apply mutation for {}", e);
+                            warn!("fail to apply mutation for {}", e);
                             todo!();
                         }
                     }
@@ -422,14 +422,14 @@ impl Application for AbciImpl {
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         }
                         Err(e) => {
-                            info!("fail to apply mutation for {}", e);
+                            warn!("fail to apply mutation for {}", e);
                             todo!();
                         }
                     }
                 }
-                let pending_namespace_len = pending_namespace.len();
-                for item in pending_namespace {
-                    match s.apply_namespace(&item.0, &item.1) {
+                let pending_databases_len = pending_databases.len();
+                for item in pending_databases {
+                    match s.apply_database(&item.0, &item.1) {
                         Ok(_) => {}
                         Err(_) => {
                             todo!()
@@ -439,7 +439,7 @@ impl Application for AbciImpl {
 
                 if pending_mutation_len > 0
                     || pending_query_session_len > 0
-                    || pending_namespace_len > 0
+                    || pending_databases_len > 0
                 {
                     //TODO how to revert
                     if let Ok(hash) = s.commit() {
