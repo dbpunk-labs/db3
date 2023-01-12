@@ -17,7 +17,10 @@
 //
 
 pub mod account_id;
-pub mod keypair;
+pub mod address;
+pub mod db3_keypair;
+pub mod db3_public_key;
+pub mod db3_serde;
+pub mod db3_signature;
 pub mod signer;
 pub mod verifier;
-pub mod address;

@@ -15,7 +15,6 @@
 // limitations under the License.
 //
 
-
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -94,7 +93,6 @@ where
     }
 }
 
-
 /// DeserializeAs support for Vec
 impl<'de, R, E> DeserializeAs<'de, Vec<u8>> for Readable<E, R>
 where
@@ -112,28 +110,3 @@ where
         }
     }
 }
-
-/// DeserializeAs support for AccountAddress
-impl<'de, R, E> DeserializeAs<'de, AccountAddress> for Readable<E, R>
-where
-    R: DeserializeAs<'de, AccountAddress>,
-    E: Encoding,
-{
-    fn deserialize_as<D>(deserializer: D) -> Result<AccountAddress, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        if deserializer.is_human_readable() {
-            let s = String::deserialize(deserializer)?;
-            if s.starts_with("0x") {
-                AccountAddress::from_hex_literal(&s)
-            } else {
-                AccountAddress::from_hex(&s)
-            }
-            .map_err(to_custom_error::<'de, D, _>)
-        } else {
-            R::deserialize_as(deserializer)
-        }
-    }
-}
-

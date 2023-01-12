@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 
+use db3_error::{DB3Error, Result};
 
 pub enum SignatureSchema {
     // the validator can use ed25519
@@ -31,7 +32,7 @@ impl SignatureScheme {
         }
     }
 
-    pub fn from_flag(flag: &str) -> Result<SignatureScheme, SuiError> {
+    pub fn from_flag(flag: &str) -> Result<SignatureScheme> {
         let byte_int = flag
             .parse::<u8>()
             .map_err(|_| DB3Error::KeyConversionError("Invalid key scheme".to_string()))?;

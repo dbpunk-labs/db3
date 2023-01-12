@@ -15,37 +15,36 @@
 // limitations under the License.
 //
 
-
+use crate::db3_serde::Readable;
+use crate::keypair::DB3PublicKey;
 use db3_error::DB3Error;
+use fastcrypto::encoding::{decode_bytes_hex, Base58, Base64, Encoding, Hex};
+use fastcrypto::hash::{HashFunction, Sha3_256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::Bytes;
-use fastcrypto::encoding::{Base58, Base64, Encoding, Hex};
-use fastcrypto::hash::{HashFunction, Sha3_256};
-use crate::db3_serde::Readable;
 
-const DB3_ADDRESS_LENGTH:u32 = 20;
+const DB3_ADDRESS_LENGTH: usize = 20;
 
 #[serde_as]
 #[derive(
     Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema,
 )]
-pub struct DB3Address( 
+pub struct DB3Address(
     #[schemars(with = "Hex")]
     #[serde_as(as = "Readable<Hex, _>")]
     [u8; DB3_ADDRESS_LENGTH],
 );
 
 impl DB3Address {
-
     pub const ZERO: Self = Self([0u8, DB3_ADDRESS_LENGTH]);
 
     pub fn to_vec(&self) -> Vec<u8> {
         self.0.to_vec()
     }
 
- 	pub fn optional_address_as_hex<S>(
+    pub fn optional_address_as_hex<S>(
         key: &Option<DB3Address>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
@@ -71,21 +70,31 @@ impl DB3Address {
     }
 }
 
-
-impl TryFrom<Vec<u8>> for DB3Address {
+impl TryFrom<vec<u8>> for DB3Address {
     type Error = DB3Error;
-    fn try_from(bytes: Vec<u8>) -> Result<Self, SuiError> {
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         let arr: [u8; DB3_ADDRESS_LENGTH] =
             bytes.try_into().map_err(|_| DB3Error::InvalidAddress)?;
         Ok(Self(arr))
     }
 }
 
+impl From<&DB3PublicKey> for DB3Address {
+    fn from(pk: &DB3PublicKey) -> Self {
+        let mut hasher = Sha3_256::default();
+        hasher.update([pk.flag()]);
+        hasher.update(pk);
+        let g_arr = hasher.finalize();
+        let mut res = [0u8; DB3_ADDRESS_LENGTH];
+        // OK to access slice because Sha3_256 should never be shorter than DB3_ADDRESS_LENGTH.
+        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
+        DB3Address(res)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-	use super::*;
-
-	#[test]
-	fn it_works() {
-	}
+    use super::*;
+    #[test]
+    fn it_works() {}
 }
