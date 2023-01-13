@@ -106,19 +106,19 @@ pub struct Ed25519DB3Signature(
 );
 
 impl Ed25519DB3Signature {
-    fn new(kp: &Self::KeyPair, message: &[u8]) -> SuiResult<Self> {
+    fn new(kp: &Self::KeyPair, message: &[u8]) -> Result<Self> {
         let sig = kp
             .try_sign(message)
-            .map_err(|_| SuiError::InvalidSignature {
+            .map_err(|_| DB3Error::InvalidSignature {
                 error: "Failed to sign valid message with keypair".to_string(),
             })?;
 
         let mut signature_bytes: Vec<u8> = Vec::new();
         signature_bytes
-            .extend_from_slice(&[<Self::PubKey as SuiPublicKey>::SIGNATURE_SCHEME.flag()]);
+            .extend_from_slice(&[<Self::PubKey as DB3PublicKey>::SIGNATURE_SCHEME.flag()]);
         signature_bytes.extend_from_slice(sig.as_ref());
         signature_bytes.extend_from_slice(kp.public().as_ref());
-        Self::from_bytes(&signature_bytes[..]).map_err(|err| SuiError::InvalidSignature {
+        Self::from_bytes(&signature_bytes[..]).map_err(|err| DB3Error::InvalidSignature {
             error: err.to_string(),
         })
     }
