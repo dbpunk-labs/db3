@@ -9,6 +9,7 @@
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/dbpunk-labs/db3?style=flat-square)
 [![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)](https://twitter.com/Db3Network)
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
+[![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/dbpunk-labs/db3/badge)](https://www.gitpoap.io/gh/gitpoap/gitpoap-docs)
 
 
 # What's DB3 Network?
