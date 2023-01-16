@@ -1,4 +1,11 @@
-![db3_logo](./docs/images/db3_logo.png)
+
+<p align="center" width="100%">
+    <img width="33%" src="https://github.com/dbpunk-labs/db3/blob/main/docs/images/db3_logo.png">
+</p>
+
+<p align="center" width="100%">
+A star ⭐️ is welcome.
+</p>
 
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/dbpunk-labs/db3/ci.yml?branch=main&style=flat-square)
 ![coverage](https://img.shields.io/codecov/c/github/dbpunk-labs/db3?style=flat-square)
@@ -14,47 +21,43 @@
 
 # What's DB3 Network?
 
-DB3 is a community-driven layer2 decentralized database network. and if you are a developer, you can think db3 is a decentralized firebase firestore alternative.
+DB3 is a community-driven layer2 decentralized database network. It provides developers with an alternative to firebase firestore.
 
 ## Why DB3 Network
 
-db3 network will provide data management for web3 applications, you can store and query documents against the db3 network with a firestore-like [SDK](https://github.com/dbpunk-labs/db3.js).
+DB3 network serves as the data management for web3 applications; you can store and query documents into the db3 network with a firestore-like [SDK](https://github.com/dbpunk-labs/db3.js).
 
 ![position](./docs/images/position_web3.jpg)
 
 ## Features
 
-1. **Infinite Storage Space**
+**Infinite Storage Space**
 
-   Scalability is the key to the web3 explosion, db3 will use the following strategies to achieve web3 scale
+Scalability is critical in the web3 era; DB3 will use the following strategies to achieve dApp's scalability:
+  * Personal computers is enough to maintain the minimum network node requirements so everyone can join the db3 network to provide storage space.
+  * Using dynamic sharding to scale out: when a storage shard chain does not have enough space to store [mutation](./docs/mutation.md), the original shard chain will split itself into two subchains.
+  * Archiving the cold data to recycle storage space: historical cold blocks and cold state data will be archived to FileCoin, so new incoming data can always be stored.
 
-    * PC can meet the minimum system requirements so everyone can join the db3 network to provide storage space.
-    * Using dynamic sharding to achieve scale out. when a storage shard chain has not enough space to store [mutation](./docs/mutation.md), it will split itself into two subchains.
-    * Using cold data archive to recycle storage space. history cold blocks and cold state data will be archived to FileCoin and the storage node will always has storage space to store new data.
+**Blazed Fast and Provable On-chain Query**
 
-2. **Blazed Fast and Provable On-chain Query**
+Currently,decentralization means terrible performance, but DB3 is trying to improve significantly:
+* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of the DB3 network, and it has high performance and also fast-proof generation. 
+* Geo distribution: the nodes in every storage shard are geo-distributed, and the clients can execute queries against the nearest storage node.
+* [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly. 
 
-   Currently, decentralization means bad performance but db3 is trying to make a big improvement in performance
+**Crypto Native Data Ownership**
 
-	* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of db3 network and it not only has high performance but also the fast-proof generation
-	* Geo distribution, the nodes in every storage shard are geo-distributed and the clients can execute queries against the nearest storage node
+We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271), and every document has its owner, while only the owner who holds the private key can update/delete the record. DB3 network generates the proofs and provides signatures to prove the membership (db3 has the specific document) and ownership.
 
-    * [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly
+**Programming on-chain in web2 manner**
 
-3. **Crypto Native Data Ownership**
+Dapp developers can develop data processing contracts and deploy them to the DB3 network just like developing data backend in web2.
 
+**Ethereum Guarded Security**
 
-    We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271) and every document has its owner and only the owner which holds the private key can update/delete the document. and the db3 network can generate the proofs and provide signatures to prove the membership(db3 has the specific document) and ownership
+DB3 network is a layer2 network on Ethereum and Ethereum guards all the assets.
 
-4. **On-chain Programmable**
-
-    Dapp developers can develop data processing contracts and deploy them to the db3 network just like developing data backend in web2
-
-5. **Ethereum Guarded Security**
-
-    DB3 network is a layer2 network on Ethereum and all the assets are guarded by Ethereum
-
-If you want to know what these features exactly mean? go to the [background introduction](./docs/background.md)
+Looking for more details?go to the [background introduction](./docs/background.md)
 
 # Getting Started
 
@@ -108,11 +111,9 @@ more examples
 
 # Project assistance
 
-If you want to say thank you or/and support active development of DB3 Network
-
-* Add a GitHub Star to the project.
-* Tweet about how to use db3 network.
-* Write interesting articles about the project on Dev.to, Medium or your personal blog.
+* Add a GitHub Star⭐️ to the project.
+* Tweet about how to use DB3 network.
+* Write blogs about the project on [Dev.to](https://dev.to/), [Medium](https://medium.com/) or your personal blog.
 
 Together, we can make db3 network better!
 
