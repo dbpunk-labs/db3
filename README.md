@@ -33,6 +33,7 @@ without the db3 network, if you want to build a data-rich dapp .e.g a social dap
 
 the first choice is very easy for you to develop the data-rich dapps but it breaks the law of decentralization, the second can keep the decentralization but will cost a lot of engineering effort. so with the db3 network, you can both develop the data-rich dapps with minimal engineering effort and can keep the decentralization. this is the reason why we need the db3 network
 
+
 # Features
 
 **Infinite Storage Space**
