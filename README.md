@@ -19,17 +19,21 @@ A star ⭐️ is welcome.
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/dbpunk-labs/db3/badge)](https://www.gitpoap.io/gh/dbpunk-labs/db3)
 
 
-# What's DB3 Network?
+# What's DB3 Network
 
-DB3 is a community-driven layer2 decentralized database network. It provides developers with an alternative to firebase firestore.
+DB3 Network is an open-source decentralized firebase firestore alternative to build data-rich dapps quickly with minimal engineering effort.
 
-## Why DB3 Network
+# Why DB3 Network
 
-DB3 network serves as the data management for web3 applications; you can store and query documents into the db3 network with a firestore-like [SDK](https://github.com/dbpunk-labs/db3.js).
+![why db3](./docs/images/why_db3.jpg)
 
-![position](./docs/images/position_web3.jpg)
+without the db3 network, if you want to build a data-rich dapp .e.g a social dapp,  you have two choices
+1. use a centralized data architecture .e.g firebase or MongoDB to store the data
+2. use Ethereum or other blockchains to store data and use the graph to index data. the blockchain can keep the data ownership and the graph can provide a fast on-chain query
 
-## Features
+the first choice is so easy for you to develop the data-rich dapps but it breaks the law of decentralization, the second can keep the decentralization but will cost a lot of engineering effort. so with the db3 network, you can both develop the data-rich dapps with minimal engineering effort and can keep the decentralization. this is the reason why we need the db3 network
+
+# Features
 
 **Infinite Storage Space**
 
@@ -70,44 +74,29 @@ cd db3 && bash install_env.sh && cargo build
 cd tools &&  sh start_localnet.sh
 ```
 
-### Developers Friendly SDK
+### Start building
 
 ```typescript
-// connect to db3 node
-const db3_instance = new DB3("http://127.0.0.1:26659");
-const doc_store = new DocStore(db3_instance);
-const doc_index = {
-    keys: [
-        {
-            name: 'address',
-            keyType: DocKeyType.STRING,
-        },
-        {
-            name: 'ts',
-            keyType: DocKeyType.NUMBER,
-        },
-    ],
-    ns: 'ns1',
-    docName: 'transaction',
-};
-const transaction = {
-    address: '0x11111',
-    ts: 9527,
-    amount: 10,
-};
-// insert a document
-const result = await doc_store.insertDocs(doc_index, [transaction], _sign, 1);
-// query a document
-const query = {
-    address: '0x11111',
-    ts: 9527,
-};
-const docs = await doc_store.getDocs(doc_index, [query], _sign);
+/*
+|----------------------------|
+| use db3js open a database  |
+|----------------------------|
+*/
+
+// build sign function
+const sign = await getSign()
+
+// build database factory
+const dbFactory = new DB3Factory({
+    node: 'http://127.0.0.1:26659',
+    sign,
+    nonce
+})
+
+// open database with a address
+const db = dbFactory.open("0x5ca8d43c15fb366d80e221d11a34894eb0975da6")
 ```
-
-more examples
-
-* [helloworld in typescript](./examples/helloworld)
+for more please go to [db3.js](https://github.com/dbpunk-labs/db3.js)
 
 # Project assistance
 
@@ -118,7 +107,7 @@ more examples
 Together, we can make db3 network better!
 
 
-# The Relationship Between Roles
+# The internal of db3
 
 ![relationship](./docs/images/db3-overview.svg)
 
