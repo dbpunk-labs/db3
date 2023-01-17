@@ -29,9 +29,10 @@ DB3 Network is an open-source decentralized firebase firestore alternative to bu
 
 without the db3 network, if you want to build a data-rich dapp .e.g a social dapp,  you have two choices
 1. use a centralized data architecture .e.g firebase or MongoDB to store the data
-2. use Ethereum or other blockchains to store data and use the graph to index data. the blockchain can keep the data ownership and the graph can provide a fast on-chain query
+2. use Ethereum or other blockchains to store data and use thegraph to index data. the blockchain can keep the decentralization and thegraph can provide a fast on-chain query
 
-the first choice is so easy for you to develop the data-rich dapps but it breaks the law of decentralization, the second can keep the decentralization but will cost a lot of engineering effort. so with the db3 network, you can both develop the data-rich dapps with minimal engineering effort and can keep the decentralization. this is the reason why we need the db3 network
+the first choice is very easy for you to develop the data-rich dapps but it breaks the law of decentralization, the second can keep the decentralization but will cost a lot of engineering effort. so with the db3 network, you can both develop the data-rich dapps with minimal engineering effort and can keep the decentralization. this is the reason why we need the db3 network
+
 
 # Features
 
