@@ -18,6 +18,7 @@ A star ⭐️ is welcome.
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/dbpunk-labs/db3/badge)](https://www.gitpoap.io/gh/dbpunk-labs/db3)
 
+**English | [中文](./README_zh_cn.md)**
 
 # What's DB3 Network
 
