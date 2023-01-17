@@ -32,6 +32,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 
 use signature::Signer;
+use signature::Signature;
 
 #[derive(Debug, From)]
 pub enum DB3KeyPair {

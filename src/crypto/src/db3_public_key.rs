@@ -15,10 +15,12 @@
 // limitations under the License.
 //
 
-use crate::signature_schema::SignatureScheme;
+use crate::signature_scheme::SignatureScheme;
+use derive_more::From;
 use eyre::eyre;
 use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey};
 use fastcrypto::encoding::Base64;
+use fastcrypto::encoding::Encoding;
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey};
 pub use fastcrypto::traits::{EncodeDecodeBase64, ToFromBytes};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -56,12 +58,12 @@ impl EncodeDecodeBase64 for DB3PublicKey {
         let bytes = Base64::decode(value).map_err(|e| eyre!("{}", e.to_string()))?;
         match bytes.first() {
             Some(x) => {
-                if x == SignatureScheme::ED25519.flag() {
+                if x == &SignatureScheme::ED25519.flag() {
                     let pk = Ed25519PublicKey::from_bytes(
                         bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
                     )?;
                     Ok(DB3PublicKey::Ed25519(pk))
-                } else if x == SignatureScheme::Secp256k1.flag() {
+                } else if x == &SignatureScheme::Secp256k1.flag() {
                     let pk = Secp256k1PublicKey::from_bytes(
                         bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
                     )?;
@@ -99,7 +101,7 @@ impl<'de> Deserialize<'de> for DB3PublicKey {
 
 impl DB3PublicKey {
     pub fn flag(&self) -> u8 {
-        self.schema().flag()
+        self.scheme().flag()
     }
 
     pub fn try_from_bytes(

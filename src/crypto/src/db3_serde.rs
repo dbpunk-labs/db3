@@ -15,18 +15,12 @@
 // limitations under the License.
 //
 
-use std::fmt::Debug;
-use std::marker::PhantomData;
-
 use anyhow::anyhow;
-use fastcrypto::encoding::{Base64, Encoding};
-use fastcrypto::traits::ToFromBytes;
 use serde;
 use serde::de::{Deserializer, Error};
-use serde::ser::{Error as SerError, Serializer};
-use serde::Deserialize;
-use serde::Serialize;
-use serde_with::{Bytes, DeserializeAs, SerializeAs};
+use serde::ser::Serializer;
+use serde_with::{DeserializeAs, SerializeAs};
+use std::marker::PhantomData;
 
 /// Use with serde_as to encode/decode bytes to/from Base64/Hex for human-readable serializer and deserializer
 /// E : Encoding of the human readable output

@@ -15,32 +15,32 @@
 // limitations under the License.
 //
 
-
+use crate::db3_address::DB3Address;
+use crate::db3_public_key::DB3PublicKey;
 use crate::db3_serde::Readable;
+use crate::signature_scheme::SignatureScheme;
 use db3_error::{DB3Error, Result};
+use enum_dispatch::enum_dispatch;
 use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey, Ed25519Signature};
 use fastcrypto::encoding::{Base64, Encoding};
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey, Secp256k1Signature};
-use fastcrypto::traits::{Authenticator, KeyPair, VerifyingKey};
+use fastcrypto::traits::{Authenticator, KeyPair, ToFromBytes, VerifyingKey};
+use schemars::JsonSchema;
+pub use fastcrypto::traits::KeyPair as KeypairTraits;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use signature::Signature;
-use std::fmt::Debug;
-
-// the byte size of secp256k1 signature
-const SECP256K1_SIGNATURE_LENGTH: usize =
-    Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1;
-// the byte size 0f ed25519 signature
-const ED25519_SIGNATURE_LENGTH: usize = Ed25519PublicKey::LENGTH + Ed25519Signature::LENGTH + 1;
+use serde_with::{serde_as, Bytes};
+use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 
 
 #[enum_dispatch]
 #[derive(Clone, JsonSchema, PartialEq, Eq, Hash)]
-pub enum DB3Signature {
+pub enum Signature {
     Ed25519DB3Signature,
     Secp256k1DB3Signature,
 }
 
-impl Serialize for DB3Signature {
+impl Serialize for Signature {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -55,7 +55,7 @@ impl Serialize for DB3Signature {
     }
 }
 
-impl<'de> Deserialize<'de> for DB3Signature {
+impl<'de> Deserialize<'de> for Signature {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -73,7 +73,7 @@ impl<'de> Deserialize<'de> for DB3Signature {
     }
 }
 
-impl AsRef<[u8]> for DB3Signature {
+impl AsRef<[u8]> for Signature {
     fn as_ref(&self) -> &[u8] {
         match self {
             DB3Signature::Ed25519DB3Signature(sig) => sig.as_ref(),
@@ -82,7 +82,7 @@ impl AsRef<[u8]> for DB3Signature {
     }
 }
 
-impl signature::Signature for DB3Signature {
+impl signature::Signature for Signature {
     fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, signature::Error> {
         match bytes.first() {
             Some(x) => {
@@ -103,7 +103,7 @@ impl signature::Signature for DB3Signature {
     }
 }
 
-impl Debug for DB3Signature {
+impl Debug for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         let flag = Base64::encode([self.scheme().flag()]);
         let s = Base64::encode(self.signature_bytes());
@@ -111,6 +111,9 @@ impl Debug for DB3Signature {
         write!(f, "{flag}@{s}@{p}")?;
         Ok(())
     }
+}
+pub trait DB3PublicKeyScheme: VerifyingKey {
+    const SIGNATURE_SCHEME: SignatureScheme;
 }
 
 #[serde_as]
@@ -121,17 +124,9 @@ pub struct Ed25519DB3Signature(
     [u8; Ed25519PublicKey::LENGTH + Ed25519Signature::LENGTH + 1],
 );
 
-impl Ed25519DB3Signature {
-    fn new(kp: &Ed25519KeyPair, message: &[u8]) -> Result<Self> {
-        let sig = kp.try_sign(message).map_err(|_| {
-            DB3Error::InvalidSignature("Failed to sign valid message with keypair".to_string())
-        })?;
-        let mut signature_bytes: Vec<u8> = Vec::new();
-        signature_bytes.extend_from_slice(&[SignatureScheme::ED25519.flag()]);
-        signature_bytes.extend_from_slice(sig.as_ref());
-        signature_bytes.extend_from_slice(kp.public().as_ref());
-        Self::from_bytes(&signature_bytes[..])
-            .map_err(|err| DB3Error::InvalidSignature(err.to_string()))
+impl Default for Ed25519DB3Signature {
+    fn default() -> Self {
+        Self([0; Ed25519PublicKey::LENGTH + Ed25519Signature::LENGTH + 1])
     }
 }
 
@@ -147,6 +142,29 @@ impl AsMut<[u8]> for Ed25519DB3Signature {
     }
 }
 
+impl signature::Signature for Ed25519DB3Signature {
+    fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, signature::Error> {
+        if bytes.len() != Self::LENGTH {
+            return Err(signature::Error::new());
+        }
+        let mut sig_bytes = [0; Self::LENGTH];
+        sig_bytes.copy_from_slice(bytes);
+        Ok(Self(sig_bytes))
+    }
+}
+
+
+impl DB3PublicKeyScheme for Ed25519PublicKey {
+    const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::ED25519;
+}
+
+impl DB3SignatureInner for Ed25519DB3Signature {
+    type Sig = Ed25519Signature;
+    type PubKey = Ed25519PublicKey;
+    type KeyPair = Ed25519KeyPair;
+    const LENGTH: usize = Ed25519PublicKey::LENGTH + Ed25519Signature::LENGTH + 1;
+}
+
 //
 // Secp256k1 DB3 Signature port
 //
@@ -157,21 +175,6 @@ pub struct Secp256k1DB3Signature(
     #[serde_as(as = "Readable<Base64, Bytes>")]
     [u8; Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1],
 );
-
-
-impl Secp256k1DB3Signature {
-    fn new(kp: &Secp256k1KeyPair, message: &[u8]) -> Result<Self> {
-        let sig = kp.try_sign(message).map_err(|_| {
-            DB3Error::InvalidSignature("Failed to sign valid message with keypair".to_string())
-        })?;
-        let mut signature_bytes: Vec<u8> = Vec::new();
-        signature_bytes.extend_from_slice(&[SignatureScheme::Secp256k1.flag()]);
-        signature_bytes.extend_from_slice(sig.as_ref());
-        signature_bytes.extend_from_slice(kp.public().as_ref());
-        Self::from_bytes(&signature_bytes[..])
-            .map_err(|err| DB3Error::InvalidSignature(err.to_string()))
-    }
-}
 
 impl AsRef<[u8]> for Secp256k1DB3Signature {
     fn as_ref(&self) -> &[u8] {
@@ -187,16 +190,118 @@ impl AsMut<[u8]> for Secp256k1DB3Signature {
 
 impl signature::Signature for Secp256k1DB3Signature {
     fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, signature::Error> {
-        if bytes.len() != SECP256K1_SIGNATURE_LENGTH {
+        if bytes.len() != Self::LENGTH {
             return Err(signature::Error::new());
         }
-        let mut sig_bytes = [0; SECP256K1_SIGNATURE_LENGTH];
+        let mut sig_bytes = [0; Self::LENGTH];
         sig_bytes.copy_from_slice(bytes);
         Ok(Self(sig_bytes))
     }
 }
 
+impl DB3SignatureInner for Secp256k1DB3Signature {
+    type Sig = Secp256k1Signature;
+    type PubKey = Secp256k1PublicKey;
+    type KeyPair = Secp256k1KeyPair;
+    const LENGTH: usize = Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1;
+}
 
+impl DB3PublicKeyScheme for Secp256k1PublicKey {
+    const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::Secp256r1;
+}
+
+
+pub trait DB3SignatureInner: Sized + signature::Signature + PartialEq + Eq + Hash {
+    type Sig: Authenticator<PubKey = Self::PubKey>;
+    type PubKey: VerifyingKey<Sig = Self::Sig> + DB3PublicKeyScheme;
+    type KeyPair: KeypairTraits<PubKey = Self::PubKey, Sig = Self::Sig>;
+    const LENGTH: usize = Self::Sig::LENGTH + Self::PubKey::LENGTH + 1;
+    const SCHEME: SignatureScheme = Self::PubKey::SIGNATURE_SCHEME;
+    fn get_verification_inputs(&self, author: DB3Address) -> Result<(Self::Sig, Self::PubKey)> {
+        // Is this signature emitted by the expected author?
+        let bytes = self.public_key_bytes();
+        let pk = Self::PubKey::from_bytes(bytes)
+            .map_err(|_| DB3Error::KeyConversionError("Invalid public key".to_string()))?;
+        let received_addr = DB3Address::from(&pk);
+        if received_addr != author {
+            return Err(DB3Error::IncorrectSigner {
+                error: format!("Signature get_verification_inputs() failure. Author is {author}, received address is {received_addr}")
+            });
+        }
+        // deserialize the signature
+        let signature = Self::Sig::from_bytes(self.signature_bytes()).map_err(|err| {
+            DB3Error::InvalidSignature {
+                error: err.to_string(),
+            }
+        })?;
+
+        Ok((signature, pk))
+    }
+
+    fn new(kp: &Self::KeyPair, message: &[u8]) -> Result<Self> {
+        let sig = kp
+            .try_sign(message)
+            .map_err(|_| DB3Error::InvalidSignature {
+                error: "Failed to sign valid message with keypair".to_string(),
+            })?;
+
+        let mut signature_bytes: Vec<u8> = Vec::new();
+        signature_bytes
+            .extend_from_slice(&[<Self::PubKey as DB3PublicKeyScheme>::SIGNATURE_SCHEME.flag()]);
+        signature_bytes.extend_from_slice(sig.as_ref());
+        signature_bytes.extend_from_slice(kp.public().as_ref());
+        Self::from_bytes(&signature_bytes[..]).map_err(|err| DB3Error::InvalidSignature {
+            error: err.to_string(),
+        })
+    }
+}
+
+#[enum_dispatch(Signature)]
+pub trait DB3Signature: Sized + signature::Signature {
+    fn signature_bytes(&self) -> &[u8];
+    fn public_key_bytes(&self) -> &[u8];
+    fn scheme(&self) -> SignatureScheme;
+
+    fn verify<T>(&self, value: &T, author: DB3Address) -> Result<()>
+    where
+        T: Signable<Vec<u8>>;
+}
+
+pub trait Signable<W> {
+    fn write(&self, writer: &mut W);
+}
+
+impl<S: DB3SignatureInner + Sized> DB3Signature for S {
+    fn signature_bytes(&self) -> &[u8] {
+        // Access array slice is safe because the array bytes is initialized as
+        // flag || signature || pubkey with its defined length.
+        &self.as_ref()[1..1 + S::Sig::LENGTH]
+    }
+
+    fn public_key_bytes(&self) -> &[u8] {
+        // Access array slice is safe because the array bytes is initialized as
+        // flag || signature || pubkey with its defined length.
+        &self.as_ref()[S::Sig::LENGTH + 1..]
+    }
+
+    fn scheme(&self) -> SignatureScheme {
+        S::PubKey::SIGNATURE_SCHEME
+    }
+
+    fn verify<T>(&self, value: &T, author: DB3Address) -> Result<()>
+    where
+        T: Signable<Vec<u8>>,
+    {
+        // Currently done twice - can we improve on this?;
+        let (sig, pk) = &self.get_verification_inputs(author)?;
+        let mut message = Vec::new();
+        value.write(&mut message);
+        pk.verify(&message[..], sig)
+            .map_err(|e| DB3Error::InvalidSignature {
+                error: format!("{}", e),
+            })
+    }
+}
 
 #[cfg(test)]
 mod tests {

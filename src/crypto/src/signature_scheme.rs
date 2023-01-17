@@ -17,11 +17,11 @@
 
 use db3_error::{DB3Error, Result};
 
-pub enum SignatureSchema {
+pub enum SignatureScheme {
     // the validator can use ed25519
     ED25519,
     // the user can use secp256k1
-    Secp256k1 // the ethereum used this signature schema
+    Secp256k1, // the ethereum used this signature scheme
 }
 
 impl SignatureScheme {
@@ -35,13 +35,11 @@ impl SignatureScheme {
     pub fn from_flag(flag: &str) -> Result<SignatureScheme> {
         let byte_int = flag
             .parse::<u8>()
-            .map_err(|_| DB3Error::KeyConversionError("Invalid key scheme".to_string()))?;
+            .map_err(|_| DB3Error::KeyCodecError("Invalid key scheme".to_string()))?;
         match byte_int {
             0x00 => Ok(SignatureScheme::ED25519),
             0x01 => Ok(SignatureScheme::Secp256k1),
-            _ => Err(DB3Error::KeyConversionError(
-                "Invalid key scheme".to_string(),
-            )),
+            _ => Err(DB3Error::KeyCodecError("Invalid key scheme".to_string())),
         }
     }
 }
