@@ -29,6 +29,8 @@ pub enum DB3Error {
     SignError(String),
     #[error("fail to verify the request with error {0}")]
     VerifyFailed(String),
+    #[error("invalid signature siwith error {0}")]
+    InvalidSignature(String),
     #[error("fail to codec key with error {0}")]
     KeyCodecError(String),
     #[error("fail to apply mutation with error {0}")]

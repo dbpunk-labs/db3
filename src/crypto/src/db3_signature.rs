@@ -15,7 +15,23 @@
 // limitations under the License.
 //
 
+
+use crate::db3_serde::Readable;
+use db3_error::{DB3Error, Result};
+use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey, Ed25519Signature};
+use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey, Secp256k1Signature};
+use fastcrypto::traits::{Authenticator, KeyPair, VerifyingKey};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use signature::Signature;
+use std::fmt::Debug;
+
+// the byte size of secp256k1 signature
+const SECP256K1_SIGNATURE_LENGTH: usize =
+    Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1;
+// the byte size 0f ed25519 signature
+const ED25519_SIGNATURE_LENGTH: usize = Ed25519PublicKey::LENGTH + Ed25519Signature::LENGTH + 1;
+
 
 #[enum_dispatch]
 #[derive(Clone, JsonSchema, PartialEq, Eq, Hash)]
@@ -88,7 +104,7 @@ impl signature::Signature for DB3Signature {
 }
 
 impl Debug for DB3Signature {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         let flag = Base64::encode([self.scheme().flag()]);
         let s = Base64::encode(self.signature_bytes());
         let p = Base64::encode(self.public_key_bytes());
@@ -106,21 +122,16 @@ pub struct Ed25519DB3Signature(
 );
 
 impl Ed25519DB3Signature {
-    fn new(kp: &Self::KeyPair, message: &[u8]) -> Result<Self> {
-        let sig = kp
-            .try_sign(message)
-            .map_err(|_| DB3Error::InvalidSignature {
-                error: "Failed to sign valid message with keypair".to_string(),
-            })?;
-
+    fn new(kp: &Ed25519KeyPair, message: &[u8]) -> Result<Self> {
+        let sig = kp.try_sign(message).map_err(|_| {
+            DB3Error::InvalidSignature("Failed to sign valid message with keypair".to_string())
+        })?;
         let mut signature_bytes: Vec<u8> = Vec::new();
-        signature_bytes
-            .extend_from_slice(&[<Self::PubKey as DB3PublicKey>::SIGNATURE_SCHEME.flag()]);
+        signature_bytes.extend_from_slice(&[SignatureScheme::ED25519.flag()]);
         signature_bytes.extend_from_slice(sig.as_ref());
         signature_bytes.extend_from_slice(kp.public().as_ref());
-        Self::from_bytes(&signature_bytes[..]).map_err(|err| DB3Error::InvalidSignature {
-            error: err.to_string(),
-        })
+        Self::from_bytes(&signature_bytes[..])
+            .map_err(|err| DB3Error::InvalidSignature(err.to_string()))
     }
 }
 
@@ -136,16 +147,56 @@ impl AsMut<[u8]> for Ed25519DB3Signature {
     }
 }
 
-impl signature::Signature for Ed25519DB3Signature {
+//
+// Secp256k1 DB3 Signature port
+//
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+pub struct Secp256k1DB3Signature(
+    #[schemars(with = "Base64")]
+    #[serde_as(as = "Readable<Base64, Bytes>")]
+    [u8; Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1],
+);
+
+
+impl Secp256k1DB3Signature {
+    fn new(kp: &Secp256k1KeyPair, message: &[u8]) -> Result<Self> {
+        let sig = kp.try_sign(message).map_err(|_| {
+            DB3Error::InvalidSignature("Failed to sign valid message with keypair".to_string())
+        })?;
+        let mut signature_bytes: Vec<u8> = Vec::new();
+        signature_bytes.extend_from_slice(&[SignatureScheme::Secp256k1.flag()]);
+        signature_bytes.extend_from_slice(sig.as_ref());
+        signature_bytes.extend_from_slice(kp.public().as_ref());
+        Self::from_bytes(&signature_bytes[..])
+            .map_err(|err| DB3Error::InvalidSignature(err.to_string()))
+    }
+}
+
+impl AsRef<[u8]> for Secp256k1DB3Signature {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl AsMut<[u8]> for Secp256k1DB3Signature {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.0.as_mut()
+    }
+}
+
+impl signature::Signature for Secp256k1DB3Signature {
     fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, signature::Error> {
-        if bytes.len() != Self::LENGTH {
+        if bytes.len() != SECP256K1_SIGNATURE_LENGTH {
             return Err(signature::Error::new());
         }
-        let mut sig_bytes = [0; Self::LENGTH];
+        let mut sig_bytes = [0; SECP256K1_SIGNATURE_LENGTH];
         sig_bytes.copy_from_slice(bytes);
         Ok(Self(sig_bytes))
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {
