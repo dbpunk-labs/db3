@@ -1,4 +1,5 @@
 use bytes::BytesMut;
+use chrono::Utc;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use db3_base::{get_a_random_nonce, get_a_static_keypair, get_address_from_pk};
 use db3_crypto::signer::Db3Signer;
@@ -10,11 +11,10 @@ use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
 use std::sync::Arc;
-use std::{time, process};
+use std::{process, time};
 use tokio::runtime::Runtime;
 use tokio::time::{sleep, Duration};
 use tonic::transport::Endpoint;
-use chrono::Utc;
 
 // Here we have an async function to benchmark
 // run batch_get_key 1000 during a session
@@ -74,11 +74,23 @@ async fn run_submit_mutation(submit_count: i32, kv_size: i32) {
         let mut kv_pairs = vec![];
         for i in 0..kv_size {
             kv_pairs.push(KvPair {
-                key: format!("bm_submit_mutation_key_{}_{}_{}", process_id, ts, i).as_bytes().to_vec(),
-                value: format!("bm_submit_mutation_value_{}_{}_{}", process_id, ts, i).as_bytes().to_vec(),
+                key: format!("bm_submit_mutation_key_{}_{}_{}", process_id, ts, i)
+                    .as_bytes()
+                    .to_vec(),
+                value: format!("bm_submit_mutation_value_{}_{}_{}", process_id, ts, i)
+                    .as_bytes()
+                    .to_vec(),
                 action: MutationAction::InsertKv.into(),
             });
         }
+        println!(
+            "key: {:?}",
+            format!("bm_submit_mutation_key_{}_{}_{}", process_id, ts, i)
+        );
+        println!(
+            "value: {:?}",
+            format!("bm_submit_mutation_value_{}_{}_{}", process_id, ts, i)
+        );
         let mutation = Mutation {
             ns: ns_vec.clone(),
             kv_pairs,
@@ -102,22 +114,18 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("submit mutation key size 1");
     group.sample_size(60);
     for qps in [100, 200, 400, 600].iter() {
-        group.bench_with_input(
-            BenchmarkId::new("qps", qps),
-            qps,
-            |b, &qps| {
-                b.to_async(&rt).iter(|| async {
-                    let start = Utc::now().timestamp_millis();
-                    run_submit_mutation(qps,1).await;
-                    let consumed = (Utc::now().timestamp_millis() - start) as u64;
-                    if consumed < 1000 {
-                        sleep(Duration::from_millis(1000 - consumed)).await;
-                    } else {
-                        println!("qps out of capacity");
-                    }
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("qps", qps), qps, |b, &qps| {
+            b.to_async(&rt).iter(|| async {
+                let start = Utc::now().timestamp_millis();
+                run_submit_mutation(qps, 1).await;
+                let consumed = (Utc::now().timestamp_millis() - start) as u64;
+                if consumed < 1000 {
+                    sleep(Duration::from_millis(1000 - consumed)).await;
+                } else {
+                    println!("qps out of capacity");
+                }
+            })
+        });
     }
 }
 
