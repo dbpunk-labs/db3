@@ -18,11 +18,11 @@
 use crate::signature_scheme::SignatureScheme;
 use derive_more::From;
 use eyre::eyre;
-use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey};
+use fastcrypto::ed25519::Ed25519PublicKey;
 use fastcrypto::encoding::Base64;
 use fastcrypto::encoding::Encoding;
-use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey};
-pub use fastcrypto::traits::{EncodeDecodeBase64, ToFromBytes};
+use fastcrypto::secp256k1::Secp256k1PublicKey;
+use fastcrypto::traits::{EncodeDecodeBase64, ToFromBytes, VerifyingKey};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone, PartialEq, Eq, From)]
@@ -115,7 +115,6 @@ impl DB3PublicKey {
             SignatureScheme::Secp256k1 => Ok(DB3PublicKey::Secp256k1(
                 Secp256k1PublicKey::from_bytes(key_bytes)?,
             )),
-            _ => Err(eyre::eyre!("Unsupported curve")),
         }
     }
 
@@ -125,6 +124,18 @@ impl DB3PublicKey {
             DB3PublicKey::Secp256k1(_) => SignatureScheme::Secp256k1,
         }
     }
+}
+
+pub trait DB3PublicKeyScheme: VerifyingKey {
+    const SIGNATURE_SCHEME: SignatureScheme;
+}
+
+impl DB3PublicKeyScheme for Ed25519PublicKey {
+    const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::ED25519;
+}
+
+impl DB3PublicKeyScheme for Secp256k1PublicKey {
+    const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::Secp256k1;
 }
 
 #[cfg(test)]

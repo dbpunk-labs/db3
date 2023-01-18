@@ -67,6 +67,8 @@ pub enum DB3Error {
     QuerySessionVerifyError(String),
     #[error("fail to query database {0}")]
     QueryDatabaseError(String),
+    #[error("the address does not match the public key")]
+    InvalidSigner,
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

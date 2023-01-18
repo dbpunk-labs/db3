@@ -16,7 +16,7 @@
 //
 
 use crate::db3_address::DB3Address;
-use crate::db3_public_key::DB3PublicKey;
+use crate::db3_public_key::DB3PublicKeyScheme;
 use crate::db3_serde::Readable;
 use crate::signature_scheme::SignatureScheme;
 use db3_error::{DB3Error, Result};
@@ -24,13 +24,15 @@ use enum_dispatch::enum_dispatch;
 use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey, Ed25519Signature};
 use fastcrypto::encoding::{Base64, Encoding};
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey, Secp256k1Signature};
-pub use fastcrypto::traits::KeyPair as KeypairTraits;
-use fastcrypto::traits::{Authenticator, KeyPair, ToFromBytes, VerifyingKey};
+use fastcrypto::traits::KeyPair as KeypairTraits;
+use fastcrypto::traits::{Authenticator, ToFromBytes, VerifyingKey};
+use fastcrypto::Verifier;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, Bytes};
+use signature::Signer;
 use std::fmt::{Debug, Formatter};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 #[enum_dispatch]
 #[derive(Clone, JsonSchema, PartialEq, Eq, Hash)]
@@ -75,8 +77,8 @@ impl<'de> Deserialize<'de> for Signature {
 impl AsRef<[u8]> for Signature {
     fn as_ref(&self) -> &[u8] {
         match self {
-            DB3Signature::Ed25519DB3Signature(sig) => sig.as_ref(),
-            DB3Signature::Secp256k1DB3Signature(sig) => sig.as_ref(),
+            Signature::Ed25519DB3Signature(sig) => sig.as_ref(),
+            Signature::Secp256k1DB3Signature(sig) => sig.as_ref(),
         }
     }
 }
@@ -110,9 +112,6 @@ impl Debug for Signature {
         write!(f, "{flag}@{s}@{p}")?;
         Ok(())
     }
-}
-pub trait DB3PublicKeyScheme: VerifyingKey {
-    const SIGNATURE_SCHEME: SignatureScheme;
 }
 
 #[serde_as]
@@ -150,10 +149,6 @@ impl signature::Signature for Ed25519DB3Signature {
         sig_bytes.copy_from_slice(bytes);
         Ok(Self(sig_bytes))
     }
-}
-
-impl DB3PublicKeyScheme for Ed25519PublicKey {
-    const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::ED25519;
 }
 
 impl DB3SignatureInner for Ed25519DB3Signature {
@@ -204,10 +199,6 @@ impl DB3SignatureInner for Secp256k1DB3Signature {
     const LENGTH: usize = Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1;
 }
 
-impl DB3PublicKeyScheme for Secp256k1PublicKey {
-    const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::Secp256r1;
-}
-
 pub trait DB3SignatureInner: Sized + signature::Signature + PartialEq + Eq + Hash {
     type Sig: Authenticator<PubKey = Self::PubKey>;
     type PubKey: VerifyingKey<Sig = Self::Sig> + DB3PublicKeyScheme;
@@ -218,17 +209,14 @@ pub trait DB3SignatureInner: Sized + signature::Signature + PartialEq + Eq + Has
         // Is this signature emitted by the expected author?
         let bytes = self.public_key_bytes();
         let pk = Self::PubKey::from_bytes(bytes)
-            .map_err(|_| DB3Error::KeyConversionError("Invalid public key".to_string()))?;
+            .map_err(|_| DB3Error::KeyCodecError("Invalid public key".to_string()))?;
         let received_addr = DB3Address::from(&pk);
         if received_addr != author {
-            return Err(DB3Error::IncorrectSigner (
-                format!("Signature get_verification_inputs() failure. Author is {author}, received address is {received_addr}")
-            ));
+            return Err(DB3Error::InvalidSigner);
         }
         // deserialize the signature
         let signature = Self::Sig::from_bytes(self.signature_bytes())
             .map_err(|err| DB3Error::InvalidSignature(err.to_string()))?;
-
         Ok((signature, pk))
     }
 

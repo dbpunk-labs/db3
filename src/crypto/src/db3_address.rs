@@ -15,15 +15,14 @@
 // limitations under the License.
 //
 
-use crate::db3_public_key::DB3PublicKey;
+use crate::db3_public_key::{DB3PublicKey, DB3PublicKeyScheme};
 use crate::db3_serde::Readable;
 use db3_error::DB3Error;
-use fastcrypto::encoding::{decode_bytes_hex, Base58, Base64, Encoding, Hex};
+use fastcrypto::encoding::{decode_bytes_hex, Encoding, Hex};
 use fastcrypto::hash::{HashFunction, Sha3_256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use serde_with::Bytes;
 
 const DB3_ADDRESS_LENGTH: usize = 20;
 
@@ -87,6 +86,19 @@ impl From<&DB3PublicKey> for DB3Address {
         let g_arr = hasher.finalize();
         let mut res = [0u8; DB3_ADDRESS_LENGTH];
         // OK to access slice because Sha3_256 should never be shorter than DB3_ADDRESS_LENGTH.
+        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
+        DB3Address(res)
+    }
+}
+
+impl<T: DB3PublicKeyScheme> From<&T> for DB3Address {
+    fn from(pk: &T) -> Self {
+        let mut hasher = Sha3_256::default();
+        hasher.update([T::SIGNATURE_SCHEME.flag()]);
+        hasher.update(pk);
+        let g_arr = hasher.finalize();
+        let mut res = [0u8; DB3_ADDRESS_LENGTH];
+        // OK to access slice because Sha3_256 should never be shorter than SUI_ADDRESS_LENGTH.
         res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
         DB3Address(res)
     }

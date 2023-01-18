@@ -16,13 +16,16 @@
 //
 
 use crate::db3_public_key::DB3PublicKey;
-use crate::db3_signature::{DB3Signature, Ed25519DB3Signature};
-use crate::signature_schema::SignatureScheme;
-use db3_error::{DB3Error, Result};
+use crate::db3_signature::{
+    DB3SignatureInner, Ed25519DB3Signature, Secp256k1DB3Signature, Signature,
+};
+use crate::signature_scheme::SignatureScheme;
+use db3_error::DB3Error;
+use derive_more::From;
 use eyre::eyre;
-use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey};
-use fastcrypto::encoding::Base64;
-use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey};
+use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey};
+use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey};
 pub use fastcrypto::traits::KeyPair as KeypairTraits;
 pub use fastcrypto::traits::{
     AggregateAuthenticator, Authenticator, EncodeDecodeBase64, SigningKey, ToFromBytes,
@@ -32,7 +35,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 
 use signature::Signer;
-use signature::Signature;
 
 #[derive(Debug, From)]
 pub enum DB3KeyPair {
@@ -52,8 +54,8 @@ impl DB3KeyPair {
     }
 }
 
-impl Signer<DB3Signature> for DB3KeyPair {
-    fn try_sign(&self, msg: &[u8]) -> std::result::Result<DB3Signature, signature::Error> {
+impl Signer<Signature> for DB3KeyPair {
+    fn try_sign(&self, msg: &[u8]) -> std::result::Result<Signature, signature::Error> {
         match self {
             DB3KeyPair::Ed25519(kp) => kp.try_sign(msg),
             DB3KeyPair::Secp256k1(kp) => kp.try_sign(msg),
@@ -79,13 +81,12 @@ impl EncodeDecodeBase64 for DB3KeyPair {
             DB3KeyPair::Ed25519(kp) => {
                 let kp1 = kp.copy();
                 bytes.extend_from_slice(&[self.public().flag()]);
-                bytes.extend_from_slice(kp.public().as_ref());
                 bytes.extend_from_slice(kp1.private().as_ref());
             }
+
             DB3KeyPair::Secp256k1(kp) => {
                 let kp1 = kp.copy();
                 bytes.extend_from_slice(&[self.public().flag()]);
-                bytes.extend_from_slice(kp.public().as_ref());
                 bytes.extend_from_slice(kp1.private().as_ref());
             }
         }
@@ -100,15 +101,22 @@ impl EncodeDecodeBase64 for DB3KeyPair {
         match SignatureScheme::from_flag_byte(bytes.first().ok_or_else(|| eyre!("Invalid length"))?)
         {
             Ok(x) => match x {
-                SignatureScheme::ED25519 => Ok(DB3KeyPair::Ed25519(Ed25519KeyPair::from_bytes(
-                    bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
-                )?)),
-                SignatureScheme::Secp256k1 => {
-                    Ok(DB3KeyPair::Secp256k1(Secp256k1KeyPair::from_bytes(
+                SignatureScheme::ED25519 => {
+                    let sk = Ed25519PrivateKey::from_bytes(
                         bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
-                    )?))
+                    )
+                    .map_err(|_| eyre!("invalid secret"))?;
+                    let kp = Ed25519KeyPair::from(sk);
+                    Ok(DB3KeyPair::Ed25519(kp))
                 }
-                _ => Err(eyre!("Invalid flag byte")),
+                SignatureScheme::Secp256k1 => {
+                    let sk = Secp256k1PrivateKey::from_bytes(
+                        bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
+                    )
+                    .map_err(|_| eyre!("invalid secret"))?;
+                    let kp = Secp256k1KeyPair::from(sk);
+                    Ok(DB3KeyPair::Secp256k1(kp))
+                }
             },
             _ => Err(eyre!("Invalid bytes")),
         }
@@ -137,7 +145,7 @@ impl<'de> Deserialize<'de> for DB3KeyPair {
     }
 }
 
-impl Signer<DB3Signature> for Ed25519KeyPair {
+impl Signer<Signature> for Ed25519KeyPair {
     fn try_sign(&self, msg: &[u8]) -> std::result::Result<Signature, signature::Error> {
         Ok(Ed25519DB3Signature::new(self, msg)
             .map_err(|_| signature::Error::new())?
@@ -145,7 +153,7 @@ impl Signer<DB3Signature> for Ed25519KeyPair {
     }
 }
 
-impl Signer<DB3Signature> for Secp256k1KeyPair {
+impl Signer<Signature> for Secp256k1KeyPair {
     fn try_sign(&self, msg: &[u8]) -> std::result::Result<Signature, signature::Error> {
         Ok(Secp256k1DB3Signature::new(self, msg)
             .map_err(|_| signature::Error::new())?
