@@ -41,7 +41,7 @@ with the db3 network, you can get both advantages of those two choices.
 
 **Schemaless**
 
-You can store your custom data to db3 network without any changes
+You can store your custom data to the db3 network without any changes
 
 **High Performance**
 
