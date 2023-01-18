@@ -167,10 +167,32 @@ mod tests {
     use crate::db3_signature::DB3Signature;
     use crate::key_derive;
     #[test]
-    fn keypair_smoke_test() {
+    fn keypair_smoke_test_secp256k1() {
+        let seed: [u8; 32] = [0; 32];
+        let (address, keypair) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1)
+                .unwrap();
+        assert_eq!(
+            "\"0x0dc8e109d5dd2bee6746ca1d6fd9919659bdb28a\"",
+            serde_json::to_string(&address).unwrap()
+        );
+        let msg: [u8; 1] = [0; 1];
+        let result = keypair.try_sign(&msg);
+        assert_eq!(true, result.is_ok());
+        let signature = result.unwrap();
+        let result = signature.verify(&msg, address);
+        assert_eq!(true, result.is_ok());
+    }
+
+    #[test]
+    fn keypair_smoke_test_ed25519() {
         let seed: [u8; 32] = [0; 32];
         let (address, keypair) =
             key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        assert_eq!(
+            "\"0xb1401338b39a93681030ab54ed4668b46c19813e\"",
+            serde_json::to_string(&address).unwrap()
+        );
         let msg: [u8; 1] = [0; 1];
         let result = keypair.try_sign(&msg);
         assert_eq!(true, result.is_ok());

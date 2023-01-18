@@ -537,9 +537,6 @@ mod tests {
 
     #[tokio::test]
     async fn open_session_replay_attach() {
-        let mut rng = rand::thread_rng();
-        let nonce = get_a_random_nonce();
-
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -574,9 +571,6 @@ mod tests {
     }
     #[tokio::test]
     async fn open_session_ttl_expiered() {
-        let mut rng = rand::thread_rng();
-        let nonce = get_a_random_nonce();
-
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();

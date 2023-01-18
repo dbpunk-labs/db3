@@ -276,6 +276,46 @@ impl<S: DB3SignatureInner + Sized> DB3Signature for S {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::key_derive;
+
     #[test]
-    fn it_works() {}
+    fn secp256k1_signature_smoke_test() {
+        let seed: [u8; 32] = [0; 32];
+        let (address, keypair) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1)
+                .unwrap();
+        let msg: [u8; 1] = [0; 1];
+        let result = keypair.try_sign(&msg);
+        assert_eq!(true, result.is_ok());
+        let signature = result.unwrap();
+        // as ref
+        let result = signature.verify(&msg, address);
+        assert_eq!(true, result.is_ok());
+        let byte_data = signature.as_ref();
+        let result = Signature::from_bytes(byte_data);
+        assert_eq!(true, result.is_ok());
+        let signature = result.unwrap();
+        let result = signature.verify(&msg, address);
+        assert_eq!(true, result.is_ok());
+    }
+
+    #[test]
+    fn ed25119_signature_smoke_test() {
+        let seed: [u8; 32] = [0; 32];
+        let (address, keypair) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        let msg: [u8; 1] = [0; 1];
+        let result = keypair.try_sign(&msg);
+        assert_eq!(true, result.is_ok());
+        let signature = result.unwrap();
+        // as ref
+        let result = signature.verify(&msg, address);
+        assert_eq!(true, result.is_ok());
+        let byte_data = signature.as_ref();
+        let result = Signature::from_bytes(byte_data);
+        assert_eq!(true, result.is_ok());
+        let signature = result.unwrap();
+        let result = signature.verify(&msg, address);
+        assert_eq!(true, result.is_ok());
+    }
 }
