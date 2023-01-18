@@ -33,6 +33,7 @@ DB3 Network is an open-source decentralized firebase firestore alternative to bu
 when you want to build a dapp that has custom data to store and query, you have two choices at currently
 
 1st. use a centralized data architecture .e.g firebase or MongoDB to store the custom data. this is friendly for developers but will break the law of decentralization
+
 2nd. use Ethereum or other blockchains to store the custom data and use thegraph to index data. this can keep the decentralization but will cost a lot of engineering effort
 
 with the db3 network, you can get both advantages of those two choices.
