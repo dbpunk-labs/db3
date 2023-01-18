@@ -319,7 +319,5 @@ mod tests {
         let result = signature.verify(&msg, address);
         assert_eq!(true, result.is_ok());
         assert_eq!(SignatureScheme::ED25519.flag(), signature.scheme().flag());
-
     }
-
 }
