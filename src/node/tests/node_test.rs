@@ -55,7 +55,6 @@ mod node_integration {
 
     #[actix_web::test]
     async fn json_rpc_database_smoke_test() {
-        let nonce = get_a_random_nonce();
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
         let kp = db3_cmd::get_key_pair(false).unwrap();

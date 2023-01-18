@@ -180,6 +180,10 @@ mod tests {
         let result = keypair.try_sign(&msg);
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
+        assert_eq!(
+            "\"AZ0DU4T3WgMT2AWsczEus1Xl08Q1VsTZu6pPE0e1Op1LRqEz+FL+FgKjQDlVU3r6HAKBImJ3OyHZd4cHFudcbzABAhZubOzkI26ArLlTxnxFZSQy67JFBaPlrFJe6aTA58Lw\"",
+            serde_json::to_string(&signature).unwrap()
+        );
         let result = signature.verify(&msg, address);
         assert_eq!(true, result.is_ok());
     }
@@ -197,6 +201,7 @@ mod tests {
         let result = keypair.try_sign(&msg);
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
+
         let result = signature.verify(&msg, address);
         assert_eq!(true, result.is_ok());
     }
