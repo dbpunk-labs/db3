@@ -95,7 +95,7 @@ const dbFactory = new DB3Factory({
     nonce
 })
 
-// open database with a address
+// open database with an address
 const db = dbFactory.open("0x5ca8d43c15fb366d80e221d11a34894eb0975da6")
 ```
 for more please go to [db3.js](https://github.com/dbpunk-labs/db3.js)
