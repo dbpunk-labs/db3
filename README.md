@@ -18,6 +18,7 @@ A star ⭐️ is welcome.
 ![Discord](https://img.shields.io/discord/1025017851179962408?style=flat-square)
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/dbpunk-labs/db3/badge)](https://www.gitpoap.io/gh/dbpunk-labs/db3)
 
+**English | [中文](./README_zh_cn.md)**
 
 # What's DB3 Network
 
@@ -94,7 +95,7 @@ const dbFactory = new DB3Factory({
     nonce
 })
 
-// open database with a address
+// open database with an address
 const db = dbFactory.open("0x5ca8d43c15fb366d80e221d11a34894eb0975da6")
 ```
 for more please go to [db3.js](https://github.com/dbpunk-labs/db3.js)
