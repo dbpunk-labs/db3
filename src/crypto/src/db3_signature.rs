@@ -24,14 +24,13 @@ use enum_dispatch::enum_dispatch;
 use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey, Ed25519Signature};
 use fastcrypto::encoding::{Base64, Encoding};
 use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey, Secp256k1Signature};
+pub use fastcrypto::traits::KeyPair as KeypairTraits;
 use fastcrypto::traits::{Authenticator, KeyPair, ToFromBytes, VerifyingKey};
 use schemars::JsonSchema;
-pub use fastcrypto::traits::KeyPair as KeypairTraits;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, Bytes};
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-
 
 #[enum_dispatch]
 #[derive(Clone, JsonSchema, PartialEq, Eq, Hash)]
@@ -153,7 +152,6 @@ impl signature::Signature for Ed25519DB3Signature {
     }
 }
 
-
 impl DB3PublicKeyScheme for Ed25519PublicKey {
     const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::ED25519;
 }
@@ -210,7 +208,6 @@ impl DB3PublicKeyScheme for Secp256k1PublicKey {
     const SIGNATURE_SCHEME: SignatureScheme = SignatureScheme::Secp256r1;
 }
 
-
 pub trait DB3SignatureInner: Sized + signature::Signature + PartialEq + Eq + Hash {
     type Sig: Authenticator<PubKey = Self::PubKey>;
     type PubKey: VerifyingKey<Sig = Self::Sig> + DB3PublicKeyScheme;
@@ -224,35 +221,29 @@ pub trait DB3SignatureInner: Sized + signature::Signature + PartialEq + Eq + Has
             .map_err(|_| DB3Error::KeyConversionError("Invalid public key".to_string()))?;
         let received_addr = DB3Address::from(&pk);
         if received_addr != author {
-            return Err(DB3Error::IncorrectSigner {
-                error: format!("Signature get_verification_inputs() failure. Author is {author}, received address is {received_addr}")
-            });
+            return Err(DB3Error::IncorrectSigner (
+                format!("Signature get_verification_inputs() failure. Author is {author}, received address is {received_addr}")
+            ));
         }
         // deserialize the signature
-        let signature = Self::Sig::from_bytes(self.signature_bytes()).map_err(|err| {
-            DB3Error::InvalidSignature {
-                error: err.to_string(),
-            }
-        })?;
+        let signature = Self::Sig::from_bytes(self.signature_bytes())
+            .map_err(|err| DB3Error::InvalidSignature(err.to_string()))?;
 
         Ok((signature, pk))
     }
 
     fn new(kp: &Self::KeyPair, message: &[u8]) -> Result<Self> {
-        let sig = kp
-            .try_sign(message)
-            .map_err(|_| DB3Error::InvalidSignature {
-                error: "Failed to sign valid message with keypair".to_string(),
-            })?;
+        let sig = kp.try_sign(message).map_err(|_| {
+            DB3Error::InvalidSignature("Failed to sign valid message with keypair".to_string())
+        })?;
 
         let mut signature_bytes: Vec<u8> = Vec::new();
         signature_bytes
             .extend_from_slice(&[<Self::PubKey as DB3PublicKeyScheme>::SIGNATURE_SCHEME.flag()]);
         signature_bytes.extend_from_slice(sig.as_ref());
         signature_bytes.extend_from_slice(kp.public().as_ref());
-        Self::from_bytes(&signature_bytes[..]).map_err(|err| DB3Error::InvalidSignature {
-            error: err.to_string(),
-        })
+        Self::from_bytes(&signature_bytes[..])
+            .map_err(|err| DB3Error::InvalidSignature(err.to_string()))
     }
 }
 
@@ -297,9 +288,7 @@ impl<S: DB3SignatureInner + Sized> DB3Signature for S {
         let mut message = Vec::new();
         value.write(&mut message);
         pk.verify(&message[..], sig)
-            .map_err(|e| DB3Error::InvalidSignature {
-                error: format!("{}", e),
-            })
+            .map_err(|e| DB3Error::InvalidSignature(format!("{}", e)))
     }
 }
 
