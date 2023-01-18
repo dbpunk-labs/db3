@@ -38,3 +38,6 @@ features = [
 [[bench]]
 name = "sdk_benchmark"
 harness = false
+[[bench]]
+name = "submit_mutation_benchmark"
+harness = false

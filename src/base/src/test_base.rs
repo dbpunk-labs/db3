@@ -33,7 +33,7 @@ pub fn get_a_static_keypair() -> Keypair {
 // this function is used for testing
 pub fn get_a_random_nonce() -> u64 {
     let mut rng = rand::thread_rng();
-    let nonce = rng.gen_range(0..11000);
+    let nonce = rng.gen_range(0..100000000);
     nonce
 }
 pub fn get_a_static_address() -> AccountAddress {
