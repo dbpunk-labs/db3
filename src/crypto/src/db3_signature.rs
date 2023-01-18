@@ -297,6 +297,7 @@ mod tests {
         let signature = result.unwrap();
         let result = signature.verify(&msg, address);
         assert_eq!(true, result.is_ok());
+        assert_eq!(SignatureScheme::Secp256k1.flag(), signature.scheme().flag());
     }
 
     #[test]
@@ -317,5 +318,8 @@ mod tests {
         let signature = result.unwrap();
         let result = signature.verify(&msg, address);
         assert_eq!(true, result.is_ok());
+        assert_eq!(SignatureScheme::ED25519.flag(), signature.scheme().flag());
+
     }
+
 }

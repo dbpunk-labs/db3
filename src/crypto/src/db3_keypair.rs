@@ -176,6 +176,12 @@ mod tests {
             "\"0x0dc8e109d5dd2bee6746ca1d6fd9919659bdb28a\"",
             serde_json::to_string(&address).unwrap()
         );
+        let b64_str = keypair.encode_base64();
+        assert_eq!(
+            "AaMABK0LhkIfC8Zk95K9hq8vIhSozAiEwRnNbpPT9DDt",
+            b64_str
+        );
+        let keypair = DB3KeyPair::decode_base64("AaMABK0LhkIfC8Zk95K9hq8vIhSozAiEwRnNbpPT9DDt").unwrap();
         let msg: [u8; 1] = [0; 1];
         let result = keypair.try_sign(&msg);
         assert_eq!(true, result.is_ok());
