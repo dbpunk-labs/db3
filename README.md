@@ -1,6 +1,6 @@
 
 <p align="center" width="100%">
-    <img width="33%" src="https://github.com/dbpunk-labs/db3/blob/main/docs/images/db3_logo.png">
+    <img width="33%" src="./docs/images/db3_logo.png">
 </p>
 
 <p align="center" width="100%">
@@ -22,48 +22,45 @@ A star ⭐️ is welcome.
 
 # What's DB3 Network
 
-DB3 Network is an open-source decentralized firebase firestore alternative to build data-rich dapps quickly with minimal engineering effort.
+DB3 Network is an open-source decentralized firebase firestore alternative to build dapps quickly with minimal engineering effort.
+
+![position_web3](./docs/images/position_web3.jpg)
 
 # Why DB3 Network
 
 ![why db3](./docs/images/why_db3.jpg)
 
-without the db3 network, if you want to build a data-rich dapp .e.g a social dapp,  you have two choices
-1. use a centralized data architecture .e.g firebase or MongoDB to store the data
-2. use Ethereum or other blockchains to store data and use thegraph to index data. the blockchain can keep the decentralization and thegraph can provide a fast on-chain query
+when you want to build a dapp that has custom data to store and query, you have two choices at currently
 
-the first choice is very easy for you to develop the data-rich dapps but it breaks the law of decentralization, the second can keep the decentralization but will cost a lot of engineering effort. so with the db3 network, you can both develop the data-rich dapps with minimal engineering effort and can keep the decentralization. this is the reason why we need the db3 network
+1st. use a centralized data architecture .e.g firebase or MongoDB to store the custom data. this is friendly for developers but will break the law of decentralization
+2nd. use Ethereum or other blockchains to store the custom data and use thegraph to index data. this can keep the decentralization but will cost a lot of engineering effort
 
+with the db3 network, you can get both advantages of those two choices.
 
 # Features
 
-**Infinite Storage Space**
+**Schemaless**
 
-Scalability is critical in the web3 era; DB3 will use the following strategies to achieve dApp's scalability:
-  * Personal computers is enough to maintain the minimum network node requirements so everyone can join the db3 network to provide storage space.
-  * Using dynamic sharding to scale out: when a storage shard chain does not have enough space to store [mutation](./docs/mutation.md), the original shard chain will split itself into two subchains.
-  * Archiving the cold data to recycle storage space: historical cold blocks and cold state data will be archived to FileCoin, so new incoming data can always be stored.
+You can store your custom data to the db3 network without any changes
 
-**Blazed Fast and Provable On-chain Query**
+**High Performance**
 
 Currently,decentralization means terrible performance, but DB3 is trying to improve significantly:
 * [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of the DB3 network, and it has high performance and also fast-proof generation. 
 * Geo distribution: the nodes in every storage shard are geo-distributed, and the clients can execute queries against the nearest storage node.
-* [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly. 
+* [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly.
 
-**Crypto Native Data Ownership**
+**Data Ownership**
 
 We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271), and every document has its owner, while only the owner who holds the private key can update/delete the record. DB3 network generates the proofs and provides signatures to prove the membership (db3 has the specific document) and ownership.
 
-**Programming on-chain in web2 manner**
+**Programmable**
 
 Dapp developers can develop data processing contracts and deploy them to the DB3 network just like developing data backend in web2.
 
 **Ethereum Guarded Security**
 
 DB3 network is a layer2 network on Ethereum and Ethereum guards all the assets.
-
-Looking for more details?go to the [background introduction](./docs/background.md)
 
 # Getting Started
 
@@ -117,7 +114,8 @@ Together, we can make db3 network better!
 
 ![arch](./docs/images/db3-architecture.svg)
 
-more technical details
+# How it works
+
 * [mutation](./docs/mutation.md)
 * [query session](./docs/query.md)
 * [dvm](./docs/dvm.md)
