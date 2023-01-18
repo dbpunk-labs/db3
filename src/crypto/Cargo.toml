@@ -33,5 +33,7 @@ eyre = "0.6.8"
 enum_dispatch = "^0.3"
 derive_more = "0.99.17"
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "bbb2d02a7a64c27314721748cc4d015b00490dbe" , features=['copy_key']}
+bip32 = "0.4.0"
+slip10_ed25519 = "0.1.3"
 
 

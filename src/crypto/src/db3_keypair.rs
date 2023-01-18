@@ -20,7 +20,7 @@ use crate::db3_signature::{
     DB3SignatureInner, Ed25519DB3Signature, Secp256k1DB3Signature, Signature,
 };
 use crate::signature_scheme::SignatureScheme;
-use db3_error::DB3Error;
+use db3_error::{DB3Error, Result};
 use derive_more::From;
 use eyre::eyre;
 use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey};
@@ -164,7 +164,18 @@ impl Signer<Signature> for Secp256k1KeyPair {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::db3_signature::DB3Signature;
+    use crate::key_derive;
     #[test]
-    fn it_works() {}
+    fn keypair_smoke_test() {
+        let seed: [u8; 32] = [0; 32];
+        let (address, keypair) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        let msg: [u8; 1] = [0; 1];
+        let result = keypair.try_sign(&msg);
+        assert_eq!(true, result.is_ok());
+        let signature = result.unwrap();
+        let result = signature.verify(&msg, address);
+        assert_eq!(true, result.is_ok());
+    }
 }

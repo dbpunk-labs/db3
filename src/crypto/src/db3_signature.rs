@@ -241,9 +241,7 @@ pub trait DB3Signature: Sized + signature::Signature {
     fn public_key_bytes(&self) -> &[u8];
     fn scheme(&self) -> SignatureScheme;
 
-    fn verify<T>(&self, value: &T, author: DB3Address) -> Result<()>
-    where
-        T: Signable<Vec<u8>>;
+    fn verify(&self, value: &[u8], author: DB3Address) -> Result<()>;
 }
 
 pub trait Signable<W> {
@@ -267,15 +265,10 @@ impl<S: DB3SignatureInner + Sized> DB3Signature for S {
         S::PubKey::SIGNATURE_SCHEME
     }
 
-    fn verify<T>(&self, value: &T, author: DB3Address) -> Result<()>
-    where
-        T: Signable<Vec<u8>>,
-    {
+    fn verify(&self, value: &[u8], author: DB3Address) -> Result<()> {
         // Currently done twice - can we improve on this?;
         let (sig, pk) = &self.get_verification_inputs(author)?;
-        let mut message = Vec::new();
-        value.write(&mut message);
-        pk.verify(&message[..], sig)
+        pk.verify(value, sig)
             .map_err(|e| DB3Error::InvalidSignature(format!("{}", e)))
     }
 }
