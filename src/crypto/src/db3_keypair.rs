@@ -20,7 +20,7 @@ use crate::db3_signature::{
     DB3SignatureInner, Ed25519DB3Signature, Secp256k1DB3Signature, Signature,
 };
 use crate::signature_scheme::SignatureScheme;
-use db3_error::{DB3Error, Result};
+use db3_error::DB3Error;
 use derive_more::From;
 use eyre::eyre;
 use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey};
@@ -188,7 +188,7 @@ mod tests {
             "\"AZ0DU4T3WgMT2AWsczEus1Xl08Q1VsTZu6pPE0e1Op1LRqEz+FL+FgKjQDlVU3r6HAKBImJ3OyHZd4cHFudcbzABAhZubOzkI26ArLlTxnxFZSQy67JFBaPlrFJe6aTA58Lw\"",
             serde_json::to_string(&signature).unwrap()
         );
-        let result = signature.verify(&msg, address);
+        let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
     }
 
@@ -206,7 +206,7 @@ mod tests {
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
 
-        let result = signature.verify(&msg, address);
+        let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
     }
 }

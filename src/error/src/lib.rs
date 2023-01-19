@@ -71,6 +71,8 @@ pub enum DB3Error {
     InvalidSigner,
     #[error("fail to generate key for {0}")]
     SignatureKeyGenError(String),
+    #[error("fail to sign message for {0}")]
+    SignMessageError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

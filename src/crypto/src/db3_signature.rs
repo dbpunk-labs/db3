@@ -205,15 +205,10 @@ pub trait DB3SignatureInner: Sized + signature::Signature + PartialEq + Eq + Has
     type KeyPair: KeypairTraits<PubKey = Self::PubKey, Sig = Self::Sig>;
     const LENGTH: usize = Self::Sig::LENGTH + Self::PubKey::LENGTH + 1;
     const SCHEME: SignatureScheme = Self::PubKey::SIGNATURE_SCHEME;
-    fn get_verification_inputs(&self, author: DB3Address) -> Result<(Self::Sig, Self::PubKey)> {
-        // Is this signature emitted by the expected author?
+    fn get_verification_inputs(&self) -> Result<(Self::Sig, Self::PubKey)> {
         let bytes = self.public_key_bytes();
         let pk = Self::PubKey::from_bytes(bytes)
             .map_err(|_| DB3Error::KeyCodecError("Invalid public key".to_string()))?;
-        let received_addr = DB3Address::from(&pk);
-        if received_addr != author {
-            return Err(DB3Error::InvalidSigner);
-        }
         // deserialize the signature
         let signature = Self::Sig::from_bytes(self.signature_bytes())
             .map_err(|err| DB3Error::InvalidSignature(err.to_string()))?;
@@ -241,7 +236,7 @@ pub trait DB3Signature: Sized + signature::Signature {
     fn public_key_bytes(&self) -> &[u8];
     fn scheme(&self) -> SignatureScheme;
 
-    fn verify(&self, value: &[u8], author: DB3Address) -> Result<()>;
+    fn verify(&self, value: &[u8]) -> Result<DB3Address>;
 }
 
 pub trait Signable<W> {
@@ -265,11 +260,11 @@ impl<S: DB3SignatureInner + Sized> DB3Signature for S {
         S::PubKey::SIGNATURE_SCHEME
     }
 
-    fn verify(&self, value: &[u8], author: DB3Address) -> Result<()> {
-        // Currently done twice - can we improve on this?;
-        let (sig, pk) = &self.get_verification_inputs(author)?;
+    fn verify(&self, value: &[u8]) -> Result<DB3Address> {
+        let (sig, pk) = &self.get_verification_inputs()?;
         pk.verify(value, sig)
-            .map_err(|e| DB3Error::InvalidSignature(format!("{}", e)))
+            .map_err(|e| DB3Error::InvalidSignature(format!("{e}")))?;
+        Ok(DB3Address::from(pk))
     }
 }
 
@@ -289,14 +284,18 @@ mod tests {
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
         // as ref
-        let result = signature.verify(&msg, address);
+        let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
         let byte_data = signature.as_ref();
         let result = Signature::from_bytes(byte_data);
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
-        let result = signature.verify(&msg, address);
+        let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
+        assert_eq!(
+            serde_json::to_string(&address).unwrap(),
+            serde_json::to_string(&result.unwrap()).unwrap()
+        );
         assert_eq!(SignatureScheme::Secp256k1.flag(), signature.scheme().flag());
     }
 
@@ -310,14 +309,18 @@ mod tests {
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
         // as ref
-        let result = signature.verify(&msg, address);
+        let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
         let byte_data = signature.as_ref();
         let result = Signature::from_bytes(byte_data);
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
-        let result = signature.verify(&msg, address);
+        let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
+        assert_eq!(
+            serde_json::to_string(&address).unwrap(),
+            serde_json::to_string(&result.unwrap()).unwrap()
+        );
         assert_eq!(SignatureScheme::ED25519.flag(), signature.scheme().flag());
     }
 }
