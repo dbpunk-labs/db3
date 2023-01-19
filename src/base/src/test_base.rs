@@ -20,7 +20,9 @@ use ed25519_dalek::{Keypair, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SECRET_KEY
 use ethereum_types::Address as AccountAddress;
 use hex::FromHex;
 use rand::{thread_rng, Rng};
+
 // this function is used for testing
+//
 pub fn get_a_static_keypair() -> Keypair {
     let secret_key: &[u8] = b"833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42";
     let public_key: &[u8] = b"ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf";

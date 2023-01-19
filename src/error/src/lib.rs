@@ -19,6 +19,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DB3Error {
+    #[error("invalid db3 address")]
+    InvalidAddress,
     #[error("fail to require lock from state")]
     StateLockBusyError,
     #[error("fail to load key pair {0}")]
@@ -27,6 +29,8 @@ pub enum DB3Error {
     SignError(String),
     #[error("fail to verify the request with error {0}")]
     VerifyFailed(String),
+    #[error("invalid signature siwith error {0}")]
+    InvalidSignature(String),
     #[error("fail to codec key with error {0}")]
     KeyCodecError(String),
     #[error("fail to apply mutation with error {0}")]
@@ -63,6 +67,12 @@ pub enum DB3Error {
     QuerySessionVerifyError(String),
     #[error("fail to query database {0}")]
     QueryDatabaseError(String),
+    #[error("the address does not match the public key")]
+    InvalidSigner,
+    #[error("fail to generate key for {0}")]
+    SignatureKeyGenError(String),
+    #[error("fail to sign message for {0}")]
+    SignMessageError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
