@@ -210,7 +210,6 @@ impl StorageNode for StorageNodeImpl {
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
-
                 // Verify query session sdk
                 match sess_store.get_session_mut(&payload.session_token) {
                     Some(sess) => {
@@ -277,10 +276,12 @@ impl StorageNode for StorageNodeImpl {
         request.encode(&mut buf).map_err(|e| {
             Status::internal(format!("fail to submit query session with error {}", e))
         })?;
+
         let buf = buf.freeze();
         let r = BroadcastRequest {
             body: buf.as_ref().to_vec(),
         };
+
         let request = tonic::Request::new(r);
         let response = self
             .broadcast(request)
@@ -293,7 +294,7 @@ impl StorageNode for StorageNodeImpl {
         // let hash = String::from_utf8_lossy(base64_byte.as_ref()).to_string();
         // TODO(chenjing): sign
         Ok(Response::new(CloseSessionResponse {
-            query_session_info: node_query_session_info.clone(),
+            query_session_info: node_query_session_info,
             hash: response.hash,
         }))
     }
