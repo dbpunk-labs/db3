@@ -113,7 +113,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     // });
     let mut group = c.benchmark_group("submit mutation key size 1");
     group.sample_size(60);
-    for qps in [100, 200, 400, 600].iter() {
+    for qps in [10].iter() {
         group.bench_with_input(BenchmarkId::new("qps", qps), qps, |b, &qps| {
             b.to_async(&rt).iter(|| async {
                 let start = Utc::now().timestamp_millis();
