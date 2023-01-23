@@ -54,7 +54,7 @@ mod tests {
     use chrono::Utc;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
-    use db3_proto::db3_session_proto::{QuerySessionInfo, SessionStatus};
+    use db3_proto::db3_session_proto::QuerySessionInfo;
 
     #[test]
     fn it_estimate_gas() {
@@ -83,7 +83,6 @@ mod tests {
             id: 1,
             start_time: Utc::now().timestamp(),
             query_count: 10,
-            status: SessionStatus::Stop.into(),
         };
 
         let units = estimate_query_session_gas(&node_query_session_info);

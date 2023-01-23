@@ -49,12 +49,12 @@ pub fn check_query_session_info(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session_manager::SessionStatus;
     use bytes::BytesMut;
     use chrono::Utc;
     use db3_base::get_a_static_keypair;
     use db3_crypto::signer::Db3Signer;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use db3_proto::db3_session_proto::SessionStatus;
 
     #[test]
     fn test_verify_happy_path() -> Result<()> {
@@ -62,7 +62,6 @@ mod tests {
             id: 1,
             start_time: Utc::now().timestamp(),
             query_count: 10,
-            status: SessionStatus::Stop.into(),
         };
         let client_query_session = CloseSessionPayload {
             session_info: Some(client_query_session_info),
@@ -72,7 +71,6 @@ mod tests {
             id: 1,
             start_time: Utc::now().timestamp(),
             query_count: 10,
-            status: SessionStatus::Stop.into(),
         };
         // encode and sign client_query_session_info
         let kp = get_a_static_keypair();
@@ -101,13 +99,11 @@ mod tests {
             id: 1,
             start_time: Utc::now().timestamp(),
             query_count: 100,
-            status: SessionStatus::Stop.into(),
         };
         let node_query_session_info = QuerySessionInfo {
             id: 1,
             start_time: Utc::now().timestamp(),
             query_count: 10,
-            status: SessionStatus::Stop.into(),
         };
         // encode and sign client_query_session_info
         let kp = get_a_static_keypair();

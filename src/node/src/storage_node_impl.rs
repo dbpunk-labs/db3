@@ -44,7 +44,6 @@ use bytes::BytesMut;
 use db3_crypto::signer::Db3Signer;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::info;
-
 pub struct StorageNodeImpl {
     context: Context,
     signer: Db3Signer,
@@ -430,6 +429,7 @@ impl StorageNode for StorageNodeImpl {
                 {
                     sess.check_session_status();
                     Ok(Response::new(GetSessionInfoResponse {
+                        session_status: sess.get_session_status_as_i32(),
                         session_info: Some(sess.get_session_info()),
                     }))
                 } else {
