@@ -16,7 +16,7 @@
 //
 
 use super::context::Context;
-use db3_crypto::verifier::Verifier;
+use db3_crypto::db3_verifier::DB3Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
@@ -166,12 +166,8 @@ impl StorageNode for StorageNodeImpl {
         request: Request<OpenSessionRequest>,
     ) -> std::result::Result<Response<OpenSessionResponse>, Status> {
         let r = request.into_inner();
-        let account_id = Verifier::verify(
-            r.payload.as_ref(),
-            r.signature.as_ref(),
-            r.public_key.as_ref(),
-        )
-        .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        let account_id = DB3Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = OpenSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode open session request ".to_string()))?;
         let header = payload.header;
@@ -202,7 +198,7 @@ impl StorageNode for StorageNodeImpl {
         let client_query_session: &[u8] = r.payload.as_ref();
         let client_signature: &[u8] = r.signature.as_ref();
         let client_public_key: &[u8] = r.public_key.as_ref();
-        Verifier::verify(client_query_session, client_signature, client_public_key)
+        DB3Verifier::verify(client_query_session, client_signature)
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = CloseSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
@@ -253,7 +249,6 @@ impl StorageNode for StorageNodeImpl {
             node_query_session_info: node_query_session_info.clone(),
             client_query_session: client_query_session.to_vec().to_owned(),
             client_signature: client_signature.to_vec().to_owned(),
-            client_public_key: client_public_key.to_vec().to_owned(),
         };
         // Submit query session
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
@@ -264,10 +259,10 @@ impl StorageNode for StorageNodeImpl {
         let (signature, public_key) = self.signer.sign(mbuf.as_ref()).map_err(|e| {
             Status::internal(format!("fail to submit query session with error {}", e))
         })?;
+
         let request = WriteRequest {
             signature: signature.as_ref().to_vec().to_owned(),
             payload: mbuf.as_ref().to_vec().to_owned(),
-            public_key: public_key.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::QuerySessionPayload.into(),
         };
 

@@ -98,7 +98,6 @@ message GetSessionInfoRequest {
 message OpenSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
-    bytes public_key = 3;
 }
 
 message OpenSessionResponse {
@@ -111,7 +110,6 @@ message OpenSessionResponse {
 message CloseSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
-    bytes public_key = 3;
 }
 
 message CloseSessionResponse {

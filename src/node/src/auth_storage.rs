@@ -33,7 +33,7 @@ use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
 use db3_types::cost;
 use db3_types::gas;
-use ethereum_types::Address as AccountAddress;
+use db3_crypto::db3_address::DB3Address as AccountAddress;
 use hex;
 use merkdb::proofs::{Node, Op as ProofOp};
 use merkdb::Merk;

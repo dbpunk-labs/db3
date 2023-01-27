@@ -16,11 +16,6 @@
 //
 
 pub mod mutation_sdk;
-pub mod store_sdk;
-
 #[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
-}
+pub mod sdk_test;
+pub mod store_sdk;
