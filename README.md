@@ -1,11 +1,9 @@
 
-<p align="center" width="100%">
-    <img width="33%" src="./docs/images/db3_logo.png">
-</p>
-
-<p align="center" width="100%">
-A star ⭐️ is welcome.
-</p>
+<p align="center">
+ <img width="400px" src="./docs/images/db3_logo.svg" align="center"/>
+<p align="center"> A ⭐️ is welcome!
+  
+<p align="center">
 
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/dbpunk-labs/db3/ci.yml?branch=main&style=flat-square)
 ![coverage](https://img.shields.io/codecov/c/github/dbpunk-labs/db3?style=flat-square)
@@ -18,51 +16,48 @@ A star ⭐️ is welcome.
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/dbpunk-labs/db3/badge)](https://www.gitpoap.io/gh/dbpunk-labs/db3)
 [![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/sz3bmZx2uh)
 
-
 **English | [中文](./README_zh_cn.md)**
 
-# What's DB3 Network
+## What's DB3 Network?
 
-DB3 Network is an open-source decentralized firebase firestore alternative to build dapps quickly with minimal engineering effort.
+DB3 Network is an open-source, decentralized firebase firestore alternative to build dApps quickly and less challenging.
+![position](./docs/images/position_web3.png)
 
-![position_web3](./docs/images/position_web3.jpg)
-
-# Why DB3 Network
-
+## Why DB3 Network
 ![why db3](./docs/images/why_db3.jpg)
 
-when you want to build a dapp that has custom data to store and query, you have two choices at currently
+Currently, there are two types of Data architecture for dApp(decentralized application): centralized vs. decentralized.
+  
+**Centralized**: use [Firebase](https://firebase.google.com)<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/firebase.svg" />
+ or [MongoDB](https://github.com/mongodb/mongo)<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/mongodb.svg" />to store the data), both of which are developer-friendly. However, dApps would be regarded as less secure based on a central database.
+  
+**Decentralized**: use Ethereum<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/ethereum.svg" /> or other blockchains to store the data and use [the Graph](https://thegraph.com/en/) to index data from it. The separation of the storage and the indexer would cause many issues in future development.
+  
+With Db3 network, you can get both advantages of the above two choices.
 
-1st. use a centralized data architecture .e.g firebase or MongoDB to store the custom data. this is friendly for developers but will break the law of decentralization
-
-2nd. use Ethereum or other blockchains to store the custom data and use thegraph to index data. this can keep the decentralization but will cost a lot of engineering effort
-
-with the db3 network, you can get both advantages of those two choices.
 
 # Features
-
 **Schemaless**
-
-You can store your custom data to the db3 network without any changes
+You can store data on the DB3 Network without any changes.
 
 **High Performance**
 
-Currently,decentralization means terrible performance, but DB3 is trying to improve significantly:
-* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of the DB3 network, and it has high performance and also fast-proof generation. 
+Currently, decentralization means terrible performance, but DB3 is trying to improve it significantly:
+* [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) is the storage engine of the DB3 Network, and it has high Performance and fast-proof generation. 
 * Geo distribution: the nodes in every storage shard are geo-distributed, and the clients can execute queries against the nearest storage node.
-* [Query session](./docs/query.md), the first decentralized query protocol to resolve performance and incentive perfectly.
+* [Query session](./docs/query.md), the first decentralized query protocol to resolve Performance and incentive perfectly.
 
 **Data Ownership**
 
-We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271), and every document has its owner, while only the owner who holds the private key can update/delete the record. DB3 network generates the proofs and provides signatures to prove the membership (db3 has the specific document) and ownership.
+We proposed [the document level ownership](https://github.com/dbpunk-labs/db3/issues/271), and every document has its owner, while only the owner holds the private key can update/delete the record. DB3 network generates the proofs and provides signatures to prove the membership (db3 has the specific document) and ownership.
 
 **Programmable**
 
-Dapp developers can develop data processing contracts and deploy them to the DB3 network just like developing data backend in web2.
+Dapp developers can develop data processing contracts and deploy them to the DB3 Network, just like the data backend in web2.
 
 **Ethereum Guarded Security**
 
-DB3 network is a layer2 network on Ethereum and Ethereum guards all the assets.
+DB3 Network is a layer2 network on Ethereum and Ethereum guards all the assets.
 
 # Getting Started
 
@@ -154,3 +149,4 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
