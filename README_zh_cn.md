@@ -1,10 +1,9 @@
 
-<p align="center" width="100%">
-    <img width="33%" src="https://github.com/dbpunk-labs/db3/blob/main/docs/images/db3_logo.png">
-</p>
-
-<p align="center" width="100%">
-A star ⭐️ is welcome.
+<p align="center">
+ <img width="300px" src="./docs/images/db3_logo.svg" align="center"/>
+<p align="center"> A ⭐️ is welcome!
+  
+<p align="center">
 </p>
 
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/dbpunk-labs/db3/ci.yml?branch=main&style=flat-square)
@@ -23,6 +22,10 @@ A star ⭐️ is welcome.
 # 什么是DB3 Network
 
 DB3 Network是一款开源的去中心化的firebase替代品，在DB3 Network上面可以低成本快速构建复杂的去中心化数据应用
+
+<p align="left">
+ <img width="600px" src="./docs/images/position_web3.svg" align="center"/>
+</p>
 
 # 为什么需要DB3 Network
 
