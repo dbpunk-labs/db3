@@ -22,8 +22,8 @@
 
 DB3 Network is an open-source, decentralized firebase firestore alternative to build dApps quickly and less challenging.
 
-<p align="center">
- <img width="300px" src="./docs/images/position_web3.svg" align="center"/>
+<p align="left">
+ <img width="600px" src="./docs/images/position_web3.svg" align="center"/>
 
 ## Why DB3 Network
 ![why db3](./docs/images/why_db3.jpg)
