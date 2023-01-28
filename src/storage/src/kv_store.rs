@@ -16,12 +16,12 @@
 //
 
 use super::key::Key;
+use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, RangeKey};
 use db3_types::cost;
-use ethereum_types::Address as AccountAddress;
 use merkdb::proofs::{query::Query, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use std::collections::HashSet;
@@ -51,12 +51,8 @@ impl KvStore {
         return true;
     }
 
-    fn convert(
-        kp: &KvPair,
-        account_addr: &AccountAddress,
-        ns: &[u8],
-    ) -> Result<(BatchEntry, usize)> {
-        let key = Key(*account_addr, ns, kp.key.as_ref());
+    fn convert(kp: &KvPair, addr: &DB3Address, ns: &[u8]) -> Result<(BatchEntry, usize)> {
+        let key = Key(*addr, ns, kp.key.as_ref());
         let encoded_key = key.encode()?;
         let action = MutationAction::from_i32(kp.action);
         match action {
@@ -75,7 +71,7 @@ impl KvStore {
 
     pub fn apply(
         db: Pin<&mut Merk>,
-        account_addr: &AccountAddress,
+        addr: &DB3Address,
         mutation: &Mutation,
     ) -> Result<(Units, usize)> {
         let ns = mutation.ns.as_ref();
@@ -85,7 +81,7 @@ impl KvStore {
         let mut entries: Vec<BatchEntry> = Vec::new();
         let mut total_in_bytes: usize = 0;
         for kv in ordered_kv_pairs {
-            let (batch_entry, bytes) = Self::convert(&kv, account_addr, ns)?;
+            let (batch_entry, bytes) = Self::convert(&kv, addr, ns)?;
             total_in_bytes += bytes;
             entries.push(batch_entry);
         }
@@ -100,7 +96,7 @@ impl KvStore {
 
     pub fn batch_get(
         db: Pin<&Merk>,
-        account_addr: &AccountAddress,
+        addr: &DB3Address,
         batch_get_keys: &BatchGetKey,
     ) -> Result<LinkedList<ProofOp>> {
         let mut query = Query::new();
@@ -113,7 +109,7 @@ impl KvStore {
         }
 
         for k in &batch_get_keys.keys {
-            let key = Key(*account_addr, batch_get_keys.ns.as_ref(), k.as_ref());
+            let key = Key(*addr, batch_get_keys.ns.as_ref(), k.as_ref());
             let encoded_key = key.encode()?;
             query.insert_key(encoded_key);
         }
@@ -125,7 +121,7 @@ impl KvStore {
 
     pub fn get_range(
         db: Pin<&Merk>,
-        account_addr: &AccountAddress,
+        addr: &DB3Address,
         range_key: &RangeKey,
     ) -> Result<LinkedList<ProofOp>> {
         let mut query = Query::new();
@@ -134,10 +130,8 @@ impl KvStore {
                 if range.start.cmp(&range.end) < std::cmp::Ordering::Less {
                     return Err(DB3Error::QueryKvError("bad range order".to_string()));
                 }
-                let start_key =
-                    Key(*account_addr, range_key.ns.as_ref(), range.start.as_ref()).encode()?;
-                let end_key =
-                    Key(*account_addr, range_key.ns.as_ref(), range.end.as_ref()).encode()?;
+                let start_key = Key(*addr, range_key.ns.as_ref(), range.start.as_ref()).encode()?;
+                let end_key = Key(*addr, range_key.ns.as_ref(), range.end.as_ref()).encode()?;
                 let std_range = std::ops::Range {
                     start: start_key,
                     end: end_key,

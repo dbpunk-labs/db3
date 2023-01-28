@@ -24,7 +24,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-const DB3_ADDRESS_LENGTH: usize = 20;
+pub const DB3_ADDRESS_LENGTH: usize = 20;
 
 #[serde_as]
 #[derive(
@@ -78,6 +78,12 @@ impl TryFrom<Vec<u8>> for DB3Address {
     }
 }
 
+impl From<&[u8; DB3_ADDRESS_LENGTH]> for DB3Address {
+    fn from(data: &[u8; DB3_ADDRESS_LENGTH]) -> Self {
+        Self(*data)
+    }
+}
+
 impl From<&DB3PublicKey> for DB3Address {
     fn from(pk: &DB3PublicKey) -> Self {
         let mut hasher = Sha3_256::default();
@@ -111,6 +117,14 @@ impl TryFrom<&[u8]> for DB3Address {
         let arr: [u8; DB3_ADDRESS_LENGTH] =
             bytes.try_into().map_err(|_| DB3Error::InvalidAddress)?;
         Ok(Self(arr))
+    }
+}
+
+impl TryFrom<&str> for DB3Address {
+    type Error = DB3Error;
+    fn try_from(addr: &str) -> std::result::Result<Self, DB3Error> {
+        let value = decode_bytes_hex(addr).map_err(|_| DB3Error::InvalidAddress)?;
+        Ok(Self(value))
     }
 }
 

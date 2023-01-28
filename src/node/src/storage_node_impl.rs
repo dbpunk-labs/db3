@@ -16,6 +16,7 @@
 //
 
 use super::context::Context;
+use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_verifier::DB3Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
@@ -33,7 +34,6 @@ use db3_proto::db3_session_proto::{
 use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
-use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::boxed::Box;
 use std::str::FromStr;
@@ -197,7 +197,6 @@ impl StorageNode for StorageNodeImpl {
         let r = request.into_inner();
         let client_query_session: &[u8] = r.payload.as_ref();
         let client_signature: &[u8] = r.signature.as_ref();
-        let client_public_key: &[u8] = r.public_key.as_ref();
         DB3Verifier::verify(client_query_session, client_signature)
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = CloseSessionPayload::decode(r.payload.as_ref())
@@ -256,7 +255,7 @@ impl StorageNode for StorageNodeImpl {
             Status::internal(format!("fail to submit query session with error {}", e))
         })?;
         let mbuf = mbuf.freeze();
-        let (signature, public_key) = self.signer.sign(mbuf.as_ref()).map_err(|e| {
+        let signature  = self.signer.sign(mbuf.as_ref()).map_err(|e| {
             Status::internal(format!("fail to submit query session with error {}", e))
         })?;
 
@@ -398,7 +397,7 @@ impl StorageNode for StorageNodeImpl {
             info!("empty account");
             return Err(Status::invalid_argument("empty address".to_string()));
         }
-        let addr = AccountAddress::from_str(r.addr.as_str())
+        let addr = DB3Address::try_from(r.addr.as_str())
             .map_err(|e| Status::internal(format!("{}", e)))?;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
