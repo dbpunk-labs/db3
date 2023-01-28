@@ -12,6 +12,5 @@ members = [
     "src/cmd",
 ]
 
-
 [workspace.dependencies]
 

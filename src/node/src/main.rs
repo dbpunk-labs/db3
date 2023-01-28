@@ -22,7 +22,7 @@ shadow!(build);
 use actix_cors::Cors;
 use actix_web::{rt, web, App, HttpServer};
 use clap::{Parser, Subcommand};
-use db3_crypto::signer::Db3Signer;
+use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_node::abci_impl::{AbciImpl, NodeState};
 use db3_node::auth_storage::AuthStorage;
 use db3_node::context::Context;
@@ -157,7 +157,7 @@ async fn start_grpc_service(
 ) {
     let addr = format!("{}:{}", public_host, public_grpc_port);
     let kp = db3_node::node_key::get_key_pair(None).unwrap();
-    let signer = Db3Signer::new(kp);
+    let signer = Db3MultiSchemeSigner::new(kp);
     let storage_node = StorageNodeImpl::new(context, signer);
     info!("start db3 storage node on public addr {}", addr);
     if disable_grpc_web {
@@ -312,10 +312,10 @@ async fn start_shell(cmd: Commands) {
         let channel = endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
         let kp = db3_cmd::get_key_pair(true).unwrap();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let sdk = MutationSDK::new(client.clone(), signer);
         let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let mut store_sdk = StoreSDK::new(client, signer);
         print!(">");
         stdout().flush().unwrap();

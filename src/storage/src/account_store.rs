@@ -16,11 +16,11 @@
 //
 //
 use bytes::BytesMut;
+use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_types::account_key::AccountKey;
-use ethereum_types::Address as AccountAddress;
 use merkdb::{Merk, Op};
 use prost::Message;
 use std::pin::Pin;
@@ -32,12 +32,8 @@ impl AccountStore {
         Self {}
     }
 
-    pub fn apply(
-        db: Pin<&mut Merk>,
-        account_addr: &AccountAddress,
-        account: &Account,
-    ) -> Result<()> {
-        let key = AccountKey(*account_addr);
+    pub fn apply(db: Pin<&mut Merk>, addr: &DB3Address, account: &Account) -> Result<()> {
+        let key = AccountKey(*addr);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024);
         account
@@ -53,8 +49,8 @@ impl AccountStore {
         Ok(())
     }
 
-    pub fn get_account(db: Pin<&Merk>, account_addr: &AccountAddress) -> Result<Account> {
-        let key = AccountKey(*account_addr);
+    pub fn get_account(db: Pin<&Merk>, addr: &DB3Address) -> Result<Account> {
+        let key = AccountKey(*addr);
         let encoded_key = key.encode()?;
         //TODO verify the result
         let values = db

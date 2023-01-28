@@ -16,8 +16,8 @@
 //
 
 use chrono::Utc;
+use db3_crypto::db3_address::DB3Address;
 use db3_proto::db3_session_proto::{QuerySessionInfo, SessionStatus};
-use ethereum_types::Address;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
@@ -120,8 +120,8 @@ impl SessionPool {
 }
 
 pub struct SessionStore {
-    session_pools: HashMap<Address, SessionPool>,
-    token_account_map: HashMap<String, Address>,
+    session_pools: HashMap<DB3Address, SessionPool>,
+    token_account_map: HashMap<String, DB3Address>,
     open_session_headers: HashSet<String>,
     sid: i32,
 }
@@ -163,7 +163,7 @@ impl SessionStore {
         &mut self,
         header: &String,
         start_time: i64,
-        addr: Address,
+        addr: DB3Address,
     ) -> Result<(String, QuerySessionInfo), String> {
         if self.is_ttl_expired(start_time) {
             return Err(format!("Session HEADER {} ttl is expired", header));
@@ -204,7 +204,7 @@ impl SessionStore {
                 Some(sess_pool) => sess_pool.remove_session(token),
                 None => Err(format!("Fail to remove session. Address not exist")),
             },
-            None => Err(format!("Fail to remove session, token not exist {}", token)),
+            None => Err(format!("Fail to remove session, token not exist {token}")),
         }
     }
     pub fn is_session_exist(&self, token: &str) -> bool {
@@ -216,7 +216,7 @@ impl SessionStore {
             None => false,
         }
     }
-    pub fn get_address(&self, token: &str) -> Option<Address> {
+    pub fn get_address(&self, token: &str) -> Option<DB3Address> {
         match self.token_account_map.get(token).clone() {
             Some(addr) => Some(addr.clone()),
             None => None,

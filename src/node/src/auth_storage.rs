@@ -229,9 +229,10 @@ impl AuthStorage {
             bill_type: BillType::BillForQuery.into(),
             time: self.current_block_state.block_time,
             bill_target_id: mutation_id.to_vec(),
-            owner: addr.as_bytes().to_vec(),
-            query_addr: query_addr.as_bytes().to_vec(),
+            owner: addr.to_vec(),
+            query_addr: query_addr.to_vec(),
         };
+
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         BillStore::apply(db, &bill)?;
 
@@ -279,7 +280,7 @@ impl AuthStorage {
             bill_type: BillType::BillForMutation.into(),
             time: self.current_block_state.block_time,
             bill_target_id: mutation_id.to_vec(),
-            owner: addr.as_bytes().to_vec(),
+            owner: addr.to_vec(),
             query_addr: vec![],
         };
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);

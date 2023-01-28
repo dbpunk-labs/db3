@@ -1,10 +1,12 @@
+use fastcrypto::traits::ToFromBytes;
+use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey};
+use db3_crypto::db3_keypair::DB3KeyPair;
 use db3_error::{DB3Error, Result};
 use dirs;
-use ed25519_dalek::Keypair;
 use std::option::Option;
 use tendermint_config::PrivValidatorKey;
 
-pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
+pub fn get_key_pair(file_path: Option<String>) -> Result<DB3KeyPair> {
     let mut home_dir = dirs::home_dir().unwrap();
     let key_path = match file_path {
         Some(path) => {
@@ -21,12 +23,17 @@ pub fn get_key_pair(file_path: Option<String>) -> Result<Keypair> {
 
     match PrivValidatorKey::load_json_file(&key_path) {
         Ok(key) => match key.priv_key.ed25519_keypair() {
-            Some(kp) => Ok(Keypair::from_bytes(kp.to_bytes().as_ref()).unwrap()),
+            Some(kp) => {
+                let private_key = Ed25519PrivateKey::from_bytes(kp.secret.as_ref())
+                    .map_err(|e| DB3Error::LoadKeyPairError(format!("{e}")))?;
+                let pair = Ed25519KeyPair::from(private_key);
+                Ok(DB3KeyPair::Ed25519(pair))
+            }
             None => Err(DB3Error::LoadKeyPairError(format!(
                 "parsed ed25519 keypair is null"
             ))),
         },
-        Err(e) => Err(DB3Error::LoadKeyPairError(format!("{:?}", e))),
+        Err(e) => Err(DB3Error::LoadKeyPairError(format!("{e}"))),
     }
 }
 

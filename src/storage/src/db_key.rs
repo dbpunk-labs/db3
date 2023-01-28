@@ -14,12 +14,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use db3_crypto::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use db3_error::{DB3Error, Result};
-use ethereum_types::Address as AccountAddress;
 const DATABASE: &str = "_DB_";
-const MIN_KEY_TOTAL_LEN: usize = AccountAddress::len_bytes() + DATABASE.len();
+const MIN_KEY_TOTAL_LEN: usize = DB3_ADDRESS_LENGTH + DATABASE.len();
 /// account_address + _NS_ + ns
-pub struct DbKey<'a>(pub AccountAddress, pub &'a [u8]);
+pub struct DbKey<'a>(pub DB3Address, pub &'a [u8]);
 
 impl<'a> DbKey<'a> {
     ///
@@ -42,10 +42,10 @@ impl<'a> DbKey<'a> {
             ));
         }
         let key_start_offset = MIN_KEY_TOTAL_LEN;
-        let data_slice: &[u8; AccountAddress::len_bytes()] = &data[..AccountAddress::len_bytes()]
+        let data_slice: &[u8; DB3_ADDRESS_LENGTH] = &data[..DB3_ADDRESS_LENGTH]
             .try_into()
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        let addr = AccountAddress::from(data_slice);
+            .map_err(|e| DB3Error::KeyCodecError(format!("{e}")))?;
+        let addr = DB3Address::from(data_slice);
         Ok(Self(addr, &data[key_start_offset..]))
     }
 }

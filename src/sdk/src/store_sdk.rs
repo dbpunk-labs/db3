@@ -177,7 +177,7 @@ impl StoreSDK {
 
     pub async fn get_account(&self, addr: &AccountAddress) -> std::result::Result<Account, Status> {
         let r = GetAccountRequest {
-            addr: format!("{addr}", addr),
+            addr: format!("{addr}"),
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
@@ -265,8 +265,7 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session with token {} not found",
-                token
+                "Fail to query, session with token {token} not found"
             ))),
         }
     }
