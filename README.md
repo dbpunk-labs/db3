@@ -1,6 +1,6 @@
 
 <p align="center">
- <img width="400px" src="./docs/images/db3_logo.svg" align="center"/>
+ <img width="300px" src="./docs/images/db3_logo.svg" align="center"/>
 <p align="center"> A ⭐️ is welcome!
   
 <p align="center">
@@ -21,7 +21,9 @@
 ## What's DB3 Network?
 
 DB3 Network is an open-source, decentralized firebase firestore alternative to build dApps quickly and less challenging.
-![position](./docs/images/position_web3.png)
+
+<p align="center">
+ <img width="300px" src="./docs/images/position_web3.svg" align="center"/>
 
 ## Why DB3 Network
 ![why db3](./docs/images/why_db3.jpg)
