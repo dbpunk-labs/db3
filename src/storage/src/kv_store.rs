@@ -89,7 +89,7 @@ impl KvStore {
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
-                .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+                .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
         }
         Ok((gas, total_in_bytes))
     }

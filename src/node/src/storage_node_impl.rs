@@ -17,6 +17,7 @@
 
 use super::context::Context;
 use db3_crypto::db3_address::DB3Address;
+use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_crypto::db3_verifier::DB3Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
@@ -41,17 +42,16 @@ use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
 
 use bytes::BytesMut;
-use db3_crypto::signer::Db3Signer;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::info;
 
 pub struct StorageNodeImpl {
     context: Context,
-    signer: Db3Signer,
+    signer: Db3MultiSchemeSigner,
 }
 
 impl StorageNodeImpl {
-    pub fn new(context: Context, singer: Db3Signer) -> Self {
+    pub fn new(context: Context, singer: Db3MultiSchemeSigner) -> Self {
         Self {
             context,
             signer: singer,
@@ -255,8 +255,9 @@ impl StorageNode for StorageNodeImpl {
             Status::internal(format!("fail to submit query session with error {}", e))
         })?;
         let mbuf = mbuf.freeze();
-        let signature  = self.signer.sign(mbuf.as_ref()).map_err(|e| {
-            Status::internal(format!("fail to submit query session with error {}", e))
+
+        let signature = self.signer.sign(mbuf.as_ref()).map_err(|e| {
+            Status::internal(format!("fail to submit query session with error {e}"))
         })?;
 
         let request = WriteRequest {
@@ -268,7 +269,7 @@ impl StorageNode for StorageNodeImpl {
         //TODO add the capacity to mutation sdk configuration
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf).map_err(|e| {
-            Status::internal(format!("fail to submit query session with error {}", e))
+            Status::internal(format!("fail to submit query session with error {e}"))
         })?;
 
         let buf = buf.freeze();
@@ -280,9 +281,7 @@ impl StorageNode for StorageNodeImpl {
         let response = self
             .broadcast(request)
             .await
-            .map_err(|e| {
-                Status::internal(format!("fail to submit query session with error {}", e))
-            })?
+            .map_err(|e| Status::internal(format!("fail to submit query session with error {e}")))?
             .into_inner();
         // let base64_byte = base64::encode(response.hash);
         // let hash = String::from_utf8_lossy(base64_byte.as_ref()).to_string();

@@ -17,9 +17,9 @@
 
 use super::db_key::DbKey;
 use bytes::BytesMut;
+use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::Database;
-use ethereum_types::Address as AccountAddress;
 use merkdb::proofs::{query::Query, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
@@ -34,12 +34,12 @@ impl DbStore {
         Self {}
     }
 
-    fn convert(db: &Database, account_addr: &AccountAddress) -> Result<(BatchEntry, usize)> {
-        let key = DbKey(*account_addr, db.name.as_bytes().as_ref());
+    fn convert(db: &Database, addr: &DB3Address) -> Result<(BatchEntry, usize)> {
+        let key = DbKey(*addr, db.name.as_bytes().as_ref());
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024 * 4);
         db.encode(&mut buf)
-            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{}", e)))?;
+            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         let buf = buf.freeze();
         let total_in_bytes = encoded_key.len() + buf.as_ref().len();
         Ok((
@@ -48,42 +48,35 @@ impl DbStore {
         ))
     }
 
-    pub fn apply_del(db: Pin<&mut Merk>, account_addr: &AccountAddress, name: &str) -> Result<()> {
+    pub fn apply_del(db: Pin<&mut Merk>, addr: &DB3Address, name: &str) -> Result<()> {
         let mut entries: Vec<BatchEntry> = Vec::new();
-        let key = DbKey(*account_addr, name.as_bytes().as_ref());
+        let key = DbKey(*addr, name.as_bytes().as_ref());
         let encoded_key = key.encode()?;
         let entry = (encoded_key, Op::Delete);
         entries.push(entry);
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
-                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{}", e)))?;
+                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         }
         Ok(())
     }
 
-    pub fn apply_add(
-        db: Pin<&mut Merk>,
-        account_addr: &AccountAddress,
-        database: &Database,
-    ) -> Result<()> {
+    pub fn apply_add(db: Pin<&mut Merk>, addr: &DB3Address, database: &Database) -> Result<()> {
         let mut entries: Vec<BatchEntry> = Vec::new();
-        let (batch_entry, _) = Self::convert(database, account_addr)?;
+        let (batch_entry, _) = Self::convert(database, addr)?;
         entries.push(batch_entry);
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
-                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{}", e)))?;
+                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         }
         Ok(())
     }
 
-    pub fn get_databases(
-        db: Pin<&Merk>,
-        account_addr: &AccountAddress,
-    ) -> Result<LinkedList<ProofOp>> {
-        let start_key = DbKey(*account_addr, "".as_bytes().as_ref());
-        let end_key = DbKey(*account_addr, "~~".as_bytes().as_ref());
+    pub fn get_databases(db: Pin<&Merk>, addr: &DB3Address) -> Result<LinkedList<ProofOp>> {
+        let start_key = DbKey(*addr, "".as_bytes().as_ref());
+        let end_key = DbKey(*addr, "~~".as_bytes().as_ref());
         let range = Range {
             start: start_key.encode()?,
             end: end_key.encode()?,
@@ -92,7 +85,7 @@ impl DbStore {
         query.insert_range(range);
         let ops = db
             .execute_query(query)
-            .map_err(|e| DB3Error::QueryDatabaseError(format!("{}", e)))?;
+            .map_err(|e| DB3Error::QueryDatabaseError(format!("{e}")))?;
         Ok(ops)
     }
 }
