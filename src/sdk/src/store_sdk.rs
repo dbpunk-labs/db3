@@ -62,12 +62,12 @@ impl StoreSDK {
         let mut buf = BytesMut::with_capacity(1024 * 8);
         payload
             .encode(&mut buf)
-            .map_err(|e| Status::internal(format!("{}", e)))?;
+            .map_err(|e| Status::internal(format!("{e}")))?;
         let buf = buf.freeze();
         let signature = self
             .signer
             .sign(buf.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+            .map_err(|e| Status::internal(format!("{e}")))?;
         let r = OpenSessionRequest {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
@@ -82,7 +82,7 @@ impl StoreSDK {
             .insert_session_with_token(&result.query_session_info.unwrap(), &result.session_token)
         {
             Ok(_) => Ok(response.clone()),
-            Err(e) => Err(Status::internal(format!("Fail to open session {}", e))),
+            Err(e) => Err(Status::internal(format!("Fail to open session {e}"))),
         }
     }
 
@@ -105,14 +105,14 @@ impl StoreSDK {
                 let mut buf = BytesMut::with_capacity(1024 * 8);
                 payload
                     .encode(&mut buf)
-                    .map_err(|e| Status::internal(format!("{}", e)))?;
+                    .map_err(|e| Status::internal(format!("{e}")))?;
 
                 let buf = buf.freeze();
 
                 let signature = self
                     .signer
                     .sign(buf.as_ref())
-                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
+                    .map_err(|e| Status::internal(format!("{e}")))?;
 
                 let r = CloseSessionRequest {
                     payload: buf.as_ref().to_vec(),
@@ -170,15 +170,14 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session with token {} not found",
-                token
+                "Fail to query, session with token {token} not found"
             ))),
         }
     }
 
     pub async fn get_account(&self, addr: &AccountAddress) -> std::result::Result<Account, Status> {
         let r = GetAccountRequest {
-            addr: format!("{:?}", addr),
+            addr: format!("{addr}", addr),
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
@@ -233,8 +232,7 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session with token {} not found",
-                token
+                "Fail to query, session with token {token} not found"
             ))),
         }
     }

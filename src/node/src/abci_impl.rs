@@ -15,6 +15,8 @@
 // limitations under the License.
 //
 
+use shadow_rs::shadow;
+shadow!(build);
 use super::auth_storage::Hash;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
@@ -44,6 +46,7 @@ pub struct NodeState {
     total_mutations: Arc<AtomicU64>,
     total_query_sessions: Arc<AtomicU64>,
 }
+
 #[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
@@ -88,7 +91,7 @@ impl Application for AbciImpl {
                 );
                 ResponseInfo {
                     data: "db3".to_string(),
-                    version: "0.1.0".to_string(),
+                    version: shadow_rs::tag(),
                     app_version: 1,
                     last_block_height: s.get_last_block_state().block_height,
                     last_block_app_hash: Bytes::copy_from_slice(
@@ -96,7 +99,6 @@ impl Application for AbciImpl {
                     ),
                 }
             }
-
             Err(_) => todo!(),
         }
     }
@@ -312,6 +314,7 @@ impl Application for AbciImpl {
                             {
                                 match self.pending_query_session.lock() {
                                     Ok(mut s) => {
+                                        //TODO  check the node query session info
                                         s.push((
                                             client_account_id.addr,
                                             account_id.addr,

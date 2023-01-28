@@ -22,8 +22,7 @@ use ed25519_dalek::{PublicKey, Signature, Verifier as EdVerifier};
 
 pub struct Verifier {}
 
-impl Verifier {
-}
+impl Verifier {}
 
 #[cfg(test)]
 mod tests {
