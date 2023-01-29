@@ -16,11 +16,11 @@
 //
 //
 use bytes::BytesMut;
+use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_types::account_key::AccountKey;
-use ethereum_types::Address as AccountAddress;
 use merkdb::{Merk, Op};
 use prost::Message;
 use std::pin::Pin;
@@ -32,12 +32,8 @@ impl AccountStore {
         Self {}
     }
 
-    pub fn apply(
-        db: Pin<&mut Merk>,
-        account_addr: &AccountAddress,
-        account: &Account,
-    ) -> Result<()> {
-        let key = AccountKey(*account_addr);
+    pub fn apply(db: Pin<&mut Merk>, addr: &DB3Address, account: &Account) -> Result<()> {
+        let key = AccountKey(*addr);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024);
         account
@@ -53,8 +49,8 @@ impl AccountStore {
         Ok(())
     }
 
-    pub fn get_account(db: Pin<&Merk>, account_addr: &AccountAddress) -> Result<Account> {
-        let key = AccountKey(*account_addr);
+    pub fn get_account(db: Pin<&Merk>, addr: &DB3Address) -> Result<Account> {
+        let key = AccountKey(*addr);
         let encoded_key = key.encode()?;
         //TODO verify the result
         let values = db
@@ -89,13 +85,21 @@ impl AccountStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_address;
+    use db3_crypto::key_derive;
+    use db3_crypto::signature_scheme::SignatureScheme;
     use std::boxed::Box;
     use tempdir::TempDir;
+
+    fn gen_address() -> DB3Address {
+        let seed: [u8; 32] = [0; 32];
+        let (address, _) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        address
+    }
     #[test]
     fn it_apply_account() {
         let tmp_dir_path = TempDir::new("apply_account").expect("create temp dir");
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let account = Account {

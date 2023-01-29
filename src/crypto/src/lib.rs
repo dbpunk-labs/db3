@@ -23,7 +23,6 @@ pub mod db3_public_key;
 pub mod db3_serde;
 pub mod db3_signature;
 pub mod db3_signer;
+pub mod db3_verifier;
 pub mod key_derive;
 pub mod signature_scheme;
-pub mod signer;
-pub mod verifier;

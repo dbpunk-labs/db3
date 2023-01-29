@@ -13,6 +13,7 @@ db3-base={ path = "../base" }
 db3-proto={ path ="../proto" }
 db3-error={ path = "../error" }
 db3-types={ path = "../types" }
+db3-crypto={ path = "../crypto" }
 tracing = "0.1"
 merkdb = {version= "2.0.0", path = "../../thirdparty/merkdb"}
 hex = "0.4.3"

@@ -14,15 +14,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use db3_crypto::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use db3_error::{DB3Error, Result};
-use ethereum_types::Address as AccountAddress;
-const NAMESPACE: &str = "_NAMESPACE_";
+const NAMESPACE: &str = "_NS_";
 const MAX_USE_KEY_LEN: usize = 128 * 4;
 const MAX_NAMESPACE_LEN: usize = 16;
-const MIN_KEY_TOTAL_LEN: usize = AccountAddress::len_bytes() + NAMESPACE.len();
+const MIN_KEY_TOTAL_LEN: usize = DB3_ADDRESS_LENGTH + NAMESPACE.len();
 
 /// account_address + NAMESPACE + ns  + user_key
-pub struct Key<'a>(pub AccountAddress, pub &'a [u8], pub &'a [u8]);
+pub struct Key<'a>(pub DB3Address, pub &'a [u8], pub &'a [u8]);
 
 impl<'a> Key<'a> {
     ///
@@ -51,11 +51,13 @@ impl<'a> Key<'a> {
                 "the length of data is invalid".to_string(),
             ));
         }
+
         let key_start_offset = MIN_KEY_TOTAL_LEN + ns.len();
-        let data_slice: &[u8; AccountAddress::len_bytes()] = &data[..AccountAddress::len_bytes()]
+        let data_slice: &[u8; DB3_ADDRESS_LENGTH] = &data[..DB3_ADDRESS_LENGTH]
             .try_into()
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        let addr = AccountAddress::from(data_slice);
+            .map_err(|e| DB3Error::KeyCodecError(format!("{e}")))?;
+
+        let addr = DB3Address::from(data_slice);
         Ok(Self(addr, ns, &data[key_start_offset..]))
     }
 }
@@ -63,11 +65,19 @@ impl<'a> Key<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_address;
+    use db3_crypto::key_derive;
+    use db3_crypto::signature_scheme::SignatureScheme;
+
+    fn gen_address() -> DB3Address {
+        let seed: [u8; 32] = [0; 32];
+        let (address, _) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        address
+    }
 
     #[test]
     fn it_key_serde() {
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let ns: &str = "ns1";
         let k: &str = "k1";
         let key = Key(addr, ns.as_bytes(), k.as_bytes());
@@ -75,12 +85,12 @@ mod tests {
         assert!(key_encoded.is_ok());
         let key_decoded = Key::decode(key_encoded.as_ref().unwrap(), ns.as_bytes());
         assert!(key_decoded.is_ok());
-        assert_eq!(key_decoded.unwrap().0, addr);
+        assert!(key_decoded.unwrap().0 == addr);
     }
 
     #[test]
     fn it_key_serde_cmp() -> Result<()> {
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let ns: &str = "ns1";
         let k: &str = "k1";
         let key = Key(addr, ns.as_bytes(), k.as_bytes());
@@ -93,7 +103,4 @@ mod tests {
         assert!(key_encoded1.cmp(&key_encoded2) == std::cmp::Ordering::Less);
         Ok(())
     }
-
-    #[test]
-    fn test_store_kv() {}
 }

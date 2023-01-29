@@ -14,6 +14,7 @@ db3-error={ path = "../error" }
 db3-base={ path = "../base" }
 db3-sdk={ path = "../sdk" }
 db3-proto={ path = "../proto" }
+db3-crypto={ path = "../crypto" }
 db3-session={ path = "../session" }
 ethereum-types = { version = "0.14.0", default-features = false }
 prost = "0.11"
@@ -23,6 +24,7 @@ ed25519-dalek = "1.0.1"
 rand = "0.7"
 rand_core = "0.6"
 dirs = "4.0.0"
+bip32 = "0.4.0"
 
 [dev-dependencies]
 db3-session={ path = "../session"}

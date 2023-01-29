@@ -16,7 +16,7 @@
 //
 
 use bytes::BytesMut;
-use db3_crypto::signer::Db3Signer;
+use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{Mutation, PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{storage_node_client::StorageNodeClient, BroadcastRequest};
@@ -25,14 +25,14 @@ use std::sync::Arc;
 use subtle_encoding::base64;
 
 pub struct MutationSDK {
-    signer: Db3Signer,
+    signer: Db3MultiSchemeSigner,
     client: Arc<StorageNodeClient<tonic::transport::Channel>>,
 }
 
 impl MutationSDK {
     pub fn new(
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        signer: Db3Signer,
+        signer: Db3MultiSchemeSigner,
     ) -> Self {
         Self { client, signer }
     }
@@ -44,11 +44,10 @@ impl MutationSDK {
             .encode(&mut mbuf)
             .map_err(|e| DB3Error::SubmitMutationError(format!("{}", e)))?;
         let mbuf = mbuf.freeze();
-        let (signature, public_key) = self.signer.sign(mbuf.as_ref())?;
+        let signature = self.signer.sign(mbuf.as_ref())?;
         let request = WriteRequest {
             signature: signature.as_ref().to_vec().to_owned(),
             payload: mbuf.as_ref().to_vec().to_owned(),
-            public_key: public_key.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::MutationPayload.into(),
         };
 
@@ -75,13 +74,12 @@ impl MutationSDK {
 
 #[cfg(test)]
 mod tests {
-    use super::Db3Signer;
     use super::Mutation;
     use super::MutationSDK;
     use crate::mutation_sdk::StorageNodeClient;
+    use crate::sdk_test;
     use crate::store_sdk::StoreSDK;
     use db3_base::get_a_random_nonce;
-    use db3_base::get_a_static_keypair;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use rand::Rng;
@@ -96,8 +94,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
         let ns = "my_twitter";
         {
             let sdk = MutationSDK::new(client.clone(), signer);
@@ -138,8 +135,7 @@ mod tests {
         }
         let millis = time::Duration::from_millis(2000);
         thread::sleep(millis);
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
         let mut store_sdk = StoreSDK::new(client, signer);
         let sess_token = store_sdk.open_session().await.unwrap().session_token;
         let values = store_sdk
@@ -163,8 +159,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
         let sdk = MutationSDK::new(client, signer);
         let mut count = 1;
         loop {

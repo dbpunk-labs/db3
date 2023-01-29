@@ -15,15 +15,17 @@
 // limitations under the License.
 //
 
+use shadow_rs::shadow;
+shadow!(build);
 use super::auth_storage::Hash;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
-use db3_crypto::verifier;
+use db3_crypto::db3_address::DB3Address as AccountAddress;
+use db3_crypto::db3_verifier;
 use db3_proto::db3_mutation_proto::{DatabaseRequest, Mutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_storage::kv_store::KvStore;
-use ethereum_types::Address as AccountAddress;
 use hex;
 use prost::Message;
 use rust_secp256k1::Message as HashMessage;
@@ -44,6 +46,7 @@ pub struct NodeState {
     total_mutations: Arc<AtomicU64>,
     total_query_sessions: Arc<AtomicU64>,
 }
+
 #[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
@@ -88,7 +91,7 @@ impl Application for AbciImpl {
                 );
                 ResponseInfo {
                     data: "db3".to_string(),
-                    version: "0.1.0".to_string(),
+                    version: shadow_rs::tag(),
                     app_version: 1,
                     last_block_height: s.get_last_block_state().block_height,
                     last_block_app_hash: Bytes::copy_from_slice(
@@ -96,7 +99,6 @@ impl Application for AbciImpl {
                     ),
                 }
             }
-
             Err(_) => todo!(),
         }
     }
@@ -127,10 +129,9 @@ impl Application for AbciImpl {
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
         // decode the request
         match WriteRequest::decode(request.tx.as_ref()) {
-            Ok(request) => match verifier::Verifier::verify(
+            Ok(request) => match db3_verifier::DB3Verifier::verify(
                 request.payload.as_ref(),
                 request.signature.as_ref(),
-                request.public_key.as_ref(),
             ) {
                 Ok(_) => {
                     let payload_type = PayloadType::from_i32(request.payload_type);
@@ -156,6 +157,7 @@ impl Application for AbciImpl {
                                 }
                             }
                         }
+
                         Some(PayloadType::MutationPayload) => {
                             match Mutation::decode(request.payload.as_ref()) {
                                 Ok(mutation) => {
@@ -180,6 +182,7 @@ impl Application for AbciImpl {
                                 }
                             }
                         }
+
                         Some(PayloadType::QuerySessionPayload) => {
                             match QuerySession::decode(request.payload.as_ref()) {
                                 Ok(query_session) => {
@@ -245,10 +248,9 @@ impl Application for AbciImpl {
             request.tx.as_ref(),
         );
         if let Ok(wrequest) = WriteRequest::decode(request.tx.as_ref()) {
-            if let Ok(account_id) = verifier::Verifier::verify(
+            if let Ok(account_id) = db3_verifier::DB3Verifier::verify(
                 wrequest.payload.as_ref(),
                 wrequest.signature.as_ref(),
-                wrequest.public_key.as_ref(),
             ) {
                 let payload_type = PayloadType::from_i32(wrequest.payload_type);
                 match payload_type {
@@ -312,6 +314,7 @@ impl Application for AbciImpl {
                             {
                                 match self.pending_query_session.lock() {
                                     Ok(mut s) => {
+                                        //TODO  check the node query session info
                                         s.push((
                                             client_account_id.addr,
                                             account_id.addr,

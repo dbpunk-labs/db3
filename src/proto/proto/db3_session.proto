@@ -49,7 +49,5 @@ message QuerySession {
     bytes client_query_session = 5;
     // client signature
     bytes client_signature = 6;
-    // client public key
-    bytes client_public_key = 7;
 }
 

@@ -16,8 +16,8 @@
 //
 
 use chrono::Utc;
+use db3_crypto::db3_address::DB3Address;
 use db3_proto::db3_session_proto::QuerySessionInfo;
-use ethereum_types::Address;
 use num_traits::ToPrimitive;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
@@ -122,8 +122,8 @@ impl SessionPool {
 }
 
 pub struct SessionStore {
-    session_pools: HashMap<Address, SessionPool>,
-    token_account_map: HashMap<String, Address>,
+    session_pools: HashMap<DB3Address, SessionPool>,
+    token_account_map: HashMap<String, DB3Address>,
     open_session_headers: HashSet<String>,
     sid: i32,
 }
@@ -165,7 +165,7 @@ impl SessionStore {
         &mut self,
         header: &String,
         start_time: i64,
-        addr: Address,
+        addr: DB3Address,
     ) -> Result<(String, QuerySessionInfo), String> {
         if self.is_ttl_expired(start_time) {
             return Err(format!("Session HEADER {} ttl is expired", header));
@@ -206,7 +206,7 @@ impl SessionStore {
                 Some(sess_pool) => sess_pool.remove_session(token),
                 None => Err(format!("Fail to remove session. Address not exist")),
             },
-            None => Err(format!("Fail to remove session, token not exist {}", token)),
+            None => Err(format!("Fail to remove session, token not exist {token}")),
         }
     }
     pub fn is_session_exist(&self, token: &str) -> bool {
@@ -218,7 +218,7 @@ impl SessionStore {
             None => false,
         }
     }
-    pub fn get_address(&self, token: &str) -> Option<Address> {
+    pub fn get_address(&self, token: &str) -> Option<DB3Address> {
         match self.token_account_map.get(token).clone() {
             Some(addr) => Some(addr.clone()),
             None => None,
@@ -307,11 +307,17 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::num_traits::FromPrimitive;
-    use db3_base::get_a_static_keypair;
-    use db3_base::get_address_from_pk;
+    use db3_crypto::key_derive;
+    use db3_crypto::signature_scheme::SignatureScheme;
+    use num_traits::FromPrimitive;
     use uuid::Uuid;
 
+    fn gen_address() -> DB3Address {
+        let seed: [u8; 32] = [0; 32];
+        let (address, _) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        address
+    }
     #[test]
     fn test_new_session() {
         let mut session = SessionManager::new();
@@ -319,7 +325,7 @@ mod tests {
     }
     #[test]
     fn test_get_session_status() {
-        let mut session = SessionManager::new();
+        let session = SessionManager::new();
         assert_eq!(&SessionStatus::Running, session.get_session_status());
     }
 
@@ -350,8 +356,7 @@ mod tests {
     #[test]
     fn add_session_exceed_limit() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         for _ in 0..DEFAULT_SESSION_POOL_SIZE_LIMIT {
             assert!(sess_store
@@ -370,8 +375,7 @@ mod tests {
     #[test]
     fn get_session() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         // add session and create new session pool
         let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), ts, addr);
@@ -392,8 +396,7 @@ mod tests {
     #[test]
     fn add_session_wrong_path_duplicate_header() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let header = Uuid::new_v4().to_string();
         let ts = Utc::now().timestamp();
         // add session and create new session pool
@@ -408,8 +411,7 @@ mod tests {
     #[test]
     fn remove_session_test() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), ts, addr);
         assert!(res.is_ok());
@@ -429,8 +431,7 @@ mod tests {
     #[test]
     fn cleanup_session_test() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         for i in 0..100 {
             let (token, _) = sess_store

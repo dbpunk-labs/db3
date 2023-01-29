@@ -16,7 +16,9 @@
 //
 
 use super::context::Context;
-use db3_crypto::verifier::Verifier;
+use db3_crypto::db3_address::DB3Address;
+use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+use db3_crypto::db3_verifier::DB3Verifier;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
@@ -33,24 +35,21 @@ use db3_proto::db3_session_proto::{
 use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
-use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::boxed::Box;
-use std::str::FromStr;
 use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
 
 use bytes::BytesMut;
-use db3_crypto::signer::Db3Signer;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::info;
 pub struct StorageNodeImpl {
     context: Context,
-    signer: Db3Signer,
+    signer: Db3MultiSchemeSigner,
 }
 
 impl StorageNodeImpl {
-    pub fn new(context: Context, singer: Db3Signer) -> Self {
+    pub fn new(context: Context, singer: Db3MultiSchemeSigner) -> Self {
         Self {
             context,
             signer: singer,
@@ -165,12 +164,8 @@ impl StorageNode for StorageNodeImpl {
         request: Request<OpenSessionRequest>,
     ) -> std::result::Result<Response<OpenSessionResponse>, Status> {
         let r = request.into_inner();
-        let account_id = Verifier::verify(
-            r.payload.as_ref(),
-            r.signature.as_ref(),
-            r.public_key.as_ref(),
-        )
-        .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        let account_id = DB3Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = OpenSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode open session request ".to_string()))?;
         let header = payload.header;
@@ -200,8 +195,7 @@ impl StorageNode for StorageNodeImpl {
         let r = request.into_inner();
         let client_query_session: &[u8] = r.payload.as_ref();
         let client_signature: &[u8] = r.signature.as_ref();
-        let client_public_key: &[u8] = r.public_key.as_ref();
-        Verifier::verify(client_query_session, client_signature, client_public_key)
+        DB3Verifier::verify(client_query_session, client_signature)
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
         let payload = CloseSessionPayload::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
@@ -252,7 +246,6 @@ impl StorageNode for StorageNodeImpl {
             node_query_session_info: node_query_session_info.clone(),
             client_query_session: client_query_session.to_vec().to_owned(),
             client_signature: client_signature.to_vec().to_owned(),
-            client_public_key: client_public_key.to_vec().to_owned(),
         };
         // Submit query session
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
@@ -260,20 +253,21 @@ impl StorageNode for StorageNodeImpl {
             Status::internal(format!("fail to submit query session with error {}", e))
         })?;
         let mbuf = mbuf.freeze();
-        let (signature, public_key) = self.signer.sign(mbuf.as_ref()).map_err(|e| {
-            Status::internal(format!("fail to submit query session with error {}", e))
+
+        let signature = self.signer.sign(mbuf.as_ref()).map_err(|e| {
+            Status::internal(format!("fail to submit query session with error {e}"))
         })?;
+
         let request = WriteRequest {
             signature: signature.as_ref().to_vec().to_owned(),
             payload: mbuf.as_ref().to_vec().to_owned(),
-            public_key: public_key.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::QuerySessionPayload.into(),
         };
 
         //TODO add the capacity to mutation sdk configuration
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf).map_err(|e| {
-            Status::internal(format!("fail to submit query session with error {}", e))
+            Status::internal(format!("fail to submit query session with error {e}"))
         })?;
 
         let buf = buf.freeze();
@@ -285,9 +279,7 @@ impl StorageNode for StorageNodeImpl {
         let response = self
             .broadcast(request)
             .await
-            .map_err(|e| {
-                Status::internal(format!("fail to submit query session with error {}", e))
-            })?
+            .map_err(|e| Status::internal(format!("fail to submit query session with error {e}")))?
             .into_inner();
         // let base64_byte = base64::encode(response.hash);
         // let hash = String::from_utf8_lossy(base64_byte.as_ref()).to_string();
@@ -397,22 +389,22 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetAccountRequest>,
     ) -> std::result::Result<Response<Account>, Status> {
-        let r = request.into_inner();
+        let r: GetAccountRequest = request.into_inner();
         if r.addr.len() <= 0 {
             info!("empty account");
             return Err(Status::invalid_argument("empty address".to_string()));
         }
-        let addr = AccountAddress::from_str(r.addr.as_str())
-            .map_err(|e| Status::internal(format!("{}", e)))?;
+        let addr_ref: &[u8] = r.addr.as_ref();
+        let addr = DB3Address::try_from(addr_ref).map_err(|e| Status::internal(format!("{e}")))?;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let account = node_store
                     .get_auth_store()
                     .get_account(&addr)
-                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
+                    .map_err(|e| Status::internal(format!("{e}")))?;
                 Ok(Response::new(account))
             }
-            Err(e) => Err(Status::internal(format!("{}", e))),
+            Err(e) => Err(Status::internal(format!("{e}"))),
         }
     }
     async fn get_session_info(

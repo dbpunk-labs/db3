@@ -2,7 +2,8 @@ use bytes::BytesMut;
 use chrono::Utc;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use db3_base::{get_a_random_nonce, get_a_static_keypair, get_address_from_pk};
-use db3_crypto::signer::Db3Signer;
+use db3_crypto::key_derive;
+use db3_crypto::{db3_signer::Db3MultiSchemeSigner, signature_scheme::SignatureScheme};
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::KvPair;
 use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
@@ -25,9 +26,11 @@ async fn run_batch_get_key(keys: &Vec<Vec<u8>>) {
     let channel = rpc_endpoint.connect_lazy();
     let client = Arc::new(StorageNodeClient::new(channel));
     let ns_vec = "my_twitter".as_bytes().to_vec();
-    let kp = get_a_static_keypair();
-    let addr = get_address_from_pk(&kp.public);
-    let signer = Db3Signer::new(kp);
+    let seed: [u8; 32] = [0; 32];
+    let (_, keypair) =
+        key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1).unwrap();
+    let signer = Db3MultiSchemeSigner::new(keypair);
+
     let mut sdk = StoreSDK::new(client, signer);
     let res = sdk.open_session().await;
     assert!(res.is_ok());
@@ -63,8 +66,11 @@ async fn run_submit_mutation(submit_count: i32, kv_size: i32) {
     let sclient = client.clone();
 
     let ns_vec = "my_twitter".as_bytes().to_vec();
-    let kp = get_a_static_keypair();
-    let signer = Db3Signer::new(kp);
+    let seed: [u8; 32] = [0; 32];
+    let (_, keypair) =
+        key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1).unwrap();
+    let signer = Db3MultiSchemeSigner::new(keypair);
+
     let msdk = MutationSDK::new(mclient, signer);
 
     let ts = Utc::now().timestamp_nanos();

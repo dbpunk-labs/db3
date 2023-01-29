@@ -140,7 +140,6 @@ impl DB3PublicKeyScheme for Secp256k1PublicKey {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn it_works() {}
 }

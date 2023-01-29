@@ -87,8 +87,7 @@ message GetRangeResponse {
 }
 
 message GetAccountRequest {
-    // the hex encoded string
-    string addr = 1;
+    bytes addr = 1;
 }
 
 message GetSessionInfoRequest {
@@ -98,7 +97,6 @@ message GetSessionInfoRequest {
 message OpenSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
-    bytes public_key = 3;
 }
 
 message OpenSessionResponse {
@@ -111,7 +109,6 @@ message OpenSessionResponse {
 message CloseSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
-    bytes public_key = 3;
 }
 
 message CloseSessionResponse {

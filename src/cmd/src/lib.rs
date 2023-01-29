@@ -16,6 +16,8 @@
 //
 
 use db3_base::{get_address_from_pk, strings};
+use db3_crypto::db3_keypair::EncodeDecodeBase64;
+use db3_crypto::{db3_keypair::DB3KeyPair, key_derive, signature_scheme::SignatureScheme};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
@@ -23,15 +25,16 @@ use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use dirs;
-use ed25519_dalek::Keypair;
-use rand::rngs::OsRng;
 use std::fs::File;
 use std::io::Write;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 #[macro_use]
 extern crate prettytable;
+use bip32::Mnemonic;
 use db3_session::session_manager::SessionStatus;
 use prettytable::{format, Table};
+use rand_core::OsRng;
 use std::process::exit;
 
 const HELP: &str = r#"the help of db3 command
@@ -53,7 +56,19 @@ fn current_seconds() -> u64 {
     }
 }
 
-pub fn get_key_pair(warning: bool) -> std::io::Result<Keypair> {
+pub fn generate_keypair() -> std::io::Result<DB3KeyPair> {
+    let mnemonic = Mnemonic::random(&mut OsRng, Default::default());
+    println!("Your secret seed \n {}", mnemonic.phrase());
+    let (_, keypair) = key_derive::derive_key_pair_from_path(
+        mnemonic.entropy(),
+        None,
+        &SignatureScheme::Secp256k1,
+    )
+    .unwrap();
+    Ok(keypair)
+}
+
+pub fn get_key_pair(warning: bool) -> std::io::Result<DB3KeyPair> {
     let mut home_dir = dirs::home_dir().unwrap();
     home_dir.push(".db3");
     let user_dir = home_dir.as_path();
@@ -68,23 +83,15 @@ pub fn get_key_pair(warning: bool) -> std::io::Result<Keypair> {
     }
     if key_path.exists() {
         let kp_bytes = std::fs::read(key_path)?;
-        let key_pair = Keypair::from_bytes(kp_bytes.as_ref()).unwrap();
-        let addr = get_address_from_pk(&key_pair.public);
-        if warning {
-            println!("restore the key with addr {:?}", addr);
-        }
+        let b64_str = std::str::from_utf8(kp_bytes.as_ref()).unwrap();
+        let key_pair = DB3KeyPair::from_str(b64_str).unwrap();
         Ok(key_pair)
     } else {
-        let mut rng = OsRng {};
-        let kp: Keypair = Keypair::generate(&mut rng);
-        let addr = get_address_from_pk(&kp.public);
-        let kp_bytes = kp.to_bytes();
+        let kp = generate_keypair().unwrap();
+        let b64_str = kp.encode_base64();
         let mut f = File::create(key_path)?;
-        f.write_all(kp_bytes.as_ref())?;
+        f.write_all(b64_str.as_bytes())?;
         f.sync_all()?;
-        if warning {
-            println!("create new key with addr {:?}", addr);
-        }
         Ok(kp)
     }
 }
@@ -121,7 +128,7 @@ async fn open_session(store_sdk: &mut StoreSDK, session: &mut Option<OpenSession
             return true;
         }
         Err(e) => {
-            println!("Open Session Error: {}", e);
+            println!("Open Session Error: {e}");
             return false;
         }
     }
@@ -176,6 +183,7 @@ async fn refresh_session(
     }
     return true;
 }
+
 pub async fn process_cmd(
     sdk: &MutationSDK,
     store_sdk: &mut StoreSDK,
@@ -194,16 +202,22 @@ pub async fn process_cmd(
             println!("{}", HELP);
             return true;
         }
+
+        "gen_key" => {
+            get_key_pair(true).unwrap();
+            return true;
+        }
+
         "quit" => {
             close_session(store_sdk, session).await;
             println!("Good bye!");
             exit(1);
         }
         "account" => {
-            let kp = get_key_pair(false).unwrap();
-            let addr = get_address_from_pk(&kp.public);
-            let account = store_sdk.get_account(&addr).await.unwrap();
-            show_account(&account);
+            // let kp = get_key_pair(false).unwrap();
+            // let addr = get_address_from_pk(&kp.public);
+            // let account = store_sdk.get_account(&addr).await.unwrap();
+            // show_account(&account);
             return true;
         }
         "session" => {
@@ -327,13 +341,22 @@ pub async fn process_cmd(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_keypair;
-    use db3_crypto::signer::Db3Signer;
+    use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+    use db3_crypto::{key_derive, signature_scheme::SignatureScheme};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
+
+    fn get_a_static_keypair() -> DB3KeyPair {
+        let seed: [u8; 32] = [0; 32];
+        let (_, keypair) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1)
+                .unwrap();
+        keypair
+    }
+
     #[tokio::test]
     async fn cmd_smoke_test() {
         let ep = "http://127.0.0.1:26659";
@@ -343,10 +366,10 @@ mod tests {
         let mclient = client.clone();
 
         let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let msdk = MutationSDK::new(mclient, signer);
         let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let mut session: Option<OpenSessionResponse> = None;
 
@@ -388,7 +411,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
 
         let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let mut session: Option<OpenSessionResponse> = None;
         assert!(open_session(&mut sdk, &mut session).await);
