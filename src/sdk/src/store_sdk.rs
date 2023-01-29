@@ -28,7 +28,8 @@ use db3_proto::db3_node_proto::{
 };
 
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
-use db3_session::session_manager::SessionPool;
+use db3_session::session_manager::{SessionManager, SessionPool, SessionStatus};
+use num_traits::cast::FromPrimitive;
 use prost::Message;
 use std::sync::Arc;
 use subtle_encoding::base64;
@@ -76,10 +77,11 @@ impl StoreSDK {
         let mut client = self.client.as_ref().clone();
         let response = client.open_query_session(request).await?.into_inner();
         let result = response.clone();
-        match self
-            .session_pool
-            .insert_session_with_token(&result.query_session_info.unwrap(), &result.session_token)
-        {
+        match self.session_pool.insert_session_with_token(
+            &result.query_session_info.unwrap(),
+            &result.session_token,
+            SessionStatus::Running,
+        ) {
             Ok(_) => Ok(response.clone()),
             Err(e) => Err(Status::internal(format!("Fail to open session {e}"))),
         }
@@ -187,7 +189,7 @@ impl StoreSDK {
     pub async fn get_session_info(
         &self,
         session_token: &String,
-    ) -> std::result::Result<QuerySessionInfo, Status> {
+    ) -> std::result::Result<(QuerySessionInfo, SessionStatus), Status> {
         let session_identifier = Some(SessionIdentifier {
             session_token: session_token.clone(),
         });
@@ -196,7 +198,10 @@ impl StoreSDK {
         let mut client = self.client.as_ref().clone();
 
         let response = client.get_session_info(request).await?.into_inner();
-        Ok(response.session_info.unwrap())
+        Ok((
+            response.session_info.unwrap(),
+            SessionStatus::from_i32(response.session_status).unwrap(),
+        ))
     }
 
     pub async fn get_range(

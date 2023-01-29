@@ -15,6 +15,7 @@ db3-base={ path = "../base" }
 db3-sdk={ path = "../sdk" }
 db3-proto={ path = "../proto" }
 db3-crypto={ path = "../crypto" }
+db3-session={ path = "../session" }
 ethereum-types = { version = "0.14.0", default-features = false }
 prost = "0.11"
 prost-types = "0.11"

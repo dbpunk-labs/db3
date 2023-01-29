@@ -22,7 +22,6 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::OpenSessionResponse;
-use db3_proto::db3_session_proto::SessionStatus;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use dirs;
@@ -33,6 +32,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[macro_use]
 extern crate prettytable;
 use bip32::Mnemonic;
+use db3_session::session_manager::SessionStatus;
 use prettytable::{format, Table};
 use rand_core::OsRng;
 use std::process::exit;
@@ -169,17 +169,15 @@ async fn refresh_session(
     if session.is_none() {
         return open_session(store_sdk, session).await;
     }
-    if store_sdk
+    let (_, status) = store_sdk
         .get_session_info(&session.as_ref().unwrap().session_token)
         .await
         .map_err(|e| {
             println!("{:?}", e);
             return false;
         })
-        .unwrap()
-        .status
-        != SessionStatus::Running as i32
-    {
+        .unwrap();
+    if status != SessionStatus::Running {
         println!("Refresh session...");
         return close_session(store_sdk, session).await && open_session(store_sdk, session).await;
     }

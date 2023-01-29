@@ -18,3 +18,6 @@
 
 pub mod query_session_verifier;
 pub mod session_manager;
+#[macro_use]
+extern crate enum_primitive_derive;
+extern crate num_traits;
