@@ -20,17 +20,10 @@ syntax = "proto3";
 import "db3_base.proto";
 package db3_session_proto;
 
-enum SessionStatus {
-    Running = 0;
-    Blocked = 1;
-    Stop = 2;
-}
-
 message QuerySessionInfo {
     // the hex encoded string
     int32 id = 1;
     int64 start_time = 2;
-    SessionStatus status = 3;
     int32 query_count = 4;
 }
 

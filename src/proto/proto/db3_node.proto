@@ -120,6 +120,7 @@ message CloseSessionResponse {
 }
 
 message GetSessionInfoResponse {
+    int32 session_status = 1;
     db3_session_proto.QuerySessionInfo session_info = 2;
 }
 

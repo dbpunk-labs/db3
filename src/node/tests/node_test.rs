@@ -11,10 +11,11 @@ mod node_integration {
         WriteRequest,
     };
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-    use db3_proto::db3_session_proto::SessionStatus;
     use db3_sdk::mutation_sdk::MutationSDK;
     use db3_sdk::store_sdk::StoreSDK;
-    use db3_session::session_manager::{DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT};
+    use db3_session::session_manager::{
+        SessionStatus, DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT,
+    };
     use prost::Message;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -192,11 +193,8 @@ mod node_integration {
         let session_id_1 = session_info.session_token.clone();
         assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
         assert_eq!(session_info.session_timeout_second, DEFAULT_SESSION_PERIOD);
-        let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
-        assert_eq!(
-            SessionStatus::from_i32(info.status).unwrap(),
-            SessionStatus::Running
-        );
+        let (info, status) = store_sdk.get_session_info(&session_id_1).await.unwrap();
+        assert_eq!(status, SessionStatus::Running);
         assert_eq!(info.query_count, 0);
         let pairs = vec![
             KvPair {
@@ -247,11 +245,9 @@ mod node_integration {
 
         // session info
         {
-            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
-            assert_eq!(
-                SessionStatus::from_i32(info.status).unwrap(),
-                SessionStatus::Running.into()
-            );
+            let (info, status) = store_sdk.get_session_info(&session_id_1).await.unwrap();
+            assert_eq!(status, SessionStatus::Running);
+
             assert_eq!(info.query_count, 1);
         }
 
@@ -282,11 +278,8 @@ mod node_integration {
             );
         }
         {
-            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
-            assert_eq!(
-                SessionStatus::from_i32(info.status).unwrap(),
-                SessionStatus::Blocked
-            );
+            let (info, status) = store_sdk.get_session_info(&session_id_1).await.unwrap();
+            assert_eq!(status, SessionStatus::Blocked);
             assert_eq!(info.query_count, DEFAULT_SESSION_QUERY_LIMIT);
         }
 
@@ -300,11 +293,8 @@ mod node_integration {
 
         // update current session id
         let session_id_2 = session_info.session_token;
-        let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
-        assert_eq!(
-            SessionStatus::from_i32(info.status).unwrap(),
-            SessionStatus::Running
-        );
+        let (info, status) = store_sdk.get_session_info(&session_id_2).await.unwrap();
+        assert_eq!(status, SessionStatus::Running);
         assert_eq!(info.query_count, 0);
         // delete k1
         {
@@ -329,11 +319,8 @@ mod node_integration {
             thread::sleep(time::Duration::from_secs(4));
         }
         {
-            let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
-            assert_eq!(
-                SessionStatus::from_i32(info.status).unwrap(),
-                SessionStatus::Running
-            );
+            let (info, status) = store_sdk.get_session_info(&session_id_2).await.unwrap();
+            assert_eq!(status, SessionStatus::Running);
             assert_eq!(info.query_count, 0);
         }
         {
