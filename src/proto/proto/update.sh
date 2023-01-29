@@ -47,6 +47,10 @@ mkdir -p "${PROTOS_DIR}/google/firestore/v1"
 cp googleapis/google/firestore/v1/*.proto \
    "${PROTOS_DIR}/google/firestore/v1/"
 
+mkdir -p "${PROTOS_DIR}/google/firestore/admin"
+cp -rf googleapis/google/firestore/admin/* \
+   "${PROTOS_DIR}/google/firestore/admin/"
+
 mkdir -p "${PROTOS_DIR}/google/rpc"
 cp googleapis/google/rpc/status.proto \
    "${PROTOS_DIR}/google/rpc/"
@@ -54,6 +58,7 @@ cp googleapis/google/rpc/status.proto \
 mkdir -p "${PROTOS_DIR}/google/type"
 cp googleapis/google/type/latlng.proto \
    "${PROTOS_DIR}/google/type/"
+
 
 # Hack in `verify` support
 ex "${PROTOS_DIR}/google/firestore/v1/write.proto" <<eof
