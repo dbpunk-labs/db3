@@ -17,7 +17,6 @@
 //
 
 use crate::account_id::AccountId;
-use crate::db3_address::DB3Address;
 use crate::db3_signature::{DB3Signature, Signature};
 use db3_error::{DB3Error, Result};
 use signature::Signature as _;

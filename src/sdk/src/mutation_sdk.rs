@@ -80,7 +80,6 @@ mod tests {
     use crate::sdk_test;
     use crate::store_sdk::StoreSDK;
     use db3_base::get_a_random_nonce;
-    use db3_base::get_a_static_keypair;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use rand::Rng;
@@ -95,7 +94,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let signer = sdk_test::gen_secp256k1_signer();
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
         let ns = "my_twitter";
         {
             let sdk = MutationSDK::new(client.clone(), signer);
@@ -136,8 +135,7 @@ mod tests {
         }
         let millis = time::Duration::from_millis(2000);
         thread::sleep(millis);
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
         let mut store_sdk = StoreSDK::new(client, signer);
         let sess_token = store_sdk.open_session().await.unwrap().session_token;
         let values = store_sdk
@@ -161,7 +159,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let signer = sdk_test::gen_secp256k1_signer();
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
         let sdk = MutationSDK::new(client, signer);
         let mut count = 1;
         loop {

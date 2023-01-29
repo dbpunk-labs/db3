@@ -15,8 +15,9 @@
 // limitations under the License.
 //
 
-use dirs;
 use db3_base::{get_address_from_pk, strings};
+use db3_crypto::db3_keypair::EncodeDecodeBase64;
+use db3_crypto::{db3_keypair::DB3KeyPair, key_derive, signature_scheme::SignatureScheme};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
@@ -24,11 +25,10 @@ use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_proto::db3_session_proto::SessionStatus;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
-use std::str::FromStr;
-use db3_crypto::{db3_keypair::DB3KeyPair, key_derive, signature_scheme::SignatureScheme};
-use db3_crypto::db3_keypair::EncodeDecodeBase64;
+use dirs;
 use std::fs::File;
 use std::io::Write;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 #[macro_use]
 extern crate prettytable;
@@ -205,7 +205,10 @@ pub async fn process_cmd(
             return true;
         }
 
-        "gen_key" => {}
+        "gen_key" => {
+            get_key_pair(true).unwrap();
+            return true;
+        }
 
         "quit" => {
             close_session(store_sdk, session).await;
@@ -340,13 +343,22 @@ pub async fn process_cmd(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_keypair;
-    use db3_crypto::signer::Db3Signer;
+    use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+    use db3_crypto::{key_derive, signature_scheme::SignatureScheme};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
+
+    fn get_a_static_keypair() -> DB3KeyPair {
+        let seed: [u8; 32] = [0; 32];
+        let (_, keypair) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1)
+                .unwrap();
+        keypair
+    }
+
     #[tokio::test]
     async fn cmd_smoke_test() {
         let ep = "http://127.0.0.1:26659";
@@ -356,10 +368,10 @@ mod tests {
         let mclient = client.clone();
 
         let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let msdk = MutationSDK::new(mclient, signer);
         let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let mut session: Option<OpenSessionResponse> = None;
 
@@ -401,7 +413,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
 
         let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let mut sdk = StoreSDK::new(client, signer);
         let mut session: Option<OpenSessionResponse> = None;
         assert!(open_session(&mut sdk, &mut session).await);

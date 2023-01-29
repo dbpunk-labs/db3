@@ -65,11 +65,19 @@ impl<'a> Key<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_address;
+    use db3_crypto::key_derive;
+    use db3_crypto::signature_scheme::SignatureScheme;
+
+    fn gen_address() -> DB3Address {
+        let seed: [u8; 32] = [0; 32];
+        let (address, _) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        address
+    }
 
     #[test]
     fn it_key_serde() {
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let ns: &str = "ns1";
         let k: &str = "k1";
         let key = Key(addr, ns.as_bytes(), k.as_bytes());
@@ -77,12 +85,12 @@ mod tests {
         assert!(key_encoded.is_ok());
         let key_decoded = Key::decode(key_encoded.as_ref().unwrap(), ns.as_bytes());
         assert!(key_decoded.is_ok());
-        assert_eq!(key_decoded.unwrap().0, addr);
+        assert!(key_decoded.unwrap().0 == addr);
     }
 
     #[test]
     fn it_key_serde_cmp() -> Result<()> {
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let ns: &str = "ns1";
         let k: &str = "k1";
         let key = Key(addr, ns.as_bytes(), k.as_bytes());
@@ -95,7 +103,4 @@ mod tests {
         assert!(key_encoded1.cmp(&key_encoded2) == std::cmp::Ordering::Less);
         Ok(())
     }
-
-    #[test]
-    fn test_store_kv() {}
 }

@@ -17,7 +17,7 @@
 
 use bytes::BytesMut;
 use chrono::Utc;
-use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_node_proto::{
@@ -29,7 +29,6 @@ use db3_proto::db3_node_proto::{
 
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::SessionPool;
-use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use std::sync::Arc;
 use subtle_encoding::base64;
@@ -175,9 +174,9 @@ impl StoreSDK {
         }
     }
 
-    pub async fn get_account(&self, addr: &AccountAddress) -> std::result::Result<Account, Status> {
+    pub async fn get_account(&self, addr: &DB3Address) -> std::result::Result<Account, Status> {
         let r = GetAccountRequest {
-            addr: format!("{addr}"),
+            addr: addr.to_vec(),
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
@@ -279,7 +278,7 @@ mod tests {
     use crate::sdk_test;
     use bytes::BytesMut;
     use chrono::Utc;
-    use db3_base::{get_a_random_nonce, get_address_from_pk};
+    use db3_base::get_a_random_nonce;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
@@ -300,7 +299,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         let mclient = client.clone();
         {
-            let signer = sdk_test::gen_ed25519_signer();
+            let (_, signer) = sdk_test::gen_ed25519_signer();
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
@@ -321,7 +320,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(11000);
             std::thread::sleep(ten_millis);
         }
-        let signer = sdk_test::gen_ed25519_signer();
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
@@ -346,7 +345,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         let mclient = client.clone();
         let ns_vec = "my_data".as_bytes().to_vec();
-        let signer = sdk_test::gen_ed25519_signer();
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let msdk = MutationSDK::new(mclient, signer);
         let k1 = KvPair {
             key: "k1".as_bytes().to_vec(),
@@ -376,7 +375,7 @@ mod tests {
         assert!(result.is_ok(), "{}", result.err().unwrap());
         let two_sec = time::Duration::from_millis(2000);
         std::thread::sleep(two_sec);
-        let signer = sdk_test::gen_ed25519_signer();
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
@@ -409,7 +408,7 @@ mod tests {
         let value_vec = format!("vkalue_tt{}", 10).as_bytes().to_vec();
         let ns_vec = "my_twitter".as_bytes().to_vec();
         {
-            let signer = sdk_test::gen_ed25519_signer();
+            let (_, signer) = sdk_test::gen_ed25519_signer();
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: key_vec.clone(),
@@ -430,7 +429,7 @@ mod tests {
             let two_sec = time::Duration::from_millis(2000);
             std::thread::sleep(two_sec);
         }
-        let signer = sdk_test::gen_ed25519_signer();
+        let (addr, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
@@ -479,7 +478,7 @@ mod tests {
         let value_vec = format!("vkalue_tt{}", 20).as_bytes().to_vec();
         let ns_vec = "my_twitter".as_bytes().to_vec();
         {
-            let signer = sdk_test::gen_ed25519_signer();
+            let (_, signer) = sdk_test::gen_ed25519_signer();
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: key_vec.clone(),
@@ -501,7 +500,7 @@ mod tests {
             std::thread::sleep(two_sec);
         }
 
-        let signer = sdk_test::gen_ed25519_signer();
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
@@ -536,15 +535,15 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let signer = sdk_test::gen_ed25519_signer();
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        payload.encode(&mut buf);
+        payload.encode(&mut buf).unwrap();
         let buf = buf.freeze();
-        let (signature, public_key) = signer
+        let signature = signer
             .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))
             .unwrap();
@@ -568,15 +567,15 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let signer = sdk_test::gen_ed25519_signer();
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp() - 6,
         };
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        payload.encode(&mut buf);
+        payload.encode(&mut buf).unwrap();
         let buf = buf.freeze();
-        let (signature, public_key) = signer
+        let signature = signer
             .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))
             .unwrap();

@@ -93,16 +93,24 @@ impl DbStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_address;
+    use db3_crypto::key_derive;
+    use db3_crypto::signature_scheme::SignatureScheme;
     use db3_proto::db3_base_proto::{Erc20Token, Price};
     use db3_proto::db3_database_proto::QueryPrice;
     use std::boxed::Box;
     use tempdir::TempDir;
 
+    fn gen_address() -> DB3Address {
+        let seed: [u8; 32] = [0; 32];
+        let (address, _) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        address
+    }
+
     #[test]
     fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let usdt = Erc20Token {

@@ -1,8 +1,8 @@
-use fastcrypto::traits::ToFromBytes;
-use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey};
 use db3_crypto::db3_keypair::DB3KeyPair;
 use db3_error::{DB3Error, Result};
 use dirs;
+use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PrivateKey};
+use fastcrypto::traits::ToFromBytes;
 use std::option::Option;
 use tendermint_config::PrivValidatorKey;
 

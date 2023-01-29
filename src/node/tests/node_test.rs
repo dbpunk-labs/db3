@@ -3,7 +3,7 @@
 mod node_integration {
     use bytes::BytesMut;
     use db3_base::get_a_random_nonce;
-    use db3_crypto::signer::Db3Signer;
+    use db3_crypto::db3_signer::Db3MultiSchemeSigner;
     use db3_proto::db3_base_proto::{ChainId, ChainRole, Erc20Token, Price, UnitType, Units};
     use db3_proto::db3_database_proto::{Database, QueryPrice};
     use db3_proto::db3_mutation_proto::{
@@ -26,7 +26,7 @@ mod node_integration {
         let public_grpc_url = "http://127.0.0.1:26659";
         // create storage node sdk
         let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
@@ -39,7 +39,7 @@ mod node_integration {
         let public_grpc_url = "http://127.0.0.1:26659";
         // create storage node sdk
         let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
@@ -58,7 +58,7 @@ mod node_integration {
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
         let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let usdt = Erc20Token {
             symbal: "usdt".to_string(),
             units: vec!["cent".to_string(), "usdt".to_string()],
@@ -88,11 +88,10 @@ mod node_integration {
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut mbuf).unwrap();
         let mbuf = mbuf.freeze();
-        let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
+        let signature = signer.sign(mbuf.as_ref()).unwrap();
         let request = WriteRequest {
             signature: signature.as_ref().to_vec(),
             payload: mbuf.as_ref().to_vec().to_owned(),
-            public_key: public_key.as_ref().to_vec(),
             payload_type: PayloadType::DatabasePayload.into(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
@@ -127,7 +126,7 @@ mod node_integration {
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
         let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let signer = Db3MultiSchemeSigner::new(kp);
         let kv = KvPair {
             key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
             value: format!("vkalue_tt{}", 1).as_bytes().to_vec(),
@@ -145,11 +144,10 @@ mod node_integration {
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
         mutation.encode(&mut mbuf).unwrap();
         let mbuf = mbuf.freeze();
-        let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
+        let signature = signer.sign(mbuf.as_ref()).unwrap();
         let request = WriteRequest {
             signature: signature.as_ref().to_vec(),
             payload: mbuf.as_ref().to_vec().to_owned(),
-            public_key: public_key.as_ref().to_vec(),
             payload_type: PayloadType::MutationPayload.into(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);

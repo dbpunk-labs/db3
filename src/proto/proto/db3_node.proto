@@ -87,8 +87,7 @@ message GetRangeResponse {
 }
 
 message GetAccountRequest {
-    // the hex encoded string
-    string addr = 1;
+    bytes addr = 1;
 }
 
 message GetSessionInfoRequest {

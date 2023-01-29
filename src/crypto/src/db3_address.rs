@@ -136,7 +136,6 @@ impl AsRef<[u8]> for DB3Address {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn it_works() {}
 }

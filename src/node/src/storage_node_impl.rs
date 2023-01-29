@@ -37,7 +37,6 @@ use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
 use prost::Message;
 use std::boxed::Box;
-use std::str::FromStr;
 use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
 
@@ -391,22 +390,22 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<GetAccountRequest>,
     ) -> std::result::Result<Response<Account>, Status> {
-        let r = request.into_inner();
+        let r: GetAccountRequest = request.into_inner();
         if r.addr.len() <= 0 {
             info!("empty account");
             return Err(Status::invalid_argument("empty address".to_string()));
         }
-        let addr = DB3Address::try_from(r.addr.as_str())
-            .map_err(|e| Status::internal(format!("{}", e)))?;
+        let addr_ref: &[u8] = r.addr.as_ref();
+        let addr = DB3Address::try_from(addr_ref).map_err(|e| Status::internal(format!("{e}")))?;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let account = node_store
                     .get_auth_store()
                     .get_account(&addr)
-                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
+                    .map_err(|e| Status::internal(format!("{e}")))?;
                 Ok(Response::new(account))
             }
-            Err(e) => Err(Status::internal(format!("{}", e))),
+            Err(e) => Err(Status::internal(format!("{e}"))),
         }
     }
     async fn get_session_info(
