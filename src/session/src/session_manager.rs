@@ -309,7 +309,7 @@ mod tests {
     use super::*;
     use db3_crypto::key_derive;
     use db3_crypto::signature_scheme::SignatureScheme;
-    use db3_proto::db3_session_proto::SessionStatus;
+    use num_traits::FromPrimitive;
     use uuid::Uuid;
 
     fn gen_address() -> DB3Address {
@@ -325,7 +325,7 @@ mod tests {
     }
     #[test]
     fn test_get_session_status() {
-        let mut session = SessionManager::new();
+        let session = SessionManager::new();
         assert_eq!(&SessionStatus::Running, session.get_session_status());
     }
 

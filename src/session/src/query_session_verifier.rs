@@ -48,13 +48,12 @@ pub fn check_query_session_info(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session_manager::SessionStatus;
     use bytes::BytesMut;
     use chrono::Utc;
     use db3_crypto::db3_signer::Db3MultiSchemeSigner;
     use db3_crypto::{db3_keypair::DB3KeyPair, key_derive, signature_scheme::SignatureScheme};
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use db3_proto::db3_session_proto::SessionStatus;
+
     fn get_a_static_keypair() -> DB3KeyPair {
         let seed: [u8; 32] = [0; 32];
         let (_, keypair) =

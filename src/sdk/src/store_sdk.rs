@@ -28,7 +28,7 @@ use db3_proto::db3_node_proto::{
 };
 
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
-use db3_session::session_manager::{SessionManager, SessionPool, SessionStatus};
+use db3_session::session_manager::{SessionPool, SessionStatus};
 use num_traits::cast::FromPrimitive;
 use prost::Message;
 use std::sync::Arc;
