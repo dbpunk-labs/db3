@@ -59,7 +59,6 @@ mkdir -p "${PROTOS_DIR}/google/type"
 cp googleapis/google/type/latlng.proto \
    "${PROTOS_DIR}/google/type/"
 
-
 # Hack in `verify` support
 ex "${PROTOS_DIR}/google/firestore/v1/write.proto" <<eof
 44 insert
