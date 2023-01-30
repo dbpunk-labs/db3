@@ -2,7 +2,7 @@
 <p align="center">
  <img width="300px" src="./docs/images/db3_logo.svg" align="center"/>
 <p align="center"> A ⭐️ is welcome!
-
+  
 <p align="center">
 
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/dbpunk-labs/db3/ci.yml?branch=main&style=flat-square)
@@ -20,21 +20,20 @@
 
 ## What's DB3 Network?
 
-DB3 Network is an open-source, decentralized firebase firestore alternative to build dApps quickly and less challenging.
+DB3 Network is an open-source, decentralized firebase firestore alternative to build dApps quickly with minimal engineering effort.
 
-<p align="left">
- <img width="600px" src="./docs/images/position_web3.svg" align="center"/>
-
+<p align="center">
+ <img width="300px" src="./docs/images/position_web3.svg" align="center"/>
 
 ## Why DB3 Network
-![why db3](./docs/images/why_db3.svg)
+![why db3](./docs/images/why_db3.jpg)
 
 Currently, there are two types of Data architecture for dApp(decentralized application): centralized vs. decentralized.
   
 **Centralized**: use [Firebase](https://firebase.google.com)<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/firebase.svg" />
- or [MongoDB](https://github.com/mongodb/mongo)<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/mongodb.svg" />to store the data), both of which are developer-friendly. But in this way, it will break the law of decentralization.
+ or [MongoDB](https://github.com/mongodb/mongo)<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/mongodb.svg" />to store the data), both of which are developer-friendly. However, dApps would be regarded as less secure based on a central database.
   
-**Decentralized**: use Ethereum<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/ethereum.svg" /> or other blockchains to store the data and use [the Graph](https://thegraph.com/en/) to index data from it. This can keep the decentralization but will cost a lot of engineering effort.
+**Decentralized**: use Ethereum<img height="20" width="20" src="https://cdn.jsdelivr.net/npm/simple-icons@v8/icons/ethereum.svg" /> or other blockchains to store the data and use [the Graph](https://thegraph.com/en/) to index data from it. The separation of the storage and the indexer would cause many issues in future development.
   
 With Db3 network, you can get both advantages of the above two choices.
 
