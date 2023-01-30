@@ -26,7 +26,7 @@ DB3 Network is an open-source, decentralized firebase firestore alternative to b
  <img width="300px" src="./docs/images/position_web3.svg" align="center"/>
 
 ## Why DB3 Network
-![why db3](./docs/images/why_db3.jpg)
+![why db3](./docs/images/why_db3.svg)
 
 Currently, there are two types of Data architecture for dApp(decentralized application): centralized vs. decentralized.
   
