@@ -38,6 +38,13 @@ pub struct TxId {
     data: [u8; 32],
 }
 
+impl TxId {
+    #[inline]
+    pub fn zero() -> Self {
+        Self { data: [0; 32] }
+    }
+}
+
 impl From<&[u8]> for TxId {
     fn from(message: &[u8]) -> Self {
         let id = sha256::Hash::hash(message);
@@ -73,6 +80,11 @@ impl DbId {
     pub fn max_id() -> DbId {
         DbId::from(&[std::u8::MAX; DB3_ADDRESS_LENGTH])
     }
+
+    #[inline]
+    pub fn to_hex(&self) -> String {
+        format!("0x{}", hex::encode(self.addr.as_ref()))
+    }
 }
 
 impl AsRef<[u8]> for DbId {
@@ -86,6 +98,15 @@ impl From<&[u8; DB3_ADDRESS_LENGTH]> for DbId {
         Self {
             addr: DB3Address::from(data),
         }
+    }
+}
+
+impl TryFrom<&[u8]> for DbId {
+    type Error = DB3Error;
+    fn try_from(data: &[u8]) -> std::result::Result<Self, DB3Error> {
+        Ok(Self {
+            addr: DB3Address::try_from(data)?,
+        })
     }
 }
 

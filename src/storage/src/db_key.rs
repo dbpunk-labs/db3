@@ -65,7 +65,8 @@ impl DbKey {
 mod tests {
     use super::*;
     use db3_crypto::key_derive;
-    use db3_crypto::signature_scheme::SignatureScheme;
+    use db3_crypto::{db3_address::DB3Address, signature_scheme::SignatureScheme};
+
     fn gen_address() -> DB3Address {
         let seed: [u8; 32] = [0; 32];
         let (address, _) =
@@ -88,9 +89,10 @@ mod tests {
 
     #[test]
     fn it_cmp() -> Result<()> {
-        let min = DbKey::mix().encode()?;
+        let min = DbKey::min().encode()?;
         let max = DbKey::max().encode()?;
         assert!(min.cmp(&min) == std::cmp::Ordering::Equal);
         assert!(min.cmp(&max) == std::cmp::Ordering::Less);
+        Ok(())
     }
 }

@@ -403,7 +403,6 @@ mod tests {
     #[tokio::test]
     async fn close_session_happy_path() {
         let nonce = get_a_random_nonce();
-
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();

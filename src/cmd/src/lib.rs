@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use db3_base::{get_address_from_pk, strings};
+use db3_base::strings;
 use db3_crypto::db3_keypair::EncodeDecodeBase64;
 use db3_crypto::{db3_keypair::DB3KeyPair, key_derive, signature_scheme::SignatureScheme};
 use db3_proto::db3_account_proto::Account;
@@ -39,13 +39,9 @@ use std::process::exit;
 
 const HELP: &str = r#"the help of db3 command
 help    show all command
-put     write pairs of key and value to db3 e.g. put ns1 key1 value1 key2 values
-del     delete key from db3                 e.g. del ns1 key1 key2
-get     get value from db3                  e.g. get ns1 key1 key2
-range   get a range from db3                e.g. range ns1 start_key end_key
+db new  create a new database
 account get balance of current account
 blocks  get latest blocks
-session info        get session info    e.g session info
 quit    quit command line console
 "#;
 
@@ -161,6 +157,7 @@ async fn close_session(
         }
     }
 }
+
 /// restart session when current session is invalid/closed/blocked
 async fn refresh_session(
     store_sdk: &mut StoreSDK,
@@ -202,7 +199,7 @@ pub async fn process_cmd(
             println!("{}", HELP);
             return true;
         }
-
+        "db" => {}
         "gen_key" => {
             get_key_pair(true).unwrap();
             return true;
@@ -220,33 +217,6 @@ pub async fn process_cmd(
             // show_account(&account);
             return true;
         }
-        "session" => {
-            if parts.len() < 2 {
-                println!("no enough command, e.g. session info | session restart");
-                return false;
-            }
-            let op = parts[1];
-            match op {
-                "info" => {
-                    // TODO(chenjing): show history session list
-                    if session.is_none() {
-                        println!("start a session before query session info");
-                        return true;
-                    }
-                    if let Ok(session_info) = store_sdk
-                        .get_session_info(&session.as_ref().unwrap().session_token)
-                        .await
-                    {
-                        println!("{:?}", session_info);
-                        return true;
-                    } else {
-                        println!("empty set");
-                        return false;
-                    }
-                }
-                _ => {}
-            }
-        }
         "range" | "blocks" => {
             println!("to be provided");
             return false;
@@ -260,6 +230,7 @@ pub async fn process_cmd(
 
     let ns = parts[1];
     let mut pairs: Vec<KvPair> = Vec::new();
+
     match cmd {
         "get" => {
             if !refresh_session(store_sdk, session).await {

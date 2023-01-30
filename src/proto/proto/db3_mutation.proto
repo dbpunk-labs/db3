@@ -22,17 +22,24 @@ import "db3_database.proto";
 package db3_mutation_proto;
 
 enum MutationAction {
-    InsertKv=0;
-    DeleteKv=1;
-    Nonce= 2;
+    InsertKv = 0;
+    DeleteKv = 1;
+    Nonce = 2;
+}
+
+enum DatabaseAction {
+    CreateDB = 0;
+    AddCollection = 1;
 }
 
 message DatabaseMutation {
     db3_base_proto.BroadcastMeta meta = 1;
-    repeated IndexMutation index_mutations = 2;
+    repeated CollectionMutation collection_mutations = 2;
+    bytes db_address = 3;
+    DatabaseAction action = 4;
 }
 
-message IndexMutation {
+message CollectionMutation {
     repeated db3_database_proto.Index index = 1;
     string collection_id = 2;
 }

@@ -27,7 +27,8 @@ message Database {
     bytes address = 1;
     // the owner of the Database
     bytes sender = 2;
-    bytes tx = 3;
+    // the history of database modification
+    repeated bytes tx = 3;
     repeated Collection collections = 4;
 }
 
@@ -37,22 +38,6 @@ message Collection {
 }
 
 message Index {
-  // Query Scope defines the scope at which a query is run. This is specified on
-  // a StructuredQuery's `from` field.
-  enum QueryScope {
-    // The query scope is unspecified. Not a valid option.
-    QUERY_SCOPE_UNSPECIFIED = 0;
-
-    // Indexes with a collection query scope specified allow queries
-    // against a collection that is the child of a specific document, specified
-    // at query time, and that has the collection id specified by the index.
-    COLLECTION = 1;
-
-    // Indexes with a collection group query scope specified allow queries
-    // against all collections that has the collection id specified by the
-    // index.
-    COLLECTION_GROUP = 2;
-  }
 
   // A field in an index.
   // The field_path describes which field is indexed, the value_mode describes
@@ -131,15 +116,6 @@ message Index {
   // For single field indexes, this field will be empty.
   string name = 1;
 
-  // Indexes with a collection query scope specified allow queries
-  // against a collection that is the child of a specific document, specified at
-  // query time, and that has the same collection id.
-  //
-  // Indexes with a collection group query scope specified allow queries against
-  // all collections descended from a specific document, specified at query
-  // time, and that have the same collection id as this index.
-  QueryScope query_scope = 2;
-
   // The fields supported by this index.
   //
   // For composite indexes, this is always 2 or more fields.
@@ -151,8 +127,5 @@ message Index {
   //
   // For single field indexes, this will always be exactly one entry with a
   // field path equal to the field path of the associated field.
-  repeated IndexField fields = 3;
-
-  // Output only. The serving state of the index.
-  State state = 4;
+  repeated IndexField fields = 2;
 }
