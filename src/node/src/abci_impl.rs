@@ -17,18 +17,15 @@
 
 use shadow_rs::shadow;
 shadow!(build);
-use super::auth_storage::Hash;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
-use db3_crypto::db3_address::DB3Address as AccountAddress;
-use db3_crypto::db3_verifier;
-use db3_proto::db3_mutation_proto::{DatabaseRequest, Mutation, PayloadType, WriteRequest};
+use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
+use db3_proto::db3_mutation_proto::{DatabaseMutation, Mutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_storage::kv_store::KvStore;
 use hex;
 use prost::Message;
-use rust_secp256k1::Message as HashMessage;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
@@ -50,11 +47,11 @@ pub struct NodeState {
 #[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    pending_mutation: Arc<Mutex<Vec<(AccountAddress, Hash, Mutation)>>>,
+    pending_mutation: Arc<Mutex<Vec<(AccountAddress, TxId, Mutation)>>>,
     pending_query_session:
-        Arc<Mutex<Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)>>>,
+        Arc<Mutex<Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)>>>,
     node_state: Arc<NodeState>,
-    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseRequest)>>>,
+    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
 impl AbciImpl {
@@ -244,9 +241,7 @@ impl Application for AbciImpl {
 
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
         //TODO match the hash fucntion with tendermint
-        let mutation_id = HashMessage::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(
-            request.tx.as_ref(),
-        );
+        let txId = TxId::from(request.tx.as_ref());
         if let Ok(wrequest) = WriteRequest::decode(request.tx.as_ref()) {
             if let Ok(account_id) = db3_verifier::DB3Verifier::verify(
                 wrequest.payload.as_ref(),
@@ -255,10 +250,10 @@ impl Application for AbciImpl {
                 let payload_type = PayloadType::from_i32(wrequest.payload_type);
                 match payload_type {
                     Some(PayloadType::DatabasePayload) => {
-                        if let Ok(dr) = DatabaseRequest::decode(wrequest.payload.as_ref()) {
+                        if let Ok(dr) = DatabaseMutation::decode(wrequest.payload.as_ref()) {
                             match self.pending_databases.lock() {
                                 Ok(mut s) => {
-                                    s.push((account_id.addr, dr));
+                                    s.push((account_id.addr, dr, txId));
                                     return ResponseDeliverTx {
                                         code: 0,
                                         data: Bytes::new(),
@@ -383,7 +378,7 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
-        let pending_databases: Vec<(AccountAddress, DatabaseRequest)> =
+        let pending_databases: Vec<(AccountAddress, DatabaseMutation)> =
             match self.pending_databases.lock() {
                 Ok(mut q) => {
                     let clone_q = q.drain(..).collect();
@@ -446,7 +441,6 @@ impl Application for AbciImpl {
                 {
                     //TODO how to revert
                     if let Ok(hash) = s.commit() {
-                        span.exit();
                         ResponseCommit {
                             data: Bytes::copy_from_slice(&hash),
                             retain_height: 0,
@@ -462,6 +456,7 @@ impl Application for AbciImpl {
                         retain_height: 0,
                     }
                 }
+                span.exit();
             }
             Err(_) => {
                 todo!();

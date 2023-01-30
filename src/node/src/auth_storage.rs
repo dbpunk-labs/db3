@@ -22,7 +22,7 @@ use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_database_proto::Database;
 use db3_proto::db3_mutation_proto::{
-    database_request::Body, DatabaseRequest, KvPair, Mutation, MutationAction,
+    DatabaseMutation, KvPair, Mutation, MutationAction,
 };
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
 use db3_proto::db3_session_proto::QuerySessionInfo;
@@ -245,18 +245,15 @@ impl AuthStorage {
         Ok(gas_fee)
     }
 
-    pub fn apply_database(&mut self, addr: &DB3Address, database: &DatabaseRequest) -> Result<()> {
+    pub fn apply_database(
+        &mut self,
+        sender: &DB3Address,
+        nonce: u64,
+        tx: &TxId,
+        mutation: &DatabaseMutation,
+    ) -> Result<()> {
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        match &database.body {
-            Some(Body::Name(name)) => {
-                DbStore::apply_del(db, addr, &name)
-                //TODO delete data in kv_store
-            }
-            Some(Body::Database(d)) => DbStore::apply_add(db, addr, &d),
-            _ => {
-                todo!()
-            }
-        }
+        DbStore::apply_mutation(db, sender, nonce, tx, mutation)
     }
 
     pub fn apply_mutation(

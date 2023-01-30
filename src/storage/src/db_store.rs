@@ -17,9 +17,10 @@
 
 use super::db_key::DbKey;
 use bytes::BytesMut;
-use db3_crypto::db3_address::DB3Address;
+use db3_crypto::{db3_address::DB3Address, id::DbId, id::TxId};
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_proto::Database;
+use db3_proto::db3_database_proto::{Collection, Database};
+use db3_proto::db3_mutation_proto::DatabaseMutation;
 use merkdb::proofs::{query::Query, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
@@ -34,10 +35,36 @@ impl DbStore {
         Self {}
     }
 
-    fn convert(db: &Database, addr: &DB3Address) -> Result<(BatchEntry, usize)> {
-        let key = DbKey(*addr, db.name.as_bytes().as_ref());
+    fn from(id: &DbId, sender: &DB3Address, txid: &TxId, mutation: &DatabaseMutation) -> Database {
+        //TODO check the duplicated collection id
+        let collections: Vec<Collection> = mutation
+            .index_mutations
+            .iter()
+            .map(move |x| Collection {
+                name: x.collection_id.to_string(),
+                index_list: x.index.to_vec(),
+            })
+            .collect();
+        Database {
+            address: id.as_ref().to_vec(),
+            sender: sender.as_ref().to_vec(),
+            tx: txid.as_ref().to_vec(),
+            collections,
+        }
+    }
+
+    fn convert(
+        sender: &DB3Address,
+        nonce: u64,
+        tx: &TxId,
+        mutation: &DatabaseMutation,
+    ) -> Result<(BatchEntry, usize)> {
+        let dbid = DbId::try_from((sender, nonce))?;
+        let key = DbKey(dbid);
         let encoded_key = key.encode()?;
-        let mut buf = BytesMut::with_capacity(1024 * 4);
+        let db = Self::from(&dbid, sender, tx, mutation);
+        //TODO limit the key length
+        let mut buf = BytesMut::with_capacity(1024 * 2);
         db.encode(&mut buf)
             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         let buf = buf.freeze();
@@ -48,23 +75,15 @@ impl DbStore {
         ))
     }
 
-    pub fn apply_del(db: Pin<&mut Merk>, addr: &DB3Address, name: &str) -> Result<()> {
+    pub fn apply_mutation(
+        db: Pin<&mut Merk>,
+        sender: &DB3Address,
+        nonce: u64,
+        tx: &TxId,
+        mutation: &DatabaseMutation,
+    ) -> Result<()> {
         let mut entries: Vec<BatchEntry> = Vec::new();
-        let key = DbKey(*addr, name.as_bytes().as_ref());
-        let encoded_key = key.encode()?;
-        let entry = (encoded_key, Op::Delete);
-        entries.push(entry);
-        unsafe {
-            Pin::get_unchecked_mut(db)
-                .apply(&entries, &[])
-                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
-        }
-        Ok(())
-    }
-
-    pub fn apply_add(db: Pin<&mut Merk>, addr: &DB3Address, database: &Database) -> Result<()> {
-        let mut entries: Vec<BatchEntry> = Vec::new();
-        let (batch_entry, _) = Self::convert(database, addr)?;
+        let (batch_entry, _) = Self::convert(sender, nonce, tx, mutation)?;
         entries.push(batch_entry);
         unsafe {
             Pin::get_unchecked_mut(db)
@@ -75,8 +94,8 @@ impl DbStore {
     }
 
     pub fn get_databases(db: Pin<&Merk>, addr: &DB3Address) -> Result<LinkedList<ProofOp>> {
-        let start_key = DbKey(*addr, "".as_bytes().as_ref());
-        let end_key = DbKey(*addr, "~~".as_bytes().as_ref());
+        let start_key = DbKey::min();
+        let end_key = DbKey::max();
         let range = Range {
             start: start_key.encode()?,
             end: end_key.encode()?,
@@ -113,26 +132,13 @@ mod tests {
         let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
-        let usdt = Erc20Token {
-            symbal: "usdt".to_string(),
-            units: vec!["cent".to_string(), "usdt".to_string()],
-            scalar: vec![1, 10],
-        };
-        let price = Price {
-            amount: 1,
-            unit: "cent".to_string(),
-            token: Some(usdt),
-        };
-        let query_price = QueryPrice {
-            price: Some(price),
-            query_count: 1000,
-        };
         let ns = Database {
             name: "test1".to_string(),
             price: Some(query_price),
             ts: 1000,
             description: "test".to_string(),
         };
+
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let result = DbStore::apply_add(db_m, &addr, &ns);
         assert!(result.is_ok());

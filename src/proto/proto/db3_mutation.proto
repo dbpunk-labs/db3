@@ -27,12 +27,14 @@ enum MutationAction {
     Nonce= 2;
 }
 
-message DatabaseRequest {
-    oneof body {
-        string name = 1;
-        db3_database_proto.Database database = 2;
-    }
-    db3_base_proto.BroadcastMeta meta = 3;
+message DatabaseMutation {
+    db3_base_proto.BroadcastMeta meta = 1;
+    repeated IndexMutation index_mutations = 2;
+}
+
+message IndexMutation {
+    repeated db3_database_proto.Index index = 1;
+    string collection_id = 2;
 }
 
 message KVPair {
