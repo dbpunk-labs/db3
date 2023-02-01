@@ -135,19 +135,25 @@ impl Application for AbciImpl {
                     match payload_type {
                         Some(PayloadType::DatabasePayload) => {
                             match DatabaseMutation::decode(request.payload.as_ref()) {
-                                Ok(_) => {
-                                    return ResponseCheckTx {
-                                        code: 0,
-                                        data: Bytes::new(),
-                                        log: "".to_string(),
-                                        info: "".to_string(),
-                                        gas_wanted: 1,
-                                        gas_used: 0,
-                                        events: vec![],
-                                        codespace: "".to_string(),
-                                        ..Default::default()
-                                    };
-                                }
+                                Ok(dm) => match &dm.meta {
+                                    Some(_) => {
+                                        return ResponseCheckTx {
+                                            code: 0,
+                                            data: Bytes::new(),
+                                            log: "".to_string(),
+                                            info: "".to_string(),
+                                            gas_wanted: 1,
+                                            gas_used: 0,
+                                            events: vec![],
+                                            codespace: "".to_string(),
+                                            ..Default::default()
+                                        };
+                                    }
+                                    None => {
+                                        //TODO add event
+                                        warn!("no meta for database mutation");
+                                    }
+                                },
                                 Err(_) => {
                                     //TODO add event ?
                                     warn!("invalid database byte data");
@@ -423,7 +429,12 @@ impl Application for AbciImpl {
                 }
                 let pending_databases_len = pending_databases.len();
                 for item in pending_databases {
-                    match s.apply_database(&item.0, 1, &item.2, &item.1) {
+                    let nonce: u64 = match &item.1.meta {
+                        Some(m) => m.nonce,
+                        //TODO will not go to here
+                        None => 1,
+                    };
+                    match s.apply_database(&item.0, nonce, &item.2, &item.1) {
                         Ok(_) => {}
                         Err(_) => {
                             todo!()

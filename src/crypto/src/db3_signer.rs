@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 
+use crate::db3_address::DB3Address;
 use crate::db3_keypair::DB3KeyPair;
 use crate::db3_signature::Signature;
 use db3_error::{DB3Error, Result};
@@ -36,6 +37,11 @@ impl Db3MultiSchemeSigner {
             .try_sign(msg)
             .map_err(|e| DB3Error::SignMessageError(format!("{e}")))?;
         Ok(signature)
+    }
+
+    pub fn get_address(&self) -> Result<DB3Address> {
+        let pk = self.kp.public();
+        Ok(DB3Address::from(&pk))
     }
 }
 

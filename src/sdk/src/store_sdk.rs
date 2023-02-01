@@ -32,7 +32,6 @@ use db3_session::session_manager::{SessionPool, SessionStatus};
 use num_traits::cast::FromPrimitive;
 use prost::Message;
 use std::sync::Arc;
-use subtle_encoding::base64;
 use tonic::Status;
 use uuid::Uuid;
 
@@ -94,7 +93,7 @@ impl StoreSDK {
     pub async fn close_session(
         &mut self,
         token: &String,
-    ) -> std::result::Result<(QuerySessionInfo, QuerySessionInfo, String), Status> {
+    ) -> std::result::Result<(QuerySessionInfo, QuerySessionInfo), Status> {
         match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
@@ -126,12 +125,7 @@ impl StoreSDK {
                     Ok(response) => match self.session_pool.remove_session(token) {
                         Ok(_) => {
                             let response = response.into_inner();
-                            let base64_byte = base64::encode(response.hash);
-                            Ok((
-                                response.query_session_info.unwrap(),
-                                query_session_info,
-                                String::from_utf8_lossy(base64_byte.as_ref()).to_string(),
-                            ))
+                            Ok((response.query_session_info.unwrap(), query_session_info))
                         }
                         Err(e) => Err(Status::internal(format!("{}", e))),
                     },

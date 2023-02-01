@@ -16,6 +16,7 @@
 //
 
 use crate::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
+use base64ct::Encoding as _;
 use byteorder::{BigEndian, WriteBytesExt};
 use db3_error::DB3Error;
 use fastcrypto::hash::{HashFunction, Sha3_256};
@@ -31,17 +32,28 @@ impl AccountId {
     pub fn new(addr: DB3Address) -> Self {
         Self { addr }
     }
+    #[inline]
+    pub fn to_hex(&self) -> String {
+        format!("0x{}", hex::encode(self.addr.as_ref()))
+    }
 }
 
+pub const TX_ID_LENGTH: usize = 32;
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct TxId {
-    data: [u8; 32],
+    data: [u8; TX_ID_LENGTH],
 }
 
 impl TxId {
     #[inline]
     pub fn zero() -> Self {
-        Self { data: [0; 32] }
+        Self {
+            data: [0; TX_ID_LENGTH],
+        }
+    }
+
+    pub fn to_base64(&self) -> String {
+        base64ct::Base64::encode_string(self.as_ref())
     }
 }
 
@@ -49,6 +61,12 @@ impl From<&[u8]> for TxId {
     fn from(message: &[u8]) -> Self {
         let id = sha256::Hash::hash(message);
         Self { data: id.into_32() }
+    }
+}
+
+impl From<[u8; TX_ID_LENGTH]> for TxId {
+    fn from(data: [u8; TX_ID_LENGTH]) -> Self {
+        Self { data }
     }
 }
 
