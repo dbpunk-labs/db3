@@ -24,6 +24,7 @@ mod node_integration {
 
     fn get_mutation_sdk() -> MutationSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
+        db3_cmd::keystore::KeyStore::recover_keypair().unwrap();
         // create storage node sdk
         let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
@@ -99,6 +100,7 @@ mod node_integration {
         let nonce = get_a_random_nonce();
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
+        db3_cmd::keystore::KeyStore::recover_keypair().unwrap();
         let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         let kv = KvPair {
