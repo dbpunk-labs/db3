@@ -1,6 +1,3 @@
-[submodule "thirdparty/pg_wire"]
-	path = thirdparty/pg_wire
-	url = https://github.com/rtstore/pg_wire.git
 [submodule "thirdparty/msql-srv"]
 	path = thirdparty/msql-srv
 	url = https://github.com/imotai/msql-srv.git
