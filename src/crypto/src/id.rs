@@ -38,6 +38,15 @@ impl AccountId {
     }
 }
 
+impl TryFrom<&[u8]> for AccountId {
+    type Error = DB3Error;
+    fn try_from(data: &[u8]) -> std::result::Result<Self, DB3Error> {
+        Ok(Self {
+            addr: DB3Address::try_from(data)?,
+        })
+    }
+}
+
 pub const TX_ID_LENGTH: usize = 32;
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct TxId {
@@ -54,6 +63,11 @@ impl TxId {
 
     pub fn to_base64(&self) -> String {
         base64ct::Base64::encode_string(self.as_ref())
+    }
+
+    pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
+        let arr: [u8; TX_ID_LENGTH] = data.try_into().map_err(|_| DB3Error::InvalidAddress)?;
+        Ok(Self { data: arr })
     }
 }
 
@@ -103,6 +117,11 @@ impl DbId {
     pub fn to_hex(&self) -> String {
         format!("0x{}", hex::encode(self.addr.as_ref()))
     }
+
+    #[inline]
+    pub fn address(&self) -> &DB3Address {
+        &self.addr
+    }
 }
 
 impl AsRef<[u8]> for DbId {
@@ -116,6 +135,15 @@ impl From<&[u8; DB3_ADDRESS_LENGTH]> for DbId {
         Self {
             addr: DB3Address::from(data),
         }
+    }
+}
+
+impl TryFrom<&str> for DbId {
+    type Error = DB3Error;
+    fn try_from(addr: &str) -> std::result::Result<Self, DB3Error> {
+        Ok(Self {
+            addr: DB3Address::try_from(addr)?,
+        })
     }
 }
 

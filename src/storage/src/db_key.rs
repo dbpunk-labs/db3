@@ -37,7 +37,7 @@ impl DbKey {
     ///
     pub fn decode(data: &[u8]) -> Result<Self> {
         const MIN_KEY_TOTAL_LEN: usize = DBID_LENGTH + DATABASE.len();
-        if data.len() <= MIN_KEY_TOTAL_LEN {
+        if data.len() < MIN_KEY_TOTAL_LEN {
             return Err(DB3Error::KeyCodecError(
                 "the length of data is invalid".to_string(),
             ));

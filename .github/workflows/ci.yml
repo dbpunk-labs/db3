@@ -99,7 +99,4 @@ jobs:
           cargo build --release
           cd tools
           sh start_localnet.sh release >tm.log 2>&1 &
-      - name: Benchmark rust sdk
-        run: |
-          cargo bench --package db3-sdk
 

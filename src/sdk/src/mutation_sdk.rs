@@ -39,7 +39,7 @@ impl MutationSDK {
         Self { client, signer }
     }
 
-    pub async fn create_database(
+    pub async fn submit_database_mutation(
         &self,
         database_mutation: &DatabaseMutation,
     ) -> Result<(DbId, TxId)> {
@@ -235,7 +235,6 @@ mod tests {
             };
             let result = sdk.submit_mutation(&mutation).await;
             assert!(result.is_ok());
-            println!("{:?}", result.unwrap());
             let ten_millis = time::Duration::from_millis(1000);
             thread::sleep(ten_millis);
             count = count + 1;

@@ -33,7 +33,7 @@ then
     rm -rf db
 fi
 ./tendermint init
-../target/${BUILD_MODE}/db3 start >db3.log 2>&1  &
+../target/${BUILD_MODE}/db3 start -v >db3.log 2>&1  &
 sleep 1
 ./tendermint unsafe_reset_all && ./tendermint start
 sleep 1

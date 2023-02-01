@@ -16,7 +16,6 @@
 //
 
 use std::io::{stderr, Write};
-use std::ops::Deref;
 
 use async_trait::async_trait;
 use clap::Command;
@@ -26,9 +25,7 @@ use clap::Parser;
 use colored::Colorize;
 
 use crate::command::{DB3ClientCommand, DB3ClientContext};
-use crate::shell::{
-    install_shell_plugins, AsyncHandler, CacheKey, CommandStructure, CompletionCache, Shell,
-};
+use crate::shell::{install_shell_plugins, AsyncHandler, CommandStructure, CompletionCache, Shell};
 const DB3: &str = "
 ██████╗ ██████╗ ██████╗ 
 ██╔══██╗██╔══██╗╚════██╗
@@ -50,7 +47,7 @@ pub async fn start_console(
     out: &mut (dyn Write + Send),
     err: &mut (dyn Write + Send),
 ) -> Result<(), anyhow::Error> {
-    writeln!(out, "{DB3}");
+    writeln!(out, "{DB3}").unwrap();
     let app: Command = DB3ClientCommand::command();
     let mut shell = Shell::new(
         "db3>-$ ",
@@ -91,7 +88,7 @@ fn get_command(args: Vec<String>) -> Result<ConsoleOpts, anyhow::Error> {
 async fn handle_command(
     opts: Result<ConsoleOpts, anyhow::Error>,
     ctx: &mut DB3ClientContext,
-    completion_cache: CompletionCache,
+    _completion_cache: CompletionCache,
 ) -> Result<bool, anyhow::Error> {
     let opts = opts?;
     opts.command.execute(ctx).await;

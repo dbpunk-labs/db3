@@ -28,7 +28,7 @@ use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::ops::Range;
 use std::pin::Pin;
-use tracing::{info, warn};
+use tracing::warn;
 
 pub struct DbStore {}
 

@@ -20,13 +20,13 @@ use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
+use db3_proto::db3_database_proto::Database;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
     GetAccountRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest, OpenSessionRequest,
     OpenSessionResponse, QueryBillKey, QueryBillRequest, Range as DB3Range, RangeKey, RangeValue,
-    SessionIdentifier,
+    SessionIdentifier, ShowDatabaseRequest,
 };
-
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
 use num_traits::cast::FromPrimitive;
@@ -53,6 +53,61 @@ impl StoreSDK {
         }
     }
 
+    async fn keep_session(&mut self) -> std::result::Result<String, Status> {
+        if let Some(token) = self.session_pool.get_last_token() {
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.get_session_query_count() > 2000 {
+                        // close session
+                        self.close_session(&token).await?;
+                        let response = self.open_session().await?;
+                        Ok(response.session_token)
+                    } else {
+                        Ok(token)
+                    }
+                }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
+            }
+        } else {
+            let response = self.open_session().await?;
+            Ok(response.session_token)
+        }
+    }
+
+    ///
+    /// get the information of database with a hex format address
+    ///
+    pub async fn get_database(
+        &mut self,
+        addr: &str,
+    ) -> std::result::Result<Option<Database>, Status> {
+        let token = self.keep_session().await?;
+        match self.session_pool.get_session_mut(token.as_ref()) {
+            Some(session) => {
+                if session.check_session_running() {
+                    let r = ShowDatabaseRequest {
+                        session_token: token.to_string(),
+                        address: addr.to_string(),
+                    };
+                    let request = tonic::Request::new(r);
+                    let mut client = self.client.as_ref().clone();
+                    let response = client.show_database(request).await?.into_inner();
+                    session.increase_query(1);
+                    Ok(response.db)
+                } else {
+                    Err(Status::permission_denied(
+                        "Fail to query in this session. Please restart query session",
+                    ))
+                }
+            }
+            None => Err(Status::not_found(format!(
+                "Fail to query, session with token {token} not found"
+            ))),
+        }
+    }
+
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
@@ -71,7 +126,6 @@ impl StoreSDK {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
         };
-
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
         let response = client.open_query_session(request).await?.into_inner();

@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 
+use db3_crypto::id::DbId;
 use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
@@ -170,22 +171,8 @@ impl AuthStorage {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
 
-    pub fn get_database(&self, _addr: &DB3Address) -> Result<Vec<Database>> {
-        let ops = DbStore::get_databases(self.db.as_ref())?;
-        let mut db_list: Vec<Database> = Vec::new();
-        for op in ops {
-            match op {
-                ProofOp::Push(Node::KV(_, v)) => {
-                    if let Ok(b) = Database::decode(v.as_ref()) {
-                        db_list.push(b);
-                    } else {
-                        todo!();
-                    }
-                }
-                _ => {}
-            }
-        }
-        Ok(db_list)
+    pub fn get_database(&self, id: &DbId) -> Result<Option<Database>> {
+        DbStore::get_database(self.db.as_ref(), id)
     }
 
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {

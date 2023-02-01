@@ -28,7 +28,6 @@ use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
-use db3_proto::db3_node_proto::OpenSessionResponse;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use http::Uri;
@@ -142,9 +141,13 @@ impl DB3Command {
         }
         let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
-        let sdk = MutationSDK::new(node, signer);
+        let mutation_sdk = MutationSDK::new(node.clone(), signer);
+        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let signer = Db3MultiSchemeSigner::new(kp);
+        let store_sdk = StoreSDK::new(node, signer);
         DB3ClientContext {
-            mutation_sdk: Some(sdk),
+            mutation_sdk: Some(mutation_sdk),
+            store_sdk: Some(store_sdk),
         }
     }
 
@@ -235,7 +238,6 @@ impl DB3Command {
                     }
                 }
             }
-            _ => {}
         }
     }
 

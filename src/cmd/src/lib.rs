@@ -14,6 +14,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
+#![feature(iter_intersperse)]
 #[macro_use]
 extern crate prettytable;
 pub mod command;
