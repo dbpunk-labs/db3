@@ -118,7 +118,7 @@ db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
  * [ ] list documents
  * [ ] query documents by index
 
-### Use DB3.js
+### Build a dapp with db3.js
 
 ```typescript
 /*
