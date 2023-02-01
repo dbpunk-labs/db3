@@ -77,7 +77,7 @@ cd tools &&  sh start_localnet.sh
 
 ### Use Console
 
-Start db3 console
+ * [x] Start db3 console
 
 ```shell
 ./target/debug/db3 console
@@ -87,7 +87,7 @@ database address                           | transaction id
 0xa9f5c8170aad7a0f924d89c6edacae6db24ef57d | 0ALy/hH7CQe9lv294K6dOxGP14xWHsbRs+/pXBZa8oU=
 ```
 
-Show database
+ * [x] Show database
 
 ```shell
 db3>-$ show-db --addr 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33
@@ -96,7 +96,7 @@ db3>-$ show-db --addr 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33
  0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33 | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | EMYw64xlI2q4v1MShoKw3T60asNbWJ9//ca75M3JO3Q= |
 ```
 
-Add a collection to database
+ * [x] Add a collection to database
 
 ```shell
 db3>$ new-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251 --name books --index '{"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}'
@@ -105,7 +105,7 @@ send add collection done with tx
 
 ```
 
-Show collections in database
+ * [x] Show collections in database
 
 ```shell
 db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
@@ -113,6 +113,10 @@ db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
 -------+----------------------------------------------------------------------------
  books | {"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}
 ```
+ * [ ] create a document
+ * [ ] get a document
+ * [ ] list documents
+ * [ ] query documents by index
 
 ### Use DB3.js
 
