@@ -1,6 +1,5 @@
-
 <p align="center" width="100%">
-    <img width="33%" src="https://github.com/dbpunk-labs/db3/blob/main/docs/images/db3_logo.png">
+    <img width="33%" src="./docs/images/db3_logo.png">
 </p>
 
 <p align="center" width="100%">
@@ -36,25 +35,23 @@ DB3 Network是一款开源的去中心化的firebase替代品，在DB3 Network�
 
 # 功能列表
 
-**无限存储空间**
+**Schemaless**
 
-规模化成为了web3发展一个非常重要的特性，db3 network是通过以下方式来实现存储空间的规模化
-  * 加入网络门槛很低，让很多PC机器可以加入网络，这保证了db3 network有大量矿工节点来提供存储空间
-  * 动态网络分片,当分片存储空间到达单个分片存储容量上限，可以通过分裂操作来增加分片
-  * 历史块数据归档，可以通过归档操作讲矿工节点存储空间释放出来
+你可以存储任何json文档数据，而不用做任何修改
 
-**快速的和可证明的链上查询引擎**
+**高性能**
 
+去中心会大大降低性能，而db3 网络在通过以下功能去解决性能问题
 * [Merkdb](https://github.com/dbpunk-labs/db3/issues/100) 是一款通过高效证明和查询的存储引擎
 * [Query session](./docs/query.md) 可以保证的在提供查询性能同时，还能保证给查询服务者提供查询激励
-
-**加密原生数据拥有权**
-
-db3 network里面每一行数据都有自己唯一的[归属权](https://github.com/dbpunk-labs/db3/issues/271), 每一行数据只有拥有者通过自己的私钥才能去修改
 
 **数据可编程**
 
 db3 network提供类typescript的编程语言来开发智能合约
+
+**加密原生数据拥有权**
+
+db3 network里面每一行数据都有自己唯一的[归属权](https://github.com/dbpunk-labs/db3/issues/271), 每一行数据只有拥有者通过自己的私钥才能去修改
 
 **有以太坊保证安全**
 
@@ -72,7 +69,52 @@ cd db3 && bash install_env.sh && cargo build
 cd tools &&  sh start_localnet.sh
 ```
 
-### 开始构建
+### 使用控制台
+
+
+ * [x] 启动控制台
+
+```shell
+./target/debug/db3 console
+db3>-$ new-db
+database address                           | transaction id
+--------------------------------------------+----------------------------------------------
+0xa9f5c8170aad7a0f924d89c6edacae6db24ef57d | 0ALy/hH7CQe9lv294K6dOxGP14xWHsbRs+/pXBZa8oU=
+```
+
+ * [x] 现实数据库信息
+
+```shell
+db3>-$ show-db --addr 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33
+ database address                           | sender address                             | releated transactions                        | collections
+--------------------------------------------+--------------------------------------------+----------------------------------------------+-------------
+ 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33 | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | EMYw64xlI2q4v1MShoKw3T60asNbWJ9//ca75M3JO3Q= |
+```
+
+ * [x] 添加一个collection
+
+```shell
+db3>$ new-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251 --name books --index '{"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}'
+send add collection done with tx
+3V7r7VRg+9zUXeGNmqRR0YdVXWtBSl4sk+Z50h9BrOc=
+
+```
+
+ * [x] 查看collection
+
+```shell
+db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
+ name  | index
+-------+----------------------------------------------------------------------------
+ books | {"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}
+```
+ * [ ] create a document
+ * [ ] get a document
+ * [ ] list documents
+ * [ ] query documents by index
+
+
+### 使用db3.js构建dapp
 
 ```typescript
 /*
