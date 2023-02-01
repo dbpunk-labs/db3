@@ -131,11 +131,12 @@ message BroadcastResponse {
 
 message ShowDatabaseRequest {
     string session_token = 1;
-    repeated string names = 2;
+    // a hex string
+    string address = 2;
 }
 
 message ShowDatabaseResponse {
-    repeated db3_database_proto.Database db_list = 1;
+    db3_database_proto.Database db = 1;
 }
 
 service StorageNode {

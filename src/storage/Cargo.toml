@@ -16,9 +16,12 @@ db3-types={ path = "../types" }
 db3-crypto={ path = "../crypto" }
 tracing = "0.1"
 merkdb = {version= "2.0.0", path = "../../thirdparty/merkdb"}
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "bbb2d02a7a64c27314721748cc4d015b00490dbe" , features=['copy_key']}
 hex = "0.4.3"
 bytes = "1"
 prost = "0.11"
 prost-types = "0.11"
 tempdir = "0.3.7"
 byteorder = "1.4.3"
+serde_json = "1.0.88"
+serde = { version = "1.0.144", features = ["derive"] }

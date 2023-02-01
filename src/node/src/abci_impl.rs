@@ -17,18 +17,15 @@
 
 use shadow_rs::shadow;
 shadow!(build);
-use super::auth_storage::Hash;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
-use db3_crypto::db3_address::DB3Address as AccountAddress;
-use db3_crypto::db3_verifier;
-use db3_proto::db3_mutation_proto::{DatabaseRequest, Mutation, PayloadType, WriteRequest};
+use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
+use db3_proto::db3_mutation_proto::{DatabaseMutation, Mutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_storage::kv_store::KvStore;
 use hex;
 use prost::Message;
-use rust_secp256k1::Message as HashMessage;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
@@ -50,11 +47,11 @@ pub struct NodeState {
 #[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    pending_mutation: Arc<Mutex<Vec<(AccountAddress, Hash, Mutation)>>>,
+    pending_mutation: Arc<Mutex<Vec<(AccountAddress, TxId, Mutation)>>>,
     pending_query_session:
-        Arc<Mutex<Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)>>>,
+        Arc<Mutex<Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)>>>,
     node_state: Arc<NodeState>,
-    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseRequest)>>>,
+    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
 impl AbciImpl {
@@ -137,20 +134,26 @@ impl Application for AbciImpl {
                     let payload_type = PayloadType::from_i32(request.payload_type);
                     match payload_type {
                         Some(PayloadType::DatabasePayload) => {
-                            match DatabaseRequest::decode(request.payload.as_ref()) {
-                                Ok(_) => {
-                                    return ResponseCheckTx {
-                                        code: 0,
-                                        data: Bytes::new(),
-                                        log: "".to_string(),
-                                        info: "".to_string(),
-                                        gas_wanted: 1,
-                                        gas_used: 0,
-                                        events: vec![],
-                                        codespace: "".to_string(),
-                                        ..Default::default()
-                                    };
-                                }
+                            match DatabaseMutation::decode(request.payload.as_ref()) {
+                                Ok(dm) => match &dm.meta {
+                                    Some(_) => {
+                                        return ResponseCheckTx {
+                                            code: 0,
+                                            data: Bytes::new(),
+                                            log: "".to_string(),
+                                            info: "".to_string(),
+                                            gas_wanted: 1,
+                                            gas_used: 0,
+                                            events: vec![],
+                                            codespace: "".to_string(),
+                                            ..Default::default()
+                                        };
+                                    }
+                                    None => {
+                                        //TODO add event
+                                        warn!("no meta for database mutation");
+                                    }
+                                },
                                 Err(_) => {
                                     //TODO add event ?
                                     warn!("invalid database byte data");
@@ -244,9 +247,7 @@ impl Application for AbciImpl {
 
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
         //TODO match the hash fucntion with tendermint
-        let mutation_id = HashMessage::from_hashed_data::<rust_secp256k1::hashes::sha256::Hash>(
-            request.tx.as_ref(),
-        );
+        let tx_id = TxId::from(request.tx.as_ref());
         if let Ok(wrequest) = WriteRequest::decode(request.tx.as_ref()) {
             if let Ok(account_id) = db3_verifier::DB3Verifier::verify(
                 wrequest.payload.as_ref(),
@@ -255,10 +256,10 @@ impl Application for AbciImpl {
                 let payload_type = PayloadType::from_i32(wrequest.payload_type);
                 match payload_type {
                     Some(PayloadType::DatabasePayload) => {
-                        if let Ok(dr) = DatabaseRequest::decode(wrequest.payload.as_ref()) {
+                        if let Ok(dr) = DatabaseMutation::decode(wrequest.payload.as_ref()) {
                             match self.pending_databases.lock() {
                                 Ok(mut s) => {
-                                    s.push((account_id.addr, dr));
+                                    s.push((account_id.addr, dr, tx_id));
                                     return ResponseDeliverTx {
                                         code: 0,
                                         data: Bytes::new(),
@@ -284,11 +285,7 @@ impl Application for AbciImpl {
                             match self.pending_mutation.lock() {
                                 Ok(mut s) => {
                                     //TODO add gas check
-                                    s.push((
-                                        account_id.addr,
-                                        mutation_id.as_ref().clone(),
-                                        mutation,
-                                    ));
+                                    s.push((account_id.addr, tx_id, mutation));
                                     return ResponseDeliverTx {
                                         code: 0,
                                         data: Bytes::new(),
@@ -318,7 +315,7 @@ impl Application for AbciImpl {
                                         s.push((
                                             client_account_id.addr,
                                             account_id.addr,
-                                            mutation_id.as_ref().clone(),
+                                            tx_id,
                                             query_session.node_query_session_info.unwrap(),
                                         ));
                                         return ResponseDeliverTx {
@@ -363,7 +360,7 @@ impl Application for AbciImpl {
     }
 
     fn commit(&self) -> ResponseCommit {
-        let pending_mutation: Vec<(AccountAddress, Hash, Mutation)> =
+        let pending_mutation: Vec<(AccountAddress, TxId, Mutation)> =
             match self.pending_mutation.lock() {
                 Ok(mut q) => {
                     let clone_q = q.drain(..).collect();
@@ -373,7 +370,7 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
-        let pending_query_session: Vec<(AccountAddress, AccountAddress, Hash, QuerySessionInfo)> =
+        let pending_query_session: Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)> =
             match self.pending_query_session.lock() {
                 Ok(mut q) => {
                     let clone_q = q.drain(..).collect();
@@ -383,7 +380,7 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
-        let pending_databases: Vec<(AccountAddress, DatabaseRequest)> =
+        let pending_databases: Vec<(AccountAddress, DatabaseMutation, TxId)> =
             match self.pending_databases.lock() {
                 Ok(mut q) => {
                     let clone_q = q.drain(..).collect();
@@ -432,21 +429,25 @@ impl Application for AbciImpl {
                 }
                 let pending_databases_len = pending_databases.len();
                 for item in pending_databases {
-                    match s.apply_database(&item.0, &item.1) {
+                    let nonce: u64 = match &item.1.meta {
+                        Some(m) => m.nonce,
+                        //TODO will not go to here
+                        None => 1,
+                    };
+                    match s.apply_database(&item.0, nonce, &item.2, &item.1) {
                         Ok(_) => {}
                         Err(_) => {
                             todo!()
                         }
                     }
                 }
-
+                span.exit();
                 if pending_mutation_len > 0
                     || pending_query_session_len > 0
                     || pending_databases_len > 0
                 {
                     //TODO how to revert
                     if let Ok(hash) = s.commit() {
-                        span.exit();
                         ResponseCommit {
                             data: Bytes::copy_from_slice(&hash),
                             retain_height: 0,

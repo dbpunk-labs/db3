@@ -235,7 +235,6 @@ pub trait DB3Signature: Sized + signature::Signature {
     fn signature_bytes(&self) -> &[u8];
     fn public_key_bytes(&self) -> &[u8];
     fn scheme(&self) -> SignatureScheme;
-
     fn verify(&self, value: &[u8]) -> Result<DB3Address>;
 }
 

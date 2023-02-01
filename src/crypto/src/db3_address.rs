@@ -91,7 +91,6 @@ impl From<&DB3PublicKey> for DB3Address {
         hasher.update(pk);
         let g_arr = hasher.finalize();
         let mut res = [0u8; DB3_ADDRESS_LENGTH];
-        // OK to access slice because Sha3_256 should never be shorter than DB3_ADDRESS_LENGTH.
         res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
         DB3Address(res)
     }
@@ -104,7 +103,6 @@ impl<T: DB3PublicKeyScheme> From<&T> for DB3Address {
         hasher.update(pk);
         let g_arr = hasher.finalize();
         let mut res = [0u8; DB3_ADDRESS_LENGTH];
-        // OK to access slice because Sha3_256 should never be shorter than SUI_ADDRESS_LENGTH.
         res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
         DB3Address(res)
     }

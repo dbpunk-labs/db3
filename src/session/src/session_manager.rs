@@ -119,6 +119,14 @@ impl SessionPool {
     pub fn get_pool_size(&self) -> usize {
         self.session_pool.len()
     }
+
+    pub fn get_last_token(&self) -> Option<String> {
+        if let Some(k) = self.session_pool.keys().next() {
+            Some(k.to_string())
+        } else {
+            None
+        }
+    }
 }
 
 pub struct SessionStore {
@@ -137,6 +145,7 @@ impl SessionStore {
             sid: 0,
         }
     }
+
     fn gen_token(&self) -> String {
         Uuid::new_v4().to_string()
     }
@@ -280,9 +289,11 @@ impl SessionManager {
     pub fn get_session_query_count(&self) -> i32 {
         self.session_info.query_count
     }
+
     pub fn check_session_running(&mut self) -> bool {
         matches!(self.check_session_status(), SessionStatus::Running)
     }
+
     pub fn check_session_status(&mut self) -> &SessionStatus {
         match self.status {
             SessionStatus::Running => {

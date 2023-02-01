@@ -15,15 +15,14 @@
 // limitations under the License.
 //
 
-use db3_crypto::db3_address::DB3Address;
+use db3_crypto::id::DbId;
+use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_database_proto::Database;
-use db3_proto::db3_mutation_proto::{
-    database_request::Body, DatabaseRequest, KvPair, Mutation, MutationAction,
-};
+use db3_proto::db3_mutation_proto::{DatabaseMutation, KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
@@ -40,7 +39,7 @@ use merkdb::Merk;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
-use tracing::{info, warn};
+use tracing::info;
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
 
@@ -172,22 +171,8 @@ impl AuthStorage {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
 
-    pub fn get_database(&self, addr: &DB3Address) -> Result<Vec<Database>> {
-        let ops = DbStore::get_databases(self.db.as_ref(), addr)?;
-        let mut db_list: Vec<Database> = Vec::new();
-        for op in ops {
-            match op {
-                ProofOp::Push(Node::KV(_, v)) => {
-                    if let Ok(b) = Database::decode(v.as_ref()) {
-                        db_list.push(b);
-                    } else {
-                        todo!();
-                    }
-                }
-                _ => {}
-            }
-        }
-        Ok(db_list)
+    pub fn get_database(&self, id: &DbId) -> Result<Option<Database>> {
+        DbStore::get_database(self.db.as_ref(), id)
     }
 
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {
@@ -216,7 +201,7 @@ impl AuthStorage {
         &mut self,
         addr: &DB3Address,
         query_addr: &DB3Address,
-        mutation_id: &Hash,
+        tx_id: &TxId,
         query_session_info: &QuerySessionInfo,
     ) -> Result<Units> {
         let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
@@ -228,7 +213,7 @@ impl AuthStorage {
             bill_id: self.current_block_state.bill_id_counter,
             bill_type: BillType::BillForQuery.into(),
             time: self.current_block_state.block_time,
-            bill_target_id: mutation_id.to_vec(),
+            bill_target_id: tx_id.as_ref().to_vec(),
             owner: addr.to_vec(),
             query_addr: query_addr.to_vec(),
         };
@@ -245,24 +230,21 @@ impl AuthStorage {
         Ok(gas_fee)
     }
 
-    pub fn apply_database(&mut self, addr: &DB3Address, database: &DatabaseRequest) -> Result<()> {
+    pub fn apply_database(
+        &mut self,
+        sender: &DB3Address,
+        nonce: u64,
+        tx: &TxId,
+        mutation: &DatabaseMutation,
+    ) -> Result<()> {
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        match &database.body {
-            Some(Body::Name(name)) => {
-                DbStore::apply_del(db, addr, &name)
-                //TODO delete data in kv_store
-            }
-            Some(Body::Database(d)) => DbStore::apply_add(db, addr, &d),
-            _ => {
-                todo!()
-            }
-        }
+        DbStore::apply_mutation(db, sender, nonce, tx, mutation)
     }
 
     pub fn apply_mutation(
         &mut self,
         addr: &DB3Address,
-        mutation_id: &Hash,
+        tx_id: &TxId,
         mutation: &Mutation,
     ) -> Result<(Units, u64)> {
         let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
@@ -279,7 +261,7 @@ impl AuthStorage {
             bill_id: self.current_block_state.bill_id_counter,
             bill_type: BillType::BillForMutation.into(),
             time: self.current_block_state.block_time,
-            bill_target_id: mutation_id.to_vec(),
+            bill_target_id: tx_id.as_ref().to_vec(),
             owner: addr.to_vec(),
             query_addr: vec![],
         };

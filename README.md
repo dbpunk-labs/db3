@@ -75,7 +75,46 @@ cd db3 && bash install_env.sh && cargo build
 cd tools &&  sh start_localnet.sh
 ```
 
-### Start building
+### Use Console
+
+Start db3 console
+
+```shell
+./target/debug/db3 console
+db3>-$ new-db
+database address                           | transaction id
+--------------------------------------------+----------------------------------------------
+0xa9f5c8170aad7a0f924d89c6edacae6db24ef57d | 0ALy/hH7CQe9lv294K6dOxGP14xWHsbRs+/pXBZa8oU=
+```
+
+Show database
+
+```shell
+db3>-$ show-db --addr 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33
+ database address                           | sender address                             | releated transactions                        | collections
+--------------------------------------------+--------------------------------------------+----------------------------------------------+-------------
+ 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33 | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | EMYw64xlI2q4v1MShoKw3T60asNbWJ9//ca75M3JO3Q= |
+```
+
+Add a collection to database
+
+```shell
+db3>$ new-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251 --name books --index '{"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}'
+send add collection done with tx
+3V7r7VRg+9zUXeGNmqRR0YdVXWtBSl4sk+Z50h9BrOc=
+
+```
+
+Show collections in database
+
+```shell
+db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
+ name  | index
+-------+----------------------------------------------------------------------------
+ books | {"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}
+```
+
+### Use DB3.js
 
 ```typescript
 /*

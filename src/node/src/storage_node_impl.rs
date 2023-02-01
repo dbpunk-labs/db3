@@ -18,7 +18,7 @@
 use super::context::Context;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
-use db3_crypto::db3_verifier::DB3Verifier;
+use db3_crypto::{db3_verifier::DB3Verifier, id::DbId};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
@@ -66,6 +66,11 @@ impl StorageNode for StorageNodeImpl {
         let show_database_req = request.into_inner();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
+                // get database id
+                let address_ref: &str = show_database_req.address.as_ref();
+                let db_id = DbId::try_from(address_ref)
+                    .map_err(|e| Status::internal(format!("invalid database address {e}")))?;
+                // validate the session id
                 match node_store
                     .get_session_store()
                     .get_session_mut(&show_database_req.session_token)
@@ -79,29 +84,17 @@ impl StorageNode for StorageNodeImpl {
                     }
                     None => return Err(Status::internal("Fail to create session")),
                 }
-                let addr = node_store
-                    .get_session_store()
-                    .get_address(&show_database_req.session_token);
-                if addr.is_none() {
-                    return Err(Status::internal(format!(
-                        "not address found related to current token {}",
-                        &show_database_req.session_token
-                    )));
-                }
-                let real_addr = addr.unwrap();
-                let db_list = node_store
+                let db = node_store
                     .get_auth_store()
-                    .get_database(&real_addr)
+                    .get_database(&db_id)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
-
                 node_store
                     .get_session_store()
                     .get_session_mut(&show_database_req.session_token)
                     .unwrap()
                     .increase_query(1);
-                Ok(Response::new(ShowDatabaseResponse { db_list }))
+                Ok(Response::new(ShowDatabaseResponse { db }))
             }
-
             Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
         }
     }

@@ -20,19 +20,18 @@ use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
+use db3_proto::db3_database_proto::Database;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
     GetAccountRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest, OpenSessionRequest,
     OpenSessionResponse, QueryBillKey, QueryBillRequest, Range as DB3Range, RangeKey, RangeValue,
-    SessionIdentifier,
+    SessionIdentifier, ShowDatabaseRequest,
 };
-
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
 use num_traits::cast::FromPrimitive;
 use prost::Message;
 use std::sync::Arc;
-use subtle_encoding::base64;
 use tonic::Status;
 use uuid::Uuid;
 
@@ -54,6 +53,61 @@ impl StoreSDK {
         }
     }
 
+    async fn keep_session(&mut self) -> std::result::Result<String, Status> {
+        if let Some(token) = self.session_pool.get_last_token() {
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.get_session_query_count() > 2000 {
+                        // close session
+                        self.close_session(&token).await?;
+                        let response = self.open_session().await?;
+                        Ok(response.session_token)
+                    } else {
+                        Ok(token)
+                    }
+                }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
+            }
+        } else {
+            let response = self.open_session().await?;
+            Ok(response.session_token)
+        }
+    }
+
+    ///
+    /// get the information of database with a hex format address
+    ///
+    pub async fn get_database(
+        &mut self,
+        addr: &str,
+    ) -> std::result::Result<Option<Database>, Status> {
+        let token = self.keep_session().await?;
+        match self.session_pool.get_session_mut(token.as_ref()) {
+            Some(session) => {
+                if session.check_session_running() {
+                    let r = ShowDatabaseRequest {
+                        session_token: token.to_string(),
+                        address: addr.to_string(),
+                    };
+                    let request = tonic::Request::new(r);
+                    let mut client = self.client.as_ref().clone();
+                    let response = client.show_database(request).await?.into_inner();
+                    session.increase_query(1);
+                    Ok(response.db)
+                } else {
+                    Err(Status::permission_denied(
+                        "Fail to query in this session. Please restart query session",
+                    ))
+                }
+            }
+            None => Err(Status::not_found(format!(
+                "Fail to query, session with token {token} not found"
+            ))),
+        }
+    }
+
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
@@ -72,7 +126,6 @@ impl StoreSDK {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
         };
-
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
         let response = client.open_query_session(request).await?.into_inner();
@@ -94,7 +147,7 @@ impl StoreSDK {
     pub async fn close_session(
         &mut self,
         token: &String,
-    ) -> std::result::Result<(QuerySessionInfo, QuerySessionInfo, String), Status> {
+    ) -> std::result::Result<(QuerySessionInfo, QuerySessionInfo), Status> {
         match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
@@ -126,12 +179,7 @@ impl StoreSDK {
                     Ok(response) => match self.session_pool.remove_session(token) {
                         Ok(_) => {
                             let response = response.into_inner();
-                            let base64_byte = base64::encode(response.hash);
-                            Ok((
-                                response.query_session_info.unwrap(),
-                                query_session_info,
-                                String::from_utf8_lossy(base64_byte.as_ref()).to_string(),
-                            ))
+                            Ok((response.query_session_info.unwrap(), query_session_info))
                         }
                         Err(e) => Err(Status::internal(format!("{}", e))),
                     },
@@ -403,7 +451,6 @@ mod tests {
     #[tokio::test]
     async fn close_session_happy_path() {
         let nonce = get_a_random_nonce();
-
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
