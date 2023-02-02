@@ -22,21 +22,7 @@ use ed25519_dalek::{PublicKey, Signature, Verifier as EdVerifier};
 
 pub struct Verifier {}
 
-impl Verifier {
-    pub fn verify(msg: &[u8], signature_raw: &[u8], public_key_raw: &[u8]) -> Result<AccountId> {
-        let public_key = PublicKey::from_bytes(&public_key_raw)
-            .map_err(|e| DB3Error::VerifyFailed(format!("{}", e)))?;
-        let signature = Signature::try_from(signature_raw)
-            .map_err(|e| DB3Error::VerifyFailed(format!("{}", e)))?;
-        match public_key.verify(msg, &signature) {
-            Ok(_) => Ok(AccountId::new(public_key)),
-            Err(e) => Err(DB3Error::VerifyFailed(format!(
-                "invalid signature for err {}",
-                e
-            ))),
-        }
-    }
-}
+impl Verifier {}
 
 #[cfg(test)]
 mod tests {

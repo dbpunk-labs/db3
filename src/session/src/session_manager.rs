@@ -16,11 +16,11 @@
 //
 
 use chrono::Utc;
-use db3_proto::db3_session_proto::{QuerySessionInfo, SessionStatus};
-use ethereum_types::Address;
+use db3_crypto::db3_address::DB3Address;
+use db3_proto::db3_session_proto::QuerySessionInfo;
+use num_traits::ToPrimitive;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
-
 // retry generate token
 pub const GEN_TOKEN_RETRY: i32 = 10;
 // default session timeout 1hrs
@@ -87,6 +87,7 @@ impl SessionPool {
         &mut self,
         session_info: &QuerySessionInfo,
         token: &str,
+        status: SessionStatus,
     ) -> Result<String, String> {
         if self.session_pool.contains_key(token) {
             Err(format!("Fail to create session. Token already exist."))
@@ -95,6 +96,7 @@ impl SessionPool {
                 token.to_string(),
                 SessionManager {
                     session_info: session_info.clone(),
+                    status,
                 },
             );
             Ok(token.to_string())
@@ -117,11 +119,19 @@ impl SessionPool {
     pub fn get_pool_size(&self) -> usize {
         self.session_pool.len()
     }
+
+    pub fn get_last_token(&self) -> Option<String> {
+        if let Some(k) = self.session_pool.keys().next() {
+            Some(k.to_string())
+        } else {
+            None
+        }
+    }
 }
 
 pub struct SessionStore {
-    session_pools: HashMap<Address, SessionPool>,
-    token_account_map: HashMap<String, Address>,
+    session_pools: HashMap<DB3Address, SessionPool>,
+    token_account_map: HashMap<String, DB3Address>,
     open_session_headers: HashSet<String>,
     sid: i32,
 }
@@ -135,6 +145,7 @@ impl SessionStore {
             sid: 0,
         }
     }
+
     fn gen_token(&self) -> String {
         Uuid::new_v4().to_string()
     }
@@ -163,7 +174,7 @@ impl SessionStore {
         &mut self,
         header: &String,
         start_time: i64,
-        addr: Address,
+        addr: DB3Address,
     ) -> Result<(String, QuerySessionInfo), String> {
         if self.is_ttl_expired(start_time) {
             return Err(format!("Session HEADER {} ttl is expired", header));
@@ -204,7 +215,7 @@ impl SessionStore {
                 Some(sess_pool) => sess_pool.remove_session(token),
                 None => Err(format!("Fail to remove session. Address not exist")),
             },
-            None => Err(format!("Fail to remove session, token not exist {}", token)),
+            None => Err(format!("Fail to remove session, token not exist {token}")),
         }
     }
     pub fn is_session_exist(&self, token: &str) -> bool {
@@ -216,7 +227,7 @@ impl SessionStore {
             None => false,
         }
     }
-    pub fn get_address(&self, token: &str) -> Option<Address> {
+    pub fn get_address(&self, token: &str) -> Option<DB3Address> {
         match self.token_account_map.get(token).clone() {
             Some(addr) => Some(addr.clone()),
             None => None,
@@ -232,10 +243,18 @@ impl SessionStore {
         }
     }
 }
+#[derive(Debug, Clone, Primitive, PartialEq)]
+pub enum SessionStatus {
+    Running = 1,
+    Blocked = 2,
+    Stop = 3,
+}
+impl SessionStatus {}
 
 #[derive(Debug, Clone)]
 pub struct SessionManager {
     session_info: QuerySessionInfo,
+    status: SessionStatus,
 }
 
 impl SessionManager {
@@ -248,9 +267,15 @@ impl SessionManager {
                 id,
                 start_time,
                 query_count: 0,
-                status: SessionStatus::Running.into(),
             },
+            status: SessionStatus::Running.into(),
         }
+    }
+    pub fn get_session_status(&self) -> &SessionStatus {
+        &self.status
+    }
+    pub fn get_session_status_as_i32(&self) -> i32 {
+        self.status.to_u32().unwrap() as i32
     }
     pub fn get_session_info(&self) -> QuerySessionInfo {
         self.session_info.clone()
@@ -264,24 +289,26 @@ impl SessionManager {
     pub fn get_session_query_count(&self) -> i32 {
         self.session_info.query_count
     }
+
     pub fn check_session_running(&mut self) -> bool {
-        self.check_session_status() == SessionStatus::Running.into()
+        matches!(self.check_session_status(), SessionStatus::Running)
     }
-    pub fn check_session_status(&mut self) -> SessionStatus {
-        match SessionStatus::from_i32(self.session_info.status) {
-            Some(SessionStatus::Running) => {
+
+    pub fn check_session_status(&mut self) -> &SessionStatus {
+        match self.status {
+            SessionStatus::Running => {
                 if Utc::now().timestamp() - self.session_info.start_time > DEFAULT_SESSION_PERIOD {
-                    self.session_info.status = SessionStatus::Blocked.into();
+                    self.status = SessionStatus::Blocked;
                 } else if self.session_info.query_count >= DEFAULT_SESSION_QUERY_LIMIT {
-                    self.session_info.status = SessionStatus::Blocked.into();
+                    self.status = SessionStatus::Blocked;
                 }
             }
             _ => {}
         }
-        SessionStatus::from_i32(self.session_info.status).unwrap()
+        &self.status
     }
     pub fn close_session(&mut self) {
-        self.session_info.status = SessionStatus::Stop.into();
+        self.status = SessionStatus::Stop;
     }
     pub fn increase_query(&mut self, count: i32) {
         self.session_info.query_count += count;
@@ -291,45 +318,56 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_keypair;
-    use db3_base::get_address_from_pk;
-    use db3_proto::db3_session_proto::SessionStatus;
+    use db3_crypto::key_derive;
+    use db3_crypto::signature_scheme::SignatureScheme;
+    use num_traits::FromPrimitive;
     use uuid::Uuid;
+
+    fn gen_address() -> DB3Address {
+        let seed: [u8; 32] = [0; 32];
+        let (address, _) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        address
+    }
     #[test]
     fn test_new_session() {
         let mut session = SessionManager::new();
-        assert_eq!(SessionStatus::Running, (session.check_session_status()));
+        assert_eq!(&SessionStatus::Running, session.check_session_status());
+    }
+    #[test]
+    fn test_get_session_status() {
+        let session = SessionManager::new();
+        assert_eq!(&SessionStatus::Running, session.get_session_status());
     }
 
     #[test]
     fn update_session_status_happy_path() {
         let mut session = SessionManager::new();
-        assert_eq!(SessionStatus::Running, session.check_session_status());
+        assert_eq!(&SessionStatus::Running, session.check_session_status());
     }
 
     #[test]
     fn query_exceed_limit_session_blocked() {
         let mut session = SessionManager::new();
         session.check_session_status();
-        assert_eq!(SessionStatus::Running, session.check_session_status());
+        assert_eq!(&SessionStatus::Running, session.check_session_status());
         session.increase_query(DEFAULT_SESSION_QUERY_LIMIT + 1);
         session.check_session_status();
-        assert_eq!(SessionStatus::Blocked, session.check_session_status());
+        assert_eq!(&SessionStatus::Blocked, session.check_session_status());
     }
 
     #[test]
     fn close_session_test() {
         let mut session = SessionManager::new();
-        assert_eq!(SessionStatus::Running, session.check_session_status());
+        assert_eq!(&SessionStatus::Running, session.check_session_status());
         session.close_session();
-        assert_eq!(SessionStatus::Stop, session.check_session_status());
+        assert_eq!(&SessionStatus::Stop, session.check_session_status());
     }
 
     #[test]
     fn add_session_exceed_limit() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         for _ in 0..DEFAULT_SESSION_POOL_SIZE_LIMIT {
             assert!(sess_store
@@ -348,8 +386,7 @@ mod tests {
     #[test]
     fn get_session() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         // add session and create new session pool
         let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), ts, addr);
@@ -366,11 +403,11 @@ mod tests {
         let res = sess_store.get_session_mut(&"token_unknow".to_string());
         assert!(res.is_none());
     }
+
     #[test]
     fn add_session_wrong_path_duplicate_header() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let header = Uuid::new_v4().to_string();
         let ts = Utc::now().timestamp();
         // add session and create new session pool
@@ -381,11 +418,11 @@ mod tests {
         let res = sess_store.add_new_session(&header, ts, addr);
         assert!(res.is_err());
     }
+
     #[test]
     fn remove_session_test() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         let res = sess_store.add_new_session(&Uuid::new_v4().to_string(), ts, addr);
         assert!(res.is_ok());
@@ -405,8 +442,7 @@ mod tests {
     #[test]
     fn cleanup_session_test() {
         let mut sess_store = SessionStore::new();
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
+        let addr = gen_address();
         let ts = Utc::now().timestamp();
         for i in 0..100 {
             let (token, _) = sess_store
@@ -418,7 +454,7 @@ mod tests {
                 let session = sess_store.get_session_mut(&token).unwrap();
                 session.increase_query(DEFAULT_SESSION_QUERY_LIMIT + 1);
                 session.check_session_status();
-                assert_eq!(SessionStatus::Blocked, session.check_session_status());
+                assert_eq!(&SessionStatus::Blocked, session.check_session_status());
             }
         }
         // expect session pool len 100. 50 running, 50 blocked
@@ -439,11 +475,19 @@ mod tests {
             50
         );
     }
+
     #[test]
     fn is_ttl_expired_test() {
         let sess_store = SessionStore::new();
         assert!(!sess_store.is_ttl_expired(Utc::now().timestamp() - 1));
         assert!(sess_store.is_ttl_expired(Utc::now().timestamp() - 5));
         assert!(sess_store.is_ttl_expired(Utc::now().timestamp() - 10));
+    }
+
+    #[test]
+    fn session_status_from_i32() {
+        assert_eq!(SessionStatus::from_i32(1), Some(SessionStatus::Running));
+        assert_eq!(SessionStatus::from_i32(2), Some(SessionStatus::Blocked));
+        assert_eq!(SessionStatus::from_i32(3), Some(SessionStatus::Stop));
     }
 }

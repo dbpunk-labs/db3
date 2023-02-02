@@ -17,38 +17,94 @@
 
 use bytes::BytesMut;
 use chrono::Utc;
-use db3_crypto::signer::Db3Signer;
+use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
+use db3_proto::db3_database_proto::Database;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
     GetAccountRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest, OpenSessionRequest,
     OpenSessionResponse, QueryBillKey, QueryBillRequest, Range as DB3Range, RangeKey, RangeValue,
-    SessionIdentifier,
+    SessionIdentifier, ShowDatabaseRequest,
 };
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
-use db3_session::session_manager::SessionPool;
-use ethereum_types::Address as AccountAddress;
+use db3_session::session_manager::{SessionPool, SessionStatus};
+use num_traits::cast::FromPrimitive;
 use prost::Message;
 use std::sync::Arc;
-use subtle_encoding::base64;
 use tonic::Status;
 use uuid::Uuid;
+
 pub struct StoreSDK {
     client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-    signer: Db3Signer,
+    signer: Db3MultiSchemeSigner,
     session_pool: SessionPool,
 }
 
 impl StoreSDK {
     pub fn new(
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        signer: Db3Signer,
+        signer: Db3MultiSchemeSigner,
     ) -> Self {
         Self {
             client,
             signer,
             session_pool: SessionPool::new(),
+        }
+    }
+
+    async fn keep_session(&mut self) -> std::result::Result<String, Status> {
+        if let Some(token) = self.session_pool.get_last_token() {
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.get_session_query_count() > 2000 {
+                        // close session
+                        self.close_session(&token).await?;
+                        let response = self.open_session().await?;
+                        Ok(response.session_token)
+                    } else {
+                        Ok(token)
+                    }
+                }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
+            }
+        } else {
+            let response = self.open_session().await?;
+            Ok(response.session_token)
+        }
+    }
+
+    ///
+    /// get the information of database with a hex format address
+    ///
+    pub async fn get_database(
+        &mut self,
+        addr: &str,
+    ) -> std::result::Result<Option<Database>, Status> {
+        let token = self.keep_session().await?;
+        match self.session_pool.get_session_mut(token.as_ref()) {
+            Some(session) => {
+                if session.check_session_running() {
+                    let r = ShowDatabaseRequest {
+                        session_token: token.to_string(),
+                        address: addr.to_string(),
+                    };
+                    let request = tonic::Request::new(r);
+                    let mut client = self.client.as_ref().clone();
+                    let response = client.show_database(request).await?.into_inner();
+                    session.increase_query(1);
+                    Ok(response.db)
+                } else {
+                    Err(Status::permission_denied(
+                        "Fail to query in this session. Please restart query session",
+                    ))
+                }
+            }
+            None => Err(Status::not_found(format!(
+                "Fail to query, session with token {token} not found"
+            ))),
         }
     }
 
@@ -60,29 +116,30 @@ impl StoreSDK {
         let mut buf = BytesMut::with_capacity(1024 * 8);
         payload
             .encode(&mut buf)
-            .map_err(|e| Status::internal(format!("{}", e)))?;
+            .map_err(|e| Status::internal(format!("{e}")))?;
         let buf = buf.freeze();
-        let (signature, public_key) = self
+        let signature = self
             .signer
             .sign(buf.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+            .map_err(|e| Status::internal(format!("{e}")))?;
         let r = OpenSessionRequest {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
-            public_key: public_key.as_ref().to_vec(),
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
         let response = client.open_query_session(request).await?.into_inner();
         let result = response.clone();
-        match self
-            .session_pool
-            .insert_session_with_token(&result.query_session_info.unwrap(), &result.session_token)
-        {
+        match self.session_pool.insert_session_with_token(
+            &result.query_session_info.unwrap(),
+            &result.session_token,
+            SessionStatus::Running,
+        ) {
             Ok(_) => Ok(response.clone()),
-            Err(e) => Err(Status::internal(format!("Fail to open session {}", e))),
+            Err(e) => Err(Status::internal(format!("Fail to open session {e}"))),
         }
     }
+
     /// close session
     /// 1. verify Account
     /// 2. request close_query_session
@@ -90,7 +147,7 @@ impl StoreSDK {
     pub async fn close_session(
         &mut self,
         token: &String,
-    ) -> std::result::Result<(QuerySessionInfo, QuerySessionInfo, String), Status> {
+    ) -> std::result::Result<(QuerySessionInfo, QuerySessionInfo), Status> {
         match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
@@ -98,32 +155,31 @@ impl StoreSDK {
                     session_info: Some(query_session_info.clone()),
                     session_token: token.clone(),
                 };
+
                 let mut buf = BytesMut::with_capacity(1024 * 8);
                 payload
                     .encode(&mut buf)
-                    .map_err(|e| Status::internal(format!("{}", e)))?;
+                    .map_err(|e| Status::internal(format!("{e}")))?;
+
                 let buf = buf.freeze();
-                let (signature, public_key) = self
+
+                let signature = self
                     .signer
                     .sign(buf.as_ref())
-                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
+                    .map_err(|e| Status::internal(format!("{e}")))?;
+
                 let r = CloseSessionRequest {
                     payload: buf.as_ref().to_vec(),
                     signature: signature.as_ref().to_vec(),
-                    public_key: public_key.as_ref().to_vec(),
                 };
+
                 let request = tonic::Request::new(r);
                 let mut client = self.client.as_ref().clone();
                 match client.close_query_session(request).await {
                     Ok(response) => match self.session_pool.remove_session(token) {
                         Ok(_) => {
                             let response = response.into_inner();
-                            let base64_byte = base64::encode(response.hash);
-                            Ok((
-                                response.query_session_info.unwrap(),
-                                query_session_info,
-                                String::from_utf8_lossy(base64_byte.as_ref()).to_string(),
-                            ))
+                            Ok((response.query_session_info.unwrap(), query_session_info))
                         }
                         Err(e) => Err(Status::internal(format!("{}", e))),
                     },
@@ -163,15 +219,14 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session with token {} not found",
-                token
+                "Fail to query, session with token {token} not found"
             ))),
         }
     }
 
-    pub async fn get_account(&self, addr: &AccountAddress) -> std::result::Result<Account, Status> {
+    pub async fn get_account(&self, addr: &DB3Address) -> std::result::Result<Account, Status> {
         let r = GetAccountRequest {
-            addr: format!("{:?}", addr),
+            addr: addr.to_vec(),
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
@@ -182,7 +237,7 @@ impl StoreSDK {
     pub async fn get_session_info(
         &self,
         session_token: &String,
-    ) -> std::result::Result<QuerySessionInfo, Status> {
+    ) -> std::result::Result<(QuerySessionInfo, SessionStatus), Status> {
         let session_identifier = Some(SessionIdentifier {
             session_token: session_token.clone(),
         });
@@ -191,7 +246,10 @@ impl StoreSDK {
         let mut client = self.client.as_ref().clone();
 
         let response = client.get_session_info(request).await?.into_inner();
-        Ok(response.session_info.unwrap())
+        Ok((
+            response.session_info.unwrap(),
+            SessionStatus::from_i32(response.session_status).unwrap(),
+        ))
     }
 
     pub async fn get_range(
@@ -226,8 +284,7 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session with token {} not found",
-                token
+                "Fail to query, session with token {token} not found"
             ))),
         }
     }
@@ -260,8 +317,7 @@ impl StoreSDK {
                 }
             }
             None => Err(Status::not_found(format!(
-                "Fail to query, session with token {} not found",
-                token
+                "Fail to query, session with token {token} not found"
             ))),
         }
     }
@@ -269,13 +325,13 @@ impl StoreSDK {
 
 #[cfg(test)]
 mod tests {
-    use super::Db3Signer;
-    use super::StoreSDK;
+
     use super::*;
     use crate::mutation_sdk::MutationSDK;
+    use crate::sdk_test;
     use bytes::BytesMut;
     use chrono::Utc;
-    use db3_base::{get_a_random_nonce, get_a_static_keypair, get_address_from_pk};
+    use db3_base::get_a_random_nonce;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::KvPair;
     use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
@@ -296,8 +352,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         let mclient = client.clone();
         {
-            let kp = get_a_static_keypair();
-            let signer = Db3Signer::new(kp);
+            let (_, signer) = sdk_test::gen_ed25519_signer();
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
@@ -318,8 +373,7 @@ mod tests {
             let ten_millis = time::Duration::from_millis(11000);
             std::thread::sleep(ten_millis);
         }
-        let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
@@ -344,8 +398,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         let mclient = client.clone();
         let ns_vec = "my_data".as_bytes().to_vec();
-        let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let msdk = MutationSDK::new(mclient, signer);
         let k1 = KvPair {
             key: "k1".as_bytes().to_vec(),
@@ -375,8 +428,7 @@ mod tests {
         assert!(result.is_ok(), "{}", result.err().unwrap());
         let two_sec = time::Duration::from_millis(2000);
         std::thread::sleep(two_sec);
-        let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
@@ -399,7 +451,6 @@ mod tests {
     #[tokio::test]
     async fn close_session_happy_path() {
         let nonce = get_a_random_nonce();
-
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -409,8 +460,7 @@ mod tests {
         let value_vec = format!("vkalue_tt{}", 10).as_bytes().to_vec();
         let ns_vec = "my_twitter".as_bytes().to_vec();
         {
-            let kp = get_a_static_keypair();
-            let signer = Db3Signer::new(kp);
+            let (_, signer) = sdk_test::gen_ed25519_signer();
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: key_vec.clone(),
@@ -431,15 +481,12 @@ mod tests {
             let two_sec = time::Duration::from_millis(2000);
             std::thread::sleep(two_sec);
         }
-        let kp = get_a_static_keypair();
-        let addr = get_address_from_pk(&kp.public);
-        let signer = Db3Signer::new(kp);
+        let (addr, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
         let session_info = res.unwrap();
         assert_eq!(session_info.session_token.len(), 36);
-
         let account_res = sdk.get_account(&addr).await;
         assert!(account_res.is_ok());
         let account1 = account_res.unwrap();
@@ -483,8 +530,7 @@ mod tests {
         let value_vec = format!("vkalue_tt{}", 20).as_bytes().to_vec();
         let ns_vec = "my_twitter".as_bytes().to_vec();
         {
-            let kp = get_a_static_keypair();
-            let signer = Db3Signer::new(kp);
+            let (_, signer) = sdk_test::gen_ed25519_signer();
             let msdk = MutationSDK::new(mclient, signer);
             let kv = KvPair {
                 key: key_vec.clone(),
@@ -505,8 +551,8 @@ mod tests {
             let two_sec = time::Duration::from_millis(2000);
             std::thread::sleep(two_sec);
         }
-        let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let mut sdk = StoreSDK::new(client, signer);
         let res = sdk.open_session().await;
         assert!(res.is_ok());
@@ -541,57 +587,53 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        payload.encode(&mut buf);
+        payload.encode(&mut buf).unwrap();
         let buf = buf.freeze();
-        let (signature, public_key) = signer
+        let signature = signer
             .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))
             .unwrap();
         let r = OpenSessionRequest {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
-            public_key: public_key.as_ref().to_vec(),
         };
         let request = tonic::Request::new(r.clone());
         let response = client.open_query_session(request).await;
         assert!(response.is_ok());
-
         // duplicate header
         std::thread::sleep(time::Duration::from_millis(1000));
         let request = tonic::Request::new(r.clone());
         let response = client.open_query_session(request).await;
         assert!(response.is_err());
     }
+
     #[tokio::test]
     async fn open_session_ttl_expiered() {
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let kp = get_a_static_keypair();
-        let signer = Db3Signer::new(kp);
+        let (_, signer) = sdk_test::gen_ed25519_signer();
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp() - 6,
         };
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        payload.encode(&mut buf);
+        payload.encode(&mut buf).unwrap();
         let buf = buf.freeze();
-        let (signature, public_key) = signer
+        let signature = signer
             .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("{:?}", e)))
             .unwrap();
         let r = OpenSessionRequest {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
-            public_key: public_key.as_ref().to_vec(),
         };
         let request = tonic::Request::new(r.clone());
         let response = client.open_query_session(request).await;

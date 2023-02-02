@@ -67,6 +67,8 @@ pub enum DB3Error {
     QuerySessionVerifyError(String),
     #[error("fail to query database {0}")]
     QueryDatabaseError(String),
+    #[error("database with addr {0} was not found")]
+    DatabaseNotFound(String),
     #[error("the address does not match the public key")]
     InvalidSigner,
     #[error("fail to generate key for {0}")]

@@ -87,8 +87,7 @@ message GetRangeResponse {
 }
 
 message GetAccountRequest {
-    // the hex encoded string
-    string addr = 1;
+    bytes addr = 1;
 }
 
 message GetSessionInfoRequest {
@@ -98,7 +97,6 @@ message GetSessionInfoRequest {
 message OpenSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
-    bytes public_key = 3;
 }
 
 message OpenSessionResponse {
@@ -111,7 +109,6 @@ message OpenSessionResponse {
 message CloseSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
-    bytes public_key = 3;
 }
 
 message CloseSessionResponse {
@@ -120,6 +117,7 @@ message CloseSessionResponse {
 }
 
 message GetSessionInfoResponse {
+    int32 session_status = 1;
     db3_session_proto.QuerySessionInfo session_info = 2;
 }
 
@@ -133,11 +131,12 @@ message BroadcastResponse {
 
 message ShowDatabaseRequest {
     string session_token = 1;
-    repeated string names = 2;
+    // a hex string
+    string address = 2;
 }
 
 message ShowDatabaseResponse {
-    repeated db3_database_proto.Database db_list = 1;
+    db3_database_proto.Database db = 1;
 }
 
 service StorageNode {

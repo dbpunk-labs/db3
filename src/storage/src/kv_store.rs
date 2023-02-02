@@ -16,12 +16,12 @@
 //
 
 use super::key::Key;
+use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_mutation_proto::{KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, RangeKey};
 use db3_types::cost;
-use ethereum_types::Address as AccountAddress;
 use merkdb::proofs::{query::Query, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use std::collections::HashSet;
@@ -51,12 +51,8 @@ impl KvStore {
         return true;
     }
 
-    fn convert(
-        kp: &KvPair,
-        account_addr: &AccountAddress,
-        ns: &[u8],
-    ) -> Result<(BatchEntry, usize)> {
-        let key = Key(*account_addr, ns, kp.key.as_ref());
+    fn convert(kp: &KvPair, addr: &DB3Address, ns: &[u8]) -> Result<(BatchEntry, usize)> {
+        let key = Key(*addr, ns, kp.key.as_ref());
         let encoded_key = key.encode()?;
         let action = MutationAction::from_i32(kp.action);
         match action {
@@ -75,7 +71,7 @@ impl KvStore {
 
     pub fn apply(
         db: Pin<&mut Merk>,
-        account_addr: &AccountAddress,
+        addr: &DB3Address,
         mutation: &Mutation,
     ) -> Result<(Units, usize)> {
         let ns = mutation.ns.as_ref();
@@ -85,7 +81,7 @@ impl KvStore {
         let mut entries: Vec<BatchEntry> = Vec::new();
         let mut total_in_bytes: usize = 0;
         for kv in ordered_kv_pairs {
-            let (batch_entry, bytes) = Self::convert(&kv, account_addr, ns)?;
+            let (batch_entry, bytes) = Self::convert(&kv, addr, ns)?;
             total_in_bytes += bytes;
             entries.push(batch_entry);
         }
@@ -93,14 +89,14 @@ impl KvStore {
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
-                .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+                .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
         }
         Ok((gas, total_in_bytes))
     }
 
     pub fn batch_get(
         db: Pin<&Merk>,
-        account_addr: &AccountAddress,
+        addr: &DB3Address,
         batch_get_keys: &BatchGetKey,
     ) -> Result<LinkedList<ProofOp>> {
         let mut query = Query::new();
@@ -113,7 +109,7 @@ impl KvStore {
         }
 
         for k in &batch_get_keys.keys {
-            let key = Key(*account_addr, batch_get_keys.ns.as_ref(), k.as_ref());
+            let key = Key(*addr, batch_get_keys.ns.as_ref(), k.as_ref());
             let encoded_key = key.encode()?;
             query.insert_key(encoded_key);
         }
@@ -125,7 +121,7 @@ impl KvStore {
 
     pub fn get_range(
         db: Pin<&Merk>,
-        account_addr: &AccountAddress,
+        addr: &DB3Address,
         range_key: &RangeKey,
     ) -> Result<LinkedList<ProofOp>> {
         let mut query = Query::new();
@@ -134,10 +130,8 @@ impl KvStore {
                 if range.start.cmp(&range.end) < std::cmp::Ordering::Less {
                     return Err(DB3Error::QueryKvError("bad range order".to_string()));
                 }
-                let start_key =
-                    Key(*account_addr, range_key.ns.as_ref(), range.start.as_ref()).encode()?;
-                let end_key =
-                    Key(*account_addr, range_key.ns.as_ref(), range.end.as_ref()).encode()?;
+                let start_key = Key(*addr, range_key.ns.as_ref(), range.start.as_ref()).encode()?;
+                let end_key = Key(*addr, range_key.ns.as_ref(), range.end.as_ref()).encode()?;
                 let std_range = std::ops::Range {
                     start: start_key,
                     end: end_key,
@@ -156,17 +150,26 @@ impl KvStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_address;
+    use db3_crypto::key_derive;
+    use db3_crypto::signature_scheme::SignatureScheme;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_node_proto::Range as DB3Range;
+
     use merkdb::proofs::Node;
     use std::boxed::Box;
     use tempdir::TempDir;
 
+    fn gen_address() -> DB3Address {
+        let seed: [u8; 32] = [0; 32];
+        let (address, _) =
+            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        address
+    }
+
     #[test]
     fn test_range_empty() {
         let tmp_dir_path = TempDir::new("get range").expect("create temp dir");
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let db = Box::pin(merk);
         let range = DB3Range {
@@ -186,7 +189,7 @@ mod tests {
     #[test]
     fn test_get_range_smoke() {
         let tmp_dir_path = TempDir::new("get range").expect("create temp dir");
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let kv1 = KvPair {
@@ -273,7 +276,7 @@ mod tests {
     #[test]
     fn it_batch_get_empty() {
         let tmp_dir_path = TempDir::new("batch get").expect("create temp dir");
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let db = Box::pin(merk);
         let key = "k1".as_bytes().to_vec();
@@ -289,7 +292,7 @@ mod tests {
     #[test]
     fn it_apply_mutation() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
-        let addr = get_a_static_address();
+        let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let kv1 = KvPair {

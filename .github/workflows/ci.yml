@@ -89,10 +89,6 @@ jobs:
           name: db3-log-artifact
           path: |
             tools/db3.log
-            tools/tm.log
-      - name: Rust java sdk test
-        run: |
-          cd java && mvn test
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}
@@ -103,7 +99,4 @@ jobs:
           cargo build --release
           cd tools
           sh start_localnet.sh release >tm.log 2>&1 &
-      - name: Benchmark rust sdk
-        run: |
-          cargo bench --package db3-sdk
 

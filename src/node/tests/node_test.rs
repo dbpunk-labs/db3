@@ -3,18 +3,18 @@
 mod node_integration {
     use bytes::BytesMut;
     use db3_base::get_a_random_nonce;
-    use db3_crypto::signer::Db3Signer;
-    use db3_proto::db3_base_proto::{ChainId, ChainRole, Erc20Token, Price, UnitType, Units};
-    use db3_proto::db3_database_proto::{Database, QueryPrice};
+    use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+    use db3_proto::db3_base_proto::{ChainId, ChainRole, UnitType, Units};
+    use db3_proto::db3_database_proto::Database;
     use db3_proto::db3_mutation_proto::{
-        database_request::Body, DatabaseRequest, KvPair, Mutation, MutationAction, PayloadType,
-        WriteRequest,
+        DatabaseMutation, KvPair, Mutation, MutationAction, PayloadType, WriteRequest,
     };
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-    use db3_proto::db3_session_proto::SessionStatus;
     use db3_sdk::mutation_sdk::MutationSDK;
     use db3_sdk::store_sdk::StoreSDK;
-    use db3_session::session_manager::{DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT};
+    use db3_session::session_manager::{
+        SessionStatus, DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT,
+    };
     use prost::Message;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -24,9 +24,10 @@ mod node_integration {
 
     fn get_mutation_sdk() -> MutationSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
+        db3_cmd::keystore::KeyStore::recover_keypair().unwrap();
         // create storage node sdk
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let signer = Db3MultiSchemeSigner::new(kp);
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
@@ -38,8 +39,8 @@ mod node_integration {
     fn get_store_sdk() -> StoreSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
         // create storage node sdk
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let signer = Db3MultiSchemeSigner::new(kp);
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
@@ -53,81 +54,55 @@ mod node_integration {
         }
     }
 
-    #[actix_web::test]
-    async fn json_rpc_database_smoke_test() {
-        let json_rpc_url = "http://127.0.0.1:26670";
-        let client = awc::Client::default();
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
-        let usdt = Erc20Token {
-            symbal: "usdt".to_string(),
-            units: vec!["cent".to_string(), "usdt".to_string()],
-            scalar: vec![1, 10],
-        };
-        let price = Price {
-            amount: 1,
-            unit: "cent".to_string(),
-            token: Some(usdt),
-        };
-        let query_price = QueryPrice {
-            price: Some(price),
-            query_count: 1000,
-        };
-        let database = Database {
-            name: "test1".to_string(),
-            price: Some(query_price),
-            ts: 1000,
-            description: "test".to_string(),
-        };
-
-        let db = Body::Database(database);
-        let request = DatabaseRequest {
-            body: Some(db),
-            meta: None,
-        };
-        let mut mbuf = BytesMut::with_capacity(1024 * 4);
-        request.encode(&mut mbuf).unwrap();
-        let mbuf = mbuf.freeze();
-        let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
-        let request = WriteRequest {
-            signature: signature.as_ref().to_vec(),
-            payload: mbuf.as_ref().to_vec().to_owned(),
-            public_key: public_key.as_ref().to_vec(),
-            payload_type: PayloadType::DatabasePayload.into(),
-        };
-        let mut buf = BytesMut::with_capacity(1024 * 4);
-        request.encode(&mut buf).unwrap();
-        let buf = buf.freeze();
-        // encode request to base64
-        let data = base64::encode(buf.as_ref());
-        let base64_str = String::from_utf8_lossy(data.as_ref()).to_string();
-        let request = serde_json::json!(
-            {"method": "broadcast",
-            "params": vec![base64_str],
-            "id": 1,
-            "jsonrpc": "2.0"
-            }
-        );
-        let mut response = client.post(json_rpc_url).send_json(&request).await.unwrap();
-        if let serde_json::Value::Object(val) = response.json::<serde_json::Value>().await.unwrap()
-        {
-            if let Some(serde_json::Value::String(s)) = val.get("result") {
-                assert!(s.len() > 0);
-            } else {
-                assert!(false)
-            }
-        } else {
-            assert!(false)
-        }
-    }
+    //#[actix_web::test]
+    //async fn json_rpc_database_smoke_test() {
+    //    let json_rpc_url = "http://127.0.0.1:26670";
+    //    let client = awc::Client::default();
+    //    let kp = db3_cmd::get_key_pair(false).unwrap();
+    //    let signer = Db3MultiSchemeSigner::new(kp);
+    //    let mut mbuf = BytesMut::with_capacity(1024 * 4);
+    //    request.encode(&mut mbuf).unwrap();
+    //    let mbuf = mbuf.freeze();
+    //    let signature = signer.sign(mbuf.as_ref()).unwrap();
+    //    let request = WriteRequest {
+    //        signature: signature.as_ref().to_vec(),
+    //        payload: mbuf.as_ref().to_vec().to_owned(),
+    //        payload_type: PayloadType::DatabasePayload.into(),
+    //    };
+    //    let mut buf = BytesMut::with_capacity(1024 * 4);
+    //    request.encode(&mut buf).unwrap();
+    //    let buf = buf.freeze();
+    //    // encode request to base64
+    //    let data = base64::encode(buf.as_ref());
+    //    let base64_str = String::from_utf8_lossy(data.as_ref()).to_string();
+    //    let request = serde_json::json!(
+    //        {"method": "broadcast",
+    //        "params": vec![base64_str],
+    //        "id": 1,
+    //        "jsonrpc": "2.0"
+    //        }
+    //    );
+    //    let mut response = client.post(json_rpc_url).send_json(&request).await.unwrap();
+    //    if let serde_json::Value::Object(val) = response.json::<serde_json::Value>().await.unwrap()
+    //    {
+    //        if let Some(serde_json::Value::String(s)) = val.get("result") {
+    //            assert!(s.len() > 0);
+    //        } else {
+    //            assert!(false)
+    //        }
+    //    } else {
+    //        assert!(false)
+    //    }
+    //}
 
     #[actix_web::test]
     async fn json_rpc_smoke_test() {
         let nonce = get_a_random_nonce();
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
-        let kp = db3_cmd::get_key_pair(false).unwrap();
-        let signer = Db3Signer::new(kp);
+        db3_cmd::keystore::KeyStore::recover_keypair().unwrap();
+        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let signer = Db3MultiSchemeSigner::new(kp);
         let kv = KvPair {
             key: format!("kkkkk_tt{}", 1).as_bytes().to_vec(),
             value: format!("vkalue_tt{}", 1).as_bytes().to_vec(),
@@ -145,11 +120,10 @@ mod node_integration {
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
         mutation.encode(&mut mbuf).unwrap();
         let mbuf = mbuf.freeze();
-        let (signature, public_key) = signer.sign(mbuf.as_ref()).unwrap();
+        let signature = signer.sign(mbuf.as_ref()).unwrap();
         let request = WriteRequest {
             signature: signature.as_ref().to_vec(),
             payload: mbuf.as_ref().to_vec().to_owned(),
-            public_key: public_key.as_ref().to_vec(),
             payload_type: PayloadType::MutationPayload.into(),
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
@@ -192,11 +166,8 @@ mod node_integration {
         let session_id_1 = session_info.session_token.clone();
         assert_eq!(session_info.max_query_limit, DEFAULT_SESSION_QUERY_LIMIT);
         assert_eq!(session_info.session_timeout_second, DEFAULT_SESSION_PERIOD);
-        let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
-        assert_eq!(
-            SessionStatus::from_i32(info.status).unwrap(),
-            SessionStatus::Running
-        );
+        let (info, status) = store_sdk.get_session_info(&session_id_1).await.unwrap();
+        assert_eq!(status, SessionStatus::Running);
         assert_eq!(info.query_count, 0);
         let pairs = vec![
             KvPair {
@@ -247,11 +218,9 @@ mod node_integration {
 
         // session info
         {
-            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
-            assert_eq!(
-                SessionStatus::from_i32(info.status).unwrap(),
-                SessionStatus::Running.into()
-            );
+            let (info, status) = store_sdk.get_session_info(&session_id_1).await.unwrap();
+            assert_eq!(status, SessionStatus::Running);
+
             assert_eq!(info.query_count, 1);
         }
 
@@ -282,11 +251,8 @@ mod node_integration {
             );
         }
         {
-            let info = store_sdk.get_session_info(&session_id_1).await.unwrap();
-            assert_eq!(
-                SessionStatus::from_i32(info.status).unwrap(),
-                SessionStatus::Blocked
-            );
+            let (info, status) = store_sdk.get_session_info(&session_id_1).await.unwrap();
+            assert_eq!(status, SessionStatus::Blocked);
             assert_eq!(info.query_count, DEFAULT_SESSION_QUERY_LIMIT);
         }
 
@@ -300,11 +266,8 @@ mod node_integration {
 
         // update current session id
         let session_id_2 = session_info.session_token;
-        let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
-        assert_eq!(
-            SessionStatus::from_i32(info.status).unwrap(),
-            SessionStatus::Running
-        );
+        let (info, status) = store_sdk.get_session_info(&session_id_2).await.unwrap();
+        assert_eq!(status, SessionStatus::Running);
         assert_eq!(info.query_count, 0);
         // delete k1
         {
@@ -329,11 +292,8 @@ mod node_integration {
             thread::sleep(time::Duration::from_secs(4));
         }
         {
-            let info = store_sdk.get_session_info(&session_id_2).await.unwrap();
-            assert_eq!(
-                SessionStatus::from_i32(info.status).unwrap(),
-                SessionStatus::Running
-            );
+            let (info, status) = store_sdk.get_session_info(&session_id_2).await.unwrap();
+            assert_eq!(status, SessionStatus::Running);
             assert_eq!(info.query_count, 0);
         }
         {

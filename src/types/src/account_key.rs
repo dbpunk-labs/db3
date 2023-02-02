@@ -15,13 +15,13 @@
 // limitations under the License.
 //
 use super::ensure_len_eq;
+use db3_crypto::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use db3_error::{DB3Error, Result};
-use ethereum_types::Address as AccountAddress;
 
 const ACCOUNT_ID: &str = "_ACCOUNT_";
 
-pub struct AccountKey(pub AccountAddress);
-const ACCOUNT_KEY_SIZE: usize = AccountAddress::len_bytes() + ACCOUNT_ID.len();
+pub struct AccountKey(pub DB3Address);
+const ACCOUNT_KEY_SIZE: usize = DB3_ADDRESS_LENGTH + ACCOUNT_ID.len();
 
 impl AccountKey {
     pub fn encode(&self) -> Result<Vec<u8>> {
@@ -32,10 +32,10 @@ impl AccountKey {
     pub fn decode(data: &[u8]) -> Result<Self> {
         ensure_len_eq(data, ACCOUNT_KEY_SIZE)
             .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        let data_slice: &[u8; AccountAddress::len_bytes()] = &data[..AccountAddress::len_bytes()]
+        let data_slice: &[u8; DB3_ADDRESS_LENGTH] = &data[..DB3_ADDRESS_LENGTH]
             .try_into()
             .expect("slice with incorrect length");
-        let addr = AccountAddress::from(data_slice);
+        let addr = DB3Address::from(data_slice);
         Ok(Self(addr))
     }
 }

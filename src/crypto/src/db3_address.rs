@@ -24,7 +24,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-const DB3_ADDRESS_LENGTH: usize = 20;
+pub const DB3_ADDRESS_LENGTH: usize = 20;
 
 #[serde_as]
 #[derive(
@@ -78,6 +78,12 @@ impl TryFrom<Vec<u8>> for DB3Address {
     }
 }
 
+impl From<&[u8; DB3_ADDRESS_LENGTH]> for DB3Address {
+    fn from(data: &[u8; DB3_ADDRESS_LENGTH]) -> Self {
+        Self(*data)
+    }
+}
+
 impl From<&DB3PublicKey> for DB3Address {
     fn from(pk: &DB3PublicKey) -> Self {
         let mut hasher = Sha3_256::default();
@@ -85,7 +91,6 @@ impl From<&DB3PublicKey> for DB3Address {
         hasher.update(pk);
         let g_arr = hasher.finalize();
         let mut res = [0u8; DB3_ADDRESS_LENGTH];
-        // OK to access slice because Sha3_256 should never be shorter than DB3_ADDRESS_LENGTH.
         res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
         DB3Address(res)
     }
@@ -98,7 +103,6 @@ impl<T: DB3PublicKeyScheme> From<&T> for DB3Address {
         hasher.update(pk);
         let g_arr = hasher.finalize();
         let mut res = [0u8; DB3_ADDRESS_LENGTH];
-        // OK to access slice because Sha3_256 should never be shorter than SUI_ADDRESS_LENGTH.
         res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
         DB3Address(res)
     }
@@ -114,6 +118,14 @@ impl TryFrom<&[u8]> for DB3Address {
     }
 }
 
+impl TryFrom<&str> for DB3Address {
+    type Error = DB3Error;
+    fn try_from(addr: &str) -> std::result::Result<Self, DB3Error> {
+        let value = decode_bytes_hex(addr).map_err(|_| DB3Error::InvalidAddress)?;
+        Ok(Self(value))
+    }
+}
+
 impl AsRef<[u8]> for DB3Address {
     fn as_ref(&self) -> &[u8] {
         &self.0[..]
@@ -122,7 +134,6 @@ impl AsRef<[u8]> for DB3Address {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn it_works() {}
 }

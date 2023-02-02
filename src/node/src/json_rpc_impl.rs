@@ -19,10 +19,10 @@ use super::hash_util;
 use super::json_rpc;
 use actix_web::{web, Error, HttpResponse};
 use bytes::Bytes;
+use db3_crypto::db3_address::DB3Address;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
-use ethereum_types::Address as AccountAddress;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -40,8 +40,7 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
         let base64_bytes = base64::encode(&bill.bill_target_id);
         let base64_string = String::from_utf8(base64_bytes).unwrap();
         new_bill.insert("bill_target_id".to_string(), Value::from(base64_string));
-        let addr = AccountAddress::from_slice(bill.owner.as_ref());
-        new_bill.insert("owner".to_string(), Value::from(format!("{:?}", addr)));
+        //TODO add owner address
         new_bill.insert("time".to_string(), Value::from(bill.time));
         new_bill.insert("block_height".to_string(), Value::from(bill.block_height));
         new_bill.insert("bill_type".to_string(), Value::from(bill.bill_type));
@@ -279,7 +278,7 @@ async fn handle_account(
         Err(json_rpc::ErrorData::new(-32601, err))
     } else {
         if let Value::String(s) = &params[0] {
-            if let Ok(addr) = AccountAddress::from_str(s.as_str()) {
+            if let Ok(addr) = DB3Address::try_from(s.as_str()) {
                 let account = match context.node_store.lock() {
                     Ok(mut store) => store.get_auth_store().get_account(&addr),
                     _ => todo!(),

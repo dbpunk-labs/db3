@@ -19,7 +19,7 @@ use super::get_address_from_pk;
 use ed25519_dalek::{Keypair, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 use ethereum_types::Address as AccountAddress;
 use hex::FromHex;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 // this function is used for testing
 //

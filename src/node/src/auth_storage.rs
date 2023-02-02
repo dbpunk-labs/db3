@@ -15,14 +15,14 @@
 // limitations under the License.
 //
 
+use db3_crypto::id::DbId;
+use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_database_proto::Database;
-use db3_proto::db3_mutation_proto::{
-    database_request::Body, DatabaseRequest, KvPair, Mutation, MutationAction,
-};
+use db3_proto::db3_mutation_proto::{DatabaseMutation, KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
@@ -33,14 +33,13 @@ use db3_storage::key::Key;
 use db3_storage::kv_store::KvStore;
 use db3_types::cost;
 use db3_types::gas;
-use ethereum_types::Address as AccountAddress;
 use hex;
 use merkdb::proofs::{Node, Op as ProofOp};
 use merkdb::Merk;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
-use tracing::{info, warn};
+use tracing::info;
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
 
@@ -115,7 +114,7 @@ impl AuthStorage {
         &self.last_block_state
     }
 
-    pub fn get_range(&self, addr: &AccountAddress, range_key: &RangeKey) -> Result<RangeValue> {
+    pub fn get_range(&self, addr: &DB3Address, range_key: &RangeKey) -> Result<RangeValue> {
         let proofs_ops = KvStore::get_range(self.db.as_ref(), addr, range_key)?;
         let ns = range_key.ns.as_ref();
         let mut kv_pairs: Vec<KvPair> = Vec::new();
@@ -142,7 +141,7 @@ impl AuthStorage {
 
     pub fn batch_get(
         &self,
-        addr: &AccountAddress,
+        addr: &DB3Address,
         batch_get_keys: &BatchGetKey,
     ) -> Result<BatchGetValue> {
         let proofs_ops = KvStore::batch_get(self.db.as_ref(), addr, batch_get_keys)?;
@@ -168,26 +167,12 @@ impl AuthStorage {
         })
     }
 
-    pub fn get_account(&self, addr: &AccountAddress) -> Result<Account> {
+    pub fn get_account(&self, addr: &DB3Address) -> Result<Account> {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
 
-    pub fn get_database(&self, addr: &AccountAddress) -> Result<Vec<Database>> {
-        let ops = DbStore::get_databases(self.db.as_ref(), addr)?;
-        let mut db_list: Vec<Database> = Vec::new();
-        for op in ops {
-            match op {
-                ProofOp::Push(Node::KV(_, v)) => {
-                    if let Ok(b) = Database::decode(v.as_ref()) {
-                        db_list.push(b);
-                    } else {
-                        todo!();
-                    }
-                }
-                _ => {}
-            }
-        }
-        Ok(db_list)
+    pub fn get_database(&self, id: &DbId) -> Result<Option<Database>> {
+        DbStore::get_database(self.db.as_ref(), id)
     }
 
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {
@@ -214,9 +199,9 @@ impl AuthStorage {
 
     pub fn apply_query_session(
         &mut self,
-        addr: &AccountAddress,
-        query_addr: &AccountAddress,
-        mutation_id: &Hash,
+        addr: &DB3Address,
+        query_addr: &DB3Address,
+        tx_id: &TxId,
         query_session_info: &QuerySessionInfo,
     ) -> Result<Units> {
         let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
@@ -228,10 +213,11 @@ impl AuthStorage {
             bill_id: self.current_block_state.bill_id_counter,
             bill_type: BillType::BillForQuery.into(),
             time: self.current_block_state.block_time,
-            bill_target_id: mutation_id.to_vec(),
-            owner: addr.as_bytes().to_vec(),
-            query_addr: query_addr.as_bytes().to_vec(),
+            bill_target_id: tx_id.as_ref().to_vec(),
+            owner: addr.to_vec(),
+            query_addr: query_addr.to_vec(),
         };
+
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         BillStore::apply(db, &bill)?;
 
@@ -246,26 +232,19 @@ impl AuthStorage {
 
     pub fn apply_database(
         &mut self,
-        addr: &AccountAddress,
-        database: &DatabaseRequest,
+        sender: &DB3Address,
+        nonce: u64,
+        tx: &TxId,
+        mutation: &DatabaseMutation,
     ) -> Result<()> {
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        match &database.body {
-            Some(Body::Name(name)) => {
-                DbStore::apply_del(db, addr, &name)
-                //TODO delete data in kv_store
-            }
-            Some(Body::Database(d)) => DbStore::apply_add(db, addr, &d),
-            _ => {
-                todo!()
-            }
-        }
+        DbStore::apply_mutation(db, sender, nonce, tx, mutation)
     }
 
     pub fn apply_mutation(
         &mut self,
-        addr: &AccountAddress,
-        mutation_id: &Hash,
+        addr: &DB3Address,
+        tx_id: &TxId,
         mutation: &Mutation,
     ) -> Result<(Units, u64)> {
         let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
@@ -282,8 +261,8 @@ impl AuthStorage {
             bill_id: self.current_block_state.bill_id_counter,
             bill_type: BillType::BillForMutation.into(),
             time: self.current_block_state.block_time,
-            bill_target_id: mutation_id.to_vec(),
-            owner: addr.as_bytes().to_vec(),
+            bill_target_id: tx_id.as_ref().to_vec(),
+            owner: addr.to_vec(),
             query_addr: vec![],
         };
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
