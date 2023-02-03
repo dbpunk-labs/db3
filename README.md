@@ -40,7 +40,8 @@ With Db3 network, you can get both advantages of the above two choices.
 
 # Features
 **Schemaless**
-You can store data on the DB3 Network without any changes.
+
+You can store data on DB3 Network without any change.
 
 **High Performance**
 
