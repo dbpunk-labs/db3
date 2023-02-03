@@ -166,18 +166,24 @@ mod tests {
     use super::*;
     use crate::db3_signature::DB3Signature;
     use crate::key_derive;
+    use bip39::{Language, Mnemonic, Seed};
     #[test]
     fn keypair_smoke_test_secp256k1() {
-        let seed: [u8; 32] = [0; 32];
+        let mnemonic = Mnemonic::from_phrase(
+            "result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss",
+            Language::English,
+        )
+        .unwrap();
+        let seed = Seed::new(&mnemonic, "");
         let (address, keypair) =
-            key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1)
+            key_derive::derive_key_pair_from_path(seed.as_ref(), None, &SignatureScheme::Secp256k1)
                 .unwrap();
         assert_eq!(
-            "\"0x0dc8e109d5dd2bee6746ca1d6fd9919659bdb28a\"",
+            "\"0xed17b3f435c03ff69c2cdc6d394932e68375f20f\"",
             serde_json::to_string(&address).unwrap()
         );
         let b64_str = keypair.encode_base64();
-        assert_eq!("AaMABK0LhkIfC8Zk95K9hq8vIhSozAiEwRnNbpPT9DDt", b64_str);
+        assert_eq!("AcmPGAEAvTzN4yUK5TXNtDRq68nC2HY2cWy1IyOAViyi", b64_str);
         let keypair =
             DB3KeyPair::decode_base64("AaMABK0LhkIfC8Zk95K9hq8vIhSozAiEwRnNbpPT9DDt").unwrap();
         let msg: [u8; 1] = [0; 1];
@@ -190,6 +196,16 @@ mod tests {
         );
         let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
+
+        let ts_signature = "AH5QFEhl8OQHom8DmzkWJeuPs62q3z7XhAcIUM+MwYnEMoOCA8tB4K4JcEZIqu4vHYu6H4/XHc6Wmn0L0m6TaCsBA+NxdDVYKrM9LjFdIem8ThlQCh/EyM3HOhU2WJF3SxMf";
+        let ts_signature_obj_ret =
+            Secp256k1DB3Signature::from_bytes(Base64::decode(ts_signature).unwrap().as_ref());
+        assert_eq!(true, ts_signature_obj_ret.is_ok());
+        let ts_address = ts_signature_obj_ret.unwrap().verify(&msg).unwrap();
+        assert_eq!(
+            "\"0xed17b3f435c03ff69c2cdc6d394932e68375f20f\"",
+            serde_json::to_string(&ts_address).unwrap()
+        );
     }
 
     #[test]
@@ -205,7 +221,6 @@ mod tests {
         let result = keypair.try_sign(&msg);
         assert_eq!(true, result.is_ok());
         let signature = result.unwrap();
-
         let result = signature.verify(&msg);
         assert_eq!(true, result.is_ok());
     }
