@@ -16,6 +16,7 @@
 //
 
 use crate::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
+use base64ct::Base64 as _;
 use base64ct::Encoding as _;
 use byteorder::{BigEndian, WriteBytesExt};
 use db3_error::DB3Error;
@@ -63,6 +64,9 @@ impl TxId {
 
     pub fn to_base64(&self) -> String {
         base64ct::Base64::encode_string(self.as_ref())
+    }
+    pub fn try_from_base64(input: &str) -> std::result::Result<Self, DB3Error> {
+        Self::try_from_bytes(base64ct::Base64::decode_vec(input).unwrap().as_slice())
     }
 
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
@@ -187,4 +191,14 @@ mod tests {
 
     #[test]
     fn it_works() {}
+
+    #[test]
+    fn tx_base64_encode_decode() {
+        let txId = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=");
+        assert!(txId.is_ok());
+        assert_eq!(
+            "iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=",
+            txId.unwrap().to_base64()
+        )
+    }
 }

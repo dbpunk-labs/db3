@@ -75,6 +75,10 @@ pub enum DB3Error {
     SignatureKeyGenError(String),
     #[error("fail to sign message for {0}")]
     SignMessageError(String),
+    #[error("fail to decode document for {0}")]
+    DocumentDecodeError(String),
+    #[error("fail to query document {0}")]
+    QueryDocumentError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
