@@ -37,9 +37,11 @@ db3 client show-key
  0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | secp256k1
 ```
 
-this command will create a key used for signing message
+this command will create a key used for signing a message
 
 ### Create a Database
+
+start the console connecting to the `https://grpc.devnet.db3.network` and create a database
 
 ```
 db3 console --url https://grpc.devnet.db3.network
@@ -53,6 +55,7 @@ db3>-$ show-db --addr 0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded
  0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | ZJqQkwULNOuyVeeECGoHIHusyFTghsTWVJYMsg1afZM= |  
 ```
 
+
 ### Create a Collection
 
 ```
@@ -64,3 +67,5 @@ db3>-$ show-collection --addr 0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded
 -------+----------------------------------------------------------------------------
  books | {"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}
 ```
+create a collection with name `books` in database
+
