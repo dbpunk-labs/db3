@@ -93,7 +93,35 @@ impl AsRef<[u8]> for TxId {
         &self.data[..]
     }
 }
-
+pub const DOCUMENT_ID_LENGTH: usize = 16;
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
+pub struct DocumentId {
+    data: [u8; DOCUMENT_ID_LENGTH],
+}
+impl DocumentId {
+    pub fn create(
+        block_id: u64,
+        mutation_id: u32,
+        index: u32,
+    ) -> std::result::Result<Self, DB3Error> {
+        let mut bytes: Vec<u8> = Vec::with_capacity(DOCUMENT_ID_LENGTH);
+        bytes.extend(block_id.to_be_bytes());
+        bytes.extend(mutation_id.to_be_bytes());
+        bytes.extend(index.to_be_bytes());
+        Self::try_from_bytes(bytes.as_slice())
+    }
+    pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
+        let buf: [u8; DOCUMENT_ID_LENGTH] = data
+            .try_into()
+            .map_err(|_| DB3Error::InvalidDocumentIdBytes)?;
+        Ok(Self { data: buf })
+    }
+}
+impl AsRef<[u8]> for DocumentId {
+    fn as_ref(&self) -> &[u8] {
+        &self.data[..]
+    }
+}
 pub const DBID_LENGTH: usize = DB3_ADDRESS_LENGTH;
 
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
@@ -200,5 +228,13 @@ mod tests {
             "iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=",
             txId.unwrap().to_base64()
         )
+    }
+    #[test]
+    fn create_ut() {
+        let doc_id = DocumentId::create(1000000, 1000, 100);
+        assert_eq!(
+            vec![0, 0, 0, 0, 0, 15, 66, 64, 0, 0, 3, 232, 0, 0, 0, 100],
+            doc_id.unwrap().data.to_vec()
+        );
     }
 }

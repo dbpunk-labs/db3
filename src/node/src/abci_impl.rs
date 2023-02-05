@@ -248,7 +248,6 @@ impl Application for AbciImpl {
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
         //TODO match the hash fucntion with tendermint
         let tx_id = TxId::from(request.tx.as_ref());
-        println!("tx_id: {}", tx_id.to_base64());
         if let Ok(wrequest) = WriteRequest::decode(request.tx.as_ref()) {
             if let Ok(account_id) = db3_verifier::DB3Verifier::verify(
                 wrequest.payload.as_ref(),

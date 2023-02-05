@@ -18,7 +18,7 @@
 use clap::*;
 
 use crate::keystore::KeyStore;
-use db3_base::db3_document::DB3Document;
+use db3_crypto::db3_document::DB3Document;
 use db3_crypto::id::{AccountId, DbId, TxId};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::{Database, Index};

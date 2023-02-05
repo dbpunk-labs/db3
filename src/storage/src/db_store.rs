@@ -17,8 +17,9 @@
 
 use super::db_key::DbKey;
 use bytes::BytesMut;
-use db3_base::db3_document::DB3Document;
-use db3_crypto::{db3_address::DB3Address, id::DbId, id::TxId};
+use db3_crypto::{
+    db3_address::DB3Address, db3_document::DB3Document, id::DbId, id::DocumentId, id::TxId,
+};
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::{Collection, Database};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, DocumentMutation};
@@ -190,8 +191,8 @@ impl DbStore {
         sender: &DB3Address,
         tx: &TxId,
         mutation: &DatabaseMutation,
-        blockId: u64,
-        mutationId: u32,
+        block_id: u64,
+        mutation_id: u32,
     ) -> Result<()> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
@@ -208,19 +209,14 @@ impl DbStore {
                         .filter(|x| document_mutation.collection_id == x.name)
                         .nth(0);
                     for document in document_mutation.document.iter() {
-                        let documentId = format!("{:0>8}{:0>4}{:0>3}", blockId, mutationId, idx);
-                        let key_vec = documentId.as_bytes().to_vec();
-                        let mut db3_document = DB3Document::try_from(document.clone()).unwrap();
-                        db3_document.add_documentId(documentId.as_str());
-                        db3_document.add_txId(&tx.as_ref());
-                        db3_document.add_owner(sender.as_ref());
+                        let document_id = DocumentId::create(block_id, mutation_id, idx)
+                            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
+                            .unwrap();
+                        let db3_document =
+                            DB3Document::new(document.clone(), &document_id, &tx, &sender);
+                        let key_vec = document_id.as_ref().to_vec();
                         let document_vec = db3_document.into_bytes().to_vec();
                         idx += 1;
-                        println!(
-                            "collection: {} add document: {}",
-                            collection.unwrap().name,
-                            documentId
-                        );
                         entries.push((key_vec, Op::Put(document_vec)));
                     }
                 }
@@ -239,7 +235,7 @@ impl DbStore {
     //
     // add document
     //
-    fn get_document(db: Pin<&mut Merk>, documentId: &Vec<u8>) -> Result<Option<Vec<u8>>> {
+    fn get_document(db: Pin<&mut Merk>, documentId: &DocumentId) -> Result<Option<Vec<u8>>> {
         //TODO use reference
         let value = db
             .get(documentId.as_ref())
@@ -252,8 +248,8 @@ impl DbStore {
         nonce: u64,
         tx: &TxId,
         mutation: &DatabaseMutation,
-        blockId: u64,
-        mutationId: u32,
+        block_id: u64,
+        mutation_id: u32,
     ) -> Result<()> {
         let action = DatabaseAction::from_i32(mutation.action);
         match action {
@@ -262,7 +258,7 @@ impl DbStore {
             }
             Some(DatabaseAction::AddCollection) => Self::add_collection(db, sender, tx, mutation),
             Some(DatabaseAction::AddDocument) => {
-                Self::add_document(db, sender, tx, mutation, blockId, mutationId)
+                Self::add_document(db, sender, tx, mutation, block_id, mutation_id)
             }
             None => Ok(()),
         }
@@ -403,12 +399,11 @@ mod tests {
         assert!(DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 2).is_ok());
 
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        if let Ok(Some(document_vec)) =
-            DbStore::get_document(db_m, &"000010000002000".as_bytes().to_vec())
-        {
+        let document_id = DocumentId::create(1000, 2, 0).unwrap();
+        if let Ok(Some(document_vec)) = DbStore::get_document(db_m, &document_id) {
             let db3_document = DB3Document::try_from(document_vec).unwrap();
             assert_eq!("John Doe", db3_document.as_ref().get_str("name").unwrap());
-            assert_eq!(&addr.to_vec(), db3_document.get_owner().unwrap());
+            assert_eq!(addr.to_vec(), db3_document.get_owner().unwrap().to_vec());
         } else {
             assert!(false);
         }

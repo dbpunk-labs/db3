@@ -79,6 +79,8 @@ pub enum DB3Error {
     DocumentDecodeError(String),
     #[error("fail to query document {0}")]
     QueryDocumentError(String),
+    #[error("invalid document id bytes")]
+    InvalidDocumentIdBytes,
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

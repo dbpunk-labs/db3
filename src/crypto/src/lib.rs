@@ -18,6 +18,7 @@
 
 pub mod account_id;
 pub mod db3_address;
+pub mod db3_document;
 pub mod db3_keypair;
 pub mod db3_public_key;
 pub mod db3_serde;
