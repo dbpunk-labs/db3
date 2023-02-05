@@ -21,11 +21,13 @@ use db3_crypto::{
     db3_address::DB3Address, db3_document::DB3Document, id::DbId, id::DocumentId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
+use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_database_proto::{Collection, Database};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, DocumentMutation};
 use merkdb::proofs::{query::Query, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::ops::Range;
@@ -201,23 +203,24 @@ impl DbStore {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
                 let mut idx = 0;
+                let mut cid_index_map: HashMap<String, _> = HashMap::new();
+                for collection in d.collections.iter() {
+                    cid_index_map.insert(collection.name.to_string(), &collection.index_list);
+                }
                 for document_mutation in &mutation.document_mutations {
-                    println!("apply document_mutation");
-                    let collection = d
-                        .collections
-                        .iter()
-                        .filter(|x| document_mutation.collection_id == x.name)
-                        .nth(0);
-                    for document in document_mutation.document.iter() {
-                        let document_id = DocumentId::create(block_id, mutation_id, idx)
-                            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
-                            .unwrap();
-                        let db3_document =
-                            DB3Document::new(document.clone(), &document_id, &tx, &sender);
-                        let key_vec = document_id.as_ref().to_vec();
-                        let document_vec = db3_document.into_bytes().to_vec();
-                        idx += 1;
-                        entries.push((key_vec, Op::Put(document_vec)));
+                    if let Some(index_list) = cid_index_map.get(&document_mutation.collection_id) {
+                        for document in document_mutation.document.iter() {
+                            let document_id = DocumentId::create(block_id, mutation_id, idx)
+                                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
+                                .unwrap();
+                            let db3_document =
+                                DB3Document::new(document.clone(), &document_id, &tx, &sender);
+                            let key_vec = document_id.as_ref().to_vec();
+                            let document_vec = db3_document.into_bytes().to_vec();
+                            idx += 1;
+                            entries.push((key_vec, Op::Put(document_vec)));
+                            // TODO(chenjing): add key for document with given index_list
+                        }
                     }
                 }
                 unsafe {
