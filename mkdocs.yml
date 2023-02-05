@@ -1,3 +1,13 @@
 site_name: DB3 Network
+
+repo_name: dbpunk-labs/db3
+repo_url: https://github.com/dbpunk-labs/db3.git
 theme:
   name: material
+  features:
+    - content.tabs.link
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true 
