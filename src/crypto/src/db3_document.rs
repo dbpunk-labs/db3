@@ -3,21 +3,29 @@ use crate::id::{AccountId, DocumentId, TxId};
 use bson::spec::BinarySubtype;
 use bson::Document;
 use bson::{Binary, Bson, RawDocumentBuf};
-use db3_error::{DB3Error, Result};
-use fastcrypto::traits::ToFromBytes;
-use serde_json::{Map, Value};
+use db3_error::DB3Error;
+use serde_json::Value;
 
 #[derive(Debug)]
 pub struct DB3Document {
     doc: Document,
 }
 impl DB3Document {
-    pub fn new(document: Vec<u8>, document_id: &DocumentId, tx: &TxId, owner: &DB3Address) -> Self {
-        let mut db3_document = DB3Document::try_from(document).unwrap();
-        db3_document.add_document_id(document_id);
-        db3_document.add_tx_id(tx);
-        db3_document.add_owner(owner);
-        db3_document
+    pub fn new(
+        document: Vec<u8>,
+        document_id: &DocumentId,
+        tx: &TxId,
+        owner: &DB3Address,
+    ) -> std::result::Result<Self, DB3Error> {
+        match DB3Document::try_from(document) {
+            Ok(mut db3_document) => {
+                db3_document.add_document_id(document_id);
+                db3_document.set_tx_id(tx);
+                db3_document.add_owner(owner);
+                Ok(db3_document)
+            }
+            Err(err) => Err(DB3Error::DocumentDecodeError(format!("{:?}", err))),
+        }
     }
     pub fn create_from_json_str(
         document: &str,
@@ -27,7 +35,7 @@ impl DB3Document {
     ) -> Self {
         let mut db3_document = DB3Document::try_from(document).unwrap();
         db3_document.add_document_id(document_id);
-        db3_document.add_tx_id(tx);
+        db3_document.set_tx_id(tx);
         db3_document.add_owner(owner);
         db3_document
     }
@@ -35,25 +43,25 @@ impl DB3Document {
         let row_doc = RawDocumentBuf::from_document(&self.doc).unwrap();
         row_doc.into_bytes()
     }
-    pub fn add_document_id(&mut self, docId: &DocumentId) {
+    fn add_document_id(&mut self, doc_id: &DocumentId) {
         self.doc.insert(
-            "_docId",
+            "_doc_id",
             Bson::Binary(Binary {
                 subtype: BinarySubtype::Generic,
-                bytes: docId.as_ref().to_vec(),
+                bytes: doc_id.as_ref().to_vec(),
             }),
         );
     }
 
     pub fn get_document_id(&self) -> std::result::Result<DocumentId, DB3Error> {
-        match self.doc.get_binary_generic("_docId") {
-            Ok(docId) => DocumentId::try_from_bytes(docId.as_slice()),
+        match self.doc.get_binary_generic("_doc_id") {
+            Ok(doc_id) => DocumentId::try_from_bytes(doc_id.as_slice()),
             Err(err) => Err(DB3Error::DocumentDecodeError(format!("{:?}", err))),
         }
     }
-    pub fn add_tx_id(&mut self, tx_id: &TxId) {
+    pub fn set_tx_id(&mut self, tx_id: &TxId) {
         self.doc.insert(
-            "_txId",
+            "_tx_id",
             Bson::Binary(Binary {
                 subtype: BinarySubtype::Generic,
                 bytes: tx_id.as_ref().to_vec(),
@@ -61,13 +69,13 @@ impl DB3Document {
         );
     }
     pub fn get_tx_id(&self) -> std::result::Result<TxId, DB3Error> {
-        match self.doc.get_binary_generic("_txId") {
-            Ok(txId) => TxId::try_from_bytes(txId.as_slice()),
+        match self.doc.get_binary_generic("_tx_id") {
+            Ok(tx_id) => TxId::try_from_bytes(tx_id.as_slice()),
             Err(err) => Err(DB3Error::DocumentDecodeError(format!("{:?}", err))),
         }
     }
 
-    pub fn add_owner(&mut self, addr: &DB3Address) {
+    fn add_owner(&mut self, addr: &DB3Address) {
         self.doc.insert(
             "_ownerAddr",
             Bson::Binary(Binary {
@@ -154,7 +162,7 @@ mod tests {
         )
     }
     #[test]
-    fn add_docId() {
+    fn add_doc_id() {
         let data = r#"
         {
             "name": "John Doe",
@@ -172,7 +180,7 @@ mod tests {
         assert_eq!("John Doe", document.as_ref().get_str("name").unwrap());
     }
     #[test]
-    fn add_txId() {
+    fn add_tx_id() {
         let data = r#"
         {
             "name": "John Doe",
@@ -183,8 +191,8 @@ mod tests {
             ]
         }"#;
         let mut document = DB3Document::try_from(data).unwrap();
-        let txId = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
-        document.add_tx_id(&txId);
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        document.set_tx_id(&tx_id);
         assert!(document.get_document_id().is_err());
         assert_eq!(
             "iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=",
@@ -229,9 +237,9 @@ mod tests {
             ]
         }"#;
         let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
-        let txId = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
         let document_id = DocumentId::create(100000, 1000, 100).unwrap();
-        let document = DB3Document::create_from_json_str(data, &document_id, &txId, &addr);
+        let document = DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr);
         assert_eq!(
             "0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b",
             AccountId::try_from(document.get_owner().unwrap().as_ref())
@@ -249,9 +257,9 @@ mod tests {
         let document = b"\x13\x00\x00\x00\x02hi\x00\x06\x00\x00\x00y'all\x00\x00".to_vec();
 
         let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
-        let txId = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
         let document_id = DocumentId::create(100000, 1000, 100).unwrap();
-        let document = DB3Document::new(document, &document_id, &txId, &addr);
+        let document = DB3Document::new(document, &document_id, &tx_id, &addr).unwrap();
         assert_eq!(
             "0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b",
             AccountId::try_from(document.get_owner().unwrap().as_ref())

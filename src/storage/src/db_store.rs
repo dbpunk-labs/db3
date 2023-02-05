@@ -21,7 +21,6 @@ use db3_crypto::{
     db3_address::DB3Address, db3_document::DB3Document, id::DbId, id::DocumentId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_database_proto::{Collection, Database};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, DocumentMutation};
 use merkdb::proofs::{query::Query, Op as ProofOp};
@@ -214,7 +213,9 @@ impl DbStore {
                                 .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
                                 .unwrap();
                             let db3_document =
-                                DB3Document::new(document.clone(), &document_id, &tx, &sender);
+                                DB3Document::new(document.clone(), &document_id, &tx, &sender)
+                                    .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
+                                    .unwrap();
                             let key_vec = document_id.as_ref().to_vec();
                             let document_vec = db3_document.into_bytes().to_vec();
                             idx += 1;
@@ -238,10 +239,10 @@ impl DbStore {
     //
     // add document
     //
-    fn get_document(db: Pin<&mut Merk>, documentId: &DocumentId) -> Result<Option<Vec<u8>>> {
+    fn get_document(db: Pin<&mut Merk>, document_id: &DocumentId) -> Result<Option<Vec<u8>>> {
         //TODO use reference
         let value = db
-            .get(documentId.as_ref())
+            .get(document_id.as_ref())
             .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?;
         Ok(value)
     }

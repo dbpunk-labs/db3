@@ -16,7 +16,6 @@
 //
 
 use crate::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
-use base64ct::Base64 as _;
 use base64ct::Encoding as _;
 use byteorder::{BigEndian, WriteBytesExt};
 use db3_error::DB3Error;
