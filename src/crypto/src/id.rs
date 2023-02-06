@@ -359,11 +359,11 @@ mod tests {
 
     #[test]
     fn tx_base64_encode_decode() {
-        let txId = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=");
-        assert!(txId.is_ok());
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=");
+        assert!(tx_id.is_ok());
         assert_eq!(
             "iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=",
-            txId.unwrap().to_base64()
+            tx_id.unwrap().to_base64()
         )
     }
     #[test]

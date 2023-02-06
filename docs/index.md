@@ -41,11 +41,10 @@ db3>-$ new-db
 --------------------------------------------+----------------------------------------------
  0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded | ZJqQkwULNOuyVeeECGoHIHusyFTghsTWVJYMsg1afZM=
 db3>-$ show-db --addr 0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded
- database address                           | sender address                             | releated transactions                        | collections 
+ database address                           | sender address                             | related transactions                        | collections
 --------------------------------------------+--------------------------------------------+----------------------------------------------+-------------
- 0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | ZJqQkwULNOuyVeeECGoHIHusyFTghsTWVJYMsg1afZM= |  
+ 0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | ZJqQkwULNOuyVeeECGoHIHusyFTghsTWVJYMsg1afZM= |
 ```
-
 
 ### Create a Collection
 
@@ -58,5 +57,12 @@ db3>-$ show-collection --addr 0xffe0f0ea53dd3ccf6de1fc046a0f8eb68f98dded
 -------+----------------------------------------------------------------------------
  books | {"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}
 ```
-create a collection with name `books` in database
+create a collection with name `books` and an index named `idx1` in database
 
+### Create a Document
+
+```
+db3>-$ new-doc --addr 0x997f631fcafeed5ee319c83683ae16e64783602b --collection-name books --documents '{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}'
+send add document done with tx
++O9cK2cHLexZQvIITk4OTm8SxBhq7Yz7g+xZYiionWo=
+```

@@ -415,6 +415,7 @@ mod tests {
         Index,
     };
     use db3_proto::db3_mutation_proto::CollectionMutation;
+    use db3_proto::db3_mutation_proto::DocumentMutation;
     use std::boxed::Box;
     use tempdir::TempDir;
 
