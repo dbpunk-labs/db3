@@ -98,6 +98,7 @@ pub const TYPE_ID_LENGTH: usize = 1;
 pub const BLOCK_ID_LENGTH: usize = 8;
 pub const MUTATION_ID_LENGTH: usize = 4;
 pub const OP_ENTRY_INDEX_LENGTH: usize = 4;
+pub const INDEX_FIELD_ID_LENGTH: usize = 4;
 /// OpEntryId := BlockId + MutationId + OpEntryIdx
 pub const OP_ENTRY_ID_LENGTH: usize = 16;
 
@@ -138,6 +139,22 @@ impl OpEntryId {
         unsafe { mem::transmute::<[u8; 16], u128>(self.data) }
     }
 
+    fn get_block_id(&self) -> u64 {
+        let mut x : [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+        x.copy_from_slice(&self.data[..BLOCK_ID_LENGTH]);
+        u64::from_be_bytes(x)
+    }
+
+    fn get_mutation_id(&self) -> u32 {
+        let mut x : [u8; 4] = [0, 0, 0, 0];
+        x.copy_from_slice(&self.data[BLOCK_ID_LENGTH .. BLOCK_ID_LENGTH + MUTATION_ID_LENGTH]);
+        u32::from_be_bytes(x)
+    }
+    fn get_op_entry_ixd(&self) -> u32 {
+        let mut x : [u8; 4] = [0, 0, 0, 0];
+        x.copy_from_slice(&self.data[BLOCK_ID_LENGTH + MUTATION_ID_LENGTH..]);
+        u32::from_be_bytes(x)
+    }
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
         let buf: [u8; OP_ENTRY_ID_LENGTH] = data
             .try_into()
@@ -150,7 +167,7 @@ impl OpEntryId {
 impl fmt::Display for OpEntryId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Customize so only `x` and `y` are denoted.
-        write!(f, "{}", self.get_as_int())
+        write!(f, "{}-{}-{}", self.get_block_id(), self.get_mutation_id(), self.get_op_entry_ixd())
     }
 }
 impl AsRef<[u8]> for OpEntryId {
@@ -186,12 +203,12 @@ impl DocumentId {
 
     /// collection id = document_id[OP_ENTRY_ID_LENGTH..]
     pub fn get_collection_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
-        CollectionId::try_from_bytes(self.data[DOCUMENT_ID_LENGTH..DOCUMENT_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref())
+        CollectionId::try_from_bytes(self.data[TYPE_ID_LENGTH..TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref())
     }
 
     /// document entry id = document_id[OP_ENTRY_ID_LENGTH..]
     pub fn get_document_entry_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
-        DocumentEntryId::try_from_bytes(self.data[DOCUMENT_ID_LENGTH + OP_ENTRY_ID_LENGTH..].as_ref())
+        DocumentEntryId::try_from_bytes(self.data[TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH..].as_ref())
     }
 
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
@@ -213,7 +230,7 @@ impl fmt::Display for DocumentId {
         // Customize so only `x` and `y` are denoted.
         let collection_id = self.get_collection_id().map_err(|e| e).unwrap();
         let document_entry_id = self.get_document_entry_id().map_err(|e| e).unwrap();
-        write!(f, "{}|{}", collection_id, document_entry_id)
+        write!(f, "DOC|{}|{}", collection_id, document_entry_id)
     }
 }
 /// DocumentId := CollectionId + IndexFieldId + KeyBytes + DocumentEntryId
@@ -238,11 +255,23 @@ impl IndexId {
         Ok(Self { data })
     }
 
-    pub fn get_document_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
-        DocumentEntryId::try_from_bytes(self.data[self.data.len() - DOCUMENT_ID_LENGTH..].as_ref())
+    pub fn get_document_id(&self) -> std::result::Result<DocumentId, DB3Error> {
+        DocumentId::try_from_bytes(self.data[self.data.len() - DOCUMENT_ID_LENGTH..].as_ref())
     }
     pub fn get_collection_id(&self) -> std::result::Result<CollectionId, DB3Error> {
         CollectionId::try_from_bytes(self.data[TYPE_ID_LENGTH..TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref())
+    }
+    pub fn get_index_field_id(&self) -> u32 {
+        let mut x : [u8; 4] = [0, 0, 0, 0];
+        x.copy_from_slice(&self.data[TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH .. TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH + INDEX_FIELD_ID_LENGTH]);
+        u32::from_be_bytes(x)
+    }
+
+    pub fn get_key(&self) -> std::result::Result<&str, DB3Error> {
+        match std::str::from_utf8(&self.data[TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH + INDEX_FIELD_ID_LENGTH.. self.data.len() - DOCUMENT_ID_LENGTH]) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(DB3Error::InvalidIndexIdBytes(format!("{:?}", e)))
+        }
     }
 }
 impl AsRef<Vec<u8>> for IndexId {
@@ -255,7 +284,8 @@ impl fmt::Display for IndexId {
         // Customize so only `x` and `y` are denoted.
         let collection_id = self.get_collection_id().map_err(|e| e).unwrap();
         let document_id = self.get_document_id().map_err(|e| e).unwrap();
-        write!(f, "{}|.todo..|{}", collection_id, document_id)
+        let key = self.get_key().map_err(|e| e).unwrap();
+        write!(f, "INDEX|{}|{}|{}|{}", collection_id, self.get_index_field_id(), key, document_id)
     }
 }
 pub const DBID_LENGTH: usize = DB3_ADDRESS_LENGTH;
@@ -365,10 +395,40 @@ mod tests {
     }
     #[test]
     fn op_entry_create_ut() {
-        let doc_id = OpEntryId::create(1000000, 1000, 100);
+        let op_entry_id = OpEntryId::create(1000000, 1000, 100).unwrap();
         assert_eq!(
             vec![0, 0, 0, 0, 0, 15, 66, 64, 0, 0, 3, 232, 0, 0, 0, 100],
-            doc_id.unwrap().data.to_vec()
+            op_entry_id.data.to_vec()
         );
+        assert_eq!(1000000, op_entry_id.get_block_id());
+        assert_eq!(1000, op_entry_id.get_mutation_id());
+        assert_eq!(100, op_entry_id.get_op_entry_ixd());
+        assert_eq!("1000000-1000-100", op_entry_id.to_string())
+    }
+
+
+
+    #[test]
+    fn document_id_ut() {
+        let collection_id = CollectionId::create(1000, 100, 10).unwrap();
+        let document_entry_id = DocumentEntryId::create(999, 99, 9).unwrap();
+        let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
+        assert_eq!(collection_id, document_id.get_collection_id().unwrap());
+        assert_eq!(document_entry_id, document_id.get_document_entry_id().unwrap());
+        assert_eq!("DOC|1000-100-10|999-99-9", document_id.to_string());
+    }
+
+    #[test]
+    fn index_id_ut() {
+        let collection_id = CollectionId::create(1000, 100, 10).unwrap();
+        let document_entry_id = DocumentEntryId::create(999, 99, 9).unwrap();
+        let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
+
+        let index_id = IndexId::create(&collection_id, 3, "key_content", &document_id).unwrap();
+        assert_eq!(collection_id, index_id.get_collection_id().unwrap());
+        assert_eq!(document_id, index_id.get_document_id().unwrap());
+        assert_eq!(3, index_id.get_index_field_id());
+        assert_eq!("key_content", index_id.get_key().unwrap());
+        assert_eq!("INDEX|1000-100-10|3|key_content|DOC|1000-100-10|999-99-9", index_id.to_string());
     }
 }

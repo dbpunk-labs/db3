@@ -32,7 +32,7 @@ use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::ops::Range;
 use std::pin::Pin;
-use tracing::{debug, warn};
+use tracing::{debug, warn, info, span, Level};
 
 pub struct DbStore {}
 
@@ -224,6 +224,7 @@ impl DbStore {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
+        let span = span!(Level::INFO, "database").entered();
         match database {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
@@ -259,7 +260,7 @@ impl DbStore {
                                     .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
                                     .unwrap();
                             let document_vec = db3_document.into_bytes().to_vec();
-                            debug!("put document id {}", document_id);
+                            info!("put document id {}", document_id.to_string());
                             entries.push((document_id.as_ref().to_vec(), Op::Put(document_vec)));
 
                             // insert index key -> document_id
@@ -281,7 +282,7 @@ impl DbStore {
                                         .unwrap();
 
                                         // put indexId->documentId
-                                        debug!("put index id {}", document_id);
+                                        info!("put index id {}", index_id.to_string());
                                         entries.push((index_id.as_ref().to_vec(), Op::Put(vec![])));
                                     }
                                     Err(e) => {
@@ -308,6 +309,7 @@ impl DbStore {
                 )));
             }
         }
+        span.exit();
         Ok(())
     }
     //
