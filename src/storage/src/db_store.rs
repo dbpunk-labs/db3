@@ -23,8 +23,8 @@ use db3_crypto::{
 };
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::{Collection, Database};
-use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, DocumentMutation};
-use merkdb::proofs::{query::Query, Op as ProofOp, Node};
+use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
+use merkdb::proofs::{query::Query, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::HashMap;
@@ -324,12 +324,19 @@ impl DbStore {
     //
     // get documents
     //
-    fn get_documents_range(db: Pin<&mut Merk>, collection_id: &CollectionId) -> Result<LinkedList<ProofOp>> {
+    fn get_documents_range(
+        db: Pin<&mut Merk>,
+        collection_id: &CollectionId,
+    ) -> Result<LinkedList<ProofOp>> {
         //TODO use reference
-        let start_key =
-            DocumentId::create(collection_id, &DocumentEntryId::zero()).unwrap().as_ref().to_vec();
-        let end_key =
-            DocumentId::create(collection_id, &DocumentEntryId::one()).unwrap().as_ref().to_vec();
+        let start_key = DocumentId::create(collection_id, &DocumentEntryId::zero())
+            .unwrap()
+            .as_ref()
+            .to_vec();
+        let end_key = DocumentId::create(collection_id, &DocumentEntryId::one())
+            .unwrap()
+            .as_ref()
+            .to_vec();
         let mut query = Query::new();
         query.insert_range(std::ops::Range {
             start: start_key,
@@ -408,6 +415,7 @@ mod tests {
         Index,
     };
     use db3_proto::db3_mutation_proto::CollectionMutation;
+    use db3_proto::db3_mutation_proto::DocumentMutation;
     use std::boxed::Box;
     use tempdir::TempDir;
 
@@ -473,7 +481,6 @@ mod tests {
         dm
     }
 
-
     #[test]
     fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("db_store_test").expect("create temp dir");
@@ -495,8 +502,6 @@ mod tests {
         // get database test
         let dbId = DbId::try_from((&addr, 1)).unwrap();
         if let Ok(Some(res)) = DbStore::get_database(db.as_ref(), &dbId) {
-
-
             assert_eq!(1, res.collections.len());
             let collection = &res.collections[0];
             let collection_id = CollectionId::try_from_bytes(collection.id.as_slice()).unwrap();
@@ -535,7 +540,6 @@ mod tests {
             } else {
                 assert!(false);
             }
-
         } else {
             assert!(false);
         }

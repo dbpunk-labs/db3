@@ -101,9 +101,8 @@ pub const OP_ENTRY_INDEX_LENGTH: usize = 4;
 /// OpEntryId := BlockId + MutationId + OpEntryIdx
 pub const OP_ENTRY_ID_LENGTH: usize = 16;
 
-
-pub const DocumentIdTypeId : i8 = 1;
-pub const IndexIdTypeId : i8 = 2;
+pub const DocumentIdTypeId: i8 = 1;
+pub const IndexIdTypeId: i8 = 2;
 
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
 pub struct OpEntryId {
@@ -163,8 +162,6 @@ pub type DocumentEntryId = OpEntryId;
 
 pub type CollectionId = OpEntryId;
 
-
-
 /// DocumentId := CollectionId + DocumentId
 pub const DOCUMENT_ID_LENGTH: usize = TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH + OP_ENTRY_ID_LENGTH;
 #[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
@@ -186,12 +183,16 @@ impl DocumentId {
 
     /// collection id = document_id[OP_ENTRY_ID_LENGTH..]
     pub fn get_collection_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
-        CollectionId::try_from_bytes(self.data[DOCUMENT_ID_LENGTH..DOCUMENT_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref())
+        CollectionId::try_from_bytes(
+            self.data[DOCUMENT_ID_LENGTH..DOCUMENT_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref(),
+        )
     }
 
     /// document entry id = document_id[OP_ENTRY_ID_LENGTH..]
     pub fn get_document_entry_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
-        DocumentEntryId::try_from_bytes(self.data[DOCUMENT_ID_LENGTH + OP_ENTRY_ID_LENGTH..].as_ref())
+        DocumentEntryId::try_from_bytes(
+            self.data[DOCUMENT_ID_LENGTH + OP_ENTRY_ID_LENGTH..].as_ref(),
+        )
     }
 
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
@@ -242,7 +243,9 @@ impl IndexId {
         DocumentEntryId::try_from_bytes(self.data[self.data.len() - DOCUMENT_ID_LENGTH..].as_ref())
     }
     pub fn get_collection_id(&self) -> std::result::Result<CollectionId, DB3Error> {
-        CollectionId::try_from_bytes(self.data[TYPE_ID_LENGTH..TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref())
+        CollectionId::try_from_bytes(
+            self.data[TYPE_ID_LENGTH..TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref(),
+        )
     }
 }
 impl AsRef<Vec<u8>> for IndexId {
@@ -356,11 +359,11 @@ mod tests {
 
     #[test]
     fn tx_base64_encode_decode() {
-        let txId = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=");
-        assert!(txId.is_ok());
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=");
+        assert!(tx_id.is_ok());
         assert_eq!(
             "iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=",
-            txId.unwrap().to_base64()
+            tx_id.unwrap().to_base64()
         )
     }
     #[test]
