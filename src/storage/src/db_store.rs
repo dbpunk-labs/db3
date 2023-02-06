@@ -24,7 +24,7 @@ use db3_crypto::{
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::{Collection, Database};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, DocumentMutation};
-use merkdb::proofs::{query::Query, Op as ProofOp};
+use merkdb::proofs::{query::Query, Op as ProofOp, Node};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::HashMap;
@@ -321,6 +321,26 @@ impl DbStore {
             .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?;
         Ok(value)
     }
+    //
+    // get documents
+    //
+    fn get_documents_range(db: Pin<&mut Merk>, collection_id: &CollectionId) -> Result<LinkedList<ProofOp>> {
+        //TODO use reference
+        let start_key =
+            DocumentId::create(collection_id, &DocumentEntryId::zero()).unwrap().as_ref().to_vec();
+        let end_key =
+            DocumentId::create(collection_id, &DocumentEntryId::one()).unwrap().as_ref().to_vec();
+        let mut query = Query::new();
+        query.insert_range(std::ops::Range {
+            start: start_key,
+            end: end_key,
+        });
+
+        let ops = db
+            .execute_query(query)
+            .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
+        Ok(ops)
+    }
     pub fn apply_mutation(
         db: Pin<&mut Merk>,
         sender: &DB3Address,
@@ -453,6 +473,7 @@ mod tests {
         dm
     }
 
+
     #[test]
     fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("db_store_test").expect("create temp dir");
@@ -461,6 +482,8 @@ mod tests {
         let mut db = Box::pin(merk);
         let db_mutation = build_database_mutation(&addr);
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+
+        // create DB Test
         let result = DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, 1000, 1);
         assert!(result.is_ok());
         if let Ok(ops) = DbStore::get_databases(db.as_ref()) {
@@ -469,23 +492,24 @@ mod tests {
             assert!(false);
         }
 
+        // get database test
         let dbId = DbId::try_from((&addr, 1)).unwrap();
-
         if let Ok(Some(res)) = DbStore::get_database(db.as_ref(), &dbId) {
+
+
             assert_eq!(1, res.collections.len());
             let collection = &res.collections[0];
-
-            let db_mutation = build_document_mutation(dbId.address(), collection.name.as_str());
             let collection_id = CollectionId::try_from_bytes(collection.id.as_slice()).unwrap();
-            let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+            let db_mutation = build_document_mutation(dbId.address(), collection.name.as_str());
 
+            // add document test
+            let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
             let res = DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 2);
             assert!(res.is_ok());
 
+            // get document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            // let collection_id = CollectionId::create(1000, 1, 0).unwrap();
             let document_entry_id = DocumentEntryId::create(1000, 2, 0).unwrap();
-
             let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
             let res = DbStore::get_document(db_m, &document_id);
             if let Ok(Some(document_vec)) = res {
@@ -495,6 +519,23 @@ mod tests {
             } else {
                 assert!(false);
             }
+
+            // insert 2nd document
+
+            // add document test
+            let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+            let db_mutation = build_document_mutation(dbId.address(), collection.name.as_str());
+            let res = DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 3);
+            assert!(res.is_ok());
+
+            // show documents
+            let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+            if let Ok(ops) = DbStore::get_documents_range(db_m, &collection_id) {
+                assert_eq!(2, ops.len());
+            } else {
+                assert!(false);
+            }
+
         } else {
             assert!(false);
         }
