@@ -33,8 +33,9 @@ message Database {
 }
 
 message Collection {
-    string name = 1;
-    repeated Index index_list = 2;
+    bytes id = 1;
+    string name = 2;
+    repeated Index index_list = 3;
 }
 
 message Index {
@@ -115,6 +116,8 @@ message Index {
   // `projects/{project_id}/databases/{database_id}/collectionGroups/{collection_id}/indexes/{composite_index_id}`
   // For single field indexes, this field will be empty.
   string name = 1;
+  // Id of the index filed in the collection
+  uint32 id = 2;
 
   // The fields supported by this index.
   //
@@ -127,5 +130,5 @@ message Index {
   //
   // For single field indexes, this will always be exactly one entry with a
   // field path equal to the field path of the associated field.
-  repeated IndexField fields = 2;
+  repeated IndexField fields = 3;
 }

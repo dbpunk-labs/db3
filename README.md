@@ -18,9 +18,10 @@
 
 **English | [中文](./README_zh_cn.md)**
 
-## What's DB3 Network?
+## DB3 Network
 
-DB3 Network is an open-source, decentralized firebase firestore alternative to build dApps quickly with minimal engineering effort.
+DB3 Network is an open-source and decentralized firebase firestore alternative for building fully decentralized dApps quickly with  minimal engineering effort.
+
 
 
 <p align="center">
@@ -113,7 +114,14 @@ db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
 -------+----------------------------------------------------------------------------
  books | {"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}
 ```
- * [ ] create a document
+ * [x] Create a document
+
+```
+db3>-$ new-doc --addr 0x997f631fcafeed5ee319c83683ae16e64783602b --collection-name books --documents '{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}'
+send add document done with tx
++O9cK2cHLexZQvIITk4OTm8SxBhq7Yz7g+xZYiionWo=
+```
+
  * [ ] get a document
  * [ ] list documents
  * [ ] query documents by index

@@ -18,10 +18,13 @@
 use clap::*;
 
 use crate::keystore::KeyStore;
+use db3_crypto::db3_document::DB3Document;
 use db3_crypto::id::{AccountId, DbId, TxId};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::{Database, Index};
-use db3_proto::db3_mutation_proto::{CollectionMutation, DatabaseAction, DatabaseMutation};
+use db3_proto::db3_mutation_proto::{
+    CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMutation,
+};
 use db3_sdk::{mutation_sdk::MutationSDK, store_sdk::StoreSDK};
 use prettytable::{format, Table};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -69,6 +72,19 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         addr: String,
     },
+    /// Create a document
+    #[clap(name = "new-doc")]
+    NewDocument {
+        /// the address of database
+        #[clap(long)]
+        addr: String,
+        /// the name of collection
+        #[clap(long)]
+        collection_name: String,
+        /// the content of document
+        #[clap(long)]
+        documents: Vec<String>,
+    },
 }
 
 impl DB3ClientCommand {
@@ -101,7 +117,7 @@ impl DB3ClientCommand {
         table.set_titles(row![
             "database address",
             "sender address",
-            "releated transactions",
+            "related transactions",
             "collections"
         ]);
         let tx_list: String = database
@@ -154,7 +170,7 @@ impl DB3ClientCommand {
                     .collect();
                 let collection = CollectionMutation {
                     index: index_vec.to_owned(),
-                    collection_id: name.to_string(),
+                    collection_name: name.to_string(),
                 };
                 //TODO check database id and collection name
                 let db_id = DbId::try_from(addr.as_str()).unwrap();
@@ -171,6 +187,7 @@ impl DB3ClientCommand {
                     collection_mutations: vec![collection],
                     db_address: db_id.as_ref().to_vec(),
                     action: DatabaseAction::AddCollection.into(),
+                    document_mutations: vec![],
                 };
                 if let Ok((_, tx_id)) = ctx
                     .mutation_sdk
@@ -238,6 +255,7 @@ impl DB3ClientCommand {
                     collection_mutations: vec![],
                     db_address: vec![],
                     action: DatabaseAction::CreateDb.into(),
+                    document_mutations: vec![],
                 };
                 if let Ok((db_id, tx_id)) = ctx
                     .mutation_sdk
@@ -253,6 +271,49 @@ impl DB3ClientCommand {
                     table.printstd();
                 } else {
                     println!("fail to create database");
+                }
+            }
+            DB3ClientCommand::NewDocument {
+                addr,
+                collection_name,
+                documents,
+            } => {
+                //TODO validate the index existing in the document
+                //TODO check database id and collection name
+                let db_id = DbId::try_from(addr.as_str()).unwrap();
+                let meta = BroadcastMeta {
+                    //TODO get from network
+                    nonce: Self::current_seconds(),
+                    //TODO use config
+                    chain_id: ChainId::DevNet.into(),
+                    //TODO use config
+                    chain_role: ChainRole::StorageShardChain.into(),
+                };
+                let db3_documents = documents
+                    .iter()
+                    .map(|x| DB3Document::try_from(x.as_str()).unwrap().into_bytes())
+                    .collect();
+                let document_mut = DocumentMutation {
+                    collection_name,
+                    document: db3_documents,
+                };
+                let dm = DatabaseMutation {
+                    meta: Some(meta),
+                    action: DatabaseAction::AddDocument.into(),
+                    db_address: db_id.as_ref().to_vec(),
+                    document_mutations: vec![document_mut],
+                    collection_mutations: vec![],
+                };
+                if let Ok((_, tx_id)) = ctx
+                    .mutation_sdk
+                    .as_ref()
+                    .unwrap()
+                    .submit_database_mutation(&dm)
+                    .await
+                {
+                    println!("send add document done with tx\n{}", tx_id.to_base64());
+                } else {
+                    println!("fail to add document");
                 }
             }
         }
