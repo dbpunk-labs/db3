@@ -43,10 +43,10 @@ message DatabaseMutation {
 
 message CollectionMutation {
     repeated db3_database_proto.Index index = 1;
-    string collection_id = 2;
+    string collection_name = 2;
 }
 message DocumentMutation {
-    string collection_id = 1;
+    string collection_name = 1;
     repeated bytes document = 2;
 }
 message KVPair {

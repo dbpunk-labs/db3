@@ -22,6 +22,8 @@ use db3_error::DB3Error;
 use fastcrypto::hash::{HashFunction, Sha3_256};
 use rust_secp256k1::hashes::{sha256, Hash};
 use rust_secp256k1::ThirtyTwoByteHash;
+use std::{fmt, mem};
+
 // it's ethereum compatiable account id
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct AccountId {
@@ -92,42 +94,153 @@ impl AsRef<[u8]> for TxId {
         &self.data[..]
     }
 }
-pub const DOCUMENT_ID_LENGTH: usize = 16;
+pub const BLOCK_ID_LENGTH: usize = 8;
+pub const MUTATION_ID_LENGTH: usize = 4;
+pub const OP_ENTRY_INDEX_LENGTH: usize = 4;
+/// OpEntryId := BlockId + MutationId + OpEntryIdx
+pub const OP_ENTRY_ID_LENGTH: usize = 16;
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
-pub struct DocumentId {
-    data: [u8; DOCUMENT_ID_LENGTH],
+pub struct OpEntryId {
+    data: [u8; OP_ENTRY_ID_LENGTH],
 }
-impl DocumentId {
+impl OpEntryId {
     pub fn create(
         block_id: u64,
         mutation_id: u32,
-        index: u32,
+        op_entry_idx: u32,
     ) -> std::result::Result<Self, DB3Error> {
-        let mut bytes: Vec<u8> = Vec::with_capacity(DOCUMENT_ID_LENGTH);
+        let mut bytes: Vec<u8> = Vec::with_capacity(OP_ENTRY_ID_LENGTH);
         bytes.extend(block_id.to_be_bytes());
         bytes.extend(mutation_id.to_be_bytes());
-        bytes.extend(index.to_be_bytes());
+        bytes.extend(op_entry_idx.to_be_bytes());
         Self::try_from_bytes(bytes.as_slice())
     }
+
+    fn get_as_int(&self) -> u128 {
+        unsafe { mem::transmute::<[u8; 16], u128>(self.data) }
+    }
+
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
-        let buf: [u8; DOCUMENT_ID_LENGTH] = data
+        let buf: [u8; OP_ENTRY_ID_LENGTH] = data
+            .try_into()
+            .map_err(|_| DB3Error::InvalidOpEntryIdBytes)?;
+        Ok(Self { data: buf })
+    }
+}
+
+/// Diplay OpEntryId = BlockId-MutationId-OpEntryId
+impl fmt::Display for OpEntryId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Customize so only `x` and `y` are denoted.
+        write!(f, "{}", self.get_as_int())
+    }
+}
+impl AsRef<[u8]> for OpEntryId {
+    fn as_ref(&self) -> &[u8] {
+        &self.data[..]
+    }
+}
+
+pub type DocumentEntryId = OpEntryId;
+
+pub type CollectionId = OpEntryId;
+
+/// DocumentId := CollectionId + DocumentId
+pub const DOCUMENT_ID_LENGHT: usize = 32;
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
+pub struct DocumentId {
+    data: [u8; DOCUMENT_ID_LENGHT],
+}
+
+impl DocumentId {
+    pub fn create(
+        collection_id: &CollectionId,
+        document_entry_id: &DocumentEntryId,
+    ) -> std::result::Result<Self, DB3Error> {
+        let mut bytes: Vec<u8> = Vec::with_capacity(DOCUMENT_ID_LENGHT);
+        bytes.extend(collection_id.as_ref());
+        bytes.extend(document_entry_id.as_ref());
+        Self::try_from_bytes(bytes.as_slice())
+    }
+
+    /// collection id = document_id[OP_ENTRY_ID_LENGTH..]
+    pub fn get_collection_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
+        CollectionId::try_from_bytes(self.data[0..OP_ENTRY_ID_LENGTH].as_ref())
+    }
+
+    /// document entry id = document_id[OP_ENTRY_ID_LENGTH..]
+    pub fn get_document_entry_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
+        DocumentEntryId::try_from_bytes(self.data[OP_ENTRY_ID_LENGTH..].as_ref())
+    }
+
+    pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
+        let buf: [u8; DOCUMENT_ID_LENGHT] = data
             .try_into()
             .map_err(|_| DB3Error::InvalidDocumentIdBytes)?;
         Ok(Self { data: buf })
     }
 }
+
 impl AsRef<[u8]> for DocumentId {
     fn as_ref(&self) -> &[u8] {
         &self.data[..]
     }
 }
-pub const DBID_LENGTH: usize = DB3_ADDRESS_LENGTH;
 
+impl fmt::Display for DocumentId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Customize so only `x` and `y` are denoted.
+        let collection_id = self.get_collection_id().map_err(|e| e).unwrap();
+        let document_entry_id = self.get_document_entry_id().map_err(|e| e).unwrap();
+        write!(f, "{}|{}", collection_id, document_entry_id)
+    }
+}
+/// DocumentId := CollectionId + IndexFieldId + KeyBytes + DocumentEntryId
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Clone, Debug)]
+pub struct IndexId {
+    data: Vec<u8>,
+}
+
+impl IndexId {
+    pub fn create(
+        collection_id: &CollectionId,
+        index_field_id: u32,
+        key: &str,
+        document_id: &DocumentId,
+    ) -> std::result::Result<Self, DB3Error> {
+        let mut data: Vec<u8> = Vec::new();
+        data.extend(collection_id.as_ref());
+        data.extend(index_field_id.to_be_bytes());
+        data.extend(key.as_bytes());
+        data.extend(document_id.as_ref());
+        Ok(Self { data })
+    }
+
+    pub fn get_document_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
+        DocumentEntryId::try_from_bytes(self.data[self.data.len() - DOCUMENT_ID_LENGHT..].as_ref())
+    }
+    pub fn get_collection_id(&self) -> std::result::Result<CollectionId, DB3Error> {
+        CollectionId::try_from_bytes(self.data[0..OP_ENTRY_ID_LENGTH].as_ref())
+    }
+}
+impl AsRef<Vec<u8>> for IndexId {
+    fn as_ref(&self) -> &Vec<u8> {
+        &self.data
+    }
+}
+impl fmt::Display for IndexId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Customize so only `x` and `y` are denoted.
+        let collection_id = self.get_collection_id().map_err(|e| e).unwrap();
+        let document_id = self.get_document_id().map_err(|e| e).unwrap();
+        write!(f, "{}|.todo..|{}", collection_id, document_id)
+    }
+}
+pub const DBID_LENGTH: usize = DB3_ADDRESS_LENGTH;
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct DbId {
     addr: DB3Address,
 }
-
 impl DbId {
     #[inline]
     pub fn length() -> usize {
@@ -229,8 +342,8 @@ mod tests {
         )
     }
     #[test]
-    fn create_ut() {
-        let doc_id = DocumentId::create(1000000, 1000, 100);
+    fn op_entry_create_ut() {
+        let doc_id = OpEntryId::create(1000000, 1000, 100);
         assert_eq!(
             vec![0, 0, 0, 0, 0, 15, 66, 64, 0, 0, 3, 232, 0, 0, 0, 100],
             doc_id.unwrap().data.to_vec()

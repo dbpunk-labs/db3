@@ -2,7 +2,7 @@ use crate::db3_address::DB3Address;
 use crate::id::{AccountId, DocumentId, TxId};
 use bson::spec::BinarySubtype;
 use bson::Document;
-use bson::{Binary, Bson, RawDocumentBuf};
+use bson::{Array, Binary, Bson, RawDocumentBuf};
 use db3_error::DB3Error;
 use serde_json::Value;
 
@@ -90,6 +90,41 @@ impl DB3Document {
             Err(err) => Err(DB3Error::DocumentDecodeError(format!("{:?}", err))),
         }
     }
+
+    pub fn get_keys(
+        &self,
+        index: &db3_proto::db3_database_proto::Index,
+    ) -> std::result::Result<Bson, DB3Error> {
+        let keys: Vec<_> = index.fields.iter().map(|f| f.field_path.as_str()).collect();
+        match keys.len() {
+            0 => Err(DB3Error::DocumentDecodeError(format!(
+                "fail to get empty keys"
+            ))),
+            1 => self.get_single_key(keys[0]),
+            _ => self.get_multiple_keys(keys),
+        }
+    }
+    fn get_single_key(&self, key: &str) -> std::result::Result<Bson, DB3Error> {
+        match self.doc.get(key) {
+            Some(value) => Ok(value.clone()),
+            None => Err(DB3Error::DocumentDecodeError(format!(
+                "key {} not exist in document",
+                key
+            ))),
+        }
+    }
+    fn get_multiple_keys(&self, keys: Vec<&str>) -> std::result::Result<Bson, DB3Error> {
+        let mut array_bson: Vec<_> = Vec::new();
+        for key in keys.iter() {
+            match self.get_single_key(key) {
+                Ok(v) => {
+                    array_bson.push(v);
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(Bson::Array(array_bson))
+    }
 }
 impl AsRef<Document> for DB3Document {
     fn as_ref(&self) -> &Document {
@@ -127,6 +162,19 @@ impl TryFrom<Vec<u8>> for DB3Document {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id::{CollectionId, DocumentEntryId};
+    use bson::spec::ElementType;
+    use db3_proto::db3_database_proto::{
+        index::index_field::{Order, ValueMode},
+        index::IndexField,
+        Index,
+    };
+
+    fn mock_document_id() -> DocumentId {
+        let collection_id = CollectionId::create(99999, 999, 99).unwrap();
+        let document_entry_id = DocumentEntryId::create(100000, 1000, 100).unwrap();
+        DocumentId::create(&collection_id, &document_entry_id).unwrap()
+    }
     #[test]
     fn try_from_json_str_ut() {
         let data = r#"
@@ -161,6 +209,7 @@ mod tests {
             b"\x13\x00\x00\x00\x02hi\x00\x06\x00\x00\x00y'all\x00\x00"
         )
     }
+
     #[test]
     fn add_doc_id() {
         let data = r#"
@@ -172,7 +221,8 @@ mod tests {
                 "+44 2345678"
             ]
         }"#;
-        let document_id = DocumentId::create(100000, 1000, 100).unwrap();
+
+        let document_id = mock_document_id();
         let mut document = DB3Document::try_from(data).unwrap();
         document.add_document_id(&document_id);
         assert_eq!(document_id, document.get_document_id().unwrap());
@@ -238,7 +288,7 @@ mod tests {
         }"#;
         let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
         let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
-        let document_id = DocumentId::create(100000, 1000, 100).unwrap();
+        let document_id = mock_document_id();
         let document = DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr);
         assert_eq!(
             "0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b",
@@ -258,7 +308,7 @@ mod tests {
 
         let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
         let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
-        let document_id = DocumentId::create(100000, 1000, 100).unwrap();
+        let document_id = mock_document_id();
         let document = DB3Document::new(document, &document_id, &tx_id, &addr).unwrap();
         assert_eq!(
             "0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b",
@@ -271,5 +321,146 @@ mod tests {
             document.get_tx_id().unwrap().to_base64()
         );
         assert_eq!(document_id, document.get_document_id().unwrap());
+    }
+
+    #[test]
+    fn get_single_keys_ut_happy_path() {
+        let data = r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#;
+        let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        let document_id = mock_document_id();
+        let document = DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr);
+        let index_field = IndexField {
+            field_path: "name".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![index_field],
+        };
+        if let Ok(keys) = document.get_keys(&index) {
+            assert_eq!(keys.element_type(), ElementType::String);
+            assert_eq!("John Doe", keys.as_str().unwrap())
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn get_single_keys_ut_wrong_path() {
+        let data = r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#;
+        let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+
+        let document_id = mock_document_id();
+        let document = DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr);
+        let index_field = IndexField {
+            field_path: "key_not_exist".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![index_field],
+        };
+        let res = document.get_keys(&index);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn get_multi_keys_ut_happy_path() {
+        let data = r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#;
+        let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        let document_id = mock_document_id();
+        let document = DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr);
+        let index = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![
+                IndexField {
+                    field_path: "name".to_string(),
+                    value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+                },
+                IndexField {
+                    field_path: "age".to_string(),
+                    value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+                },
+            ],
+        };
+        if let Ok(keys) = document.get_keys(&index) {
+            assert_eq!(keys.element_type(), ElementType::Array);
+            println!("keys {}", keys);
+            // println!("keys {}", );
+            assert_eq!("John Doe", keys.as_array().unwrap()[0].as_str().unwrap());
+            assert_eq!(43, keys.as_array().unwrap()[1].as_i64().unwrap());
+        } else {
+            assert!(false);
+        }
+    }
+    #[test]
+    fn get_multi_keys_ut_wrong_path() {
+        let data = r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#;
+        let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        let document_id = mock_document_id();
+        let document = DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr);
+        let index_has_key_not_exist = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![
+                IndexField {
+                    field_path: "name_not_exit".to_string(),
+                    value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+                },
+                IndexField {
+                    field_path: "age".to_string(),
+                    value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+                },
+            ],
+        };
+        assert!(document.get_keys(&index_has_key_not_exist).is_err());
+
+        let index_empty_keys = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![],
+        };
+        assert!(document.get_keys(&index_empty_keys).is_err());
     }
 }

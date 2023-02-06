@@ -80,7 +80,7 @@ pub enum DB3ClientCommand {
         addr: String,
         /// the name of collection
         #[clap(long)]
-        collection_id: String,
+        collection_name: String,
         /// the content of document
         #[clap(long)]
         documents: Vec<String>,
@@ -170,7 +170,7 @@ impl DB3ClientCommand {
                     .collect();
                 let collection = CollectionMutation {
                     index: index_vec.to_owned(),
-                    collection_id: name.to_string(),
+                    collection_name: name.to_string(),
                 };
                 //TODO check database id and collection name
                 let db_id = DbId::try_from(addr.as_str()).unwrap();
@@ -275,7 +275,7 @@ impl DB3ClientCommand {
             }
             DB3ClientCommand::NewDocument {
                 addr,
-                collection_id,
+                collection_name,
                 documents,
             } => {
                 //TODO validate the index existing in the document
@@ -294,7 +294,7 @@ impl DB3ClientCommand {
                     .map(|x| DB3Document::try_from(x.as_str()).unwrap().into_bytes())
                     .collect();
                 let document_mut = DocumentMutation {
-                    collection_id,
+                    collection_name,
                     document: db3_documents,
                 };
                 let dm = DatabaseMutation {
