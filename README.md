@@ -66,7 +66,7 @@ DB3 Network is a layer2 network on Ethereum and Ethereum guards all the assets.
 
 # Getting Started
 
-### Start A Local Testnet
+### Build
 
 ```shell
 git clone https://github.com/dbpunk-labs/db3.git

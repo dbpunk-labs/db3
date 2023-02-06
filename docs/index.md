@@ -12,19 +12,10 @@ DB3 Network is an open-source and decentralized firebase firestore alternative t
 
 ### Install
 
-
-=== "Mac"
-    ```
-    wget https://github.com/dbpunk-labs/db3/releases/download/v0.2.6/db3-v0.2.6-macos-x86_64.tar.gz
-    tar -zxvf db3-v0.2.6-macos-x86_64.tar.gz
-    cd db3-v0.2.6-macos-x86_64 && export PATH=`pwd`/bin:$PATH
-    ```
-=== "Ubuntu"
-    ```
-    wget https://github.com/dbpunk-labs/db3/releases/download/v0.2.6/db3-v0.2.6-linux-x86_64.tar.gz
-    tar -zxvf db3-v0.2.6-linux-x86_64.tar.gz
-    cd db3-v0.2.6-linux-x86_64 && export PATH=`pwd`/bin:&PATH
-    ```
+```
+wget https://github.com/dbpunk-labs/db3/raw/main/tools/start_localnet.sh
+bash install_db3.sh
+```
 
 ### Create a key
 
