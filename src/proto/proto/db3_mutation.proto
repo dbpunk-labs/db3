@@ -30,20 +30,25 @@ enum MutationAction {
 enum DatabaseAction {
     CreateDB = 0;
     AddCollection = 1;
+    AddDocument = 2;
 }
 
 message DatabaseMutation {
     db3_base_proto.BroadcastMeta meta = 1;
-    repeated CollectionMutation collection_mutations = 2;
+    DatabaseAction action = 2;
     bytes db_address = 3;
-    DatabaseAction action = 4;
+    repeated CollectionMutation collection_mutations = 4;
+    repeated DocumentMutation document_mutations = 5;
 }
 
 message CollectionMutation {
     repeated db3_database_proto.Index index = 1;
-    string collection_id = 2;
+    string collection_name = 2;
 }
-
+message DocumentMutation {
+    string collection_name = 1;
+    repeated bytes document = 2;
+}
 message KVPair {
     // the key of value
     bytes key = 1;
