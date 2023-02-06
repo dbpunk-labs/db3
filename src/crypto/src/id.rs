@@ -377,9 +377,11 @@ mod tests {
     #[test]
     fn test_ts_db_id_smoke() {
         let sender = DB3Address::try_from("0xed17b3f435c03ff69c2cdc6d394932e68375f20f").unwrap();
-        let nonce:u64 = 10;
+        let nonce: u64 = 10;
         let db_id = DbId::try_from((&sender, nonce)).unwrap();
-        assert_eq!(db_id.to_hex().as_str(), "0xd74360cca976522a8b66c7cbd4f674fef9eeef97");
+        assert_eq!(
+            db_id.to_hex().as_str(),
+            "0xd74360cca976522a8b66c7cbd4f674fef9eeef97"
+        );
     }
-
 }
