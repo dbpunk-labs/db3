@@ -18,10 +18,11 @@
 use clap::*;
 
 use crate::keystore::KeyStore;
+use db3_base::bson_util;
 use db3_crypto::db3_document::DB3Document;
-use db3_crypto::id::{AccountId, DbId, TxId};
+use db3_crypto::id::{AccountId, DbId, DocumentId, TxId};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
-use db3_proto::db3_database_proto::{Database, Index};
+use db3_proto::db3_database_proto::{Database, Document, Index};
 use db3_proto::db3_mutation_proto::{
     CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMutation,
 };
@@ -106,15 +107,18 @@ impl DB3ClientCommand {
         }
     }
 
-    fn show_document(documents: Vec<Vec<u8>>) {
+    fn show_document(documents: Vec<Document>) {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row!["id_base64", "document",]);
         let mut error_cnt = 0;
         for document in documents {
-            if let Ok(db3_document) = DB3Document::try_from(document) {
-                if let Ok(id) = db3_document.get_document_id() {
-                    table.add_row(row![id.to_base64(), format!("{:?}", db3_document)]);
+            if let Ok(id) = DocumentId::try_from_bytes(document.id.as_slice()) {
+                if let Ok(doc) = bson_util::bytes_to_bson_document(document.doc) {
+                    table.add_row(row![
+                        id.to_base64(),
+                        format!("{:?}", doc.get_document("_doc").unwrap())
+                    ]);
                 } else {
                     error_cnt += 1;
                 }
@@ -343,13 +347,13 @@ impl DB3ClientCommand {
                     //TODO use config
                     chain_role: ChainRole::StorageShardChain.into(),
                 };
-                let db3_documents = documents
+                let bson_documents = documents
                     .iter()
-                    .map(|x| DB3Document::try_from(x.as_str()).unwrap().into_bytes())
+                    .map(|x| bson_util::json_str_to_bson_bytes(x.as_str()).unwrap())
                     .collect();
                 let document_mut = DocumentMutation {
                     collection_name,
-                    document: db3_documents,
+                    document: bson_documents,
                 };
                 let dm = DatabaseMutation {
                     meta: Some(meta),

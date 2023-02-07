@@ -151,7 +151,7 @@ message ListDocumentsRequest {
 }
 
 message ListDocumentsResponse {
-    repeated bytes documents = 1;
+    repeated db3_database_proto.Document documents = 2;
     // TODO: support next_page_token for page loading
 }
 

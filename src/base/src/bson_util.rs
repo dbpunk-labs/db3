@@ -13,6 +13,13 @@ pub fn json_str_to_bson_document(json_str: &str) -> std::result::Result<Document
     Ok(bson_document)
 }
 
+pub fn json_str_to_bson_bytes(json_str: &str) -> std::result::Result<Vec<u8>, String> {
+    match json_str_to_bson_document(json_str) {
+        Ok(doc) => Ok(bson_document_into_bytes(&doc)),
+        Err(err) => Err(err),
+    }
+}
+
 /// convert bytes to Bson::Document
 pub fn bytes_to_bson_document(buf: Vec<u8>) -> std::result::Result<Document, String> {
     let doc = RawDocumentBuf::from_bytes(buf)
@@ -31,7 +38,8 @@ pub fn bson_document_into_bytes(doc: &Document) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::bson_util::{
-        bson_document_into_bytes, bytes_to_bson_document, json_str_to_bson_document,
+        bson_document_into_bytes, bytes_to_bson_document, json_str_to_bson_bytes,
+        json_str_to_bson_document,
     };
 
     #[test]
