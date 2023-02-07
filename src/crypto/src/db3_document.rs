@@ -3,9 +3,9 @@ use crate::id::{AccountId, DocumentId, TxId};
 use bson::spec::BinarySubtype;
 use bson::Document;
 use bson::{Array, Binary, Bson, RawDocumentBuf};
+use db3_base::bson_util;
 use db3_error::DB3Error;
 use serde_json::Value;
-
 #[derive(Debug)]
 pub struct DB3Document {
     doc: Document,
@@ -40,8 +40,7 @@ impl DB3Document {
         db3_document
     }
     pub fn into_bytes(&self) -> Vec<u8> {
-        let row_doc = RawDocumentBuf::from_document(&self.doc).unwrap();
-        row_doc.into_bytes()
+        bson_util::bson_document_into_bytes(&self.doc)
     }
     fn add_document_id(&mut self, doc_id: &DocumentId) {
         self.doc.insert(
@@ -134,29 +133,22 @@ impl AsRef<Document> for DB3Document {
 impl TryFrom<&str> for DB3Document {
     type Error = DB3Error;
     fn try_from(json_str: &str) -> std::result::Result<Self, DB3Error> {
-        // Parse the string of data into serde_json::Value.
-        let value: Value = serde_json::from_str(json_str)
-            .map_err(|e| DB3Error::DocumentDecodeError(format!("{}", e)))
-            .unwrap();
-        let bson_value = bson::to_document(&value)
-            .map_err(|e| DB3Error::DocumentDecodeError(format!("{}", e)))
-            .unwrap();
-        Ok(Self { doc: bson_value })
+        Ok(Self {
+            doc: bson_util::json_str_to_bson_document(json_str)
+                .map_err(|e| DB3Error::DocumentDecodeError(format!("{}", e)))
+                .unwrap(),
+        })
     }
 }
 
 impl TryFrom<Vec<u8>> for DB3Document {
     type Error = DB3Error;
     fn try_from(buf: Vec<u8>) -> std::result::Result<Self, DB3Error> {
-        // Parse the string of data into serde_json::Value.
-        let doc = RawDocumentBuf::from_bytes(buf)
-            .map_err(|e| DB3Error::DocumentDecodeError(format!("{}", e)))
-            .unwrap();
-        let bson_value = doc
-            .to_document()
-            .map_err(|e| DB3Error::DocumentDecodeError(format!("{}", e)))
-            .unwrap();
-        Ok(Self { doc: bson_value })
+        Ok(Self {
+            doc: bson_util::bytes_to_bson_document(buf)
+                .map_err(|e| DB3Error::DocumentDecodeError(format!("{}", e)))
+                .unwrap(),
+        })
     }
 }
 #[cfg(test)]
