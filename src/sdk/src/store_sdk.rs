@@ -17,15 +17,16 @@
 
 use bytes::BytesMut;
 use chrono::Utc;
+use db3_crypto::db3_document::DB3Document;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_database_proto::Database;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
-    GetAccountRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest, OpenSessionRequest,
-    OpenSessionResponse, QueryBillKey, QueryBillRequest, Range as DB3Range, RangeKey, RangeValue,
-    SessionIdentifier, ShowDatabaseRequest,
+    GetAccountRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest, ListDocumentsRequest,
+    ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
+    Range as DB3Range, RangeKey, RangeValue, SessionIdentifier, ShowDatabaseRequest,
 };
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
@@ -73,6 +74,37 @@ impl StoreSDK {
         } else {
             let response = self.open_session().await?;
             Ok(response.session_token)
+        }
+    }
+
+    pub async fn list_documents(
+        &mut self,
+        addr: &str,
+        collection_name: &str,
+    ) -> std::result::Result<ListDocumentsResponse, Status> {
+        let token = self.keep_session().await?;
+        match self.session_pool.get_session_mut(token.as_ref()) {
+            Some(session) => {
+                if session.check_session_running() {
+                    let r = ListDocumentsRequest {
+                        session_token: token.to_string(),
+                        address: addr.to_string(),
+                        collection_name: collection_name.to_string(),
+                    };
+                    let request = tonic::Request::new(r);
+                    let mut client = self.client.as_ref().clone();
+                    let response = client.list_documents(request).await?.into_inner();
+                    session.increase_query(1);
+                    Ok(response)
+                } else {
+                    Err(Status::permission_denied(
+                        "Fail to query in this session. Please restart query session",
+                    ))
+                }
+            }
+            None => Err(Status::not_found(format!(
+                "Fail to query, session with token {token} not found"
+            ))),
         }
     }
 

@@ -18,16 +18,16 @@
 use super::context::Context;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
-use db3_crypto::{db3_verifier::DB3Verifier, id::DbId};
+use db3_crypto::{db3_verifier::DB3Verifier, id::CollectionId, id::DbId};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
     CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse, GetRangeRequest,
-    GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse, OpenSessionRequest,
-    OpenSessionResponse, QueryBillRequest, QueryBillResponse, ShowDatabaseRequest,
-    ShowDatabaseResponse,
+    GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse, ListDocumentsRequest,
+    ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse, QueryBillRequest,
+    QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
@@ -99,6 +99,69 @@ impl StorageNode for StorageNodeImpl {
         }
     }
 
+    async fn list_documents(
+        &self,
+        request: Request<ListDocumentsRequest>,
+    ) -> std::result::Result<Response<ListDocumentsResponse>, Status> {
+        let list_documents_req = request.into_inner();
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                // get database id
+                let address_ref: &str = list_documents_req.address.as_ref();
+                let db_id = DbId::try_from(address_ref)
+                    .map_err(|e| Status::internal(format!("invalid database address {e}")))?;
+                // validate the session id
+                match node_store
+                    .get_session_store()
+                    .get_session_mut(&list_documents_req.session_token)
+                {
+                    Some(session) => {
+                        if !session.check_session_running() {
+                            return Err(Status::permission_denied(
+                                "Fail to query in this session. Please restart query session",
+                            ));
+                        }
+                    }
+                    None => return Err(Status::internal("Fail to create session")),
+                }
+                if let Some(db) = node_store
+                    .get_auth_store()
+                    .get_database(&db_id)
+                    .map_err(|e| Status::internal(format!("{:?}", e)))?
+                {
+                    match db.collections.get(&list_documents_req.collection_name) {
+                        Some(collection) => {
+                            let collection_id =
+                                CollectionId::try_from_bytes(collection.id.as_slice())
+                                    .map_err(|e| Status::internal(format!("{:?}", e)))
+                                    .unwrap();
+                            let documents = node_store
+                                .get_auth_store()
+                                .get_documents(&collection_id)
+                                .map_err(|e| Status::internal(format!("{:?}", e)))
+                                .unwrap();
+                            node_store
+                                .get_session_store()
+                                .get_session_mut(&list_documents_req.session_token)
+                                .unwrap()
+                                .increase_query(1);
+                            Ok(Response::new(ListDocumentsResponse { documents }))
+                        }
+                        None => Err(Status::internal(format!(
+                            "Fail to get collection {} under database {}",
+                            list_documents_req.collection_name, address_ref
+                        ))),
+                    }
+                } else {
+                    Err(Status::internal(format!(
+                        "Fail to get database {}",
+                        address_ref
+                    )))
+                }
+            }
+            Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
+        }
+    }
     async fn get_range(
         &self,
         request: Request<GetRangeRequest>,

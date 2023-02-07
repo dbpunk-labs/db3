@@ -154,6 +154,14 @@ impl OpEntryId {
         x.copy_from_slice(&self.data[BLOCK_ID_LENGTH + MUTATION_ID_LENGTH..]);
         u32::from_be_bytes(x)
     }
+
+    pub fn to_base64(&self) -> String {
+        base64ct::Base64::encode_string(self.as_ref())
+    }
+    pub fn try_from_base64(input: &str) -> std::result::Result<Self, DB3Error> {
+        Self::try_from_bytes(base64ct::Base64::decode_vec(input).unwrap().as_slice())
+    }
+
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
         let buf: [u8; OP_ENTRY_ID_LENGTH] = data
             .try_into()
@@ -221,6 +229,13 @@ impl DocumentId {
             .try_into()
             .map_err(|_| DB3Error::InvalidDocumentIdBytes)?;
         Ok(Self { data: buf })
+    }
+
+    pub fn to_base64(&self) -> String {
+        base64ct::Base64::encode_string(self.as_ref())
+    }
+    pub fn try_from_base64(input: &str) -> std::result::Result<Self, DB3Error> {
+        Self::try_from_bytes(base64ct::Base64::decode_vec(input).unwrap().as_slice())
     }
 }
 
@@ -437,6 +452,15 @@ mod tests {
             document_id.get_document_entry_id().unwrap()
         );
         assert_eq!("DOC|1000-100-10|999-99-9", document_id.to_string());
+
+        assert_eq!(
+            "AQAAAAAAAAPoAAAAZAAAAAoAAAAAAAAD5wAAAGMAAAAJ",
+            document_id.to_base64()
+        );
+        assert_eq!(
+            DocumentId::try_from_base64("AQAAAAAAAAPoAAAAZAAAAAoAAAAAAAAD5wAAAGMAAAAJ").unwrap(),
+            document_id
+        )
     }
 
     #[test]

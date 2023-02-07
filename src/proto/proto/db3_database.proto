@@ -29,7 +29,7 @@ message Database {
     bytes sender = 2;
     // the history of database modification
     repeated bytes tx = 3;
-    repeated Collection collections = 4;
+    map<string, Collection> collections = 4;
 }
 
 message Collection {

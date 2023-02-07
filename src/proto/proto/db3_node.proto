@@ -139,6 +139,22 @@ message ShowDatabaseResponse {
     db3_database_proto.Database db = 1;
 }
 
+message ListDocumentsRequest {
+    string session_token = 1;
+    // a hex string
+    string address = 2;
+    string collection_name = 3;
+    // TODO: support paging setting (e.g page_size, page_token)
+    // TODO: support document mask
+
+
+}
+
+message ListDocumentsResponse {
+    repeated bytes documents = 1;
+    // TODO: support next_page_token for page loading
+}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
@@ -156,5 +172,7 @@ service StorageNode {
     rpc Broadcast(BroadcastRequest) returns (BroadcastResponse) {}
     // method for show database
     rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
+    // method for query document
+    rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse) {}
 }
 

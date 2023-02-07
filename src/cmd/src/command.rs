@@ -85,6 +85,17 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         documents: Vec<String>,
     },
+
+    /// Show documents under a collection
+    #[clap(name = "show-doc")]
+    ShowDocument {
+        /// the address of database
+        #[clap(long)]
+        addr: String,
+        /// the name of collection
+        #[clap(long)]
+        collection_name: String,
+    },
 }
 
 impl DB3ClientCommand {
@@ -95,11 +106,35 @@ impl DB3ClientCommand {
         }
     }
 
+    fn show_document(documents: Vec<Vec<u8>>) {
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+        table.set_titles(row!["id_base64", "document",]);
+        let mut error_cnt = 0;
+        for document in documents {
+            if let Ok(db3_document) = DB3Document::try_from(document) {
+                if let Ok(id) = db3_document.get_document_id() {
+                    table.add_row(row![id.to_base64(), format!("{:?}", db3_document)]);
+                } else {
+                    error_cnt += 1;
+                }
+            } else {
+                error_cnt += 1;
+            }
+        }
+        table.printstd();
+        if error_cnt > 0 {
+            println!(
+                "An error occurs when attempting to show documents. Affected Rows {}",
+                error_cnt
+            );
+        }
+    }
     fn show_collection(database: &Database) {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row!["name", "index",]);
-        for collection in &database.collections {
+        for (_, collection) in &database.collections {
             let index_str: String = collection
                 .index_list
                 .iter()
@@ -129,7 +164,7 @@ impl DB3ClientCommand {
         let collections: String = database
             .collections
             .iter()
-            .map(|c| c.name.to_string())
+            .map(|(name, _)| name.to_string())
             .intersperse("\n ".to_string())
             .collect();
         let address_ref: &[u8] = database.address.as_ref();
@@ -199,6 +234,25 @@ impl DB3ClientCommand {
                     println!("send add collection done with tx\n{}", tx_id.to_base64());
                 } else {
                     println!("fail to add collection");
+                }
+            }
+            DB3ClientCommand::ShowDocument {
+                addr,
+                collection_name,
+            } => {
+                match ctx
+                    .store_sdk
+                    .as_mut()
+                    .unwrap()
+                    .list_documents(addr.as_ref(), collection_name.as_ref())
+                    .await
+                {
+                    Ok(response) => {
+                        Self::show_document(response.documents);
+                    }
+                    Err(err) => {
+                        println!("fail to show documents with error {:?}", err);
+                    }
                 }
             }
             DB3ClientCommand::ShowCollection { addr } => {
