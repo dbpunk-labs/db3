@@ -2,7 +2,7 @@ use crate::db3_address::DB3Address;
 use crate::id::{AccountId, DocumentId, TxId};
 use bson::spec::BinarySubtype;
 use bson::Document;
-use bson::{Array, Binary, Bson, RawDocumentBuf};
+use bson::{Binary, Bson, RawDocumentBuf};
 use db3_error::DB3Error;
 use serde_json::Value;
 

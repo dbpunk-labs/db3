@@ -423,6 +423,7 @@ mod tests {
         Index,
     };
     use db3_proto::db3_mutation_proto::CollectionMutation;
+    use db3_proto::db3_mutation_proto::DocumentMutation;
     use std::boxed::Box;
     use tempdir::TempDir;
 
@@ -487,7 +488,6 @@ mod tests {
         println!("{json_data}");
         dm
     }
-
     #[test]
     fn db_store_new_database_test() {
         let addr = gen_address();

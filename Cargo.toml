@@ -13,4 +13,5 @@ members = [
 ]
 
 [workspace.dependencies]
+fastcrypto = {git = "https://github.com/MystenLabs/fastcrypto", rev = "bbb2d02a7a64c27314721748cc4d015b00490dbe"}
 

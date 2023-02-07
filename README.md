@@ -23,6 +23,7 @@
 DB3 Network is an open-source and decentralized firebase firestore alternative for building fully decentralized dApps quickly with  minimal engineering effort.
 
 
+
 <p align="center">
  <img width="600px" src="./docs/images/position_web3.svg" align="center"/>
 
@@ -40,6 +41,7 @@ With Db3 network, you can get both advantages of the above two choices.
 
 
 # Features
+
 **Schemaless**
 
 You can store data on DB3 Network without any change.
@@ -65,7 +67,7 @@ DB3 Network is a layer2 network on Ethereum and Ethereum guards all the assets.
 
 # Getting Started
 
-### Start A Local Testnet
+### Build
 
 ```shell
 git clone https://github.com/dbpunk-labs/db3.git
@@ -112,7 +114,14 @@ db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
 -------+----------------------------------------------------------------------------
  books | {"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}
 ```
- * [ ] create a document
+ * [x] Create a document
+
+```
+db3>-$ new-doc --addr 0x997f631fcafeed5ee319c83683ae16e64783602b --collection-name books --documents '{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}'
+send add document done with tx
++O9cK2cHLexZQvIITk4OTm8SxBhq7Yz7g+xZYiionWo=
+```
+
  * [ ] get a document
  * [ ] list documents
  * [ ] query documents by index

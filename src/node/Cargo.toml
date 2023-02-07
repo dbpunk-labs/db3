@@ -29,7 +29,7 @@ db3-sdk={path="../sdk", version="0.1.0"}
 db3-session={path="../session", version="0.1.0"}
 tracing = "0.1"
 tracing-subscriber = "0.3"
-fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "bbb2d02a7a64c27314721748cc4d015b00490dbe" , features=['copy_key']}
+fastcrypto = { workspace = true, features = ["copy_key"] }
 signature = { version = "1.6.4", features = ["rand-preview"] }
 hex = "0.4.3"
 rand = "0.8.5"
