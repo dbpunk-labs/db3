@@ -219,8 +219,7 @@ pub trait DB3SignatureInner: Sized + signature::Signature + PartialEq + Eq + Has
         let sig = kp.try_sign(message).map_err(|_| {
             DB3Error::InvalidSignature("Failed to sign valid message with keypair".to_string())
         })?;
-
-        let mut signature_bytes: Vec<u8> = Vec::new();
+        let mut signature_bytes: Vec<u8> = Vec::with_capacity(Self::LENGTH);
         signature_bytes
             .extend_from_slice(&[<Self::PubKey as DB3PublicKeyScheme>::SIGNATURE_SCHEME.flag()]);
         signature_bytes.extend_from_slice(sig.as_ref());
