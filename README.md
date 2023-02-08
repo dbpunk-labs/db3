@@ -122,8 +122,17 @@ send add document done with tx
 +O9cK2cHLexZQvIITk4OTm8SxBhq7Yz7g+xZYiionWo=
 ```
 
+ * [x] list documents
+ 
+ ```
+db3>-$ show-doc --addr 0x22fb51848e26b34e242dd16a1224e8f23ee9b42e  --collection-name books
+ id_base64                                    | owner                                      | document
+----------------------------------------------+--------------------------------------------+---------------------------------------------------------------------------------------------------------------------------
+ AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAAAfAAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
+ AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAABLAAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(44), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
+ AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAABPgAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(45), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
+ ```
  * [ ] get a document
- * [ ] list documents
  * [ ] query documents by index
 
 ### Build a dapp with db3.js
