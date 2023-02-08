@@ -168,8 +168,8 @@ impl TryFrom<Vec<u8>> for DB3Document {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_crypto::id::{AccountId, CollectionId, DocumentEntryId};
     use bson::spec::ElementType;
+    use db3_crypto::id::{AccountId, CollectionId, DocumentEntryId};
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
         index::IndexField,
