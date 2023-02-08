@@ -83,8 +83,12 @@ pub enum DB3Error {
     InvalidOpEntryIdBytes,
     #[error("invalid document id bytes")]
     InvalidDocumentIdBytes,
+    #[error("invalid document bytes {0}")]
+    InvalidDocumentBytes(String),
     #[error("invalid collection id bytes {0}")]
     InvalidCollectionIdBytes(String),
+    #[error("invalid index id bytes {0}")]
+    InvalidIndexIdBytes(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

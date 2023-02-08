@@ -16,23 +16,24 @@
 //
 
 use super::db_key::DbKey;
+use crate::db3_document::DB3Document;
 use bytes::BytesMut;
+use db3_base::bson_util;
 use db3_crypto::{
-    db3_address::DB3Address, db3_document::DB3Document, id::CollectionId, id::DbId,
-    id::DocumentEntryId, id::DocumentId, id::IndexId, id::TxId,
+    db3_address::DB3Address, id::CollectionId, id::DbId, id::DocumentEntryId, id::DocumentId,
+    id::IndexId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_proto::{Collection, Database};
+use db3_proto::db3_database_proto::{Collection, Database, Document};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
-use merkdb::proofs::{query::Query, Op as ProofOp};
+use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::ops::Range;
 use std::pin::Pin;
-use tracing::{debug, warn};
+use tracing::{debug, info, span, warn, Level};
 
 pub struct DbStore {}
 
@@ -48,41 +49,44 @@ impl DbStore {
         block_id: u64,
         mutation_id: u32,
     ) -> Result<Database> {
-        let collection_names: HashSet<String> =
-            HashSet::from_iter(old_db.collections.iter().map(|x| x.name.to_string()));
+        let mut new_collections: HashMap<String, Collection> = HashMap::new();
         let mut idx = 0;
-        let new_collections: Vec<Collection> = mutation
-            .collection_mutations
-            .iter()
-            .filter(|x| !collection_names.contains(&x.collection_name))
-            .map(|x| {
+        for new_collection in mutation.collection_mutations.iter() {
+            if old_db
+                .collections
+                .contains_key(&new_collection.collection_name)
+            {
+                return Err(DB3Error::ApplyDatabaseError(format!(
+                    "duplicated collection names {}",
+                    new_collection.collection_name
+                )));
+            } else {
                 idx += 1;
-                Collection {
-                    id: CollectionId::create(block_id, mutation_id, idx)
-                        .unwrap()
-                        .as_ref()
-                        .to_vec(),
-                    name: x.collection_name.to_string(),
-                    index_list: x.index.to_vec(),
-                }
-            })
-            .collect();
-        if new_collections.len() != mutation.collection_mutations.len() {
-            Err(DB3Error::ApplyDatabaseError(
-                "duplicated collection names".to_string(),
-            ))
-        } else {
-            let mut collections = old_db.collections.to_vec();
-            collections.extend_from_slice(new_collections.as_ref());
-            let mut tx_list = old_db.tx.to_vec();
-            tx_list.push(tx_id.as_ref().to_vec());
-            Ok(Database {
-                address: old_db.address.to_vec(),
-                sender: old_db.sender.to_vec(),
-                tx: tx_list,
-                collections,
-            })
+                new_collections.insert(
+                    new_collection.collection_name.to_string(),
+                    Collection {
+                        id: CollectionId::create(block_id, mutation_id, idx)
+                            .unwrap()
+                            .as_ref()
+                            .to_vec(),
+                        name: new_collection.collection_name.to_string(),
+                        index_list: new_collection.index.to_vec(),
+                    },
+                );
+            }
         }
+
+        for (k, v) in old_db.collections.iter() {
+            new_collections.insert(k.to_string(), v.clone());
+        }
+        let mut tx_list = old_db.tx.to_vec();
+        tx_list.push(tx_id.as_ref().to_vec());
+        Ok(Database {
+            address: old_db.address.to_vec(),
+            sender: old_db.sender.to_vec(),
+            tx: tx_list,
+            collections: new_collections,
+        })
     }
 
     fn new_database(
@@ -95,19 +99,22 @@ impl DbStore {
     ) -> Database {
         //TODO check the duplicated collection id
         let mut idx = 0;
-        let collections: Vec<Collection> = mutation
+        let collections: HashMap<String, Collection> = mutation
             .collection_mutations
             .iter()
             .map(move |x| {
                 idx += 1;
-                Collection {
-                    id: CollectionId::create(block_id, mutation_id, idx)
-                        .unwrap()
-                        .as_ref()
-                        .to_vec(),
-                    name: x.collection_name.to_string(),
-                    index_list: x.index.to_vec(),
-                }
+                (
+                    x.collection_name.to_string(),
+                    Collection {
+                        id: CollectionId::create(block_id, mutation_id, idx)
+                            .unwrap()
+                            .as_ref()
+                            .to_vec(),
+                        name: x.collection_name.to_string(),
+                        index_list: x.index.to_vec(),
+                    },
+                )
             })
             .collect();
         Database {
@@ -224,13 +231,11 @@ impl DbStore {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
+        let span = span!(Level::INFO, "database").entered();
         match database {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
-                let mut cid_index_map: HashMap<String, _> = HashMap::new();
-                for collection in d.collections.iter() {
-                    cid_index_map.insert(collection.name.to_string(), collection);
-                }
+                let cid_index_map: &HashMap<String, _> = &d.collections;
                 for document_mutation in &mutation.document_mutations {
                     if let Some(collection) = cid_index_map.get(&document_mutation.collection_name)
                     {
@@ -254,12 +259,16 @@ impl DbStore {
                                     .unwrap();
 
                             // construct db3 document with tx_id and owner addr
-                            let db3_document =
-                                DB3Document::new(document.clone(), &document_id, &tx, &sender)
-                                    .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
-                                    .unwrap();
+                            let db3_document = DB3Document::create_from_document_bytes(
+                                document.clone(),
+                                &document_id,
+                                &tx,
+                                &sender,
+                            )
+                            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
+                            .unwrap();
                             let document_vec = db3_document.into_bytes().to_vec();
-                            debug!("put document id {}", document_id);
+                            info!("put document id {}", document_id.to_string());
                             entries.push((document_id.as_ref().to_vec(), Op::Put(document_vec)));
 
                             // insert index key -> document_id
@@ -281,7 +290,7 @@ impl DbStore {
                                         .unwrap();
 
                                         // put indexId->documentId
-                                        debug!("put index id {}", document_id);
+                                        info!("put index id {}", index_id.to_string());
                                         entries.push((index_id.as_ref().to_vec(), Op::Put(vec![])));
                                     }
                                     Err(e) => {
@@ -308,26 +317,36 @@ impl DbStore {
                 )));
             }
         }
+        span.exit();
         Ok(())
     }
     //
     // add document
     //
-    fn get_document(db: Pin<&mut Merk>, document_id: &DocumentId) -> Result<Option<Vec<u8>>> {
+    fn get_document(db: Pin<&mut Merk>, document_id: &DocumentId) -> Result<Option<Document>> {
         //TODO use reference
         debug!("get document id: {}", document_id);
-        let value = db
+        if let Some(v) = db
             .get(document_id.as_ref())
-            .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?;
-        Ok(value)
+            .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?
+        {
+            let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
+            let doc =
+                bson_util::bson_document_into_bytes(db3_doc.get_document().map_err(|e| e).unwrap());
+            let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
+            Ok(Some(Document {
+                id: document_id.as_ref().to_vec(),
+                doc,
+                owner,
+            }))
+        } else {
+            Ok(None)
+        }
     }
     //
     // get documents
     //
-    fn get_documents_range(
-        db: Pin<&mut Merk>,
-        collection_id: &CollectionId,
-    ) -> Result<LinkedList<ProofOp>> {
+    pub fn get_documents(db: Pin<&Merk>, collection_id: &CollectionId) -> Result<Vec<Document>> {
         //TODO use reference
         let start_key = DocumentId::create(collection_id, &DocumentEntryId::zero())
             .unwrap()
@@ -346,7 +365,25 @@ impl DbStore {
         let ops = db
             .execute_query(query)
             .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
-        Ok(ops)
+        let mut values: Vec<_> = Vec::new();
+        for op in ops.iter() {
+            match op {
+                ProofOp::Push(Node::KV(k, v)) => {
+                    let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
+                    let doc = bson_util::bson_document_into_bytes(
+                        db3_doc.get_document().map_err(|e| e).unwrap(),
+                    );
+                    let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
+                    values.push(Document {
+                        id: k.to_vec(),
+                        doc,
+                        owner,
+                    })
+                }
+                _ => {}
+            }
+        }
+        Ok(values)
     }
     pub fn apply_mutation(
         db: Pin<&mut Merk>,
@@ -407,6 +444,7 @@ impl DbStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use db3_base::bson_util;
     use db3_crypto::key_derive;
     use db3_crypto::signature_scheme::SignatureScheme;
     use db3_proto::db3_database_proto::{
@@ -436,10 +474,10 @@ mod tests {
                 "+44 2345678"
             ]
         }"#;
-        let document = DB3Document::try_from(data).unwrap();
+        let document = bson_util::json_str_to_bson_bytes(data).unwrap();
         let document_mutations = vec![DocumentMutation {
             collection_name: collection_name.to_string(),
-            document: vec![document.into_bytes()],
+            document: vec![document],
         }];
         let dm = DatabaseMutation {
             meta: None,
@@ -452,7 +490,7 @@ mod tests {
         println!("{json_data}");
         dm
     }
-    fn build_database_mutation(addr: &DB3Address) -> DatabaseMutation {
+    fn build_database_mutation(addr: &DB3Address, collection_name: &str) -> DatabaseMutation {
         let index_field = IndexField {
             field_path: "name".to_string(),
             value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
@@ -466,7 +504,7 @@ mod tests {
 
         let index_mutation = CollectionMutation {
             index: vec![index],
-            collection_name: "collection1".to_string(),
+            collection_name: collection_name.to_string(),
         };
 
         let dm = DatabaseMutation {
@@ -480,6 +518,47 @@ mod tests {
         println!("{json_data}");
         dm
     }
+    #[test]
+    fn db_store_new_database_test() {
+        let addr = gen_address();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        let db_mutation = build_database_mutation(&addr, "collection1");
+        let database = DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+        assert!(database.collections.contains_key("collection1"))
+    }
+
+    #[test]
+    fn db_store_update_database_test() {
+        let addr = gen_address();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        let db_mutation = build_database_mutation(&addr, "collection1");
+        let old_database =
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+        assert!(old_database.collections.contains_key("collection1"));
+        let db_mutation_2 = build_database_mutation(&addr, "collection2");
+        let new_database =
+            DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101)
+                .unwrap();
+
+        assert!(new_database.collections.contains_key("collection1"));
+        assert!(new_database.collections.contains_key("collection2"));
+    }
+    #[test]
+    fn db_store_update_database_wrong_path() {
+        let addr = gen_address();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        let db_mutation = build_database_mutation(&addr, "collection1");
+        let old_database =
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+        assert!(old_database.collections.contains_key("collection1"));
+        let db_mutation_2 = build_database_mutation(&addr, "collection1");
+        let res = DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101);
+        assert!(res.is_err());
+        assert_eq!(
+            "Err(ApplyDatabaseError(\"duplicated collection names collection1\"))",
+            format!("{:?}", res)
+        );
+    }
 
     #[test]
     fn db_store_smoke_test() {
@@ -487,7 +566,8 @@ mod tests {
         let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
-        let db_mutation = build_database_mutation(&addr);
+        let collection_name = "db_store_smoke_test".to_string();
+        let db_mutation = build_database_mutation(&addr, collection_name.as_str());
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
 
         // create DB Test
@@ -500,12 +580,13 @@ mod tests {
         }
 
         // get database test
-        let dbId = DbId::try_from((&addr, 1)).unwrap();
-        if let Ok(Some(res)) = DbStore::get_database(db.as_ref(), &dbId) {
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        if let Ok(Some(res)) = DbStore::get_database(db.as_ref(), &db_id) {
             assert_eq!(1, res.collections.len());
-            let collection = &res.collections[0];
+            assert!(res.collections.contains_key(&collection_name));
+            let collection = &res.collections.get(&collection_name).unwrap();
             let collection_id = CollectionId::try_from_bytes(collection.id.as_slice()).unwrap();
-            let db_mutation = build_document_mutation(dbId.address(), collection.name.as_str());
+            let db_mutation = build_document_mutation(db_id.address(), collection.name.as_str());
 
             // add document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
@@ -517,10 +598,16 @@ mod tests {
             let document_entry_id = DocumentEntryId::create(1000, 2, 0).unwrap();
             let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
             let res = DbStore::get_document(db_m, &document_id);
-            if let Ok(Some(document_vec)) = res {
-                let db3_document = DB3Document::try_from(document_vec).unwrap();
-                assert_eq!("John Doe", db3_document.as_ref().get_str("name").unwrap());
-                assert_eq!(addr.to_vec(), db3_document.get_owner().unwrap().to_vec());
+            if let Ok(Some(document)) = res {
+                assert_eq!(
+                    r#"Document({"name": String("John Doe"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})"#,
+                    format!(
+                        "{:?}",
+                        bson_util::bytes_to_bson_document(document.doc).unwrap()
+                    )
+                );
+                assert_eq!(document_id.as_ref(), document.id);
+                assert_eq!(addr.to_vec(), document.owner)
             } else {
                 assert!(false);
             }
@@ -529,14 +616,14 @@ mod tests {
 
             // add document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            let db_mutation = build_document_mutation(dbId.address(), collection.name.as_str());
+            let db_mutation = build_document_mutation(db_id.address(), &collection_name);
             let res = DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 3);
             assert!(res.is_ok());
 
             // show documents
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            if let Ok(ops) = DbStore::get_documents_range(db_m, &collection_id) {
-                assert_eq!(2, ops.len());
+            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {
+                assert_eq!(2, documents.len());
             } else {
                 assert!(false);
             }

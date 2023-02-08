@@ -18,6 +18,7 @@
 pub mod account_store;
 pub mod bill_store;
 pub mod commit_store;
+mod db3_document;
 mod db_key;
 pub mod db_store;
 pub mod key;

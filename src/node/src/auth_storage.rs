@@ -15,13 +15,13 @@
 // limitations under the License.
 //
 
-use db3_crypto::id::DbId;
+use db3_crypto::id::{CollectionId, DbId};
 use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::{Bill, BillType};
-use db3_proto::db3_database_proto::Database;
+use db3_proto::db3_database_proto::{Database, Document};
 use db3_proto::db3_mutation_proto::{DatabaseMutation, KvPair, Mutation, MutationAction};
 use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
 use db3_proto::db3_session_proto::QuerySessionInfo;
@@ -176,6 +176,10 @@ impl AuthStorage {
 
     pub fn get_database(&self, id: &DbId) -> Result<Option<Database>> {
         DbStore::get_database(self.db.as_ref(), id)
+    }
+
+    pub fn get_documents(&self, id: &CollectionId) -> Result<Vec<Document>> {
+        DbStore::get_documents(self.db.as_ref(), id)
     }
 
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {

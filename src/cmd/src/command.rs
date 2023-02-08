@@ -18,10 +18,10 @@
 use clap::*;
 
 use crate::keystore::KeyStore;
-use db3_crypto::db3_document::DB3Document;
-use db3_crypto::id::{AccountId, DbId, TxId};
+use db3_base::bson_util;
+use db3_crypto::id::{AccountId, DbId, DocumentId, TxId};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
-use db3_proto::db3_database_proto::{Database, Index};
+use db3_proto::db3_database_proto::{Database, Document, Index};
 use db3_proto::db3_mutation_proto::{
     CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMutation,
 };
@@ -85,6 +85,17 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         documents: Vec<String>,
     },
+
+    /// Show documents under a collection
+    #[clap(name = "show-doc")]
+    ShowDocument {
+        /// the address of database
+        #[clap(long)]
+        addr: String,
+        /// the name of collection
+        #[clap(long)]
+        collection_name: String,
+    },
 }
 
 impl DB3ClientCommand {
@@ -95,11 +106,41 @@ impl DB3ClientCommand {
         }
     }
 
+    fn show_document(documents: Vec<Document>) {
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+        table.set_titles(row!["id_base64", "owner", "document",]);
+        let mut error_cnt = 0;
+        for document in documents {
+            if let Ok(id) = DocumentId::try_from_bytes(document.id.as_slice()) {
+                if let Ok(doc) = bson_util::bytes_to_bson_document(document.doc) {
+                    table.add_row(row![
+                        id.to_base64(),
+                        AccountId::try_from(document.owner.as_slice())
+                            .unwrap()
+                            .to_hex(),
+                        format!("{:?}", doc)
+                    ]);
+                } else {
+                    error_cnt += 1;
+                }
+            } else {
+                error_cnt += 1;
+            }
+        }
+        table.printstd();
+        if error_cnt > 0 {
+            println!(
+                "An error occurs when attempting to show documents. Affected Rows {}",
+                error_cnt
+            );
+        }
+    }
     fn show_collection(database: &Database) {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row!["name", "index",]);
-        for collection in &database.collections {
+        for (_, collection) in &database.collections {
             let index_str: String = collection
                 .index_list
                 .iter()
@@ -129,7 +170,7 @@ impl DB3ClientCommand {
         let collections: String = database
             .collections
             .iter()
-            .map(|c| c.name.to_string())
+            .map(|(name, _)| name.to_string())
             .intersperse("\n ".to_string())
             .collect();
         let address_ref: &[u8] = database.address.as_ref();
@@ -199,6 +240,25 @@ impl DB3ClientCommand {
                     println!("send add collection done with tx\n{}", tx_id.to_base64());
                 } else {
                     println!("fail to add collection");
+                }
+            }
+            DB3ClientCommand::ShowDocument {
+                addr,
+                collection_name,
+            } => {
+                match ctx
+                    .store_sdk
+                    .as_mut()
+                    .unwrap()
+                    .list_documents(addr.as_ref(), collection_name.as_ref())
+                    .await
+                {
+                    Ok(response) => {
+                        Self::show_document(response.documents);
+                    }
+                    Err(err) => {
+                        println!("fail to show documents with error {:?}", err);
+                    }
                 }
             }
             DB3ClientCommand::ShowCollection { addr } => {
@@ -289,13 +349,13 @@ impl DB3ClientCommand {
                     //TODO use config
                     chain_role: ChainRole::StorageShardChain.into(),
                 };
-                let db3_documents = documents
+                let bson_documents = documents
                     .iter()
-                    .map(|x| DB3Document::try_from(x.as_str()).unwrap().into_bytes())
+                    .map(|x| bson_util::json_str_to_bson_bytes(x.as_str()).unwrap())
                     .collect();
                 let document_mut = DocumentMutation {
                     collection_name,
-                    document: db3_documents,
+                    document: bson_documents,
                 };
                 let dm = DatabaseMutation {
                     meta: Some(meta),
