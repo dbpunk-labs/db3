@@ -17,7 +17,6 @@
 
 use bytes::BytesMut;
 use chrono::Utc;
-use db3_crypto::db3_document::DB3Document;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;

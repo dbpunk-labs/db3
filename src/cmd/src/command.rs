@@ -19,7 +19,6 @@ use clap::*;
 
 use crate::keystore::KeyStore;
 use db3_base::bson_util;
-use db3_crypto::db3_document::DB3Document;
 use db3_crypto::id::{AccountId, DbId, DocumentId, TxId};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::{Database, Document, Index};
@@ -110,14 +109,17 @@ impl DB3ClientCommand {
     fn show_document(documents: Vec<Document>) {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-        table.set_titles(row!["id_base64", "document",]);
+        table.set_titles(row!["id_base64", "owner", "document",]);
         let mut error_cnt = 0;
         for document in documents {
             if let Ok(id) = DocumentId::try_from_bytes(document.id.as_slice()) {
                 if let Ok(doc) = bson_util::bytes_to_bson_document(document.doc) {
                     table.add_row(row![
                         id.to_base64(),
-                        format!("{:?}", doc.get_document("_doc").unwrap())
+                        AccountId::try_from(document.owner.as_slice())
+                            .unwrap()
+                            .to_hex(),
+                        format!("{:?}", doc)
                     ]);
                 } else {
                     error_cnt += 1;

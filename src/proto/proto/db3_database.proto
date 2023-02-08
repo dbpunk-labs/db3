@@ -41,6 +41,7 @@ message Collection {
 message Document {
   bytes id = 1;
   bytes doc = 2;
+  bytes owner = 3;
 }
 message Index {
 

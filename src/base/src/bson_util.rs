@@ -1,5 +1,5 @@
 use bson::Document;
-use bson::{Array, Binary, Bson, RawDocumentBuf};
+use bson::RawDocumentBuf;
 use serde_json::Value;
 
 /// convert json string to Bson::Document
@@ -38,8 +38,7 @@ pub fn bson_document_into_bytes(doc: &Document) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::bson_util::{
-        bson_document_into_bytes, bytes_to_bson_document, json_str_to_bson_bytes,
-        json_str_to_bson_document,
+        bson_document_into_bytes, bytes_to_bson_document, json_str_to_bson_document,
     };
 
     #[test]

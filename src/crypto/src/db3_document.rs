@@ -1,11 +1,10 @@
 use crate::db3_address::DB3Address;
-use crate::id::{AccountId, DocumentId, TxId};
+use crate::id::{DocumentId, TxId};
 use bson::spec::BinarySubtype;
 use bson::Document;
-use bson::{Binary, Bson, RawDocumentBuf};
+use bson::{Binary, Bson};
 use db3_base::bson_util;
 use db3_error::DB3Error;
-use serde_json::Value;
 #[derive(Debug)]
 pub struct DB3Document {
     root: Document,
@@ -59,8 +58,7 @@ impl DB3Document {
         let doc = self
             .root
             .get_document("_doc")
-            .map_err(|e| DB3Error::DocumentDecodeError(format!("{:?}", e)))
-            .unwrap();
+            .map_err(|e| DB3Error::DocumentDecodeError(format!("{:?}", e)))?;
         Ok(doc)
     }
     fn add_document_id(&mut self, doc_id: &DocumentId) {
@@ -170,7 +168,7 @@ impl TryFrom<Vec<u8>> for DB3Document {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id::{CollectionId, DocumentEntryId};
+    use crate::id::{AccountId, CollectionId, DocumentEntryId};
     use bson::spec::ElementType;
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
@@ -212,6 +210,7 @@ mod tests {
         let mut document = DB3Document {
             root: Document::new(),
         };
+        assert!(document.get_owner().is_err());
         let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
         document.add_owner(&addr);
         assert!(document.get_document_id().is_err());
@@ -222,6 +221,16 @@ mod tests {
                 .unwrap()
                 .to_hex()
         );
+    }
+
+    #[test]
+    fn get_document_wrong_path() {
+        let document = DB3Document {
+            root: Document::new(),
+        };
+
+        let res = document.get_document();
+        assert!(res.is_err());
     }
 
     #[test]

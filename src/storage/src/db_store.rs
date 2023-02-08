@@ -17,14 +17,14 @@
 
 use super::db_key::DbKey;
 use bytes::BytesMut;
-use db3_base::bson_util::bson_document_into_bytes;
+use db3_base::bson_util;
 use db3_crypto::{
     db3_address::DB3Address, db3_document::DB3Document, id::CollectionId, id::DbId,
     id::DocumentEntryId, id::DocumentId, id::IndexId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::{Collection, Database, Document};
-use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, DocumentMutation};
+use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
@@ -325,13 +325,18 @@ impl DbStore {
     fn get_document(db: Pin<&mut Merk>, document_id: &DocumentId) -> Result<Option<Document>> {
         //TODO use reference
         debug!("get document id: {}", document_id);
-        if let Some(doc) = db
+        if let Some(v) = db
             .get(document_id.as_ref())
             .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?
         {
+            let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
+            let doc =
+                bson_util::bson_document_into_bytes(db3_doc.get_document().map_err(|e| e).unwrap());
+            let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
             Ok(Some(Document {
                 id: document_id.as_ref().to_vec(),
                 doc,
+                owner,
             }))
         } else {
             Ok(None)
@@ -362,10 +367,18 @@ impl DbStore {
         let mut values: Vec<_> = Vec::new();
         for op in ops.iter() {
             match op {
-                ProofOp::Push(Node::KV(k, v)) => values.push(Document {
-                    id: k.to_vec(),
-                    doc: v.to_vec(),
-                }),
+                ProofOp::Push(Node::KV(k, v)) => {
+                    let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
+                    let doc = bson_util::bson_document_into_bytes(
+                        db3_doc.get_document().map_err(|e| e).unwrap(),
+                    );
+                    let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
+                    values.push(Document {
+                        id: k.to_vec(),
+                        doc,
+                        owner,
+                    })
+                }
                 _ => {}
             }
         }
@@ -585,13 +598,15 @@ mod tests {
             let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
             let res = DbStore::get_document(db_m, &document_id);
             if let Ok(Some(document)) = res {
-                let db3_document = DB3Document::try_from(document.doc).unwrap();
-                let doc = db3_document.get_document().unwrap();
                 assert_eq!(
                     r#"Document({"name": String("John Doe"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})"#,
-                    format!("{:?}", doc)
+                    format!(
+                        "{:?}",
+                        bson_util::bytes_to_bson_document(document.doc).unwrap()
+                    )
                 );
-                assert_eq!(document_id.as_ref(), document.id)
+                assert_eq!(document_id.as_ref(), document.id);
+                assert_eq!(addr.to_vec(), document.owner)
             } else {
                 assert!(false);
             }

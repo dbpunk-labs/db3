@@ -102,8 +102,8 @@ pub const INDEX_FIELD_ID_LENGTH: usize = 4;
 /// OpEntryId := BlockId + MutationId + OpEntryIdx
 pub const OP_ENTRY_ID_LENGTH: usize = 16;
 
-pub const DocumentIdTypeId: i8 = 1;
-pub const IndexIdTypeId: i8 = 2;
+pub const DOCUMENT_ID_TYPE_ID: i8 = 1;
+pub const INDEX_ID_TYPE_ID: i8 = 2;
 
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
 pub struct OpEntryId {
@@ -206,7 +206,7 @@ impl DocumentId {
         document_entry_id: &DocumentEntryId,
     ) -> std::result::Result<Self, DB3Error> {
         let mut bytes: Vec<u8> = Vec::with_capacity(DOCUMENT_ID_LENGTH);
-        bytes.extend(DocumentIdTypeId.to_be_bytes());
+        bytes.extend(DOCUMENT_ID_TYPE_ID.to_be_bytes());
         bytes.extend(collection_id.as_ref());
         bytes.extend(document_entry_id.as_ref());
         Self::try_from_bytes(bytes.as_slice())
@@ -222,7 +222,6 @@ impl DocumentId {
     /// document entry id = document_id[OP_ENTRY_ID_LENGTH..]
     pub fn get_document_entry_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
         DocumentEntryId::try_from_bytes(self.data[TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH..].as_ref())
-
     }
 
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
@@ -268,7 +267,7 @@ impl IndexId {
         document_id: &DocumentId,
     ) -> std::result::Result<Self, DB3Error> {
         let mut data: Vec<u8> = Vec::new();
-        data.extend(IndexIdTypeId.to_be_bytes());
+        data.extend(INDEX_ID_TYPE_ID.to_be_bytes());
         data.extend(collection_id.as_ref());
         data.extend(index_field_id.to_be_bytes());
         data.extend(key.as_bytes());
@@ -301,7 +300,6 @@ impl IndexId {
             Ok(v) => Ok(v),
             Err(e) => Err(DB3Error::InvalidIndexIdBytes(format!("{:?}", e))),
         }
-
     }
 }
 impl AsRef<Vec<u8>> for IndexId {
