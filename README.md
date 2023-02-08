@@ -92,7 +92,7 @@ database address                           | transaction id
 
 ```shell
 db3>-$ show-db --addr 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33
- database address                           | sender address                             | releated transactions                        | collections
+ database address                           | sender address                             | related transactions                        | collections
 --------------------------------------------+--------------------------------------------+----------------------------------------------+-------------
  0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33 | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | EMYw64xlI2q4v1MShoKw3T60asNbWJ9//ca75M3JO3Q= |
 ```
