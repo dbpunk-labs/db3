@@ -16,11 +16,12 @@
 //
 
 use super::db_key::DbKey;
+use crate::db3_document::DB3Document;
 use bytes::BytesMut;
 use db3_base::bson_util;
 use db3_crypto::{
-    db3_address::DB3Address, db3_document::DB3Document, id::CollectionId, id::DbId,
-    id::DocumentEntryId, id::DocumentId, id::IndexId, id::TxId,
+    db3_address::DB3Address, id::CollectionId, id::DbId, id::DocumentEntryId, id::DocumentId,
+    id::IndexId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::{Collection, Database, Document};
@@ -520,19 +521,19 @@ mod tests {
     #[test]
     fn db_store_new_database_test() {
         let addr = gen_address();
-        let dbId = DbId::try_from((&addr, 1)).unwrap();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
-        let database = DbStore::new_database(&dbId, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+        let database = DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(database.collections.contains_key("collection1"))
     }
 
     #[test]
     fn db_store_update_database_test() {
         let addr = gen_address();
-        let dbId = DbId::try_from((&addr, 1)).unwrap();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
         let old_database =
-            DbStore::new_database(&dbId, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection2");
         let new_database =
@@ -545,10 +546,10 @@ mod tests {
     #[test]
     fn db_store_update_database_wrong_path() {
         let addr = gen_address();
-        let dbId = DbId::try_from((&addr, 1)).unwrap();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
         let old_database =
-            DbStore::new_database(&dbId, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection1");
         let res = DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101);
@@ -579,13 +580,13 @@ mod tests {
         }
 
         // get database test
-        let dbId = DbId::try_from((&addr, 1)).unwrap();
-        if let Ok(Some(res)) = DbStore::get_database(db.as_ref(), &dbId) {
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        if let Ok(Some(res)) = DbStore::get_database(db.as_ref(), &db_id) {
             assert_eq!(1, res.collections.len());
             assert!(res.collections.contains_key(&collection_name));
             let collection = &res.collections.get(&collection_name).unwrap();
             let collection_id = CollectionId::try_from_bytes(collection.id.as_slice()).unwrap();
-            let db_mutation = build_document_mutation(dbId.address(), collection.name.as_str());
+            let db_mutation = build_document_mutation(db_id.address(), collection.name.as_str());
 
             // add document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
@@ -615,7 +616,7 @@ mod tests {
 
             // add document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            let db_mutation = build_document_mutation(dbId.address(), &collection_name);
+            let db_mutation = build_document_mutation(db_id.address(), &collection_name);
             let res = DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 3);
             assert!(res.is_ok());
 

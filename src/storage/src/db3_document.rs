@@ -1,9 +1,9 @@
-use crate::db3_address::DB3Address;
-use crate::id::{DocumentId, TxId};
 use bson::spec::BinarySubtype;
 use bson::Document;
 use bson::{Binary, Bson};
 use db3_base::bson_util;
+use db3_crypto::db3_address::DB3Address;
+use db3_crypto::id::{DocumentId, TxId};
 use db3_error::DB3Error;
 #[derive(Debug)]
 pub struct DB3Document {
@@ -168,7 +168,7 @@ impl TryFrom<Vec<u8>> for DB3Document {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id::{AccountId, CollectionId, DocumentEntryId};
+    use db3_crypto::id::{AccountId, CollectionId, DocumentEntryId};
     use bson::spec::ElementType;
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
