@@ -169,9 +169,9 @@ Together, we can make db3 network better!
 
 # How it works
 
-* [mutation](./docs/mutation.md)
-* [query session](./docs/query.md)
-* [dvm](./docs/dvm.md)
+* [mutation](./docs/old/mutation.md)
+* [query session](./docs/old/query.md)
+* [dvm](./docs/old/dvm.md)
 * [merkdb](https://github.com/dbpunk-labs/db3/issues/100)
 
 
