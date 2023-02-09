@@ -24,6 +24,7 @@ use db3_proto::db3_mutation_proto::{DatabaseMutation, Mutation, PayloadType, Wri
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_storage::kv_store::KvStore;
+use fastcrypto::encoding::{Base64, Encoding};
 use hex;
 use prost::Message;
 use std::pin::Pin;
@@ -224,11 +225,18 @@ impl Application for AbciImpl {
                     }
                 }
                 Err(e) => {
+                    let payload: &[u8] = request.payload.as_ref();
+                    let signature: &[u8] = request.signature.as_ref();
                     warn!("invalid transaction has been checked for error {}", e);
+                    warn!(
+                        "payload {}, signature {}",
+                        Base64::encode(payload),
+                        Base64::encode(signature)
+                    );
                 }
             },
             Err(e) => {
-                warn!("invalid transaction has been checked for error {}", e);
+                warn!("fail to decode WriteRequest for error {}", e);
             }
         }
         // the tx should be removed from mempool

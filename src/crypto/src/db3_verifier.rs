@@ -1,6 +1,6 @@
 //
 //
-// verifier.rs
+// db3_verifier.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,5 +29,20 @@ impl DB3Verifier {
             .map_err(|e| DB3Error::InvalidSignature(format!("{e}")))?;
         let db3_address = signature.verify(&msg)?;
         Ok(AccountId::new(db3_address))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fastcrypto::encoding::{Base64, Encoding};
+    #[test]
+    fn db3_verifier_smoke_test() {
+        let signature_b64 = "AUAgHci5wbl0OEsqPVjjGAStTVZn3CbatXuAmF2KJ7jVDgYGk/t6Bdre99eNCEyfV3387dVY//D0+J8YuuXgI94BA+NxdDVYKrM9LjFdIem8ThlQCh/EyM3HOhU2WJF3SxMf";
+        let msg_b64 = "CgUIt0oYCg==";
+        let signature = Base64::decode(signature_b64).unwrap();
+        let msg = Base64::decode(msg_b64).unwrap();
+        let result = DB3Verifier::verify(msg.as_ref(), signature.as_ref());
+        assert_eq!(true, result.is_ok());
     }
 }
