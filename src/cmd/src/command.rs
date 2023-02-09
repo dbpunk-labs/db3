@@ -86,15 +86,28 @@ pub enum DB3ClientCommand {
         documents: Vec<String>,
     },
 
+    /// Get a document with given doc id
+    #[clap(name = "get-doc")]
+    GetDocument {
+        /// the id(base64) of document
+        #[clap(long)]
+        id: String,
+    },
+
     /// Show documents under a collection
     #[clap(name = "show-doc")]
     ShowDocument {
         /// the address of database
         #[clap(long)]
         addr: String,
+
         /// the name of collection
         #[clap(long)]
         collection_name: String,
+
+        /// show document by key
+        #[clap(long, default_value = "")]
+        key: String,
     },
 }
 
@@ -242,10 +255,31 @@ impl DB3ClientCommand {
                     println!("fail to add collection");
                 }
             }
+            DB3ClientCommand::GetDocument { id } => {
+                match ctx
+                    .store_sdk
+                    .as_mut()
+                    .unwrap()
+                    .get_document(id.as_str())
+                    .await
+                {
+                    Ok(Some(document)) => {
+                        Self::show_document(vec![document]);
+                    }
+                    Ok(None) => {
+                        println!("no document with target id");
+                    }
+                    Err(e) => {
+                        println!("fail to get document with error {:?}", e);
+                    }
+                }
+            }
             DB3ClientCommand::ShowDocument {
                 addr,
                 collection_name,
+                key,
             } => {
+                // TODO(chenjing): construct index keys from json key string
                 match ctx
                     .store_sdk
                     .as_mut()
