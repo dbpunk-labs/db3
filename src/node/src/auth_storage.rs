@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use db3_crypto::id::{CollectionId, DbId};
+use db3_crypto::id::{CollectionId, DbId, DocumentId};
 use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
@@ -180,6 +180,10 @@ impl AuthStorage {
 
     pub fn get_documents(&self, id: &CollectionId) -> Result<Vec<Document>> {
         DbStore::get_documents(self.db.as_ref(), id)
+    }
+
+    pub fn get_document(&self, id: &DocumentId) -> Result<Option<Document>> {
+        DbStore::get_document(self.db.as_ref(), id)
     }
 
     pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {

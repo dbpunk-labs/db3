@@ -323,21 +323,22 @@ impl DbStore {
     //
     // add document
     //
-    fn get_document(db: Pin<&mut Merk>, document_id: &DocumentId) -> Result<Option<Document>> {
+    pub fn get_document(db: Pin<&Merk>, document_id: &DocumentId) -> Result<Option<Document>> {
         //TODO use reference
         debug!("get document id: {}", document_id);
         if let Some(v) = db
             .get(document_id.as_ref())
             .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?
         {
-            let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
-            let doc =
-                bson_util::bson_document_into_bytes(db3_doc.get_document().map_err(|e| e).unwrap());
-            let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
+            let db3_doc = DB3Document::try_from(v.clone())?;
+            let doc = bson_util::bson_document_into_bytes(db3_doc.get_document()?);
+            let owner = db3_doc.get_owner()?.to_vec();
+            let tx_id = db3_doc.get_tx_id()?.as_ref().to_vec();
             Ok(Some(Document {
                 id: document_id.as_ref().to_vec(),
                 doc,
                 owner,
+                tx_id,
             }))
         } else {
             Ok(None)
@@ -369,15 +370,15 @@ impl DbStore {
         for op in ops.iter() {
             match op {
                 ProofOp::Push(Node::KV(k, v)) => {
-                    let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
-                    let doc = bson_util::bson_document_into_bytes(
-                        db3_doc.get_document().map_err(|e| e).unwrap(),
-                    );
-                    let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
+                    let db3_doc = DB3Document::try_from(v.clone())?;
+                    let doc = bson_util::bson_document_into_bytes(db3_doc.get_document()?);
+                    let owner = db3_doc.get_owner()?.to_vec();
+                    let tx_id = db3_doc.get_tx_id()?.as_ref().to_vec();
                     values.push(Document {
                         id: k.to_vec(),
                         doc,
                         owner,
+                        tx_id,
                     })
                 }
                 _ => {}
@@ -594,10 +595,9 @@ mod tests {
             assert!(res.is_ok());
 
             // get document test
-            let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
             let document_entry_id = DocumentEntryId::create(1000, 2, 0).unwrap();
             let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
-            let res = DbStore::get_document(db_m, &document_id);
+            let res = DbStore::get_document(db.as_ref(), &document_id);
             if let Ok(Some(document)) = res {
                 assert_eq!(
                     r#"Document({"name": String("John Doe"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})"#,
@@ -621,7 +621,6 @@ mod tests {
             assert!(res.is_ok());
 
             // show documents
-            let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
             if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {
                 assert_eq!(2, documents.len());
             } else {
