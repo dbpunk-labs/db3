@@ -122,7 +122,7 @@ impl DB3ClientCommand {
     fn show_document(documents: Vec<Document>) {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-        table.set_titles(row!["id_base64", "owner", "document",]);
+        table.set_titles(row!["id_base64", "owner", "document", "tx_id"]);
         let mut error_cnt = 0;
         for document in documents {
             if let Ok(id) = DocumentId::try_from_bytes(document.id.as_slice()) {
@@ -132,7 +132,10 @@ impl DB3ClientCommand {
                         AccountId::try_from(document.owner.as_slice())
                             .unwrap()
                             .to_hex(),
-                        format!("{:?}", doc)
+                        format!("{:?}", doc),
+                        TxId::try_from_bytes(document.tx_id.as_ref())
+                            .unwrap()
+                            .to_base64()
                     ]);
                 } else {
                     error_cnt += 1;

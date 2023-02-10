@@ -330,14 +330,15 @@ impl DbStore {
             .get(document_id.as_ref())
             .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?
         {
-            let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
-            let doc =
-                bson_util::bson_document_into_bytes(db3_doc.get_document().map_err(|e| e).unwrap());
-            let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
+            let db3_doc = DB3Document::try_from(v.clone())?;
+            let doc = bson_util::bson_document_into_bytes(db3_doc.get_document()?);
+            let owner = db3_doc.get_owner()?.to_vec();
+            let tx_id = db3_doc.get_tx_id()?.as_ref().to_vec();
             Ok(Some(Document {
                 id: document_id.as_ref().to_vec(),
                 doc,
                 owner,
+                tx_id,
             }))
         } else {
             Ok(None)
@@ -369,15 +370,15 @@ impl DbStore {
         for op in ops.iter() {
             match op {
                 ProofOp::Push(Node::KV(k, v)) => {
-                    let db3_doc = DB3Document::try_from(v.clone()).map_err(|e| e).unwrap();
-                    let doc = bson_util::bson_document_into_bytes(
-                        db3_doc.get_document().map_err(|e| e).unwrap(),
-                    );
-                    let owner = db3_doc.get_owner().map_err(|e| e).unwrap().to_vec();
+                    let db3_doc = DB3Document::try_from(v.clone())?;
+                    let doc = bson_util::bson_document_into_bytes(db3_doc.get_document()?);
+                    let owner = db3_doc.get_owner()?.to_vec();
+                    let tx_id = db3_doc.get_tx_id()?.as_ref().to_vec();
                     values.push(Document {
                         id: k.to_vec(),
                         doc,
                         owner,
+                        tx_id,
                     })
                 }
                 _ => {}
