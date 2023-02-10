@@ -146,8 +146,6 @@ message ListDocumentsRequest {
     string collection_name = 3;
     // TODO: support paging setting (e.g page_size, page_token)
     // TODO: support document mask
-
-
 }
 
 message ListDocumentsResponse {
