@@ -23,6 +23,17 @@ import "db3_session.proto";
 import "db3_database.proto";
 package db3_node_proto;
 
+
+message NetworkStatus {
+    uint64 total_database_count = 1;
+    uint64 total_collection_count = 2;
+    uint64 total_document_count = 3;
+    uint64 total_account_count = 4;
+    uint64 total_mutataion_count = 5;
+    uint64 total_session_count = 6;
+    uint64 total_storage_in_bytes = 7;
+}
+
 message QueryBillKey {
     uint64 height = 1;
     uint64 start_id = 2;

@@ -17,33 +17,24 @@
 
 use super::ensure_len_eq;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use db3_crypto::id::{BillId, BILL_ID_LENGTH};
 use db3_error::{DB3Error, Result};
-//TODO add shard id
-const BLOCK_BILL: &str = "BLOCK_BILL";
+const BLOCK_BILL: &str = "/bl/";
 
-pub struct BillKey(pub u64, pub u64);
-const BILL_KEY_SIZE: usize = BLOCK_BILL.len() + 16;
-impl BillKey {
+pub struct BillKey<'a>(&'a BillId);
+const BILL_KEY_SIZE: usize = BLOCK_BILL.len() + BILL_ID_LENGTH;
+
+impl<'a> BillKey {
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut encoded_key = BLOCK_BILL.as_bytes().to_vec();
-        encoded_key
-            .write_u64::<BigEndian>(self.0)
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        encoded_key
-            .write_u64::<BigEndian>(self.1)
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
+        encoded_key.extend_from_slice(self.0.as_ref());
         Ok(encoded_key)
     }
+
     pub fn decode(data: &[u8]) -> Result<Self> {
         ensure_len_eq(data, BILL_KEY_SIZE)
             .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
         let start_offset = BLOCK_BILL.len();
-        let block_height = (&data[start_offset..])
-            .read_u64::<BigEndian>()
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        let id = (&data[start_offset + 8..])
-            .read_u64::<BigEndian>()
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
         Ok(Self(block_height, id))
     }
 }
@@ -53,17 +44,17 @@ mod tests {
     use super::*;
     #[test]
     fn it_billkey_encode() -> Result<()> {
-        let bk = BillKey(1, 10);
+        let block_id: u64 = 1;
+        let mutation_id: u16 = 1;
+        let bill_id = BillId::new(block_id, mutation_id);
+        let bk = BillKey(&bill_id);
         let bk_encoded_key1 = bk.encode()?;
-        let bk = BillKey(1, 11);
+        let bk = BillKey(&BillId::new(block_id, mutation_id));
         let bk_encoded_key2 = bk.encode()?;
         assert!(bk_encoded_key2.cmp(&bk_encoded_key1) == std::cmp::Ordering::Greater);
-        let bk = BillKey(1, 9);
+        let bk = BillKey(&BillId::new(1 as u64, 9 as u16));
         let bk_encoded_key3 = bk.encode()?;
         assert!(bk_encoded_key3.cmp(&bk_encoded_key2) == std::cmp::Ordering::Less);
-        let bk_decoded = BillKey::decode(bk_encoded_key3.as_ref())?;
-        assert_eq!(bk_decoded.0, bk.0);
-        assert_eq!(bk_decoded.1, bk.1);
         Ok(())
     }
 }

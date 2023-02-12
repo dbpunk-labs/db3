@@ -49,35 +49,73 @@ impl AccountStore {
         Ok(())
     }
 
-    pub fn get_account(db: Pin<&Merk>, addr: &DB3Address) -> Result<Account> {
+    ///
+    /// override the account with a new one
+    ///
+    fn override_account(db: Pin<&mut Merk>, encoded_key: Vec<u8>, account: &Account) -> Result<()> {
+        let mut buf = BytesMut::with_capacity(1024);
+        account
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::ApplyAccountError(format!("{}", e)))?;
+        let buf = buf.freeze();
+        let entry = (encoded_key, Op::Put(buf.to_vec()));
+        unsafe {
+            Pin::get_unchecked_mut(db)
+                .apply(&[entry], &[])
+                .map_err(|e| DB3Error::ApplyAccountError(format!("{}", e)))?;
+        }
+        Ok(())
+    }
+
+    ///
+    /// Create a account for the storage chains
+    ///
+    ///
+    pub fn new_account(db: Pin<&mut Merk>, addr: &DB3Address) -> Result<bool> {
         let key = AccountKey(*addr);
         let encoded_key = key.encode()?;
-        //TODO verify the result
+        let values = db
+            .get(encoded_key.as_ref())
+            .map_err(|e| DB3Error::GetAccountError(format!("{}", e)))?;
+        if let Some(v) = values {
+            Ok(false)
+        } else {
+            let new_account = Account {
+                total_bills: Some(Units {
+                    utype: UnitType::Tai.into(),
+                    amount: 0,
+                }),
+                credits: Some(Units {
+                    utype: UnitType::Db3.into(),
+                    amount: 10,
+                }),
+                total_storage_in_bytes: 0,
+                total_mutation_count: 0,
+                total_session_count: 0,
+                nonce: 0,
+            };
+            let result = Self::override_account(db, encoded_key, &new_account);
+            Ok(result.is_ok())
+        }
+    }
+
+    ///
+    /// get account from account store
+    ///
+    ///
+    pub fn get_account(db: Pin<&Merk>, addr: &DB3Address) -> Result<Option<Account>> {
+        let key = AccountKey(*addr);
+        let encoded_key = key.encode()?;
         let values = db
             .get(encoded_key.as_ref())
             .map_err(|e| DB3Error::GetAccountError(format!("{}", e)))?;
         if let Some(v) = values {
             match Account::decode(v.as_ref()) {
-                Ok(a) => Ok(a),
+                Ok(a) => Ok(Some(a)),
                 Err(e) => Err(DB3Error::GetAccountError(format!("{}", e))),
             }
         } else {
-            //TODO assign 10 db3 credits
-            Ok(Account {
-                total_bills: Some(Units {
-                    utype: UnitType::Tai.into(),
-                    amount: 0,
-                }),
-                total_storage_in_bytes: 0,
-                total_mutation_count: 0,
-                total_query_session_count: 0,
-                credits: Some(Units {
-                    utype: UnitType::Db3.into(),
-                    amount: 10,
-                }),
-                nonce: 0,
-                bill_next_id: 0,
-            })
+            Ok(None)
         }
     }
 }
@@ -96,6 +134,7 @@ mod tests {
             key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
         address
     }
+
     #[test]
     fn it_apply_account() {
         let tmp_dir_path = TempDir::new("apply_account").expect("create temp dir");
@@ -107,15 +146,14 @@ mod tests {
                 utype: UnitType::Db3.into(),
                 amount: 2,
             }),
-            total_storage_in_bytes: 10,
-            total_mutation_count: 10,
-            total_query_session_count: 5,
             credits: Some(Units {
                 utype: UnitType::Db3.into(),
                 amount: 10,
             }),
+            total_storage_in_bytes: 10,
+            total_mutation_count: 10,
+            total_session_count: 5,
             nonce: 10,
-            bill_next_id: 10,
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let result = AccountStore::apply(db_m, &addr, &account);

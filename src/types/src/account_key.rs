@@ -18,21 +18,22 @@ use super::ensure_len_eq;
 use db3_crypto::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use db3_error::{DB3Error, Result};
 
-const ACCOUNT_ID: &str = "_ACCOUNT_";
+const ACCOUNT_ID: &str = "/ac/";
 
 pub struct AccountKey(pub DB3Address);
 const ACCOUNT_KEY_SIZE: usize = DB3_ADDRESS_LENGTH + ACCOUNT_ID.len();
 
 impl AccountKey {
     pub fn encode(&self) -> Result<Vec<u8>> {
-        let mut encoded_key = self.0.as_ref().to_vec();
-        encoded_key.extend_from_slice(ACCOUNT_ID.as_bytes());
+        let mut encoded_key = ACCOUNT_ID.as_bytes().to_vec();
+        encoded_key.extend_from_slice(self.0.as_ref());
         Ok(encoded_key)
     }
+
     pub fn decode(data: &[u8]) -> Result<Self> {
         ensure_len_eq(data, ACCOUNT_KEY_SIZE)
             .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        let data_slice: &[u8; DB3_ADDRESS_LENGTH] = &data[..DB3_ADDRESS_LENGTH]
+        let data_slice: &[u8; DB3_ADDRESS_LENGTH] = &data[ACCOUNT_ID.len()..]
             .try_into()
             .expect("slice with incorrect length");
         let addr = DB3Address::from(data_slice);

@@ -228,7 +228,6 @@ impl AuthStorage {
 
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         BillStore::apply(db, &bill)?;
-
         let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
         account.total_bills = Some(accumulate_gas);
         account.total_query_session_count =

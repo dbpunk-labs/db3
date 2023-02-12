@@ -16,15 +16,16 @@
 // limitations under the License.
 //
 syntax = "proto3";
+
 import "db3_base.proto";
+
 package db3_account_proto;
 
 message Account {
     db3_base_proto.Units total_bills = 1;
-    db3_base_proto.Units paid_biils = 2;
-    db3_base_proto.Units credits = 3;
-    uint64 total_storage_in_bytes = 4;
-    uint64 total_mutation_count = 5;
-    uint64 total_session_count = 6;
-    uint64 nonce = 7;
+    db3_base_proto.Units credits = 2;
+    uint64 total_storage_in_bytes = 3;
+    uint64 total_mutation_count = 4;
+    uint64 total_session_count = 5;
+    uint64 nonce = 6;
 }

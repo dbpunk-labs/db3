@@ -94,6 +94,33 @@ impl AsRef<[u8]> for TxId {
         &self.data[..]
     }
 }
+
+pub const BILL_ID_LENGTH: usize = 10;
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
+pub struct BillId {
+    data: [u8; BILL_ID_LENGTH],
+}
+
+impl BillId {
+    pub fn new(block_id: u64, mutation_id: u16) -> Self<BillId> {
+        let mut data: Vec<u8> = Vec::with_capacity(BILL_ID_LENGTH);
+        data.write_u64::<BigEndian>(block_id)
+            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
+        data.write_u16::<BigEndian>(mutation_id)
+            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
+        Ok(BillId { data })
+    }
+    pub fn to_base64(&self) -> String {
+        base64ct::Base64::encode_string(self.data.as_ref())
+    }
+}
+
+impl AsRef<[u8]> for BillId {
+    fn as_ref(&self) -> &[u8] {
+        &self.data[..]
+    }
+}
+
 pub const TYPE_ID_LENGTH: usize = 1;
 pub const BLOCK_ID_LENGTH: usize = 8;
 pub const MUTATION_ID_LENGTH: usize = 4;
@@ -109,6 +136,7 @@ pub const INDEX_ID_TYPE_ID: i8 = 2;
 pub struct OpEntryId {
     data: [u8; OP_ENTRY_ID_LENGTH],
 }
+
 impl OpEntryId {
     pub fn create(
         block_id: u64,

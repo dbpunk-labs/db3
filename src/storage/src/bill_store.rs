@@ -16,6 +16,7 @@
 //
 
 use bytes::BytesMut;
+use db3_crypto::id::BillId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_bill_proto::Bill;
 use db3_types::bill_key::BillKey;
@@ -29,8 +30,8 @@ use std::pin::Pin;
 pub struct BillStore {}
 
 impl BillStore {
-    pub fn apply(db: Pin<&mut Merk>, bill: &Bill) -> Result<()> {
-        let key = BillKey(bill.block_height, bill.bill_id);
+    pub fn apply(db: Pin<&mut Merk>, bill_id: &BillId, bill: &Bill) -> Result<()> {
+        let key = BillKey(bill_id);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024);
         bill.encode(&mut buf)
@@ -41,9 +42,25 @@ impl BillStore {
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&[entry], &[])
-                .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+                .map_err(|e| DB3Error::ApplyBillError(format!("{}", e)))?;
         }
         Ok(())
+    }
+
+    pub fn get_bill(db: Pin<&Merk>, bill_id: &BillId) -> Result<Option<Bill>> {
+        let key = BillKey(bill_id);
+        let encoded_key = key.encode()?;
+        let values = db
+            .get(encoded_key.as_ref())
+            .map_err(|e| DB3Error::BillQueryError(format!("{}", e)))?;
+        if let Some(v) = values {
+            match Bill::decode(v.as_ref()) {
+                Ok(a) => Ok(Some(a)),
+                Err(e) => Err(DB3Error::BillQueryError(format!("{}", e))),
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn scan(db: Pin<&Merk>, height: u64, start: u64, end: u64) -> Result<LinkedList<ProofOp>> {

@@ -1,47 +1,31 @@
 #! /bin/bash
 
 mkdir -p ~/.db3/bin
-
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    echo "download db3 package from github"
-    wget https://github.com/dbpunk-labs/db3/releases/download/v0.2.6/db3-v0.2.6-linux-x86_64.tar.gz -O /tmp/db3-v0.2.6-linux-x86_64.tar.gz
-    tar -zxvf /tmp/db3-v0.2.6-linux-x86_64.tar.gz
-    cp db3-v0.2.6-linux-x86_64/bin/db3 ~/.db3/bin
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    wget https://github.com/dbpunk-labs/db3/releases/download/v0.2.6/db3-v0.2.6-macos-x86_64.tar.gz -O /tmp/db3-v0.2.6-macos-x86_64.tar.gz
-    tar -zxvf /tmp/db3-v0.2.6-macos-x86_64.tar.gz
-    cp db3-v0.2.6-macos-x86_64/bin/db3 ~/.db3/bin
-else
-    echo "$OSTYPE is not supported, please give us a issue https://github.com/dbpunk-labs/db3/issues/new/choose"
-    exit 1
+mkdir -p ~/.db3/data
+mkdir -p ~/.db3/logs
+VERSION=v0.2.7
+if [ ! -f ~/.db3/bin/db3 ]
+then
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "download db3 package from github"
+        wget https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3-${VERSION}-linux-x86_64.tar.gz -O /tmp/db3-${VERSION}-linux-x86_64.tar.gz
+        tar -zxf /tmp/db3-${VERSION}-linux-x86_64.tar.gz
+        cp db3-${VERSION}-linux-x86_64/bin/* ~/.db3/bin
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        wget https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3-${VERSION}-macos-x86_64.tar.gz -O /tmp/db3-${VERSION}-macos-x86_64.tar.gz
+        tar -zxf /tmp/db3-${VERSION}-macos-x86_64.tar.gz
+        cp db3-${VERSION}-macos-x86_64/bin/* ~/.db3/bin
+    else
+        echo "$OSTYPE is not supported, please give us a issue https://github.com/dbpunk-labs/db3/issues/new/choose"
+        exit 1
+    fi
+    echo "init localnet configure"
+    ~/.db3/bin/tendermint init
 fi
-
-export PATH=~/.db3/bin:$PATH
-echo "please add ~/.db3/bin to the PATH"
-
-
-set -u
-
-
-usage() {
-    cat 1>&2 <<EOF
-db3up-init
-The installer for db3up
-USAGE:
-    db3up-init [FLAGS] [OPTIONS]
-FLAGS:
-    -v, --verbose           Enable verbose output
-    -q, --quiet             Disable progress output
-    -y                      Disable confirmation prompt.
-        --no-modify-path    Don't configure the PATH environment variable
-    -h, --help              Prints help information
-    -V, --version           Prints version information
-OPTIONS:
-        --default-host <default-host>              Choose a default host triple
-        --default-toolchain <default-toolchain>    Choose a default toolchain to install
-        --default-toolchain none                   Do not install any toolchains
-        --profile [minimal|default|complete]       Choose a profile
-    -c, --component <components>...                Component name to also install
-    -t, --target <targets>...                      Target name to also install
-EOF
-}
+killall db3
+echo "start db3 network in single node mode..."
+~/.db3/bin/db3 start -d ~/.db3/data >~/.db3/logs/db3.log 2>&1 &
+sleep 2
+~/.db3/bin/tendermint start >~/.db3/logs/tm.log 2>&1 &
+sleep 2
+echo "start db3 network ok .."

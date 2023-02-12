@@ -39,6 +39,7 @@ pub fn estimate_gas(mutation: &Mutation) -> Units {
         amount: gas as i64,
     }
 }
+
 pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> Units {
     let mut gas: u64 = 0;
     gas += query_session_info.query_count as u64 * COMPUTAION_GAS_PRICE;
@@ -48,6 +49,7 @@ pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> Unit
         amount: gas as i64,
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
