@@ -218,6 +218,75 @@ impl DbStore {
     }
 
     //
+    // delete document
+    //
+    fn delete_document(
+        db: Pin<&mut Merk>,
+        sender: &DB3Address,
+        mutation: &DatabaseMutation,
+    ) -> Result<()> {
+        let span = span!(Level::INFO, "document").entered();
+        let addr_ref: &[u8] = mutation.db_address.as_ref();
+        let db_id = DbId::try_from(addr_ref)?;
+        let database = Self::get_database(db.as_ref(), &db_id)?;
+        let mut entries: Vec<BatchEntry> = Vec::new();
+        match database {
+            Some(d) => {
+                for document_mutation in &mutation.document_mutations {
+                    let collection = d
+                        .collections
+                        .get(document_mutation.collection_name.as_str())
+                        .unwrap();
+                    let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())?;
+                    for doc_id_base64 in document_mutation.ids.iter() {
+                        let document_id = DocumentId::try_from_base64(&doc_id_base64)?;
+                        if let Some(v) = db
+                            .get(document_id.as_ref())
+                            .map_err(|e| DB3Error::QueryDocumentError(format!("{:?}", e)))?
+                        {
+                            let db3_doc = DB3Document::try_from(v.clone())?;
+                            let owner = &db3_doc.get_owner()?;
+                            if sender == owner {
+                                info!("delete doc id {}", document_id);
+                                entries.push((document_id.as_ref().to_vec(), Op::Delete));
+
+                                for index in collection.index_list.iter() {
+                                    let key = db3_doc.get_keys(index)?;
+                                    let index_id = IndexId::create(
+                                        &collection_id,
+                                        index.id,
+                                        key.to_string().as_str(),
+                                        &document_id,
+                                    )?;
+                                    entries.push((index_id.as_ref().to_vec(), Op::Delete));
+                                }
+                            } else {
+                                return Err(DB3Error::DocumentModifiedPermissionError);
+                            }
+                        } else {
+                            return Err(DB3Error::DocumentNotExist(doc_id_base64.clone()));
+                        }
+                    }
+                }
+            }
+            None => {
+                return Err(DB3Error::ApplyDatabaseError(format!(
+                    "database not found with addr {}",
+                    db_id.to_hex()
+                )))
+            }
+        }
+        unsafe {
+            entries.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(&b_key));
+            Pin::get_unchecked_mut(db)
+                .apply(&entries, &[])
+                .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))?;
+        }
+        span.exit();
+        Ok(())
+    }
+
+    //
     // add document
     //
     fn add_document(
@@ -227,7 +296,7 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u32,
-    ) -> Result<()> {
+    ) -> Result<Vec<DocumentId>> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
@@ -235,6 +304,7 @@ impl DbStore {
         match database {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
+                let mut document_ids: Vec<DocumentId> = Vec::new();
                 let cid_index_map: &HashMap<String, _> = &d.collections;
                 for document_mutation in &mutation.document_mutations {
                     if let Some(collection) = cid_index_map.get(&document_mutation.collection_name)
@@ -242,7 +312,7 @@ impl DbStore {
                         let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())
                             .map_err(|e| DB3Error::InvalidCollectionIdBytes(format!("{:?}", e)))
                             .unwrap();
-                        for document in document_mutation.document.iter() {
+                        for document in document_mutation.documents.iter() {
                             // generate document entry id
                             let document_entry_id = DocumentEntryId::create(
                                 block_id,
@@ -301,24 +371,28 @@ impl DbStore {
                                     }
                                 }
                             }
+
+                            document_ids.push(document_id);
                         }
                     }
                 }
                 unsafe {
+                    entries.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(&b_key));
                     Pin::get_unchecked_mut(db)
                         .apply(&entries, &[])
                         .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))?;
                 }
+                span.exit();
+                return Ok(document_ids);
             }
             None => {
+                span.exit();
                 return Err(DB3Error::ApplyDatabaseError(format!(
                     "database not found with addr {}",
                     db_id.to_hex()
                 )));
             }
         }
-        span.exit();
-        Ok(())
     }
     //
     // add document
@@ -404,8 +478,13 @@ impl DbStore {
                 Self::add_collection(db, sender, tx, mutation, block_id, mutation_id)
             }
             Some(DatabaseAction::AddDocument) => {
-                Self::add_document(db, sender, tx, mutation, block_id, mutation_id)
+                // TODO: send event with added ids
+                match Self::add_document(db, sender, tx, mutation, block_id, mutation_id) {
+                    Ok(ids) => Ok(()),
+                    Err(e) => Err(e),
+                }
             }
+            Some(DatabaseAction::DeleteDocument) => Self::delete_document(db, sender, mutation),
             None => Ok(()),
         }
     }
@@ -415,11 +494,11 @@ impl DbStore {
         let encoded_key = key.encode()?;
         let value = db
             .get(encoded_key.as_ref())
-            .map_err(|e| DB3Error::QueryDatabaseError(format!("{e}")))?;
+            .map_err(|e| DB3Error::QueryDatabaseError(format!("{:?}", e)))?;
         if let Some(v) = value {
             match Database::decode(v.as_ref()) {
                 Ok(database) => Ok(Some(database)),
-                Err(e) => Err(DB3Error::QueryDatabaseError(format!("{e}"))),
+                Err(e) => Err(DB3Error::QueryDatabaseError(format!("{:?}", e))),
             }
         } else {
             Ok(None)
@@ -455,6 +534,7 @@ mod tests {
     };
     use db3_proto::db3_mutation_proto::CollectionMutation;
     use db3_proto::db3_mutation_proto::DocumentMutation;
+    use merkdb::rocksdb::merge_operator::delete_callback;
     use std::boxed::Box;
     use tempdir::TempDir;
 
@@ -465,20 +545,15 @@ mod tests {
         address
     }
 
-    fn build_document_mutation(addr: &DB3Address, collection_name: &str) -> DatabaseMutation {
-        let data = r#"
-        {
-            "name": "John Doe",
-            "age": 43,
-            "phones": [
-                "+44 1234567",
-                "+44 2345678"
-            ]
-        }"#;
-        let document = bson_util::json_str_to_bson_bytes(data).unwrap();
+    fn build_delete_document_mutation(
+        addr: &DB3Address,
+        collection_name: &str,
+        ids: Vec<String>,
+    ) -> DatabaseMutation {
         let document_mutations = vec![DocumentMutation {
             collection_name: collection_name.to_string(),
-            document: vec![document],
+            documents: vec![],
+            ids,
         }];
         let dm = DatabaseMutation {
             meta: None,
@@ -491,6 +566,32 @@ mod tests {
         println!("{json_data}");
         dm
     }
+    fn build_add_document_mutation(
+        addr: &DB3Address,
+        collection_name: &str,
+        docs: Vec<String>,
+    ) -> DatabaseMutation {
+        let documents = docs
+            .iter()
+            .map(|data| bson_util::json_str_to_bson_bytes(data).unwrap())
+            .collect();
+        let document_mutations = vec![DocumentMutation {
+            collection_name: collection_name.to_string(),
+            documents,
+            ids: vec![],
+        }];
+        let dm = DatabaseMutation {
+            meta: None,
+            collection_mutations: vec![],
+            document_mutations,
+            db_address: addr.to_vec(),
+            action: DatabaseAction::CreateDb.into(),
+        };
+        let json_data = serde_json::to_string(&dm).unwrap();
+        println!("{json_data}");
+        dm
+    }
+
     fn build_database_mutation(addr: &DB3Address, collection_name: &str) -> DatabaseMutation {
         let index_field = IndexField {
             field_path: "name".to_string(),
@@ -519,6 +620,7 @@ mod tests {
         println!("{json_data}");
         dm
     }
+
     #[test]
     fn db_store_new_database_test() {
         let addr = gen_address();
@@ -544,6 +646,7 @@ mod tests {
         assert!(new_database.collections.contains_key("collection1"));
         assert!(new_database.collections.contains_key("collection2"));
     }
+
     #[test]
     fn db_store_update_database_wrong_path() {
         let addr = gen_address();
@@ -587,17 +690,30 @@ mod tests {
             assert!(res.collections.contains_key(&collection_name));
             let collection = &res.collections.get(&collection_name).unwrap();
             let collection_id = CollectionId::try_from_bytes(collection.id.as_slice()).unwrap();
-            let db_mutation = build_document_mutation(db_id.address(), collection.name.as_str());
+            let db_mutation = build_add_document_mutation(
+                db_id.address(),
+                collection.name.as_str(),
+                vec![r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string()],
+            );
 
             // add document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            let res = DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 2);
-            assert!(res.is_ok());
+            let ids =
+                DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 2).unwrap();
+            assert_eq!(1, ids.len());
+            let document_id_1 = ids[0];
 
             // get document test
-            let document_entry_id = DocumentEntryId::create(1000, 2, 0).unwrap();
-            let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
-            let res = DbStore::get_document(db.as_ref(), &document_id);
+            let res = DbStore::get_document(db.as_ref(), &document_id_1);
             if let Ok(Some(document)) = res {
                 assert_eq!(
                     r#"Document({"name": String("John Doe"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})"#,
@@ -606,26 +722,79 @@ mod tests {
                         bson_util::bytes_to_bson_document(document.doc).unwrap()
                     )
                 );
-                assert_eq!(document_id.as_ref(), document.id);
+                assert_eq!(document_id_1.as_ref(), document.id);
                 assert_eq!(addr.to_vec(), document.owner)
             } else {
                 assert!(false);
             }
 
-            // insert 2nd document
-
-            // add document test
+            // insert two documents
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            let db_mutation = build_document_mutation(db_id.address(), &collection_name);
-            let res = DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 3);
-            assert!(res.is_ok());
+            let db_mutation = build_add_document_mutation(
+                db_id.address(),
+                collection.name.as_str(),
+                vec![
+                    r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                    .to_string(),
+                    r#"
+        {
+            "name": "Bob",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                    .to_string(),
+                ],
+            );
+            let ids =
+                DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 3).unwrap();
+            assert_eq!(2, ids.len());
+            let document_id_2 = ids[0];
+            let document_id_3 = ids[1];
 
             // show documents
             if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {
-                assert_eq!(2, documents.len());
+                assert_eq!(3, documents.len());
             } else {
                 assert!(false);
             }
+
+            // delete document
+            let db_mutation = build_delete_document_mutation(
+                db_id.address(),
+                &collection_name,
+                vec![document_id_2.to_base64(), document_id_3.to_base64()],
+            );
+            let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+            let res = DbStore::delete_document(db_m, &addr, &db_mutation);
+            assert!(res.is_ok(), "{:?}", res);
+
+            // show documents
+            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {
+                assert_eq!(1, documents.len());
+            } else {
+                assert!(false);
+            }
+
+            assert!(DbStore::get_document(db.as_ref(), &document_id_2)
+                .unwrap()
+                .is_none());
+            assert!(DbStore::get_document(db.as_ref(), &document_id_3)
+                .unwrap()
+                .is_none());
+            assert!(DbStore::get_document(db.as_ref(), &document_id_1)
+                .unwrap()
+                .is_some());
         } else {
             assert!(false);
         }

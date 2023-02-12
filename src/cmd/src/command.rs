@@ -375,7 +375,8 @@ impl DB3ClientCommand {
                     .collect();
                 let document_mut = DocumentMutation {
                     collection_name,
-                    document: bson_documents,
+                    documents: bson_documents,
+                    ids: vec![],
                 };
                 let dm = DatabaseMutation {
                     meta: Some(meta),
