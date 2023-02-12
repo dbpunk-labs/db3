@@ -91,6 +91,13 @@ async fn handle_command(
     _completion_cache: CompletionCache,
 ) -> Result<bool, anyhow::Error> {
     let opts = opts?;
-    opts.command.execute(ctx).await;
+    match opts.command.execute(ctx).await {
+        Ok(table) => {
+            table.printstd();
+        }
+        Err(e) => {
+            println!("{:?}", e);
+        }
+    }
     Ok(false)
 }

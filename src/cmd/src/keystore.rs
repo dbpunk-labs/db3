@@ -108,7 +108,7 @@ impl KeyStore {
         }
     }
 
-    pub fn show_key(&self) {
+    pub fn show_key(&self) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row!["address", "scheme",]);
@@ -117,13 +117,12 @@ impl KeyStore {
         match &self.key_pair {
             DB3KeyPair::Ed25519(_) => {
                 table.add_row(row![id.to_hex(), "ed25519"]);
-                table.printstd();
             }
             DB3KeyPair::Secp256k1(_) => {
                 table.add_row(row![id.to_hex(), "secp256k1"]);
-                table.printstd();
             }
         }
+        Ok(table)
     }
 }
 
