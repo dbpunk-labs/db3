@@ -165,7 +165,10 @@ impl DB3Command {
             } => {
                 let mut ctx = Self::build_context(public_grpc_url.as_ref());
                 if let Some(c) = cmd {
-                    c.execute(&mut ctx).await;
+                    match c.execute(&mut ctx).await {
+                        Ok(table) => table.printstd(),
+                        Err(e) => println!("{}", e),
+                    }
                 }
             }
             DB3Command::Start {
@@ -338,5 +341,137 @@ impl DB3Command {
             }
         });
         (node_state, handler)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::command::DB3Command;
+    use db3_cmd::command::DB3ClientCommand;
+    use std::time;
+
+    #[tokio::test]
+    async fn client_cmd_smoke_test() {
+        let mut ctx = DB3Command::build_context("http://127.0.0.1:26659");
+        let cmd = DB3ClientCommand::Init {};
+        if let Ok(_) = cmd.execute(&mut ctx).await {
+        } else {
+            assert!(false);
+        }
+
+        let cmd = DB3ClientCommand::ShowKey {};
+        if let Ok(_) = cmd.execute(&mut ctx).await {
+        } else {
+            assert!(false);
+        }
+
+        let mut addr = String::new();
+        let cmd = DB3ClientCommand::NewDB {};
+        if let Ok(table) = cmd.execute(&mut ctx).await {
+            assert_eq!(1, table.len());
+            addr = table.get_row(0).unwrap().get_cell(0).unwrap().get_content();
+        } else {
+            assert!(false)
+        }
+        let collection_books = "test_books";
+        let cmd = DB3ClientCommand::NewCollection {
+            addr: addr.clone(),
+            name: collection_books.to_string(),
+            index_list: vec![r#"{"id":1,"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}"#.to_string()]
+        };
+
+        if let Ok(_) = cmd.execute(&mut ctx).await {
+        } else {
+            assert!(false)
+        }
+
+        std::thread::sleep(time::Duration::from_millis(2000));
+
+        let collection_student = "test_student";
+        let cmd = DB3ClientCommand::NewCollection {
+            addr: addr.clone(),
+            name: collection_student.to_string(),
+            index_list: vec![r#"{"id":1,"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}"#.to_string()]
+        };
+
+        if let Ok(_) = cmd.execute(&mut ctx).await {
+        } else {
+            assert!(false)
+        }
+
+        std::thread::sleep(time::Duration::from_millis(2000));
+
+        let cmd = DB3ClientCommand::ShowCollection { addr: addr.clone() };
+        if let Ok(table) = cmd.execute(&mut ctx).await {
+            assert_eq!(2, table.len());
+        } else {
+            assert!(false)
+        }
+
+        let cmd = DB3ClientCommand::NewDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            documents: vec![
+                r#"{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#
+                    .to_string(),
+            ],
+        };
+        if let Ok(table) = cmd.execute(&mut ctx).await {
+            assert_eq!(1, table.len());
+        } else {
+            assert!(false)
+        }
+        std::thread::sleep(time::Duration::from_millis(2000));
+        let cmd = DB3ClientCommand::NewDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            documents: vec![
+                r#"{"name": "Make","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
+            ],
+        };
+        if let Ok(table) = cmd.execute(&mut ctx).await {
+            assert_eq!(1, table.len());
+        } else {
+            assert!(false)
+        }
+        std::thread::sleep(time::Duration::from_millis(2000));
+
+        let mut doc_id1 = String::new();
+        let mut doc_id2 = String::new();
+        let cmd = DB3ClientCommand::ShowDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            key: "".to_string(),
+        };
+        if let Ok(table) = cmd.execute(&mut ctx).await {
+            assert_eq!(2, table.len());
+            doc_id1 = table.get_row(0).unwrap().get_cell(0).unwrap().get_content();
+            doc_id2 = table.get_row(1).unwrap().get_cell(0).unwrap().get_content();
+        } else {
+            assert!(false)
+        }
+
+        let cmd = DB3ClientCommand::GetDocument {
+            id: doc_id1.to_string(),
+        };
+        if let Ok(table) = cmd.execute(&mut ctx).await {
+            assert_eq!(
+                doc_id1,
+                table.get_row(0).unwrap().get_cell(0).unwrap().get_content()
+            );
+        } else {
+            assert!(false)
+        }
+
+        let cmd = DB3ClientCommand::GetDocument {
+            id: doc_id2.to_string(),
+        };
+        if let Ok(table) = cmd.execute(&mut ctx).await {
+            assert_eq!(
+                doc_id2,
+                table.get_row(0).unwrap().get_cell(0).unwrap().get_content()
+            );
+        } else {
+            assert!(false)
+        }
     }
 }
