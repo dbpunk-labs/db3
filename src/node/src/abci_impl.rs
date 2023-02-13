@@ -20,7 +20,7 @@ shadow!(build);
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
-use db3_proto::db3_mutation_proto::{DatabaseMutation, Mutation, PayloadType, WriteRequest};
+use db3_proto::db3_mutation_proto::{DatabaseMutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use fastcrypto::encoding::{Base64, Encoding};
@@ -41,13 +41,12 @@ use tracing::{debug, info, span, warn, Level};
 pub struct NodeState {
     total_storage_bytes: Arc<AtomicU64>,
     total_mutations: Arc<AtomicU64>,
-    total_query_sessions: Arc<AtomicU64>,
+    total_sessions: Arc<AtomicU64>,
 }
 
 #[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    pending_mutation: Arc<Mutex<Vec<(AccountAddress, TxId, Mutation)>>>,
     pending_query_session:
         Arc<Mutex<Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)>>>,
     node_state: Arc<NodeState>,
@@ -58,12 +57,11 @@ impl AbciImpl {
     pub fn new(node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>) -> Self {
         Self {
             node_store,
-            pending_mutation: Arc::new(Mutex::new(Vec::new())),
             pending_query_session: Arc::new(Mutex::new(Vec::new())),
             node_state: Arc::new(NodeState {
                 total_storage_bytes: Arc::new(AtomicU64::new(0)),
                 total_mutations: Arc::new(AtomicU64::new(0)),
-                total_query_sessions: Arc::new(AtomicU64::new(0)),
+                total_sessions: Arc::new(AtomicU64::new(0)),
             }),
             pending_databases: Arc::new(Mutex::new(Vec::new())),
         }
@@ -262,30 +260,6 @@ impl Application for AbciImpl {
                             }
                         }
                     }
-                    Some(PayloadType::MutationPayload) => {
-                        if let Ok(mutation) = Mutation::decode(wrequest.payload.as_ref()) {
-                            match self.pending_mutation.lock() {
-                                Ok(mut s) => {
-                                    //TODO add gas check
-                                    s.push((account_id.addr, tx_id, mutation));
-                                    return ResponseDeliverTx {
-                                        code: 0,
-                                        data: Bytes::new(),
-                                        log: "".to_string(),
-                                        info: "deliver_mutation".to_string(),
-                                        gas_wanted: 0,
-                                        gas_used: 0,
-                                        events: vec![Event {
-                                            r#type: "deliver".to_string(),
-                                            attributes: vec![],
-                                        }],
-                                        codespace: "".to_string(),
-                                    };
-                                }
-                                Err(_) => todo!(),
-                            }
-                        }
-                    }
                     Some(PayloadType::QuerySessionPayload) => {
                         if let Ok(query_session) = QuerySession::decode(wrequest.payload.as_ref()) {
                             if let Ok((client_account_id, _)) =
@@ -372,7 +346,7 @@ impl Application for AbciImpl {
                     match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
                         Ok(_) => {
                             self.node_state
-                                .total_query_sessions
+                                .total_sessions
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         }
                         Err(e) => {

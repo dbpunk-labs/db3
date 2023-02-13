@@ -22,4 +22,3 @@ mod db3_document;
 mod db_key;
 pub mod db_store;
 pub mod key;
-pub mod kv_store;

@@ -22,15 +22,12 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_database_proto::{Database, Document};
-use db3_proto::db3_mutation_proto::{DatabaseMutation, KvPair, Mutation, MutationAction};
-use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
+use db3_proto::db3_mutation_proto::DatabaseMutation;
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
 use db3_storage::commit_store::CommitStore;
 use db3_storage::db_store::DbStore;
-use db3_storage::key::Key;
-use db3_storage::kv_store::KvStore;
 use db3_types::cost;
 use db3_types::gas;
 use hex;
@@ -113,59 +110,6 @@ impl AuthStorage {
         &self.last_block_state
     }
 
-    pub fn get_range(&self, addr: &DB3Address, range_key: &RangeKey) -> Result<RangeValue> {
-        let proofs_ops = KvStore::get_range(self.db.as_ref(), addr, range_key)?;
-        let ns = range_key.ns.as_ref();
-        let mut kv_pairs: Vec<KvPair> = Vec::new();
-        for op in proofs_ops {
-            match op {
-                ProofOp::Push(Node::KV(k, v)) => {
-                    let new_key = Key::decode(k.as_ref(), ns)?;
-                    kv_pairs.push(KvPair {
-                        key: new_key.2.to_owned(),
-                        value: v,
-                        action: MutationAction::Nonce.into(),
-                    });
-                }
-                _ => {}
-            }
-        }
-
-        Ok(RangeValue {
-            values: kv_pairs.to_owned(),
-            ns: ns.to_vec(),
-            session_token: range_key.session_token.clone(),
-        })
-    }
-
-    pub fn batch_get(
-        &self,
-        addr: &DB3Address,
-        batch_get_keys: &BatchGetKey,
-    ) -> Result<BatchGetValue> {
-        let proofs_ops = KvStore::batch_get(self.db.as_ref(), addr, batch_get_keys)?;
-        let ns = batch_get_keys.ns.as_ref();
-        let mut kv_pairs: Vec<KvPair> = Vec::new();
-        for op in proofs_ops {
-            match op {
-                ProofOp::Push(Node::KV(k, v)) => {
-                    let new_key = Key::decode(k.as_ref(), ns)?;
-                    kv_pairs.push(KvPair {
-                        key: new_key.2.to_owned(),
-                        value: v,
-                        action: MutationAction::Nonce.into(),
-                    });
-                }
-                _ => {}
-            }
-        }
-        Ok(BatchGetValue {
-            values: kv_pairs.to_owned(),
-            session_token: batch_get_keys.session_token.clone(),
-            ns: ns.to_vec(),
-        })
-    }
-
     pub fn get_account(&self, addr: &DB3Address) -> Result<Option<Account>> {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
@@ -219,9 +163,8 @@ impl AuthStorage {
             time: self.current_block_state.block_time,
             tx_id: tx_id.as_ref().to_vec(),
             owner: addr.to_vec(),
-            provider: query_addr.to_vec(),
+            to: query_addr.to_vec(),
         };
-
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         // TODO use mutation id
         let bill_id = BillId::new(self.current_block_state.block_height as u64, 1 as u16)?;
@@ -300,7 +243,7 @@ impl AuthStorage {
             time: self.current_block_state.block_time,
             tx_id: tx.as_ref().to_vec(),
             owner: sender.to_vec(),
-            provider: vec![],
+            to: vec![],
         };
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         BillStore::apply(db, &bill_id, &bill)?;

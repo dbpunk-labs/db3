@@ -90,7 +90,7 @@ mod tests {
     use std::boxed::Box;
     use tempdir::TempDir;
     #[test]
-    fn it_apply_bill() {
+    fn it_apply_bill_test() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
         let addr = get_a_static_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
@@ -102,12 +102,11 @@ mod tests {
                 amount: 1,
             }),
             block_height: 11,
-            bill_id: 111,
             bill_type: BillType::BillForMutation.into(),
             time: 111,
-            bill_target_id: target_id.as_bytes().to_vec(),
-            query_addr: vec![],
+            tx_id: target_id.as_bytes().to_vec(),
             owner: addr.as_bytes().to_vec(),
+            to: vec![],
         };
 
         let bill_id = BillId::new(11, 111).unwrap();
@@ -121,52 +120,19 @@ mod tests {
                 amount: 1,
             }),
             block_height: 11,
-            bill_id: 1,
             bill_type: BillType::BillForMutation.into(),
             time: 111,
-            bill_target_id: target_id.as_bytes().to_vec(),
-            query_addr: vec![],
+            tx_id: target_id.as_bytes().to_vec(),
             owner: addr.as_bytes().to_vec(),
+            to: vec![],
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let bill_id = BillId::new(11, 1).unwrap();
-
         let result = BillStore::apply(db_m, &bill_id, &bill);
         assert!(result.is_ok());
-        let bill_id1 = BillId::new(11, 0).unwrap();
-        let bill_id2 = BillId::new(11, 200).unwrap();
-
-        let skey = BillKey(&bill_id1).encode().unwrap();
-        let ekey = BillKey(&bill_id2).encode().unwrap();
-        let mut query = Query::new();
-        let range = Range {
-            start: skey,
-            end: ekey,
-        };
-        query.insert_range(range);
-        let result = db.as_ref().prove(query);
-        if let Ok(r) = result {
-            let mut decoder = Decoder::new(r.as_ref());
-            loop {
-                if let Some(Ok(op)) = decoder.next() {
-                    match op {
-                        ProofOp::Push(Node::KV(k, v)) => {
-                            println!("k {:?} v {:?}", k, v);
-                        }
-                        ProofOp::Push(Node::KVHash(h)) => {
-                            println!("kvhash {:?}", h);
-                        }
-                        ProofOp::Push(Node::Hash(h)) => {
-                            println!("hash {:?}", h);
-                        }
-                        _ => {
-                            println!("other");
-                        }
-                    }
-                    continue;
-                }
-                break;
-            }
-        }
+        let result = BillStore::get_block_bills(db.as_ref(), 11);
+        assert!(result.is_ok());
+        let ops = result.unwrap();
+        assert_eq!(ops.len(), 2);
     }
 }

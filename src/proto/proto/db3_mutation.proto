@@ -21,12 +21,6 @@ import "db3_base.proto";
 import "db3_database.proto";
 package db3_mutation_proto;
 
-enum MutationAction {
-    InsertKv = 0;
-    DeleteKv = 1;
-    Nonce = 2;
-}
-
 enum DatabaseAction {
     CreateDB = 0;
     AddCollection = 1;
@@ -53,34 +47,9 @@ message DocumentMutation {
     repeated string ids = 3;
 }
 
-message KVPair {
-    // the key of value
-    bytes key = 1;
-    // the value
-    bytes value = 2;
-    MutationAction action = 3;
-}
-
-message Mutation {
-    // the namespace of kv pairs
-    bytes ns = 1;
-    // the all data to be written to db3
-    repeated KVPair kv_pairs = 2;
-    // the counter of account
-    uint64 nonce = 3;
-    // the chain id of db3
-    db3_base_proto.ChainId chain_id = 4;
-    // the chain role of db3
-    db3_base_proto.ChainRole chain_role = 5;
-    db3_base_proto.Units gas_price = 6;
-    // the predicted gas
-    uint64 gas = 7;
-}
-
 enum PayloadType {
-    MutationPayload =0;
-    QuerySessionPayload =1;
-    DatabasePayload = 2;
+    QuerySessionPayload =0;
+    DatabasePayload = 1;
 }
 
 message WriteRequest {

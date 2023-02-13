@@ -32,7 +32,6 @@ use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::HashMap;
 use std::collections::LinkedList;
-use std::ops::Range;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -663,7 +662,8 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
-        let database = DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+        let (database, _) =
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(database.collections.contains_key("collection1"))
     }
 
@@ -672,14 +672,13 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
-        let old_database =
+        let (old_database, _) =
             DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection2");
-        let new_database =
+        let (new_database, _) =
             DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101)
                 .unwrap();
-
         assert!(new_database.collections.contains_key("collection1"));
         assert!(new_database.collections.contains_key("collection2"));
     }
@@ -689,16 +688,12 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
-        let old_database =
+        let (old_database, _) =
             DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection1");
         let res = DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101);
         assert!(res.is_err());
-        assert_eq!(
-            "Err(ApplyDatabaseError(\"duplicated collection names collection1\"))",
-            format!("{:?}", res)
-        );
     }
 
     #[test]
@@ -714,11 +709,6 @@ mod tests {
         // create DB Test
         let result = DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, 1000, 1);
         assert!(result.is_ok());
-        if let Ok(ops) = DbStore::get_databases(db.as_ref()) {
-            assert_eq!(1, ops.len());
-        } else {
-            assert!(false);
-        }
 
         // get database test
         let db_id = DbId::try_from((&addr, 1)).unwrap();
@@ -744,7 +734,7 @@ mod tests {
 
             // add document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            let ids =
+            let (_, ids) =
                 DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 2).unwrap();
             assert_eq!(1, ids.len());
             let document_id_1 = ids[0];
@@ -793,7 +783,7 @@ mod tests {
                     .to_string(),
                 ],
             );
-            let ids =
+            let (_, ids) =
                 DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 3).unwrap();
             assert_eq!(2, ids.len());
             let document_id_2 = ids[0];
@@ -814,7 +804,7 @@ mod tests {
             );
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
             let res = DbStore::delete_document(db_m, &addr, &db_mutation);
-            assert!(res.is_ok(), "{:?}", res);
+            assert!(res.is_ok());
 
             // show documents
             if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {

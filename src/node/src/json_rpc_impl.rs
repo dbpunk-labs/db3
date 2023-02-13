@@ -22,7 +22,7 @@ use bytes::Bytes;
 use db3_crypto::db3_address::DB3Address;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::Bill;
-use db3_proto::db3_mutation_proto::{Mutation, WriteRequest};
+use db3_proto::db3_mutation_proto::WriteRequest;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -92,28 +92,6 @@ enum ResponseWrapper {
     External(String),
 }
 
-fn convert_mutation_to_readable(request: &WriteRequest) -> ReadableMutation {
-    let mut kv_pairs: Vec<ReadableKvPair> = Vec::new();
-    let mutation = Mutation::decode(request.payload.as_ref()).unwrap();
-    for kv in &mutation.kv_pairs {
-        kv_pairs.push(ReadableKvPair {
-            key: kv.key.to_owned(),
-            value: kv.value.to_owned(),
-            action: kv.action,
-        });
-    }
-    ReadableMutation {
-        ns: mutation.ns,
-        kv_pairs: Some(kv_pairs),
-        nonce: mutation.nonce,
-        chain_id: mutation.chain_id,
-        chain_role: mutation.chain_role,
-        gas_price: mutation.gas_price,
-        gas: mutation.gas,
-        signature: request.signature.to_owned(),
-    }
-}
-
 pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<HttpResponse, Error> {
     let request: json_rpc::Request = match serde_json::from_slice(body.as_ref()) {
         Ok(ok) => ok,
@@ -135,7 +113,6 @@ pub async fn rpc_router(body: Bytes, context: web::Data<Context>) -> Result<Http
         "bills" => handle_bills(&context, request.id, request.params).await,
         "latest_blocks" => handle_latestblocks(&context, request.id, request.params).await,
         "block" => handle_block(&context, request.id, request.params).await,
-        "mutation" => handle_mutation(&context, request.id, request.params).await,
         "account" => handle_account(&context, request.id, request.params).await,
         "net_info" => handle_netinfo(&context, request.id, request.params).await,
         "validators" => handle_validators(&context, request.id, request.params).await,
@@ -299,41 +276,6 @@ async fn handle_account(
             }
         }
         let err = "invalid parameters";
-        Err(json_rpc::ErrorData::new(-32601, err))
-    }
-}
-
-async fn handle_mutation(
-    context: &Context,
-    id: Value,
-    params: Vec<Value>,
-) -> Result<ResponseWrapper, json_rpc::ErrorData> {
-    if params.len() == 0 {
-        let err = "invalid parameters";
-        Err(json_rpc::ErrorData::new(-32601, err))
-    } else {
-        if let Value::String(s) = &params[0] {
-            let tx_hash_ret = hash_util::base64_to_hash(s.as_str());
-            if let Ok(tx_hash) = tx_hash_ret {
-                let response = context.client.tx(tx_hash, false).await.unwrap();
-                let wrequest = WriteRequest::decode(response.tx.as_ref()).unwrap();
-                let readable_mutation = convert_mutation_to_readable(&wrequest);
-                let external_id = match id {
-                    Value::Number(n) => Id::Num(n.as_i64().unwrap()),
-                    Value::String(s) => Id::Str(s),
-                    _ => todo!(),
-                };
-                let wrapper = Wrapper {
-                    jsonrpc: String::from(json_rpc::JSONRPC_VERSION),
-                    result: Some(readable_mutation),
-                    id: external_id,
-                };
-                return Ok(ResponseWrapper::External(
-                    serde_json::to_string(&wrapper).unwrap(),
-                ));
-            }
-        }
-        let err = "respnse errr";
         Err(json_rpc::ErrorData::new(-32601, err))
     }
 }

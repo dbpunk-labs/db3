@@ -26,10 +26,9 @@ use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
     CloseSessionResponse, GetAccountRequest, GetAccountResponse, GetDocumentRequest,
-    GetDocumentResponse, GetKeyRequest, GetKeyResponse, GetRangeRequest, GetRangeResponse,
-    GetSessionInfoRequest, GetSessionInfoResponse, ListDocumentsRequest, ListDocumentsResponse,
-    OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse,
-    ShowDatabaseRequest, ShowDatabaseResponse,
+    GetDocumentResponse, GetSessionInfoRequest, GetSessionInfoResponse, ListDocumentsRequest,
+    ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse, QueryBillRequest,
+    QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
@@ -195,58 +194,6 @@ impl StorageNode for StorageNodeImpl {
                 }
             }
             Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
-        }
-    }
-    async fn get_range(
-        &self,
-        request: Request<GetRangeRequest>,
-    ) -> std::result::Result<Response<GetRangeResponse>, Status> {
-        if let Some(range_key) = request.into_inner().range_keys {
-            match self.context.node_store.lock() {
-                Ok(mut node_store) => {
-                    match node_store
-                        .get_session_store()
-                        .get_session_mut(&range_key.session_token)
-                    {
-                        Some(session) => {
-                            if !session.check_session_running() {
-                                return Err(Status::permission_denied(
-                                    "Fail to query in this session. Please restart query session",
-                                ));
-                            }
-                        }
-                        None => return Err(Status::internal("Fail to create session")),
-                    }
-                    let addr = node_store
-                        .get_session_store()
-                        .get_address(&range_key.session_token);
-                    if addr.is_none() {
-                        return Err(Status::internal(format!(
-                            "not address found related to current token {}",
-                            &range_key.session_token
-                        )));
-                    }
-                    let values = node_store
-                        .get_auth_store()
-                        .get_range(&addr.unwrap(), &range_key)
-                        .map_err(|e| Status::internal(format!("{:?}", e)))?;
-
-                    node_store
-                        .get_session_store()
-                        .get_session_mut(&range_key.session_token)
-                        .unwrap()
-                        .increase_query(1);
-
-                    Ok(Response::new(GetRangeResponse {
-                        range_value: Some(values.to_owned()),
-                    }))
-                }
-                Err(e) => Err(Status::internal(format!("Fail to get key {}", e))),
-            }
-        } else {
-            Err(Status::invalid_argument(
-                "range key is empty or none".to_string(),
-            ))
         }
     }
 
@@ -415,61 +362,6 @@ impl StorageNode for StorageNodeImpl {
                 Ok(Response::new(QueryBillResponse { bills }))
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
-        }
-    }
-
-    // Batch query with keys
-    async fn get_key(
-        &self,
-        request: Request<GetKeyRequest>,
-    ) -> std::result::Result<Response<GetKeyResponse>, Status> {
-        if let Some(batch_get_key) = request.into_inner().batch_get {
-            match self.context.node_store.lock() {
-                Ok(mut node_store) => {
-                    match node_store
-                        .get_session_store()
-                        .get_session_mut(&batch_get_key.session_token)
-                    {
-                        Some(session) => {
-                            if !session.check_session_running() {
-                                return Err(Status::permission_denied(
-                                    "Fail to query in this session. Please restart query session",
-                                ));
-                            }
-                        }
-                        None => return Err(Status::internal("Fail to create session")),
-                    }
-                    let addr = node_store
-                        .get_session_store()
-                        .get_address(&batch_get_key.session_token);
-
-                    if addr.is_none() {
-                        return Err(Status::internal(format!(
-                            "not address found related to current token {}",
-                            &batch_get_key.session_token
-                        )));
-                    }
-                    let values = node_store
-                        .get_auth_store()
-                        .batch_get(&addr.unwrap(), &batch_get_key)
-                        .map_err(|e| Status::internal(format!("{:?}", e)))?;
-
-                    // TODO(chenjing): evaluate query ops based on keys size
-                    node_store
-                        .get_session_store()
-                        .get_session_mut(&batch_get_key.session_token)
-                        .unwrap()
-                        .increase_query(1);
-                    Ok(Response::new(GetKeyResponse {
-                        batch_get_values: Some(values.to_owned()),
-                    }))
-                }
-                Err(e) => Err(Status::internal(format!("Fail to get key {}", e))),
-            }
-        } else {
-            Err(Status::invalid_argument(
-                "batch key is empty or none".to_string(),
-            ))
         }
     }
 

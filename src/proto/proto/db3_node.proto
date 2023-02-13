@@ -17,7 +17,6 @@
 //
 syntax = "proto3";
 import "db3_bill.proto";
-import "db3_mutation.proto";
 import "db3_account.proto";
 import "db3_session.proto";
 import "db3_database.proto";
@@ -29,7 +28,7 @@ message NetworkStatus {
     uint64 total_collection_count = 2;
     uint64 total_document_count = 3;
     uint64 total_account_count = 4;
-    uint64 total_mutataion_count = 5;
+    uint64 total_mutation_count = 5;
     uint64 total_session_count = 6;
     uint64 total_storage_in_bytes = 7;
     uint64 total_gas = 8;
@@ -37,9 +36,7 @@ message NetworkStatus {
 
 message QueryBillKey {
     uint64 height = 1;
-    uint64 start_id = 2;
-    uint64 end_id = 3;
-    string session_token = 4;
+    string session_token = 2;
 }
 message QueryBillRequest {
     QueryBillKey query_bill_key = 1;
@@ -49,54 +46,10 @@ message QueryBillResponse {
     repeated db3_bill_proto.Bill bills = 1;
 }
 
-message Range {
-    bytes start = 1;
-    bytes end = 2;
-}
-
-message RangeKey {
-    bytes ns = 1;
-    Range range = 2;
-    string session_token = 3;
-}
-
-message BatchGetKey {
-    bytes ns = 1;
-    repeated bytes keys = 2;
-    string session_token = 3;
-}
-
-message RangeValue {
-    repeated db3_mutation_proto.KVPair values = 1;
-    string session_token = 2;
-    bytes ns = 3;
-}
-
-message BatchGetValue {
-    repeated db3_mutation_proto.KVPair values = 1;
-    string session_token = 2;
-    bytes ns = 3;
-}
-
 message SessionIdentifier {
     string session_token = 1;
 }
 
-message GetKeyRequest {
-    BatchGetKey batch_get = 1;
-}
-
-message GetKeyResponse {
-    BatchGetValue batch_get_values = 2;
-}
-
-message GetRangeRequest {
-    RangeKey range_keys = 1;
-}
-
-message GetRangeResponse {
-    RangeValue range_value = 1;
-}
 
 message GetAccountRequest {
     bytes addr = 1;
@@ -180,9 +133,6 @@ message ListDocumentsResponse {
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
-    // method for querying kv data
-    rpc GetKey(GetKeyRequest) returns (GetKeyResponse) {}
-    rpc GetRange(GetRangeRequest) returns (GetRangeResponse) {}
     // method for open query session
     rpc OpenQuerySession(OpenSessionRequest) returns (OpenSessionResponse) {}
     // method for close query session
@@ -199,4 +149,3 @@ service StorageNode {
     // method for get document
     rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
 }
-

@@ -36,8 +36,8 @@ message Bill {
     bytes tx_id = 6;
     // owner address
     bytes owner = 8;
-    // service provider address
-    bytes provider = 9;
+    // to address
+    bytes to = 9;
 }
 
 message BillQueryRequest {
