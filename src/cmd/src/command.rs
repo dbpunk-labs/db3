@@ -18,8 +18,10 @@
 use clap::*;
 
 use crate::keystore::KeyStore;
-use db3_base::bson_util;
+use db3_base::{bson_util, strings};
+use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::{AccountId, DbId, DocumentId, TxId};
+use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::{Database, Document, Index};
 use db3_proto::db3_mutation_proto::{
@@ -120,6 +122,8 @@ pub enum DB3ClientCommand {
         #[clap(long, default_value = "")]
         key: String,
     },
+    #[clap(name = "show-account")]
+    ShowAccount {},
 }
 
 impl DB3ClientCommand {
@@ -211,6 +215,30 @@ impl DB3ClientCommand {
         Ok(table)
     }
 
+    fn show_account(account: &Account, addr: &DB3Address) -> std::result::Result<Table, String> {
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+        table.set_titles(row![
+            "address",
+            "bills",
+            "credits",
+            "storage_used",
+            "mutations",
+            "session",
+            "nonce"
+        ]);
+        table.add_row(row![
+            AccountId::new(*addr).to_hex(),
+            strings::units_to_readable_num_str(account.bills.as_ref().unwrap()),
+            strings::units_to_readable_num_str(account.credits.as_ref().unwrap()),
+            strings::bytes_to_readable_num_str(account.total_storage_in_bytes),
+            account.total_mutation_count,
+            account.total_session_count,
+            account.nonce
+        ]);
+        Ok(table)
+    }
+
     pub async fn execute(self, ctx: &mut DB3ClientContext) -> std::result::Result<Table, String> {
         match self {
             DB3ClientCommand::Init {} => match KeyStore::recover_keypair() {
@@ -220,6 +248,18 @@ impl DB3ClientCommand {
 
             DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair() {
                 Ok(ks) => ks.show_key(),
+                Err(e) => Err(
+                    "no key was found, you can use init command to create a new one".to_string(),
+                ),
+            },
+            DB3ClientCommand::ShowAccount {} => match KeyStore::recover_keypair() {
+                Ok(ks) => {
+                    let addr = ks.get_address().unwrap();
+                    match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
+                        Ok(account) => Self::show_account(&account, &addr),
+                        Err(e) => Err("fail to get account".to_string()),
+                    }
+                }
                 Err(e) => Err(
                     "no key was found, you can use init command to create a new one".to_string(),
                 ),

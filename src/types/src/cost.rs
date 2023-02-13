@@ -24,8 +24,7 @@ const C_CREATEINDEX_GAS_PRICE: u64 = 100; // unit in tai
 const C_ADD_DOC_GAS_PRICE: u64 = 200; // unit in tai
 const C_DEL_DOC_GAS_PRICE: u64 = 200; // unit in tai
 const C_UPDATE_DOC_GAS_PRICE: u64 = 200; // unit in tai
-const STORAGE_GAS_PRICE: u64 = 10; // per bytes
-                                   //
+const STORAGE_GAS_PRICE: u64 = 1; // per bytes
 pub enum DbStoreOp {
     DbOp {
         create_db_ops: u64,
@@ -57,6 +56,16 @@ impl DbStoreOp {
             } => {
                 *data_in_bytes = data_size;
             }
+        }
+    }
+    pub fn get_data_size(&self) -> u64 {
+        match self {
+            DbStoreOp::DbOp {
+                 data_in_bytes, ..
+            } => *data_in_bytes,
+            DbStoreOp::DocOp {
+                 data_in_bytes, ..
+            } => *data_in_bytes,
         }
     }
 }

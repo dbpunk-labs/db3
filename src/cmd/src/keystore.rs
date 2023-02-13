@@ -108,6 +108,11 @@ impl KeyStore {
         }
     }
 
+    pub fn get_address(&self) -> std::result::Result<DB3Address, String> {
+        let pk = self.key_pair.public();
+        Ok(DB3Address::from(&pk))
+    }
+
     pub fn show_key(&self) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
