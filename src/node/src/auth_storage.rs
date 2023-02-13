@@ -19,7 +19,7 @@ use db3_crypto::id::{BillId, CollectionId, DbId, DocumentId};
 use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
-use db3_proto::db3_base_proto::Units;
+use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_database_proto::{Database, Document};
 use db3_proto::db3_mutation_proto::{DatabaseMutation, KvPair, Mutation, MutationAction};
@@ -199,8 +199,7 @@ impl AuthStorage {
     pub fn begin_block(&mut self, height: u64, time: u64) {
         self.current_block_state.block_time = time;
         self.current_block_state.block_height = height as i64;
-        self.current_block_state.bill_id_counter = 0;
-        self.current_block_state.database_mutation_counter = 0;
+        self.current_block_state.tx_counter = 0;
     }
 
     pub fn apply_query_session(
@@ -211,29 +210,28 @@ impl AuthStorage {
         query_session_info: &QuerySessionInfo,
     ) -> Result<Units> {
         let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?.unwrap();
-        self.current_block_state.bill_id_counter = self.current_block_state.bill_id_counter + 1;
+        self.current_block_state.tx_counter = self.current_block_state.tx_counter + 1;
         let gas_fee = cost::estimate_query_session_gas(query_session_info);
         let bill = Bill {
             gas_fee: Some(gas_fee.clone()),
             block_height: self.current_block_state.block_height as u64,
-            bill_id: self.current_block_state.bill_id_counter,
             bill_type: BillType::BillForQuery.into(),
             time: self.current_block_state.block_time,
-            bill_target_id: tx_id.as_ref().to_vec(),
+            tx_id: tx_id.as_ref().to_vec(),
             owner: addr.to_vec(),
-            query_addr: query_addr.to_vec(),
+            provider: query_addr.to_vec(),
         };
 
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         // TODO use mutation id
         let bill_id = BillId::new(self.current_block_state.block_height as u64, 1 as u16)?;
         BillStore::apply(db, &bill_id, &bill)?;
-        let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
-        account.total_bills = Some(accumulate_gas);
+        let accumulate_gas = gas::gas_add(&gas_fee, &account.bills.unwrap());
+        account.bills = Some(accumulate_gas);
         account.total_session_count =
             account.total_session_count + query_session_info.query_count as u64;
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        AccountStore::apply(db, &addr, &account)?;
+        AccountStore::update_account(db, &addr, &account)?;
         Ok(gas_fee)
     }
 
@@ -248,7 +246,7 @@ impl AuthStorage {
         let mut account = match AccountStore::get_account(self.db.as_ref(), sender)? {
             Some(account) => Ok(account),
             None => {
-                //TODO remove the action to create a new user
+                //TODO remove the action for adding a new user
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
                 AccountStore::new_account(db, sender)
             }
@@ -263,18 +261,19 @@ impl AuthStorage {
             tx,
             mutation,
             self.current_block_state.block_height as u64,
-            self.current_block_state.database_mutation_counter,
+            self.current_block_state.tx_counter.into(),
         )?;
         let gas_fee = cost::estimate_gas(&ops);
-        let new_credits = gas::gas_consume(&account.credits, &gas_fee);
+        let old_credits = account.credits.unwrap();
+        let new_credits = gas::gas_consume(&old_credits, &gas_fee);
         match new_credits {
             Ok(credits) => {
                 account.credits = Some(credits);
-                let new_bills = gas::gas_add(&account.bills, &gas_fee);
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
                 account.bills = Some(new_bills);
                 account.total_mutation_count += 1;
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-                AccountStore::update_account(sender, &account)?;
+                AccountStore::update_account(db, sender, &account)?;
             }
             Err(_) => {
                 //TODO throw out of gas error
@@ -282,11 +281,11 @@ impl AuthStorage {
                     utype: UnitType::Db3.into(),
                     amount: 0,
                 });
-                let new_bills = gas::gas_add(&account.bills, &gas_fee);
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
                 account.bills = Some(new_bills);
                 account.total_mutation_count += 1;
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-                AccountStore::update_account(sender, &account)?;
+                AccountStore::update_account(db, sender, &account)?;
             }
         }
         let bill_id = BillId::new(
@@ -299,48 +298,13 @@ impl AuthStorage {
             block_height: self.current_block_state.block_height as u64,
             bill_type: BillType::BillForMutation.into(),
             time: self.current_block_state.block_time,
-            tx_id: tx_id.as_ref().to_vec(),
+            tx_id: tx.as_ref().to_vec(),
             owner: sender.to_vec(),
-            service_addr: vec![],
+            provider: vec![],
         };
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         BillStore::apply(db, &bill_id, &bill)?;
         Ok(gas_fee)
-    }
-
-    pub fn apply_mutation(
-        &mut self,
-        addr: &DB3Address,
-        tx_id: &TxId,
-        mutation: &Mutation,
-    ) -> Result<(Units, u64)> {
-        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?.unwrap();
-        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        let (gas_fee, total_bytes) = KvStore::apply(db, &addr, &mutation)?;
-        let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
-        account.total_bills = Some(accumulate_gas);
-        account.total_mutation_count = account.total_mutation_count + 1;
-        account.total_storage_in_bytes = account.total_storage_in_bytes + total_bytes as u64;
-        self.current_block_state.bill_id_counter = self.current_block_state.bill_id_counter + 1;
-        let bill = Bill {
-            gas_fee: Some(gas_fee.clone()),
-            block_height: self.current_block_state.block_height as u64,
-            bill_id: self.current_block_state.bill_id_counter,
-            bill_type: BillType::BillForMutation.into(),
-            time: self.current_block_state.block_time,
-            bill_target_id: tx_id.as_ref().to_vec(),
-            owner: addr.to_vec(),
-            query_addr: vec![],
-        };
-        let bill_id = BillId::new(
-            self.current_block_state.block_height as u64,
-            self.current_block_state.bill_id_counter as u16,
-        )?;
-        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        BillStore::apply(db, &bill_id, &bill)?;
-        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        AccountStore::apply(db, &addr, &account)?;
-        Ok((gas_fee, total_bytes as u64))
     }
 
     /// return the root hash

@@ -56,7 +56,7 @@ impl AccountStore {
     pub fn update_account(db: Pin<&mut Merk>, addr: &DB3Address, account: &Account) -> Result<()> {
         let key = AccountKey(addr);
         let encoded_key = key.encode()?;
-        Self::override_account(db, key, account)
+        Self::override_account(db, encoded_key, account)
     }
 
     ///
@@ -76,7 +76,7 @@ impl AccountStore {
             }
         } else {
             let new_account = Account {
-                total_bills: Some(Units {
+                bills: Some(Units {
                     utype: UnitType::Tai.into(),
                     amount: 0,
                 }),
@@ -141,7 +141,7 @@ mod tests {
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let account = Account {
-            total_bills: Some(Units {
+            bills: Some(Units {
                 utype: UnitType::Db3.into(),
                 amount: 2,
             }),

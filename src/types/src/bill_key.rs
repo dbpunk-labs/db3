@@ -15,7 +15,6 @@
 // limitations under the License.
 //
 
-use super::ensure_len_eq;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use db3_crypto::id::{BillId, BILL_ID_LENGTH};
 use db3_error::{DB3Error, Result};

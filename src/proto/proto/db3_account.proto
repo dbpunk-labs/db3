@@ -22,7 +22,7 @@ import "db3_base.proto";
 package db3_account_proto;
 
 message Account {
-    db3_base_proto.Units total_bills = 1;
+    db3_base_proto.Units bills = 1;
     db3_base_proto.Units credits = 2;
     uint64 total_storage_in_bytes = 3;
     uint64 total_mutation_count = 4;

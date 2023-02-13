@@ -23,7 +23,6 @@ use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::Tx
 use db3_proto::db3_mutation_proto::{DatabaseMutation, Mutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
-use db3_storage::kv_store::KvStore;
 use fastcrypto::encoding::{Base64, Encoding};
 use hex;
 use prost::Message;
@@ -158,31 +157,6 @@ impl Application for AbciImpl {
                                 Err(_) => {
                                     //TODO add event ?
                                     warn!("invalid database byte data");
-                                }
-                            }
-                        }
-
-                        Some(PayloadType::MutationPayload) => {
-                            match Mutation::decode(request.payload.as_ref()) {
-                                Ok(mutation) => {
-                                    if KvStore::is_valid(&mutation) {
-                                        return ResponseCheckTx {
-                                            code: 0,
-                                            data: Bytes::new(),
-                                            log: "".to_string(),
-                                            info: "".to_string(),
-                                            gas_wanted: 1,
-                                            gas_used: 0,
-                                            events: vec![],
-                                            codespace: "".to_string(),
-                                            ..Default::default()
-                                        };
-                                    } else {
-                                        warn!("invalid mutation for kv store");
-                                    }
-                                }
-                                Err(e) => {
-                                    warn!("invalid transaction has been checked for error {}", e);
                                 }
                             }
                         }
@@ -368,16 +342,6 @@ impl Application for AbciImpl {
     }
 
     fn commit(&self) -> ResponseCommit {
-        let pending_mutation: Vec<(AccountAddress, TxId, Mutation)> =
-            match self.pending_mutation.lock() {
-                Ok(mut q) => {
-                    let clone_q = q.drain(..).collect();
-                    clone_q
-                }
-                Err(_) => {
-                    todo!();
-                }
-            };
         let pending_query_session: Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)> =
             match self.pending_query_session.lock() {
                 Ok(mut q) => {
@@ -403,24 +367,6 @@ impl Application for AbciImpl {
             Ok(mut store) => {
                 let s = store.get_auth_store();
                 let span = span!(Level::INFO, "commit").entered();
-                let pending_mutation_len = pending_mutation.len();
-                for item in pending_mutation {
-                    match s.apply_mutation(&item.0, &item.1, &item.2) {
-                        Ok((_gas, total_bytes)) => {
-                            self.node_state
-                                .total_mutations
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            self.node_state.total_storage_bytes.fetch_add(
-                                total_bytes as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
-                        }
-                        Err(e) => {
-                            warn!("fail to apply mutation for {}", e);
-                            todo!();
-                        }
-                    }
-                }
                 let pending_query_session_len = pending_query_session.len();
                 for item in pending_query_session {
                     match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
@@ -450,10 +396,7 @@ impl Application for AbciImpl {
                     }
                 }
                 span.exit();
-                if pending_mutation_len > 0
-                    || pending_query_session_len > 0
-                    || pending_databases_len > 0
-                {
+                if pending_query_session_len > 0 || pending_databases_len > 0 {
                     //TODO how to revert
                     if let Ok(hash) = s.commit() {
                         ResponseCommit {

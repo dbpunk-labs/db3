@@ -28,18 +28,37 @@ const STORAGE_GAS_PRICE: u64 = 10; // per bytes
                                    //
 pub enum DbStoreOp {
     DbOp {
-        pub create_db_ops: u64,
-        pub create_collection_ops: u64,
-        pub create_index_ops: u64,
-        pub data_in_bytes: u64,
+        create_db_ops: u64,
+        create_collection_ops: u64,
+        create_index_ops: u64,
+        data_in_bytes: u64,
     },
 
     DocOp {
-        pub add_doc_ops: u64,
-        pub del_doc_ops: u64,
-        pub update_doc_ops: u64,
-        pub data_in_bytes: u64,
+        add_doc_ops: u64,
+        del_doc_ops: u64,
+        update_doc_ops: u64,
+        data_in_bytes: u64,
     },
+}
+
+impl DbStoreOp {
+    pub fn update_data_size(&mut self, data_size: u64) {
+        match self {
+            DbStoreOp::DbOp {
+                ref mut data_in_bytes,
+                ..
+            } => {
+                *data_in_bytes = data_size;
+            }
+            DbStoreOp::DocOp {
+                ref mut data_in_bytes,
+                ..
+            } => {
+                *data_in_bytes = data_size;
+            }
+        }
+    }
 }
 
 pub fn estimate_gas(ops: &DbStoreOp) -> Units {
@@ -68,14 +87,14 @@ pub fn estimate_gas(ops: &DbStoreOp) -> Units {
         }
     }
     Units {
-        utype: UniType::Tai.into(),
+        utype: UnitType::Tai.into(),
         amount: gas,
     }
 }
 
 pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> Units {
     let mut gas: u64 = 0;
-    gas += query_session_info.query_count as u64 * COMPUTAION_GAS_PRICE;
+    gas += query_session_info.query_count as u64 * 10;
     // TODO: estimate gas based on query count and weight
     Units {
         utype: UnitType::Tai.into(),

@@ -69,29 +69,22 @@ impl KvStore {
         }
     }
 
-    pub fn apply(
-        db: Pin<&mut Merk>,
-        addr: &DB3Address,
-        mutation: &Mutation,
-    ) -> Result<(Units, usize)> {
+    pub fn apply(db: Pin<&mut Merk>, addr: &DB3Address, mutation: &Mutation) -> Result<()> {
         let ns = mutation.ns.as_ref();
         //TODO avoid copying operation
         let mut ordered_kv_pairs = mutation.kv_pairs.to_vec();
         ordered_kv_pairs.sort_by(|a, b| a.key.cmp(&b.key));
         let mut entries: Vec<BatchEntry> = Vec::new();
-        let mut total_in_bytes: usize = 0;
         for kv in ordered_kv_pairs {
-            let (batch_entry, bytes) = Self::convert(&kv, addr, ns)?;
-            total_in_bytes += bytes;
+            let (batch_entry, _) = Self::convert(&kv, addr, ns)?;
             entries.push(batch_entry);
         }
-        let gas = cost::estimate_gas(mutation);
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
                 .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
         }
-        Ok((gas, total_in_bytes))
+        Ok(())
     }
 
     pub fn batch_get(

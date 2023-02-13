@@ -66,7 +66,7 @@ impl DbStore {
             } else {
                 idx += 1;
                 collection_ops += 1;
-                index_ops += new_collection.index.len();
+                index_ops += new_collection.index.len() as u64;
                 new_collections.insert(
                     new_collection.collection_name.to_string(),
                     Collection {
@@ -93,7 +93,7 @@ impl DbStore {
                 tx: tx_list,
                 collections: new_collections,
             },
-            DbStoreOp {
+            DbStoreOp::DbOp {
                 create_db_ops: 0,
                 create_collection_ops: collection_ops,
                 create_index_ops: index_ops,
@@ -112,15 +112,15 @@ impl DbStore {
     ) -> (Database, DbStoreOp) {
         //TODO check the duplicated collection id
         let mut idx = 0;
-        let collection_count: u64 = 0;
-        let index_count: u64 = 0;
+        let mut collection_count: u64 = 0;
+        let mut index_count: u64 = 0;
         let collections: HashMap<String, Collection> = mutation
             .collection_mutations
             .iter()
             .map(move |x| {
                 idx += 1;
                 collection_count += 1;
-                index_count += x.index.len();
+                index_count += x.index.len() as u64;
                 (
                     x.collection_name.to_string(),
                     Collection {
@@ -141,7 +141,7 @@ impl DbStore {
                 tx: vec![txid.as_ref().to_vec()],
                 collections,
             },
-            DbStoreOp::DBOp {
+            DbStoreOp::DbOp {
                 create_db_ops: 1,
                 create_collection_ops: collection_count,
                 create_index_ops: index_count,
@@ -160,8 +160,8 @@ impl DbStore {
     ) -> Result<(BatchEntry, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
         let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
-        let (entry, data_in_bytes) = Self::encode_database(dbid, &db);
-        ops.data_in_bytes = data_in_bytes;
+        let (entry, data_in_bytes) = Self::encode_database(dbid, &db)?;
+        ops.update_data_size(data_in_bytes as u64);
         Ok((entry, ops))
     }
 
@@ -237,7 +237,7 @@ impl DbStore {
                         Self::update_database(&d, mutation, tx, block_id, mutation_id)?;
                     //TODO how to get the byte size that was updated
                     let (entry, data_in_bytes) = Self::encode_database(db_id, &new_db)?;
-                    ops.data_in_bytes = data_in_bytes;
+                    ops.update_data_size(data_in_bytes as u64);
                     entries.push(entry);
                     unsafe {
                         Pin::get_unchecked_mut(db)
@@ -248,8 +248,8 @@ impl DbStore {
                 }
             }
             None => {
-                todo!();
                 warn!("database not found with addr {}", db_id.to_hex());
+                todo!();
             }
         }
     }
@@ -313,7 +313,7 @@ impl DbStore {
                 )))
             }
         }
-        let del_doc_ops = entries.len();
+        let del_doc_ops: u64 = entries.len() as u64;
         unsafe {
             entries.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(&b_key));
             Pin::get_unchecked_mut(db)
@@ -384,7 +384,7 @@ impl DbStore {
                             .unwrap();
                             let document_vec = db3_document.into_bytes().to_vec();
                             add_doc_ops += 1;
-                            data_in_bytes += document_vec.len();
+                            data_in_bytes += document_vec.len() as u64;
                             info!("put document id {}", document_id.to_string());
                             entries.push((document_id.as_ref().to_vec(), Op::Put(document_vec)));
 
@@ -532,10 +532,8 @@ impl DbStore {
             }
             Some(DatabaseAction::AddDocument) => {
                 // TODO: send event with added ids
-                match Self::add_document(db, sender, tx, mutation, block_id, mutation_id) {
-                    Ok(ids) => Ok(()),
-                    Err(e) => Err(e),
-                }
+                let (ops, _) = Self::add_document(db, sender, tx, mutation, block_id, mutation_id)?;
+                Ok(ops)
             }
             Some(DatabaseAction::DeleteDocument) => Self::delete_document(db, sender, mutation),
             None => todo!(),

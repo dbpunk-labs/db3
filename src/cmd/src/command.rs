@@ -419,7 +419,7 @@ impl DB3ClientCommand {
                 collection_name,
                 ids,
             } => {
-                if (ids.is_empty()) {
+                if ids.is_empty() {
                     return Err("fail to delete with empty ids".to_string());
                 }
                 let db_id = DbId::try_from(addr.as_str()).unwrap();

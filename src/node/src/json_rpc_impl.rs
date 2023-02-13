@@ -36,10 +36,9 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
     let mut new_bills: Vec<Value> = Vec::new();
     for bill in bills {
         let mut new_bill: Map<String, Value> = Map::new();
-        new_bill.insert("bill_id".to_string(), Value::from(bill.bill_id));
-        let base64_bytes = base64::encode(&bill.bill_target_id);
+        let base64_bytes = base64::encode(&bill.tx_id);
         let base64_string = String::from_utf8(base64_bytes).unwrap();
-        new_bill.insert("bill_target_id".to_string(), Value::from(base64_string));
+        new_bill.insert("tx_id".to_string(), Value::from(base64_string));
         //TODO add owner address
         new_bill.insert("time".to_string(), Value::from(bill.time));
         new_bill.insert("block_height".to_string(), Value::from(bill.block_height));
