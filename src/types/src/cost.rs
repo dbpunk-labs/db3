@@ -18,12 +18,12 @@ use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 
-const C_CREATEDB_GAS_PRICE: u64 = 10; // unit in tai
-const C_CREATECOLLECTION_GAS_PRICE: u64 = 10; // unit in tai
-const C_CREATEINDEX_GAS_PRICE: u64 = 10; // unit in tai
-const C_ADD_DOC_GAS_PRICE: u64 = 20; // unit in tai
-const C_DEL_DOC_GAS_PRICE: u64 = 20; // unit in tai
-const C_UPDATE_DOC_GAS_PRICE: u64 = 20; // unit in tai
+const C_CREATEDB_GAS_PRICE: u64 = 100; // unit in tai
+const C_CREATECOLLECTION_GAS_PRICE: u64 = 100; // unit in tai
+const C_CREATEINDEX_GAS_PRICE: u64 = 100; // unit in tai
+const C_ADD_DOC_GAS_PRICE: u64 = 200; // unit in tai
+const C_DEL_DOC_GAS_PRICE: u64 = 200; // unit in tai
+const C_UPDATE_DOC_GAS_PRICE: u64 = 200; // unit in tai
 const STORAGE_GAS_PRICE: u64 = 10; // per bytes
                                    //
 pub enum DbStoreOp {
