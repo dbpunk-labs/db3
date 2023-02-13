@@ -21,21 +21,14 @@ use db3_crypto::id::{BillId, BILL_ID_LENGTH};
 use db3_error::{DB3Error, Result};
 const BLOCK_BILL: &str = "/bl/";
 
-pub struct BillKey<'a>(&'a BillId);
+pub struct BillKey<'a>(pub &'a BillId);
 const BILL_KEY_SIZE: usize = BLOCK_BILL.len() + BILL_ID_LENGTH;
 
-impl<'a> BillKey {
+impl<'a> BillKey<'a> {
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut encoded_key = BLOCK_BILL.as_bytes().to_vec();
         encoded_key.extend_from_slice(self.0.as_ref());
         Ok(encoded_key)
-    }
-
-    pub fn decode(data: &[u8]) -> Result<Self> {
-        ensure_len_eq(data, BILL_KEY_SIZE)
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        let start_offset = BLOCK_BILL.len();
-        Ok(Self(block_height, id))
     }
 }
 
@@ -46,13 +39,15 @@ mod tests {
     fn it_billkey_encode() -> Result<()> {
         let block_id: u64 = 1;
         let mutation_id: u16 = 1;
-        let bill_id = BillId::new(block_id, mutation_id);
+        let bill_id = BillId::new(block_id, mutation_id).unwrap();
         let bk = BillKey(&bill_id);
         let bk_encoded_key1 = bk.encode()?;
-        let bk = BillKey(&BillId::new(block_id, mutation_id));
+        let bill_id2 = BillId::new(block_id, mutation_id).unwrap();
+        let bk = BillKey(&bill_id2);
         let bk_encoded_key2 = bk.encode()?;
         assert!(bk_encoded_key2.cmp(&bk_encoded_key1) == std::cmp::Ordering::Greater);
-        let bk = BillKey(&BillId::new(1 as u64, 9 as u16));
+        let bill_id3 = BillId::new(1 as u64, 9 as u16).unwrap();
+        let bk = BillKey(&bill_id3);
         let bk_encoded_key3 = bk.encode()?;
         assert!(bk_encoded_key3.cmp(&bk_encoded_key2) == std::cmp::Ordering::Less);
         Ok(())

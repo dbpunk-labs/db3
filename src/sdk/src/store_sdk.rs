@@ -261,8 +261,8 @@ impl StoreSDK {
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
-        let account = client.get_account(request).await?.into_inner();
-        Ok(account)
+        let response = client.get_account(request).await?.into_inner();
+        Ok(response.account.unwrap())
     }
 
     pub async fn get_session_info(
@@ -544,7 +544,7 @@ mod tests {
         println!("account1: {:?}", account1);
         println!("account2: {:?}", account2);
         assert_eq!(
-            account2.total_query_session_count - account1.total_query_session_count,
+            account2.total_session_count - account1.total_session_count,
             10
         );
     }

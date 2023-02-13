@@ -68,6 +68,15 @@ impl AccountStore {
     }
 
     ///
+    /// incr bill for the account
+    ///
+    ///
+    pub fn incr_bill(db: Pin<&mut Merk>, bill: Units, nonce: u64, addr: &DB3Address) -> Result<()> {
+        let old_account = Self::get_account(db.as_ref(), addr)?;
+        Ok(())
+    }
+
+    ///
     /// Create a account for the storage chains
     ///
     ///
@@ -136,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn it_apply_account() {
+    fn it_account_smoke_test() {
         let tmp_dir_path = TempDir::new("apply_account").expect("create temp dir");
         let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
@@ -156,14 +165,10 @@ mod tests {
             nonce: 10,
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = AccountStore::apply(db_m, &addr, &account);
+        let result = AccountStore::new_account(db_m, &addr);
         assert!(result.is_ok());
-        let account_ret = AccountStore::get_account(db.as_ref(), &addr);
-        assert!(account_ret.is_ok());
-        if let Ok(a) = account_ret {
-            assert_eq!(a.total_bills, account.total_bills);
-        } else {
-            assert!(false);
-        }
+        let account_opt = AccountStore::get_account(db.as_ref(), &addr);
+        assert!(account_opt.is_ok());
+        assert!(account_opt.unwrap().is_some());
     }
 }

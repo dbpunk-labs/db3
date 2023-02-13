@@ -24,10 +24,10 @@ use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
-    CloseSessionResponse, GetAccountRequest, GetKeyRequest, GetKeyResponse, GetRangeRequest,
-    GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse, ListDocumentsRequest,
-    ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse, QueryBillRequest,
-    QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
+    CloseSessionResponse, GetAccountRequest, GetAccountResponse, GetKeyRequest, GetKeyResponse,
+    GetRangeRequest, GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse,
+    ListDocumentsRequest, ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse,
+    QueryBillRequest, QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
@@ -370,11 +370,7 @@ impl StorageNode for StorageNodeImpl {
                 }
                 let bills = node_store
                     .get_auth_store()
-                    .get_bills(
-                        query_bill_key.height,
-                        query_bill_key.start_id,
-                        query_bill_key.end_id,
-                    )
+                    .get_bills(query_bill_key.height)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
                 node_store
                     .get_session_store()
@@ -441,10 +437,11 @@ impl StorageNode for StorageNodeImpl {
             ))
         }
     }
+
     async fn get_account(
         &self,
         request: Request<GetAccountRequest>,
-    ) -> std::result::Result<Response<Account>, Status> {
+    ) -> std::result::Result<Response<GetAccountResponse>, Status> {
         let r: GetAccountRequest = request.into_inner();
         if r.addr.len() <= 0 {
             info!("empty account");
@@ -458,11 +455,13 @@ impl StorageNode for StorageNodeImpl {
                     .get_auth_store()
                     .get_account(&addr)
                     .map_err(|e| Status::internal(format!("{e}")))?;
-                Ok(Response::new(account))
+                let response = GetAccountResponse { account };
+                Ok(Response::new(response))
             }
             Err(e) => Err(Status::internal(format!("{e}"))),
         }
     }
+
     async fn get_session_info(
         &self,
         request: Request<GetSessionInfoRequest>,

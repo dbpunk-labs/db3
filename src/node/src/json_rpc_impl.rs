@@ -385,10 +385,7 @@ async fn handle_bills(
         if let Value::Number(n) = &params[0] {
             match context.node_store.lock() {
                 Ok(mut store) => {
-                    if let Ok(bills) = store
-                        .get_auth_store()
-                        .get_bills(n.as_u64().unwrap(), 1, 100)
-                    {
+                    if let Ok(bills) = store.get_auth_store().get_bills(n.as_u64().unwrap()) {
                         let value = bills_to_value(&bills);
                         return Ok(ResponseWrapper::Internal(json_rpc::Response {
                             jsonrpc: String::from(json_rpc::JSONRPC_VERSION),

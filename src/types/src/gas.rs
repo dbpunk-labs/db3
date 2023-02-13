@@ -44,6 +44,8 @@ pub fn gas_add(left: &Units, right: &Units) -> Units {
     }
 }
 
+//pub fn gas_minus(left: &Units, right: &Units) -> Units {}
+
 pub fn gas_in_tai(input: &Units) -> u64 {
     if input.utype == UnitType::Db3 as i32 {
         return (input.amount * SHIFT[1]) as u64;

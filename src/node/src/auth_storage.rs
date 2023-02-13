@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use db3_crypto::id::{CollectionId, DbId};
+use db3_crypto::id::{BillId, CollectionId, DbId};
 use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
@@ -170,7 +170,7 @@ impl AuthStorage {
         })
     }
 
-    pub fn get_account(&self, addr: &DB3Address) -> Result<Account> {
+    pub fn get_account(&self, addr: &DB3Address) -> Result<Option<Account>> {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
 
@@ -182,8 +182,8 @@ impl AuthStorage {
         DbStore::get_documents(self.db.as_ref(), id)
     }
 
-    pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {
-        let proofs_ops = BillStore::scan(self.db.as_ref(), height, start_id, end_id)?;
+    pub fn get_bills(&self, height: u64) -> Result<Vec<Bill>> {
+        let proofs_ops = BillStore::get_block_bills(self.db.as_ref(), height)?;
         let mut bills: Vec<Bill> = Vec::new();
         for op in proofs_ops {
             match op {
@@ -212,7 +212,7 @@ impl AuthStorage {
         tx_id: &TxId,
         query_session_info: &QuerySessionInfo,
     ) -> Result<Units> {
-        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
+        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?.unwrap();
         self.current_block_state.bill_id_counter = self.current_block_state.bill_id_counter + 1;
         let gas_fee = cost::estimate_query_session_gas(query_session_info);
         let bill = Bill {
@@ -227,11 +227,13 @@ impl AuthStorage {
         };
 
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        BillStore::apply(db, &bill)?;
+        // TODO use mutation id
+        let bill_id = BillId::new(self.current_block_state.block_height as u64, 1 as u16)?;
+        BillStore::apply(db, &bill_id, &bill)?;
         let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
         account.total_bills = Some(accumulate_gas);
-        account.total_query_session_count =
-            account.total_query_session_count + query_session_info.query_count as u64;
+        account.total_session_count =
+            account.total_session_count + query_session_info.query_count as u64;
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         AccountStore::apply(db, &addr, &account)?;
         Ok(gas_fee)
@@ -263,7 +265,7 @@ impl AuthStorage {
         tx_id: &TxId,
         mutation: &Mutation,
     ) -> Result<(Units, u64)> {
-        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
+        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?.unwrap();
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         let (gas_fee, total_bytes) = KvStore::apply(db, &addr, &mutation)?;
         let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
@@ -281,8 +283,12 @@ impl AuthStorage {
             owner: addr.to_vec(),
             query_addr: vec![],
         };
+        let bill_id = BillId::new(
+            self.current_block_state.block_height as u64,
+            self.current_block_state.bill_id_counter as u16,
+        )?;
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        BillStore::apply(db, &bill)?;
+        BillStore::apply(db, &bill_id, &bill)?;
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         AccountStore::apply(db, &addr, &account)?;
         Ok((gas_fee, total_bytes as u64))

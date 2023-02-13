@@ -63,9 +63,10 @@ impl BillStore {
         }
     }
 
-    pub fn scan(db: Pin<&Merk>, height: u64, start: u64, end: u64) -> Result<LinkedList<ProofOp>> {
-        let skey = BillKey(height, start);
-        let ekey = BillKey(height, end);
+    pub fn get_block_bills(db: Pin<&Merk>, height: u64) -> Result<LinkedList<ProofOp>> {
+        let (start, end) = BillId::get_block_range(height)?;
+        let skey = BillKey(&start);
+        let ekey = BillKey(&end);
         let range = Range {
             start: skey.encode()?,
             end: ekey.encode()?,
@@ -108,8 +109,10 @@ mod tests {
             query_addr: vec![],
             owner: addr.as_bytes().to_vec(),
         };
+
+        let bill_id = BillId::new(11, 111).unwrap();
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = BillStore::apply(db_m, &bill);
+        let result = BillStore::apply(db_m, &bill_id, &bill);
 
         assert!(result.is_ok());
         let bill = Bill {
@@ -126,11 +129,15 @@ mod tests {
             owner: addr.as_bytes().to_vec(),
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = BillStore::apply(db_m, &bill);
-        assert!(result.is_ok());
+        let bill_id = BillId::new(11, 1).unwrap();
 
-        let skey = BillKey(11, 0).encode().unwrap();
-        let ekey = BillKey(11, 200).encode().unwrap();
+        let result = BillStore::apply(db_m, &bill_id, &bill);
+        assert!(result.is_ok());
+        let bill_id1 = BillId::new(11, 0).unwrap();
+        let bill_id2 = BillId::new(11, 200).unwrap();
+
+        let skey = BillKey(&bill_id1).encode().unwrap();
+        let ekey = BillKey(&bill_id2).encode().unwrap();
         let mut query = Query::new();
         let range = Range {
             start: skey,

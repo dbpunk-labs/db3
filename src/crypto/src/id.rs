@@ -18,7 +18,7 @@
 use crate::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use base64ct::Encoding as _;
 use byteorder::{BigEndian, WriteBytesExt};
-use db3_error::DB3Error;
+use db3_error::{DB3Error, Result};
 use fastcrypto::hash::{HashFunction, Sha3_256};
 use rust_secp256k1::hashes::{sha256, Hash};
 use rust_secp256k1::ThirtyTwoByteHash;
@@ -102,22 +102,43 @@ pub struct BillId {
 }
 
 impl BillId {
-    pub fn new(block_id: u64, mutation_id: u16) -> Self<BillId> {
+    pub fn new(block_id: u64, mutation_id: u16) -> Result<Self> {
         let mut data: Vec<u8> = Vec::with_capacity(BILL_ID_LENGTH);
         data.write_u64::<BigEndian>(block_id)
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
+            .map_err(|e| DB3Error::KeyCodecError(format!("{e}")))?;
         data.write_u16::<BigEndian>(mutation_id)
-            .map_err(|e| DB3Error::KeyCodecError(format!("{}", e)))?;
-        Ok(BillId { data })
+            .map_err(|e| DB3Error::KeyCodecError(format!("{e}")))?;
+        //TODO avoid to copy data
+        let data_array: [u8; BILL_ID_LENGTH] = data
+            .try_into()
+            .map_err(|e| DB3Error::KeyCodecError("array length is invalid".to_string()))?;
+        Ok(BillId { data: data_array })
     }
+
     pub fn to_base64(&self) -> String {
         base64ct::Base64::encode_string(self.data.as_ref())
+    }
+
+    pub fn get_block_range(block_id: u64) -> Result<(BillId, BillId)> {
+        let start = BillId::new(block_id, 0)?;
+        let end = BillId::new(block_id, std::u16::MAX)?;
+        Ok((start, end))
     }
 }
 
 impl AsRef<[u8]> for BillId {
     fn as_ref(&self) -> &[u8] {
         &self.data[..]
+    }
+}
+
+impl TryFrom<&[u8]> for BillId {
+    type Error = DB3Error;
+    fn try_from(data: &[u8]) -> Result<Self> {
+        let data_array: [u8; BILL_ID_LENGTH] = data
+            .try_into()
+            .map_err(|e| DB3Error::KeyCodecError("array length is invalid".to_string()))?;
+        Ok(BillId { data: data_array })
     }
 }
 
@@ -516,5 +537,16 @@ mod tests {
             db_id.to_hex().as_str(),
             "0xd74360cca976522a8b66c7cbd4f674fef9eeef97"
         );
+    }
+    #[test]
+    fn test_bill_id() {
+        let block_id: u64 = 1;
+        let mutation_id: u16 = 2;
+        let bill_id = BillId::new(block_id, mutation_id).unwrap();
+        let b64_str = bill_id.to_base64();
+        assert_eq!(b64_str.as_str(), "AAAAAAAAAAEAAg==");
+        let bill_id2 = BillId::try_from(bill_id.as_ref()).unwrap();
+        let b64_str = bill_id2.to_base64();
+        assert_eq!(b64_str.as_str(), "AAAAAAAAAAEAAg==");
     }
 }
