@@ -89,6 +89,10 @@ pub enum DB3Error {
     InvalidCollectionIdBytes(String),
     #[error("invalid index id bytes {0}")]
     InvalidIndexIdBytes(String),
+    #[error("document not exist with target id {0}")]
+    DocumentNotExist(String),
+    #[error("document modified permission error")]
+    DocumentModifiedPermissionError,
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
