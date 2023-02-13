@@ -42,6 +42,7 @@ pub enum DbStoreOp {
         pub create_index_ops: u64,
         pub data_in_bytes: u64,
     },
+
     DocOp {
         pub add_doc_ops: u64,
         pub del_doc_ops: u64,
@@ -283,6 +284,8 @@ impl DbStore {
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
         let span = span!(Level::INFO, "database").entered();
+        let mut add_doc_ops: u64 = 0;
+        let mut data_in_bytes: u64 = 0;
         match database {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
@@ -319,6 +322,8 @@ impl DbStore {
                             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
                             .unwrap();
                             let document_vec = db3_document.into_bytes().to_vec();
+                            add_doc_ops += 1;
+                            data_in_bytes += document_vec.len();
                             info!("put document id {}", document_id.to_string());
                             entries.push((document_id.as_ref().to_vec(), Op::Put(document_vec)));
 
@@ -339,9 +344,9 @@ impl DbStore {
                                             DB3Error::ApplyDatabaseError(format!("{:?}", e))
                                         })
                                         .unwrap();
-
                                         // put indexId->documentId
                                         info!("put index id {}", index_id.to_string());
+                                        add_doc_ops += 1;
                                         entries.push((index_id.as_ref().to_vec(), Op::Put(vec![])));
                                     }
                                     Err(e) => {
@@ -369,7 +374,12 @@ impl DbStore {
             }
         }
         span.exit();
-        Ok(())
+        Ok(DbStoreOp::DocOp {
+            add_doc_ops,
+            del_doc_ops: 0,
+            update_doc_ops: 0,
+            data_in_bytes,
+        })
     }
     //
     // add document
@@ -456,7 +466,7 @@ impl DbStore {
             Some(DatabaseAction::AddDocument) => {
                 Self::add_document(db, sender, tx, mutation, block_id, mutation_id)
             }
-            None => Ok(()),
+            None => todo!(),
         }
     }
 
