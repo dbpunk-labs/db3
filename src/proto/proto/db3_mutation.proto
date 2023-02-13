@@ -45,10 +45,12 @@ message CollectionMutation {
     repeated db3_database_proto.Index index = 1;
     string collection_name = 2;
 }
+
 message DocumentMutation {
     string collection_name = 1;
     repeated bytes document = 2;
 }
+
 message KVPair {
     // the key of value
     bytes key = 1;

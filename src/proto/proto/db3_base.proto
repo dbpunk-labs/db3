@@ -20,14 +20,15 @@
 syntax = "proto3";
 package db3_base_proto;
 
+// 10^6 TAI = 1 DB3
 enum UnitType {
-    DB3 = 0;
-    TAI = 1; // 10^6 TAI = 1 DB3
+    TAI = 0;
+    DB3 = 1;
 }
 
 message Units {
     UnitType utype = 1;
-    int64 amount = 2;
+    uint64 amount = 2;
 }
 
 enum ChainRole {

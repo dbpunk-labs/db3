@@ -32,6 +32,7 @@ message NetworkStatus {
     uint64 total_mutataion_count = 5;
     uint64 total_session_count = 6;
     uint64 total_storage_in_bytes = 7;
+    uint64 total_gas = 8;
 }
 
 message QueryBillKey {

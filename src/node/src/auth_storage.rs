@@ -48,19 +48,16 @@ pub type Hash = [u8; HASH_LENGTH];
 pub struct BlockState {
     pub block_height: i64,
     pub abci_hash: Hash,
-    //TODO remove and use hash of bill as it's id
-    pub bill_id_counter: u64,
+    pub tx_counter: u64,
     pub block_time: u64,
-    pub database_mutation_counter: u32,
 }
 
 impl BlockState {
     pub fn reset(&mut self) {
         self.block_height = 0;
         self.abci_hash = [0; 32];
-        self.bill_id_counter = 0;
         self.block_time = 0;
-        self.database_mutation_counter = 0;
+        self.tx_counter = 0;
     }
 }
 
@@ -69,9 +66,8 @@ impl BlockState {
         Self {
             block_height: 0,
             abci_hash: [0; HASH_LENGTH],
-            bill_id_counter: 0,
             block_time: 0,
-            database_mutation_counter: 0,
+            tx_counter: 0,
         }
     }
 }

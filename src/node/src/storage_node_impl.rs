@@ -19,7 +19,6 @@ use super::context::Context;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_crypto::{db3_verifier::DB3Verifier, id::CollectionId, id::DbId};
-use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{

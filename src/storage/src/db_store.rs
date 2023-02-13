@@ -35,6 +35,21 @@ use std::ops::Range;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
+pub enum DbStoreOp {
+    DbOp {
+        pub create_db_ops: u64,
+        pub create_collection_ops: u64,
+        pub create_index_ops: u64,
+        pub data_in_bytes: u64,
+    },
+    DocOp {
+        pub add_doc_ops: u64,
+        pub del_doc_ops: u64,
+        pub update_doc_ops: u64,
+        pub data_in_bytes: u64,
+    },
+}
+
 pub struct DbStore {}
 
 impl DbStore {
@@ -48,9 +63,11 @@ impl DbStore {
         tx_id: &TxId,
         block_id: u64,
         mutation_id: u32,
-    ) -> Result<Database> {
+    ) -> Result<(Database, DbStoreOp)> {
         let mut new_collections: HashMap<String, Collection> = HashMap::new();
         let mut idx = 0;
+        let mut collection_ops: u64 = 0;
+        let mut index_ops: u64 = 0;
         for new_collection in mutation.collection_mutations.iter() {
             if old_db
                 .collections
@@ -62,6 +79,8 @@ impl DbStore {
                 )));
             } else {
                 idx += 1;
+                collection_ops += 1;
+                index_ops += new_collection.index.len();
                 new_collections.insert(
                     new_collection.collection_name.to_string(),
                     Collection {
@@ -81,12 +100,20 @@ impl DbStore {
         }
         let mut tx_list = old_db.tx.to_vec();
         tx_list.push(tx_id.as_ref().to_vec());
-        Ok(Database {
-            address: old_db.address.to_vec(),
-            sender: old_db.sender.to_vec(),
-            tx: tx_list,
-            collections: new_collections,
-        })
+        Ok((
+            Database {
+                address: old_db.address.to_vec(),
+                sender: old_db.sender.to_vec(),
+                tx: tx_list,
+                collections: new_collections,
+            },
+            DbStoreOp {
+                create_db_ops: 0,
+                create_collection_ops: collection_ops,
+                create_index_ops: index_ops,
+                data_in_bytes: 0,
+            },
+        ))
     }
 
     fn new_database(
@@ -96,14 +123,18 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u32,
-    ) -> Database {
+    ) -> (Database, DbStoreOp) {
         //TODO check the duplicated collection id
         let mut idx = 0;
+        let collection_count: u64 = 0;
+        let index_count: u64 = 0;
         let collections: HashMap<String, Collection> = mutation
             .collection_mutations
             .iter()
             .map(move |x| {
                 idx += 1;
+                collection_count += 1;
+                index_count += x.index.len();
                 (
                     x.collection_name.to_string(),
                     Collection {
@@ -117,12 +148,20 @@ impl DbStore {
                 )
             })
             .collect();
-        Database {
-            address: id.as_ref().to_vec(),
-            sender: sender.as_ref().to_vec(),
-            tx: vec![txid.as_ref().to_vec()],
-            collections,
-        }
+        (
+            Database {
+                address: id.as_ref().to_vec(),
+                sender: sender.as_ref().to_vec(),
+                tx: vec![txid.as_ref().to_vec()],
+                collections,
+            },
+            DbStoreOp::DBOp {
+                create_db_ops: 1,
+                create_collection_ops: collection_count,
+                create_index_ops: index_count,
+                data_in_bytes: 0,
+            },
+        )
     }
 
     fn convert(
@@ -132,10 +171,12 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u32,
-    ) -> Result<(BatchEntry, usize)> {
+    ) -> Result<(BatchEntry, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
-        let db = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
-        Self::encode_database(dbid, &db)
+        let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
+        let (entry, data_in_bytes) = Self::encode_database(dbid, &db);
+        ops.data_in_bytes = data_in_bytes;
+        Ok((entry, ops))
     }
 
     fn encode_database(dbid: DbId, database: &Database) -> Result<(BatchEntry, usize)> {
@@ -164,16 +205,16 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u32,
-    ) -> Result<()> {
+    ) -> Result<DbStoreOp> {
         let mut entries: Vec<BatchEntry> = Vec::new();
-        let (batch_entry, _) = Self::convert(sender, nonce, tx, mutation, block_id, mutation_id)?;
+        let (batch_entry, ops) = Self::convert(sender, nonce, tx, mutation, block_id, mutation_id)?;
         entries.push(batch_entry);
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
                 .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         }
-        Ok(())
+        Ok(ops)
     }
 
     //
@@ -186,7 +227,7 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u32,
-    ) -> Result<()> {
+    ) -> Result<DbStoreOp> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
@@ -198,23 +239,33 @@ impl DbStore {
                         "no permission to add collection to database {}",
                         db_id.to_hex()
                     );
+                    Ok(DbStoreOp::DbOp {
+                        create_db_ops: 0,
+                        create_collection_ops: 0,
+                        create_index_ops: 0,
+                        data_in_bytes: 0,
+                    })
                 } else {
                     let mut entries: Vec<BatchEntry> = Vec::new();
-                    let new_db = Self::update_database(&d, mutation, tx, block_id, mutation_id)?;
-                    let (entry, _) = Self::encode_database(db_id, &new_db)?;
+                    let (new_db, mut ops) =
+                        Self::update_database(&d, mutation, tx, block_id, mutation_id)?;
+                    //TODO how to get the byte size that was updated
+                    let (entry, data_in_bytes) = Self::encode_database(db_id, &new_db)?;
+                    ops.data_in_bytes = data_in_bytes;
                     entries.push(entry);
                     unsafe {
                         Pin::get_unchecked_mut(db)
                             .apply(&entries, &[])
                             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
                     }
+                    Ok(ops)
                 }
             }
             None => {
+                todo!();
                 warn!("database not found with addr {}", db_id.to_hex());
             }
         }
-        Ok(())
     }
 
     //
@@ -227,7 +278,7 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u32,
-    ) -> Result<()> {
+    ) -> Result<DbStoreOp> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
@@ -393,7 +444,7 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u32,
-    ) -> Result<()> {
+    ) -> Result<DbStoreOp> {
         let action = DatabaseAction::from_i32(mutation.action);
         match action {
             Some(DatabaseAction::CreateDb) => {
@@ -408,6 +459,7 @@ impl DbStore {
             None => Ok(()),
         }
     }
+
     pub fn get_database(db: Pin<&Merk>, id: &DbId) -> Result<Option<Database>> {
         //TODO use reference
         let key = DbKey(id.clone());
@@ -423,21 +475,6 @@ impl DbStore {
         } else {
             Ok(None)
         }
-    }
-
-    pub fn get_databases(db: Pin<&Merk>) -> Result<LinkedList<ProofOp>> {
-        let start_key = DbKey::min();
-        let end_key = DbKey::max();
-        let range = Range {
-            start: start_key.encode()?,
-            end: end_key.encode()?,
-        };
-        let mut query = Query::new();
-        query.insert_range(range);
-        let ops = db
-            .execute_query(query)
-            .map_err(|e| DB3Error::QueryDatabaseError(format!("{e}")))?;
-        Ok(ops)
     }
 }
 

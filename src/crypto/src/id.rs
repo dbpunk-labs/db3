@@ -538,8 +538,9 @@ mod tests {
             "0xd74360cca976522a8b66c7cbd4f674fef9eeef97"
         );
     }
+
     #[test]
-    fn test_bill_id() {
+    fn bill_id_smoke_test() {
         let block_id: u64 = 1;
         let mutation_id: u16 = 2;
         let bill_id = BillId::new(block_id, mutation_id).unwrap();
@@ -548,5 +549,7 @@ mod tests {
         let bill_id2 = BillId::try_from(bill_id.as_ref()).unwrap();
         let b64_str = bill_id2.to_base64();
         assert_eq!(b64_str.as_str(), "AAAAAAAAAAEAAg==");
+        let (start, end) = BillId::get_block_range(1).unwrap();
+        assert!(start.as_ref().cmp(end.as_ref()) == std::cmp::Ordering::Less);
     }
 }

@@ -20,7 +20,7 @@ use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{UnitType, Units};
-use db3_types::account_key::AccountKey;
+use db3_types::{account_key::AccountKey, gas};
 use merkdb::{Merk, Op};
 use prost::Message;
 use std::pin::Pin;
@@ -30,23 +30,6 @@ pub struct AccountStore {}
 impl AccountStore {
     pub fn new() -> Self {
         Self {}
-    }
-
-    pub fn apply(db: Pin<&mut Merk>, addr: &DB3Address, account: &Account) -> Result<()> {
-        let key = AccountKey(*addr);
-        let encoded_key = key.encode()?;
-        let mut buf = BytesMut::with_capacity(1024);
-        account
-            .encode(&mut buf)
-            .map_err(|e| DB3Error::ApplyAccountError(format!("{}", e)))?;
-        let buf = buf.freeze();
-        let entry = (encoded_key, Op::Put(buf.to_vec()));
-        unsafe {
-            Pin::get_unchecked_mut(db)
-                .apply(&[entry], &[])
-                .map_err(|e| DB3Error::ApplyAccountError(format!("{}", e)))?;
-        }
-        Ok(())
     }
 
     ///
@@ -68,12 +51,12 @@ impl AccountStore {
     }
 
     ///
-    /// incr bill for the account
+    /// update the account
     ///
-    ///
-    pub fn incr_bill(db: Pin<&mut Merk>, bill: Units, nonce: u64, addr: &DB3Address) -> Result<()> {
-        let old_account = Self::get_account(db.as_ref(), addr)?;
-        Ok(())
+    pub fn update_account(db: Pin<&mut Merk>, addr: &DB3Address, account: &Account) -> Result<()> {
+        let key = AccountKey(addr);
+        let encoded_key = key.encode()?;
+        Self::override_account(db, key, account)
     }
 
     ///
@@ -81,7 +64,7 @@ impl AccountStore {
     ///
     ///
     pub fn new_account(db: Pin<&mut Merk>, addr: &DB3Address) -> Result<bool> {
-        let key = AccountKey(*addr);
+        let key = AccountKey(addr);
         let encoded_key = key.encode()?;
         let values = db
             .get(encoded_key.as_ref())
@@ -108,15 +91,9 @@ impl AccountStore {
         }
     }
 
-    ///
-    /// get account from account store
-    ///
-    ///
-    pub fn get_account(db: Pin<&Merk>, addr: &DB3Address) -> Result<Option<Account>> {
-        let key = AccountKey(*addr);
-        let encoded_key = key.encode()?;
+    fn get_account_internal(db: Pin<&Merk>, key: &[u8]) -> Result<Option<Account>> {
         let values = db
-            .get(encoded_key.as_ref())
+            .get(key)
             .map_err(|e| DB3Error::GetAccountError(format!("{}", e)))?;
         if let Some(v) = values {
             match Account::decode(v.as_ref()) {
@@ -126,6 +103,16 @@ impl AccountStore {
         } else {
             Ok(None)
         }
+    }
+
+    ///
+    /// get account from account store
+    ///
+    ///
+    pub fn get_account(db: Pin<&Merk>, addr: &DB3Address) -> Result<Option<Account>> {
+        let key = AccountKey(addr);
+        let encoded_key = key.encode()?;
+        Self::get_account_internal(db, encoded_key.as_ref())
     }
 }
 
