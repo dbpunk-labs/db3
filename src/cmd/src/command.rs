@@ -85,6 +85,25 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         documents: Vec<String>,
     },
+    #[clap(name = "del-doc")]
+    DeleteDocument {
+        /// the address of database
+        #[clap(long)]
+        addr: String,
+        /// the name of collection
+        #[clap(long)]
+        collection_name: String,
+        /// the content of document
+        #[clap(long)]
+        ids: Vec<String>,
+    },
+    /// Get a document with given doc id
+    #[clap(name = "get-doc")]
+    GetDocument {
+        /// the id(base64) of document
+        #[clap(long)]
+        id: String,
+    },
 
     /// Show documents under a collection
     #[clap(name = "show-doc")]
@@ -92,9 +111,14 @@ pub enum DB3ClientCommand {
         /// the address of database
         #[clap(long)]
         addr: String,
+
         /// the name of collection
         #[clap(long)]
         collection_name: String,
+
+        /// show document by key
+        #[clap(long, default_value = "")]
+        key: String,
     },
 }
 
@@ -105,11 +129,10 @@ impl DB3ClientCommand {
             Err(_) => 0,
         }
     }
-
-    fn show_document(documents: Vec<Document>) {
+    fn show_document(documents: Vec<Document>) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-        table.set_titles(row!["id_base64", "owner", "document",]);
+        table.set_titles(row!["id_base64", "owner", "document", "tx_id"]);
         let mut error_cnt = 0;
         for document in documents {
             if let Ok(id) = DocumentId::try_from_bytes(document.id.as_slice()) {
@@ -119,7 +142,10 @@ impl DB3ClientCommand {
                         AccountId::try_from(document.owner.as_slice())
                             .unwrap()
                             .to_hex(),
-                        format!("{:?}", doc)
+                        format!("{:?}", doc),
+                        TxId::try_from_bytes(document.tx_id.as_ref())
+                            .unwrap()
+                            .to_base64()
                     ]);
                 } else {
                     error_cnt += 1;
@@ -128,15 +154,16 @@ impl DB3ClientCommand {
                 error_cnt += 1;
             }
         }
-        table.printstd();
         if error_cnt > 0 {
-            println!(
+            Err(format!(
                 "An error occurs when attempting to show documents. Affected Rows {}",
                 error_cnt
-            );
+            ))
+        } else {
+            Ok(table)
         }
     }
-    fn show_collection(database: &Database) {
+    fn show_collection(database: &Database) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row!["name", "index",]);
@@ -149,10 +176,10 @@ impl DB3ClientCommand {
                 .collect();
             table.add_row(row![collection.name, index_str]);
         }
-        table.printstd();
+        Ok(table)
     }
 
-    fn show_database(database: &Database) {
+    fn show_database(database: &Database) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row![
@@ -181,24 +208,22 @@ impl DB3ClientCommand {
             tx_list,
             collections
         ]);
-        table.printstd();
+        Ok(table)
     }
 
-    pub async fn execute(self, ctx: &mut DB3ClientContext) {
+    pub async fn execute(self, ctx: &mut DB3ClientContext) -> std::result::Result<Table, String> {
         match self {
-            DB3ClientCommand::Init {} => {
-                if let Ok(_) = KeyStore::recover_keypair() {
-                    println!("Init key successfully!");
-                }
-            }
+            DB3ClientCommand::Init {} => match KeyStore::recover_keypair() {
+                Ok(ks) => ks.show_key(),
+                Err(e) => Err(format!("{:?}", e)),
+            },
 
-            DB3ClientCommand::ShowKey {} => {
-                if let Ok(ks) = KeyStore::recover_keypair() {
-                    ks.show_key();
-                } else {
-                    println!("no key was found, you can use init command to create a new one");
-                }
-            }
+            DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair() {
+                Ok(ks) => ks.show_key(),
+                Err(e) => Err(
+                    "no key was found, you can use init command to create a new one".to_string(),
+                ),
+            },
             DB3ClientCommand::NewCollection {
                 addr,
                 name,
@@ -230,22 +255,43 @@ impl DB3ClientCommand {
                     action: DatabaseAction::AddCollection.into(),
                     document_mutations: vec![],
                 };
-                if let Ok((_, tx_id)) = ctx
+                match ctx
                     .mutation_sdk
                     .as_ref()
                     .unwrap()
                     .submit_database_mutation(&dm)
                     .await
                 {
-                    println!("send add collection done with tx\n{}", tx_id.to_base64());
-                } else {
-                    println!("fail to add collection");
+                    Ok((_, tx_id)) => {
+                        println!("send add collection done!");
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["tx_id"]);
+                        table.add_row(row![tx_id.to_base64()]);
+                        Ok(table)
+                    }
+                    Err(e) => Err(format!("fail to add collection: {:?}", e)),
+                }
+            }
+            DB3ClientCommand::GetDocument { id } => {
+                match ctx
+                    .store_sdk
+                    .as_mut()
+                    .unwrap()
+                    .get_document(id.as_str())
+                    .await
+                {
+                    Ok(Some(document)) => Self::show_document(vec![document]),
+                    Ok(None) => Err("no document with target id".to_string()),
+                    Err(e) => Err(format!("fail to get document with error {:?}", e)),
                 }
             }
             DB3ClientCommand::ShowDocument {
                 addr,
                 collection_name,
+                key,
             } => {
+                // TODO(chenjing): construct index keys from json key string
                 match ctx
                     .store_sdk
                     .as_mut()
@@ -253,12 +299,8 @@ impl DB3ClientCommand {
                     .list_documents(addr.as_ref(), collection_name.as_ref())
                     .await
                 {
-                    Ok(response) => {
-                        Self::show_document(response.documents);
-                    }
-                    Err(err) => {
-                        println!("fail to show documents with error {:?}", err);
-                    }
+                    Ok(response) => Self::show_document(response.documents),
+                    Err(e) => Err(format!("fail to show documents with error {:?}", e)),
                 }
             }
             DB3ClientCommand::ShowCollection { addr } => {
@@ -269,15 +311,9 @@ impl DB3ClientCommand {
                     .get_database(addr.as_ref())
                     .await
                 {
-                    Ok(Some(database)) => {
-                        Self::show_collection(&database);
-                    }
-                    Ok(None) => {
-                        println!("no collection with target address");
-                    }
-                    Err(e) => {
-                        println!("fail to show collections with error {e}");
-                    }
+                    Ok(Some(database)) => Self::show_collection(&database),
+                    Ok(None) => Err("no collection with target address".to_string()),
+                    Err(e) => Err(format!("fail to show collections with error {e}")),
                 }
             }
 
@@ -289,15 +325,9 @@ impl DB3ClientCommand {
                     .get_database(addr.as_ref())
                     .await
                 {
-                    Ok(Some(database)) => {
-                        Self::show_database(&database);
-                    }
-                    Ok(None) => {
-                        println!("no database with target address");
-                    }
-                    Err(e) => {
-                        println!("fail to show database with error {e}");
-                    }
+                    Ok(Some(database)) => Self::show_database(&database),
+                    Ok(None) => Err(format!("no database with target address")),
+                    Err(e) => Err(format!("fail to show database with error {e}")),
                 }
             }
 
@@ -317,20 +347,21 @@ impl DB3ClientCommand {
                     action: DatabaseAction::CreateDb.into(),
                     document_mutations: vec![],
                 };
-                if let Ok((db_id, tx_id)) = ctx
+                match ctx
                     .mutation_sdk
                     .as_ref()
                     .unwrap()
                     .submit_database_mutation(&dm)
                     .await
                 {
-                    let mut table = Table::new();
-                    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                    table.set_titles(row!["database address", "transaction id"]);
-                    table.add_row(row![db_id.to_hex(), tx_id.to_base64()]);
-                    table.printstd();
-                } else {
-                    println!("fail to create database");
+                    Ok((db_id, tx_id)) => {
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["database address", "transaction id"]);
+                        table.add_row(row![db_id.to_hex(), tx_id.to_base64()]);
+                        Ok(table)
+                    }
+                    Err(e) => Err(format!("fail to create database: {:?}", e)),
                 }
             }
             DB3ClientCommand::NewDocument {
@@ -355,7 +386,8 @@ impl DB3ClientCommand {
                     .collect();
                 let document_mut = DocumentMutation {
                     collection_name,
-                    document: bson_documents,
+                    documents: bson_documents,
+                    ids: vec![],
                 };
                 let dm = DatabaseMutation {
                     meta: Some(meta),
@@ -364,16 +396,69 @@ impl DB3ClientCommand {
                     document_mutations: vec![document_mut],
                     collection_mutations: vec![],
                 };
-                if let Ok((_, tx_id)) = ctx
+                match ctx
                     .mutation_sdk
                     .as_ref()
                     .unwrap()
                     .submit_database_mutation(&dm)
                     .await
                 {
-                    println!("send add document done with tx\n{}", tx_id.to_base64());
-                } else {
-                    println!("fail to add document");
+                    Ok((_, tx_id)) => {
+                        println!("send add document done");
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["transaction id"]);
+                        table.add_row(row![tx_id.to_base64()]);
+                        Ok(table)
+                    }
+                    Err(e) => Err(format!("fail to add document: {:?}", e)),
+                }
+            }
+            DB3ClientCommand::DeleteDocument {
+                addr,
+                collection_name,
+                ids,
+            } => {
+                if (ids.is_empty()) {
+                    return Err("fail to delete with empty ids".to_string());
+                }
+                let db_id = DbId::try_from(addr.as_str()).unwrap();
+                let meta = BroadcastMeta {
+                    //TODO get from network
+                    nonce: Self::current_seconds(),
+                    //TODO use config
+                    chain_id: ChainId::DevNet.into(),
+                    //TODO use config
+                    chain_role: ChainRole::StorageShardChain.into(),
+                };
+                let document_mut = DocumentMutation {
+                    collection_name,
+                    documents: vec![],
+                    ids,
+                };
+                let dm = DatabaseMutation {
+                    meta: Some(meta),
+                    action: DatabaseAction::DeleteDocument.into(),
+                    db_address: db_id.as_ref().to_vec(),
+                    document_mutations: vec![document_mut],
+                    collection_mutations: vec![],
+                };
+                match ctx
+                    .mutation_sdk
+                    .as_ref()
+                    .unwrap()
+                    .submit_database_mutation(&dm)
+                    .await
+                {
+                    Ok((_, tx_id)) => {
+                        println!("send delete document done");
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["transaction id"]);
+                        table.add_row(row![tx_id.to_base64()]);
+                        Ok(table)
+                    }
+                    Err(e) => Err(format!("fail to delete document: {:?}", e)),
                 }
             }
         }

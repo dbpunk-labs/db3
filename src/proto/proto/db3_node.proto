@@ -164,7 +164,14 @@ message ListDocumentsRequest {
     // TODO: support paging setting (e.g page_size, page_token)
     // TODO: support document mask
 }
-
+message GetDocumentRequest {
+    string session_token = 1;
+    // a hex string
+    string id = 2;
+}
+message GetDocumentResponse {
+    db3_database_proto.Document document = 1;
+}
 message ListDocumentsResponse {
     repeated db3_database_proto.Document documents = 2;
     // TODO: support next_page_token for page loading
@@ -189,5 +196,7 @@ service StorageNode {
     rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
     // method for query document
     rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse) {}
+    // method for get document
+    rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
 }
 

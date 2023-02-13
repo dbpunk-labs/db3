@@ -20,12 +20,13 @@ use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
-use db3_proto::db3_database_proto::Database;
+use db3_proto::db3_database_proto::{Database, Document};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, BatchGetKey, BatchGetValue, CloseSessionRequest,
-    GetAccountRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest, ListDocumentsRequest,
-    ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
-    Range as DB3Range, RangeKey, RangeValue, SessionIdentifier, ShowDatabaseRequest,
+    GetAccountRequest, GetDocumentRequest, GetKeyRequest, GetRangeRequest, GetSessionInfoRequest,
+    ListDocumentsRequest, ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse,
+    QueryBillKey, QueryBillRequest, Range as DB3Range, RangeKey, RangeValue, SessionIdentifier,
+    ShowDatabaseRequest,
 };
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
@@ -107,6 +108,35 @@ impl StoreSDK {
         }
     }
 
+    /// get the document with a base64 format id
+    pub async fn get_document(
+        &mut self,
+        id: &str,
+    ) -> std::result::Result<Option<Document>, Status> {
+        let token = self.keep_session().await?;
+        match self.session_pool.get_session_mut(token.as_ref()) {
+            Some(session) => {
+                if session.check_session_running() {
+                    let r = GetDocumentRequest {
+                        session_token: token.to_string(),
+                        id: id.to_string(),
+                    };
+                    let request = tonic::Request::new(r);
+                    let mut client = self.client.as_ref().clone();
+                    let response = client.get_document(request).await?.into_inner();
+                    session.increase_query(1);
+                    Ok(response.document)
+                } else {
+                    Err(Status::permission_denied(
+                        "Fail to query in this session. Please restart query session",
+                    ))
+                }
+            }
+            None => Err(Status::not_found(format!(
+                "Fail to query, session with token {token} not found"
+            ))),
+        }
+    }
     ///
     /// get the information of database with a hex format address
     ///

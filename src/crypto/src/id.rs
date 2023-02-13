@@ -262,7 +262,7 @@ impl DocumentId {
     }
 
     /// collection id = document_id[OP_ENTRY_ID_LENGTH..]
-    pub fn get_collection_id(&self) -> std::result::Result<DocumentEntryId, DB3Error> {
+    pub fn get_collection_id(&self) -> std::result::Result<CollectionId, DB3Error> {
         CollectionId::try_from_bytes(
             self.data[TYPE_ID_LENGTH..TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH].as_ref(),
         )

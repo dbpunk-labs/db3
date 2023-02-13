@@ -42,6 +42,7 @@ message Document {
   bytes id = 1;
   bytes doc = 2;
   bytes owner = 3;
+  bytes tx_id = 4;
 }
 message Index {
 

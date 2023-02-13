@@ -18,15 +18,18 @@
 use super::context::Context;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
-use db3_crypto::{db3_verifier::DB3Verifier, id::CollectionId, id::DbId};
+use db3_crypto::{db3_verifier::DB3Verifier, id::CollectionId, id::DbId, id::DocumentId};
+
+use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
-    CloseSessionResponse, GetAccountRequest, GetAccountResponse, GetKeyRequest, GetKeyResponse,
-    GetRangeRequest, GetRangeResponse, GetSessionInfoRequest, GetSessionInfoResponse,
-    ListDocumentsRequest, ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse,
-    QueryBillRequest, QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
+    CloseSessionResponse, GetAccountRequest, GetAccountResponse, GetDocumentRequest,
+    GetDocumentResponse, GetKeyRequest, GetKeyResponse, GetRangeRequest, GetRangeResponse,
+    GetSessionInfoRequest, GetSessionInfoResponse, ListDocumentsRequest, ListDocumentsResponse,
+    OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse,
+    ShowDatabaseRequest, ShowDatabaseResponse,
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
@@ -93,6 +96,39 @@ impl StorageNode for StorageNodeImpl {
                     .unwrap()
                     .increase_query(1);
                 Ok(Response::new(ShowDatabaseResponse { db }))
+            }
+            Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
+        }
+    }
+
+    async fn get_document(
+        &self,
+        request: Request<GetDocumentRequest>,
+    ) -> std::result::Result<Response<GetDocumentResponse>, Status> {
+        let get_document_request = request.into_inner();
+        let id = DocumentId::try_from_base64(get_document_request.id.as_str())
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                // get database id
+                // validate the session id
+                match node_store
+                    .get_session_store()
+                    .get_session_mut(&get_document_request.session_token)
+                {
+                    Some(session) => {
+                        if !session.check_session_running() {
+                            return Err(Status::permission_denied(
+                                "Fail to query in this session. Please restart query session",
+                            ));
+                        }
+                    }
+                    None => return Err(Status::internal("Fail to create session")),
+                }
+                match node_store.get_auth_store().get_document(&id) {
+                    Ok(document) => Ok(Response::new(GetDocumentResponse { document })),
+                    Err(e) => Err(Status::internal(format!("fail to get document {:?}", e))),
+                }
             }
             Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
         }
