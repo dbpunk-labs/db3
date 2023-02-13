@@ -28,22 +28,18 @@ enum BillType {
 message Bill {
     db3_base_proto.Units gas_fee = 1;
     uint64 block_height = 2;
-    // bill
-    uint64 bill_id = 3;
     // query session or mutation
     BillType bill_type = 4;
     // time on block created
     uint64 time = 5;
     // mutation id or query session id
-    bytes bill_target_id = 6;
+    bytes tx_id = 6;
     // owner address
     bytes owner = 8;
     // service address
-    bytes query_addr = 9;
+    bytes service_addr = 9;
 }
 
 message BillQueryRequest {
     uint64 block_height = 1;
-    uint64 start_id = 2;
-    uint64 end_id = 3;
 }

@@ -21,38 +21,50 @@ use db3_proto::db3_session_proto::QuerySessionInfo;
 const C_CREATEDB_GAS_PRICE: u64 = 10; // unit in tai
 const C_CREATECOLLECTION_GAS_PRICE: u64 = 10; // unit in tai
 const C_CREATEINDEX_GAS_PRICE: u64 = 10; // unit in tai
-const C_WRITE_DOC_GAS_PRICE: u64 = 20; // unit in tai
+const C_ADD_DOC_GAS_PRICE: u64 = 20; // unit in tai
+const C_DEL_DOC_GAS_PRICE: u64 = 20; // unit in tai
+const C_UPDATE_DOC_GAS_PRICE: u64 = 20; // unit in tai
 const STORAGE_GAS_PRICE: u64 = 10; // per bytes
+                                   //
+pub enum DbStoreOp {
+    DbOp {
+        pub create_db_ops: u64,
+        pub create_collection_ops: u64,
+        pub create_index_ops: u64,
+        pub data_in_bytes: u64,
+    },
 
-pub fn estimate_gas(mutation: &DatabaseMutation) -> Units {
+    DocOp {
+        pub add_doc_ops: u64,
+        pub del_doc_ops: u64,
+        pub update_doc_ops: u64,
+        pub data_in_bytes: u64,
+    },
+}
+
+pub fn estimate_gas(ops: &DbStoreOp) -> Units {
     let mut gas: u64 = 0;
-    let acount = DatabaseAction::from_i32(mutation.action);
-    match action {
-        Some(DatabaseAction::CreateDB) => {
-            gas += C_CREATEDB_GAS_PRICE;
-            for (key, collection) in mutation.collection_mutations.iter() {
-                gas += key.len() * STORAGE_GAS_PRICE + C_CREATECOLLECTION_GAS_PRICE;
-                for index in collection.index {
-                    gas += C_CREATEINDEX_GAS_PRICE + index.name.len() * STORAGE_GAS_PRICE;
-                }
-            }
+    match ops {
+        DbStoreOp::DbOp {
+            create_db_ops,
+            create_collection_ops,
+            create_index_ops,
+            data_in_bytes,
+        } => {
+            gas += C_CREATEDB_GAS_PRICE * create_db_ops
+                + C_CREATECOLLECTION_GAS_PRICE * create_collection_ops;
+            gas += C_CREATEINDEX_GAS_PRICE * create_index_ops;
+            gas += data_in_bytes * STORAGE_GAS_PRICE;
         }
-        Some(DatabaseAction::AddCollection) => {
-            for (key, collection) in mutation.collection_mutations.iter() {
-                gas += key.len() * STORAGE_GAS_PRICE + C_CREATECOLLECTION_GAS_PRICE;
-                for index in collection.index {
-                    gas += C_CREATEINDEX_GAS_PRICE + index.name.len() * STORAGE_GAS_PRICE;
-                }
-            }
-        }
-        Some(DatabaseAction::AddDocument) => {
-            for doc in mutation.document_mutations {
-                let total_bytes = doc.document.iter().map(|d| d.len()).sum();
-                gas += C_WRITE_DOC_GAS_PRICE + total_bytes * STORAGE_GAS_PRICE;
-            }
-        }
-        _ => {
-            todo!();
+        DbStoreOp::DocOp {
+            add_doc_ops,
+            del_doc_ops,
+            update_doc_ops,
+            data_in_bytes,
+        } => {
+            gas += add_doc_ops * C_ADD_DOC_GAS_PRICE + del_doc_ops * C_DEL_DOC_GAS_PRICE;
+            gas += update_doc_ops * C_UPDATE_DOC_GAS_PRICE;
+            gas += data_in_bytes * STORAGE_GAS_PRICE;
         }
     }
     Units {

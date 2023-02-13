@@ -63,14 +63,17 @@ impl AccountStore {
     /// Create a account for the storage chains
     ///
     ///
-    pub fn new_account(db: Pin<&mut Merk>, addr: &DB3Address) -> Result<bool> {
+    pub fn new_account(db: Pin<&mut Merk>, addr: &DB3Address) -> Result<Account> {
         let key = AccountKey(addr);
         let encoded_key = key.encode()?;
         let values = db
             .get(encoded_key.as_ref())
             .map_err(|e| DB3Error::GetAccountError(format!("{}", e)))?;
         if let Some(v) = values {
-            Ok(false)
+            match Account::decode(v.as_ref()) {
+                Ok(a) => Ok(a),
+                Err(e) => Err(DB3Error::GetAccountError(format!("{}", e))),
+            }
         } else {
             let new_account = Account {
                 total_bills: Some(Units {
@@ -86,8 +89,8 @@ impl AccountStore {
                 total_session_count: 0,
                 nonce: 0,
             };
-            let result = Self::override_account(db, encoded_key, &new_account);
-            Ok(result.is_ok())
+            Self::override_account(db, encoded_key, &new_account)?;
+            Ok(new_account)
         }
     }
 

@@ -26,6 +26,7 @@ use db3_crypto::{
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::{Collection, Database, Document};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
+use db3_types::cost::DbStoreOp;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
@@ -34,22 +35,6 @@ use std::collections::LinkedList;
 use std::ops::Range;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
-
-pub enum DbStoreOp {
-    DbOp {
-        pub create_db_ops: u64,
-        pub create_collection_ops: u64,
-        pub create_index_ops: u64,
-        pub data_in_bytes: u64,
-    },
-
-    DocOp {
-        pub add_doc_ops: u64,
-        pub del_doc_ops: u64,
-        pub update_doc_ops: u64,
-        pub data_in_bytes: u64,
-    },
-}
 
 pub struct DbStore {}
 

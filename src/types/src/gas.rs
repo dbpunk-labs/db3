@@ -18,14 +18,14 @@
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::{UnitType, Units};
 
-const SHIFT: [i64; 2] = [1, 1000_000_000];
-const REVERSE_SHIFT: [i64; 2] = [1000_000_000, 1];
+const SHIFT: [u64; 2] = [1, 1000_000_000];
+const REVERSE_SHIFT: [u64; 2] = [1000_000_000, 1];
 
 const UNIT_TYPES: [i32; 2] = [1, 0];
 
 pub fn gas_cmp(left: &Units, right: &Units) -> std::cmp::Ordering {
-    let mut left_value: i64 = left.amount;
-    let mut right_value: i64 = right.amount;
+    let mut left_value: u64 = left.amount;
+    let mut right_value: u64 = right.amount;
     for unit in UNIT_TYPES {
         let left_index = (unit - left.utype as i32) as usize;
         let right_index = (unit - right.utype as i32) as usize;
