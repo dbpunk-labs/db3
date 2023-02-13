@@ -462,16 +462,39 @@ mod tests {
             assert!(false)
         }
 
+        // verify document is added
         let cmd = DB3ClientCommand::GetDocument {
             id: doc_id2.to_string(),
         };
-        if let Ok(table) = cmd.execute(&mut ctx).await {
-            assert_eq!(
-                doc_id2,
-                table.get_row(0).unwrap().get_cell(0).unwrap().get_content()
-            );
-        } else {
-            assert!(false)
-        }
+        let table = cmd.execute(&mut ctx).await.unwrap();
+        assert_eq!(
+            doc_id2,
+            table.get_row(0).unwrap().get_cell(0).unwrap().get_content()
+        );
+
+        // verify test delete with empty ids
+        let cmd = DB3ClientCommand::DeleteDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            ids: vec![],
+        };
+        let res = cmd.execute(&mut ctx).await;
+        assert!(res.is_err(), "{:?}", res.unwrap());
+
+        // test delete document cmd
+        let cmd = DB3ClientCommand::DeleteDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            ids: vec![doc_id2.to_string()],
+        };
+        let table = cmd.execute(&mut ctx).await.unwrap();
+        assert_eq!(1, table.len());
+        std::thread::sleep(time::Duration::from_millis(2000));
+        // verify document is deleted
+        let cmd = DB3ClientCommand::GetDocument {
+            id: doc_id2.to_string(),
+        };
+        let res = cmd.execute(&mut ctx).await;
+        assert!(res.is_err(), "{:?}", res.unwrap());
     }
 }

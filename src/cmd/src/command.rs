@@ -85,7 +85,18 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         documents: Vec<String>,
     },
-
+    #[clap(name = "del-doc")]
+    DeleteDocument {
+        /// the address of database
+        #[clap(long)]
+        addr: String,
+        /// the name of collection
+        #[clap(long)]
+        collection_name: String,
+        /// the content of document
+        #[clap(long)]
+        ids: Vec<String>,
+    },
     /// Get a document with given doc id
     #[clap(name = "get-doc")]
     GetDocument {
@@ -401,6 +412,53 @@ impl DB3ClientCommand {
                         Ok(table)
                     }
                     Err(e) => Err(format!("fail to add document: {:?}", e)),
+                }
+            }
+            DB3ClientCommand::DeleteDocument {
+                addr,
+                collection_name,
+                ids,
+            } => {
+                if (ids.is_empty()) {
+                    return Err("fail to delete with empty ids".to_string());
+                }
+                let db_id = DbId::try_from(addr.as_str()).unwrap();
+                let meta = BroadcastMeta {
+                    //TODO get from network
+                    nonce: Self::current_seconds(),
+                    //TODO use config
+                    chain_id: ChainId::DevNet.into(),
+                    //TODO use config
+                    chain_role: ChainRole::StorageShardChain.into(),
+                };
+                let document_mut = DocumentMutation {
+                    collection_name,
+                    documents: vec![],
+                    ids,
+                };
+                let dm = DatabaseMutation {
+                    meta: Some(meta),
+                    action: DatabaseAction::DeleteDocument.into(),
+                    db_address: db_id.as_ref().to_vec(),
+                    document_mutations: vec![document_mut],
+                    collection_mutations: vec![],
+                };
+                match ctx
+                    .mutation_sdk
+                    .as_ref()
+                    .unwrap()
+                    .submit_database_mutation(&dm)
+                    .await
+                {
+                    Ok((_, tx_id)) => {
+                        println!("send delete document done");
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["transaction id"]);
+                        table.add_row(row![tx_id.to_base64()]);
+                        Ok(table)
+                    }
+                    Err(e) => Err(format!("fail to delete document: {:?}", e)),
                 }
             }
         }
