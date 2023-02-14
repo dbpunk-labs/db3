@@ -111,7 +111,7 @@ impl BillId {
         //TODO avoid to copy data
         let data_array: [u8; BILL_ID_LENGTH] = data
             .try_into()
-            .map_err(|e| DB3Error::KeyCodecError("array length is invalid".to_string()))?;
+            .map_err(|_| DB3Error::KeyCodecError("invalid array length".to_string()))?;
         Ok(BillId { data: data_array })
     }
 
@@ -137,7 +137,7 @@ impl TryFrom<&[u8]> for BillId {
     fn try_from(data: &[u8]) -> Result<Self> {
         let data_array: [u8; BILL_ID_LENGTH] = data
             .try_into()
-            .map_err(|e| DB3Error::KeyCodecError("array length is invalid".to_string()))?;
+            .map_err(|_| DB3Error::KeyCodecError("array length is invalid".to_string()))?;
         Ok(BillId { data: data_array })
     }
 }

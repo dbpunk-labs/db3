@@ -27,7 +27,6 @@ use fastcrypto::encoding::{Base64, Encoding};
 use hex;
 use prost::Message;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use tendermint_abci::Application;
 use tendermint_proto::abci::{
@@ -38,18 +37,10 @@ use tendermint_proto::abci::{
 use tracing::{debug, info, span, warn, Level};
 
 #[derive(Clone)]
-pub struct NodeState {
-    total_storage_bytes: Arc<AtomicU64>,
-    total_mutations: Arc<AtomicU64>,
-    total_sessions: Arc<AtomicU64>,
-}
-
-#[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
     pending_query_session:
         Arc<Mutex<Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)>>>,
-    node_state: Arc<NodeState>,
     pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
@@ -58,18 +49,8 @@ impl AbciImpl {
         Self {
             node_store,
             pending_query_session: Arc::new(Mutex::new(Vec::new())),
-            node_state: Arc::new(NodeState {
-                total_storage_bytes: Arc::new(AtomicU64::new(0)),
-                total_mutations: Arc::new(AtomicU64::new(0)),
-                total_sessions: Arc::new(AtomicU64::new(0)),
-            }),
             pending_databases: Arc::new(Mutex::new(Vec::new())),
         }
-    }
-
-    #[inline]
-    pub fn get_node_state(&self) -> &Arc<NodeState> {
-        &self.node_state
     }
 }
 
@@ -344,11 +325,7 @@ impl Application for AbciImpl {
                 let pending_query_session_len = pending_query_session.len();
                 for item in pending_query_session {
                     match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
-                        Ok(_) => {
-                            self.node_state
-                                .total_sessions
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        }
+                        Ok(_) => {}
                         Err(e) => {
                             warn!("fail to apply mutation for {}", e);
                             todo!();
@@ -364,7 +341,8 @@ impl Application for AbciImpl {
                     };
                     match s.apply_database(&item.0, nonce, &item.2, &item.1) {
                         Ok(_) => {}
-                        Err(_) => {
+                        Err(e) => {
+                            warn!("fail to apply database for {e}");
                             todo!()
                         }
                     }

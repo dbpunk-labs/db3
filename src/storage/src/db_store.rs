@@ -285,16 +285,20 @@ impl DbStore {
                             if sender == owner {
                                 info!("delete doc id {}", document_id);
                                 entries.push((document_id.as_ref().to_vec(), Op::Delete));
-
                                 for index in collection.index_list.iter() {
                                     let key = db3_doc.get_keys(index)?;
-                                    let index_id = IndexId::create(
-                                        &collection_id,
-                                        index.id,
-                                        key.to_string().as_str(),
-                                        &document_id,
-                                    )?;
-                                    entries.push((index_id.as_ref().to_vec(), Op::Delete));
+                                    match key {
+                                        Some(k) => {
+                                            let index_id = IndexId::create(
+                                                &collection_id,
+                                                index.id,
+                                                k.as_str(),
+                                                &document_id,
+                                            )?;
+                                            entries.push((index_id.as_ref().to_vec(), Op::Delete));
+                                        }
+                                        None => {}
+                                    }
                                 }
                             } else {
                                 return Err(DB3Error::DocumentModifiedPermissionError);
@@ -386,38 +390,29 @@ impl DbStore {
                             data_in_bytes += document_vec.len() as u64;
                             info!("put document id {}", document_id.to_string());
                             entries.push((document_id.as_ref().to_vec(), Op::Put(document_vec)));
-
                             // insert index key -> document_id
                             for index in collection.index_list.iter() {
                                 // retrieve key(single/multiple) from db3 document
-                                match db3_document.get_keys(index) {
-                                    Ok(key) => {
+                                match db3_document.get_keys(index)? {
+                                    Some(key) => {
                                         // generate index id
                                         let index_id = IndexId::create(
                                             &collection_id,
                                             index.id,
                                             // TODO: convert key into bson bytes
-                                            key.to_string().as_str(),
+                                            key.as_str(),
                                             &document_id,
-                                        )
-                                        .map_err(|e| {
-                                            DB3Error::ApplyDatabaseError(format!("{:?}", e))
-                                        })
-                                        .unwrap();
+                                        )?;
                                         // put indexId->documentId
                                         info!("put index id {}", index_id.to_string());
                                         add_doc_ops += 1;
                                         entries.push((index_id.as_ref().to_vec(), Op::Put(vec![])));
                                     }
-                                    Err(e) => {
-                                        return Err(DB3Error::ApplyDatabaseError(format!(
-                                            "fail to decode index keys fron document: {:?}",
-                                            e
-                                        )));
+                                    None => {
+                                        info!("no index value");
                                     }
                                 }
                             }
-
                             document_ids.push(document_id);
                         }
                     }

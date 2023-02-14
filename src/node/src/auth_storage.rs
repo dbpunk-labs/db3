@@ -36,9 +36,21 @@ use merkdb::Merk;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use tracing::info;
+
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
+
+pub struct StorageState {
+    total_storage_bytes: Arc<AtomicU64>,
+    total_mutation_count: Arc<AtomicU64>,
+    total_session_count: Arc<AtomicU64>,
+    total_database_count: Arc<AtomicU64>,
+    total_collection_count: Arc<AtomicU64>,
+    total_document_count: Arc<AtomicU64>,
+}
 
 // the block state for db3
 #[derive(Debug, Clone)]
@@ -153,9 +165,46 @@ impl AuthStorage {
         tx_id: &TxId,
         query_session_info: &QuerySessionInfo,
     ) -> Result<Units> {
-        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?.unwrap();
+        let mut account = match AccountStore::get_account(self.db.as_ref(), addr)? {
+            Some(account) => Ok(account),
+            None => {
+                //TODO remove the action for adding a new user
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::new_account(db, addr)
+            }
+        }?;
         self.current_block_state.tx_counter = self.current_block_state.tx_counter + 1;
         let gas_fee = cost::estimate_query_session_gas(query_session_info);
+        let old_credits = account.credits.unwrap();
+        let new_credits = gas::gas_consume(&old_credits, &gas_fee);
+        match new_credits {
+            Ok(credits) => {
+                account.credits = Some(credits);
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
+                account.bills = Some(new_bills);
+                account.total_session_count += 1;
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::update_account(db, addr, &account)?;
+            }
+            Err(_) => {
+                //TODO throw out of gas error
+                account.credits = Some(Units {
+                    utype: UnitType::Db3.into(),
+                    amount: 0,
+                });
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
+                account.bills = Some(new_bills);
+                account.total_session_count += 1;
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::update_account(db, addr, &account)?;
+            }
+        }
+
+        let bill_id = BillId::new(
+            self.current_block_state.block_height as u64,
+            self.current_block_state.tx_counter as u16,
+        )?;
+
         let bill = Bill {
             gas_fee: Some(gas_fee.clone()),
             block_height: self.current_block_state.block_height as u64,
@@ -166,15 +215,7 @@ impl AuthStorage {
             to: query_addr.to_vec(),
         };
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        // TODO use mutation id
-        let bill_id = BillId::new(self.current_block_state.block_height as u64, 1 as u16)?;
         BillStore::apply(db, &bill_id, &bill)?;
-        let accumulate_gas = gas::gas_add(&gas_fee, &account.bills.unwrap());
-        account.bills = Some(accumulate_gas);
-        account.total_session_count =
-            account.total_session_count + query_session_info.query_count as u64;
-        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        AccountStore::update_account(db, &addr, &account)?;
         Ok(gas_fee)
     }
 
@@ -194,6 +235,7 @@ impl AuthStorage {
                 AccountStore::new_account(db, sender)
             }
         }?;
+
         //TODO make sure the account has enough credits
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         self.current_block_state.tx_counter += 1;
@@ -233,6 +275,7 @@ impl AuthStorage {
                 AccountStore::update_account(db, sender, &account)?;
             }
         }
+
         let bill_id = BillId::new(
             self.current_block_state.block_height as u64,
             self.current_block_state.tx_counter as u16,

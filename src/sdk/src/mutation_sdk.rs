@@ -60,6 +60,7 @@ impl MutationSDK {
             payload: mbuf.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::DatabasePayload.into(),
         };
+
         //
         //TODO generate the address from local currently
         //
@@ -71,7 +72,6 @@ impl MutationSDK {
         let r = BroadcastRequest {
             body: buf.as_ref().to_vec(),
         };
-
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
         let response = client

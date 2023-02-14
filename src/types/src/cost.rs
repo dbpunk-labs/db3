@@ -60,12 +60,8 @@ impl DbStoreOp {
     }
     pub fn get_data_size(&self) -> u64 {
         match self {
-            DbStoreOp::DbOp {
-                 data_in_bytes, ..
-            } => *data_in_bytes,
-            DbStoreOp::DocOp {
-                 data_in_bytes, ..
-            } => *data_in_bytes,
+            DbStoreOp::DbOp { data_in_bytes, .. } => *data_in_bytes,
+            DbStoreOp::DocOp { data_in_bytes, .. } => *data_in_bytes,
         }
     }
 }

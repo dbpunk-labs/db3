@@ -319,8 +319,8 @@ mod tests {
     use crate::mutation_sdk::MutationSDK;
     use crate::sdk_test;
     use bytes::BytesMut;
+
     use chrono::Utc;
-    use db3_base::get_a_random_nonce;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_proto::db3_node_proto::OpenSessionRequest;
@@ -357,105 +357,52 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn close_session_happy_path() {
+    async fn doc_curd_happy_path_smoke_test() {
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let mclient = client.clone();
-        {
-            let (_, signer) = sdk_test::gen_ed25519_signer();
-            let msdk = MutationSDK::new(mclient, signer);
-            let dm = sdk_test::create_a_database_mutation();
-            let result = msdk.submit_database_mutation(&dm).await;
-            assert!(result.is_ok());
-            let ten_millis = time::Duration::from_millis(2000);
-            std::thread::sleep(ten_millis);
-        }
+        let (_, signer) = sdk_test::gen_ed25519_signer();
+        let msdk = MutationSDK::new(client.clone(), signer);
+        // create a database
+        let dm = sdk_test::create_a_database_mutation();
+        let result = msdk.submit_database_mutation(&dm).await;
+        assert!(result.is_ok());
+        let ten_millis = time::Duration::from_millis(2000);
+        std::thread::sleep(ten_millis);
+        // add a collection
+        let (db_id, tx_id) = result.unwrap();
+        println!("db id {}", db_id.to_hex());
+        let cm = sdk_test::create_a_collection_mutataion("collection1", db_id.address());
+        let result = msdk.submit_database_mutation(&cm).await;
+        assert!(result.is_ok());
+        std::thread::sleep(ten_millis);
         let (addr, signer) = sdk_test::gen_ed25519_signer();
-        let mut sdk = StoreSDK::new(client, signer);
-        let account_res = sdk.get_account(&addr).await;
-        assert!(account_res.is_ok());
-        let account1 = account_res.unwrap();
-        let res = sdk.close_session().await;
-        std::thread::sleep(time::Duration::from_millis(2000));
-        let account_res = sdk.get_account(&addr).await;
-        assert!(account_res.is_ok());
-        let account2 = account_res.unwrap();
-        assert!(res.is_ok());
-        println!("account1: {:?}", account1);
-        println!("account2: {:?}", account2);
-        assert_eq!(
-            account2.total_session_count - account1.total_session_count,
-            0
-        );
+        let mut sdk = StoreSDK::new(client.clone(), signer);
+        let database = sdk.get_database(db_id.to_hex().as_str()).await;
+        if let Ok(Some(db)) = database {
+            assert_eq!(&db.address, db_id.address().as_ref());
+            assert_eq!(&db.sender, addr.as_ref());
+            assert_eq!(db.tx.len(), 2);
+            assert_eq!(db.collections.len(), 1);
+        } else {
+            assert!(false);
+        }
+        let docm = sdk_test::add_a_document("collection1", db_id.address());
+        let result = msdk.submit_database_mutation(&docm).await;
+        assert!(result.is_ok());
+        std::thread::sleep(ten_millis);
+        let documents = sdk
+            .list_documents(db_id.to_hex().as_str(), "collection1")
+            .await
+            .unwrap();
+        assert_eq!(documents.documents.len(), 1);
+        let result = sdk.close_session().await;
+        assert!(result.is_ok());
     }
 
-    // #[tokio::test]
-    // async fn close_session_wrong_path() {
-    //     let nonce = get_a_random_nonce();
-    //     let ep = "http://127.0.0.1:26659";
-    //     let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-    //     let channel = rpc_endpoint.connect_lazy();
-    //     let client = Arc::new(StorageNodeClient::new(channel));
-    //     let mclient = client.clone();
-    //     let key_vec = format!("kkkkk_tt{}", 20).as_bytes().to_vec();
-    //     let value_vec = format!("vkalue_tt{}", 20).as_bytes().to_vec();
-    //     let ns_vec = "my_twitter".as_bytes().to_vec();
-    //     {
-    //         let (_, signer) = sdk_test::gen_ed25519_signer();
-    //         let msdk = MutationSDK::new(mclient, signer);
-    //         let kv = KvPair {
-    //             key: key_vec.clone(),
-    //             value: value_vec.clone(),
-    //             action: MutationAction::InsertKv.into(),
-    //         };
-    //         let mutation = Mutation {
-    //             ns: ns_vec.clone(),
-    //             kv_pairs: vec![kv],
-    //             nonce,
-    //             chain_id: ChainId::MainNet.into(),
-    //             chain_role: ChainRole::StorageShardChain.into(),
-    //             gas_price: None,
-    //             gas: 10,
-    //         };
-    //         let result = msdk.submit_mutation(&mutation).await;
-    //         assert!(result.is_ok(), "{}", result.err().unwrap());
-    //         let two_sec = time::Duration::from_millis(2000);
-    //         std::thread::sleep(two_sec);
-    //     }
-
-    //     let (_, signer) = sdk_test::gen_ed25519_signer();
-    //     let mut sdk = StoreSDK::new(client, signer);
-    //     let res = sdk.open_session().await;
-    //     assert!(res.is_ok());
-    //     let session_info = res.unwrap();
-    //     assert_eq!(session_info.session_token.len(), 36);
-    //     if let Ok(Some(values)) = sdk
-    //         .batch_get(&ns_vec, vec![key_vec.clone()], &session_info.session_token)
-    //         .await
-    //     {
-    //         assert_eq!(values.values.len(), 1);
-    //         assert_eq!(values.values[0].key.to_vec(), key_vec);
-    //         assert_eq!(values.values[0].value.to_vec(), value_vec);
-    //     } else {
-    //         assert!(false);
-    //     }
-
-    //     sdk.session_pool
-    //         .get_session_mut(&session_info.session_token)
-    //         .unwrap()
-    //         .increase_query(100);
-    //     let res = sdk.close_session(&session_info.session_token).await;
-    //     assert!(res.is_err());
-    //     assert_eq!(
-    //         res.err().unwrap().message(),
-    //         "query session verify fail. expect query count 1 but 101"
-    //     );
-    // }
-
     #[tokio::test]
-    async fn open_session_replay_attach() {
+    async fn open_session_replay_attack() {
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();

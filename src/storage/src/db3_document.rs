@@ -112,7 +112,7 @@ impl DB3Document {
     pub fn get_keys(
         &self,
         index: &db3_proto::db3_database_proto::Index,
-    ) -> std::result::Result<Bson, DB3Error> {
+    ) -> std::result::Result<Option<String>, DB3Error> {
         let keys: Vec<_> = index.fields.iter().map(|f| f.field_path.as_str()).collect();
         match keys.len() {
             0 => Err(DB3Error::DocumentDecodeError(format!(
@@ -122,31 +122,26 @@ impl DB3Document {
             _ => self.get_multiple_keys(keys),
         }
     }
-    fn get_single_key(&self, key: &str) -> std::result::Result<Bson, DB3Error> {
-        match self
-            .get_document()
-            .map_err(|e| DB3Error::DocumentDecodeError(format!("{:?}", e)))
-            .unwrap()
-            .get(key)
-        {
-            Some(value) => Ok(value.clone()),
-            None => Err(DB3Error::DocumentDecodeError(format!(
-                "key {} not exist in document",
-                key
-            ))),
+
+    fn get_single_key(&self, key: &str) -> std::result::Result<Option<String>, DB3Error> {
+        //TODO support other types
+        match self.get_document()?.get(key) {
+            Some(value) => Ok(Some(value.as_str().unwrap().to_string())),
+            None => Ok(None),
         }
     }
-    fn get_multiple_keys(&self, keys: Vec<&str>) -> std::result::Result<Bson, DB3Error> {
-        let mut array_bson: Vec<_> = Vec::new();
-        for key in keys.iter() {
-            match self.get_single_key(key) {
-                Ok(v) => {
-                    array_bson.push(v);
-                }
-                Err(err) => return Err(err),
-            }
-        }
-        Ok(Bson::Array(array_bson))
+
+    fn get_multiple_keys(&self, keys: Vec<&str>) -> std::result::Result<Option<String>, DB3Error> {
+        //TODO use binary operation to combine multiple keys
+        let keys_str: String = keys
+            .iter()
+            .map(|key| match self.get_single_key(key) {
+                Ok(Some(v)) => v,
+                _ => "_".to_string(),
+            })
+            .intersperse("".to_string())
+            .collect();
+        Ok(Some(keys_str))
     }
 }
 impl AsRef<Document> for DB3Document {
@@ -309,9 +304,8 @@ mod tests {
             name: "idx1".to_string(),
             fields: vec![index_field],
         };
-        if let Ok(keys) = document.get_keys(&index) {
-            assert_eq!(keys.element_type(), ElementType::String);
-            assert_eq!("John Doe", keys.as_str().unwrap())
+        if let Ok(Some(keys)) = document.get_keys(&index) {
+            assert_eq!("John Doe", keys.as_str())
         } else {
             assert!(false);
         }
@@ -378,12 +372,8 @@ mod tests {
                 },
             ],
         };
-        if let Ok(keys) = document.get_keys(&index) {
-            assert_eq!(keys.element_type(), ElementType::Array);
-            println!("keys {}", keys);
-            // println!("keys {}", );
-            assert_eq!("John Doe", keys.as_array().unwrap()[0].as_str().unwrap());
-            assert_eq!(43, keys.as_array().unwrap()[1].as_i64().unwrap());
+        if let Ok(Some(keys)) = document.get_keys(&index) {
+            assert_eq!("John Doe43", keys.as_str());
         } else {
             assert!(false);
         }

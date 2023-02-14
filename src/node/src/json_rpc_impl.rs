@@ -15,15 +15,12 @@
 // limitations under the License.
 //
 use super::context::Context;
-use super::hash_util;
 use super::json_rpc;
 use actix_web::{web, Error, HttpResponse};
 use bytes::Bytes;
 use db3_crypto::db3_address::DB3Address;
 use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::Bill;
-use db3_proto::db3_mutation_proto::WriteRequest;
-use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Value;
