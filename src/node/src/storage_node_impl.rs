@@ -27,7 +27,7 @@ use db3_proto::db3_node_proto::{
     CloseSessionResponse, GetAccountRequest, GetAccountResponse, GetDocumentRequest,
     GetDocumentResponse, GetSessionInfoRequest, GetSessionInfoResponse, ListDocumentsRequest,
     ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse, QueryBillRequest,
-    QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
+    QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,

@@ -397,7 +397,7 @@ mod tests {
             ],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!("John Doe43", std::str::from_utf8(keys.as_ref()).unwrap());
+            assert_eq!("John Doe\0\0\0\0\0\0\0+", std::str::from_utf8(keys.as_ref()).unwrap());
         } else {
             assert!(false);
         }
