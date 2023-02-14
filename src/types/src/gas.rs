@@ -26,11 +26,20 @@ const UNIT_TYPES: [i32; 2] = [1, 0];
 pub fn gas_cmp(left: &Units, right: &Units) -> std::cmp::Ordering {
     let mut left_value: u64 = left.amount;
     let mut right_value: u64 = right.amount;
+    let mut left_type: i32 = left.utype;
+    let mut right_type: i32 = right.utype;
     for unit in UNIT_TYPES {
-        let left_index = (unit - left.utype as i32) as usize;
-        let right_index = (unit - right.utype as i32) as usize;
+        let left_index = (unit - left_type) as usize;
+        let right_index = (unit - right_type) as usize;
         left_value = left_value / SHIFT[left_index];
         right_value = right_value / SHIFT[right_index];
+        if left_type >= unit {
+            left_type -= 1;
+        }
+        if right_type >= unit {
+            right_type -= 1;
+        }
+
         if left_value != right_value {
             return left_value.cmp(&right_value);
         }
@@ -92,6 +101,19 @@ mod tests {
             amount: 1,
         };
         assert_eq!(gas_cmp(&left, &right), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn it_gas_cmp_greater() {
+        let left = Units {
+            utype: UnitType::Db3.into(),
+            amount: 1,
+        };
+        let right = Units {
+            utype: UnitType::Tai.into(),
+            amount: 1,
+        };
+        assert_eq!(gas_cmp(&left, &right), std::cmp::Ordering::Greater);
     }
 
     #[test]

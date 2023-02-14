@@ -29,6 +29,7 @@ use db3_storage::bill_store::BillStore;
 use db3_storage::commit_store::CommitStore;
 use db3_storage::db_store::DbStore;
 use db3_types::cost;
+use db3_types::cost::DbStoreOp;
 use db3_types::gas;
 use hex;
 use merkdb::proofs::{Node, Op as ProofOp};
@@ -43,12 +44,13 @@ use tracing::info;
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
 
-pub struct StorageState {
+pub struct NetworkState {
     total_storage_bytes: Arc<AtomicU64>,
     total_mutation_count: Arc<AtomicU64>,
     total_session_count: Arc<AtomicU64>,
     total_database_count: Arc<AtomicU64>,
     total_collection_count: Arc<AtomicU64>,
+    total_index_count: Arc<AtomicU64>,
     total_document_count: Arc<AtomicU64>,
 }
 
@@ -86,7 +88,7 @@ pub struct AuthStorage {
     last_block_state: BlockState,
     current_block_state: BlockState,
     db: Pin<Box<Merk>>,
-    //TODO add chain id and chain role
+    network_state: Arc<NetworkState>, //TODO add chain id and chain role
 }
 
 impl AuthStorage {
@@ -95,6 +97,15 @@ impl AuthStorage {
             last_block_state: BlockState::new(),
             current_block_state: BlockState::new(),
             db: Box::pin(merk),
+            network_state: Arc::new(NetworkState {
+                total_storage_bytes: Arc::new(AtomicU64::new(0)),
+                total_mutation_count: Arc::new(AtomicU64::new(0)),
+                total_session_count: Arc::new(AtomicU64::new(0)),
+                total_database_count: Arc::new(AtomicU64::new(0)),
+                total_collection_count: Arc::new(AtomicU64::new(0)),
+                total_index_count: Arc::new(AtomicU64::new(0)),
+                total_document_count: Arc::new(AtomicU64::new(0)),
+            }),
         }
     }
 
@@ -214,9 +225,55 @@ impl AuthStorage {
             owner: addr.to_vec(),
             to: query_addr.to_vec(),
         };
+        self.network_state
+            .total_session_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
         BillStore::apply(db, &bill_id, &bill)?;
         Ok(gas_fee)
+    }
+
+    fn update_metric(&self, ops: &DbStoreOp) {
+        match ops {
+            DbStoreOp::DbOp {
+                create_db_ops,
+                create_collection_ops,
+                create_index_ops,
+                data_in_bytes,
+            } => {
+                self.network_state
+                    .total_database_count
+                    .fetch_add(*create_db_ops, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_storage_bytes
+                    .fetch_add(*data_in_bytes, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_collection_count
+                    .fetch_add(*create_collection_ops, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_index_count
+                    .fetch_add(*create_index_ops, std::sync::atomic::Ordering::Relaxed);
+            }
+            DbStoreOp::DocOp {
+                add_doc_ops,
+                del_doc_ops,
+                data_in_bytes,
+                ..
+            } => {
+                self.network_state
+                    .total_document_count
+                    .fetch_add(*add_doc_ops, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_storage_bytes
+                    .fetch_add(*data_in_bytes, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_document_count
+                    .fetch_sub(*del_doc_ops, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+        self.network_state
+            .total_mutation_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn apply_database(
@@ -248,6 +305,7 @@ impl AuthStorage {
             self.current_block_state.block_height as u64,
             self.current_block_state.tx_counter.into(),
         )?;
+        self.update_metric(&ops);
         let gas_fee = cost::estimate_gas(&ops);
         let old_credits = account.credits.unwrap();
         let new_credits = gas::gas_consume(&old_credits, &gas_fee);

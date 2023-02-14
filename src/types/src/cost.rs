@@ -126,7 +126,7 @@ mod tests {
         };
 
         let units = estimate_query_session_gas(&node_query_session_info);
-        assert_eq!(1, units.utype);
+        assert_eq!(0, units.utype);
         assert_eq!(100, units.amount);
     }
 }

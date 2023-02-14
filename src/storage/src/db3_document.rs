@@ -1,6 +1,7 @@
 use bson::spec::BinarySubtype;
 use bson::Document;
 use bson::{Binary, Bson};
+use byteorder::{BigEndian, WriteBytesExt};
 use db3_base::bson_util;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::{DocumentId, TxId};
@@ -112,7 +113,7 @@ impl DB3Document {
     pub fn get_keys(
         &self,
         index: &db3_proto::db3_database_proto::Index,
-    ) -> std::result::Result<Option<String>, DB3Error> {
+    ) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
         let keys: Vec<_> = index.fields.iter().map(|f| f.field_path.as_str()).collect();
         match keys.len() {
             0 => Err(DB3Error::DocumentDecodeError(format!(
@@ -123,25 +124,47 @@ impl DB3Document {
         }
     }
 
-    fn get_single_key(&self, key: &str) -> std::result::Result<Option<String>, DB3Error> {
-        //TODO support other types
+    fn get_single_key(&self, key: &str) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
+        let mut data: Vec<u8> = Vec::new();
         match self.get_document()?.get(key) {
-            Some(value) => Ok(Some(value.as_str().unwrap().to_string())),
+            Some(value) => match value {
+                Bson::Null => Ok(None),
+                Bson::Boolean(b) => {
+                    data.write_u8(*b as u8)
+                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                    Ok(Some(data))
+                }
+                Bson::Int64(n) => {
+                    data.write_i64::<BigEndian>(*n)
+                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                    Ok(Some(data))
+                }
+                Bson::Int32(n) => {
+                    data.write_i32::<BigEndian>(*n)
+                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                    Ok(Some(data))
+                }
+                Bson::String(s) => {
+                    data.extend_from_slice(s.as_bytes());
+                    Ok(Some(data))
+                }
+                _ => Err(DB3Error::DocumentDecodeError(
+                    "value type is not supported".to_string(),
+                )),
+            },
             None => Ok(None),
         }
     }
 
-    fn get_multiple_keys(&self, keys: Vec<&str>) -> std::result::Result<Option<String>, DB3Error> {
-        //TODO use binary operation to combine multiple keys
-        let keys_str: String = keys
-            .iter()
-            .map(|key| match self.get_single_key(key) {
-                Ok(Some(v)) => v,
-                _ => "_".to_string(),
-            })
-            .intersperse("".to_string())
-            .collect();
-        Ok(Some(keys_str))
+    fn get_multiple_keys(&self, keys: Vec<&str>) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
+        let mut data: Vec<u8> = Vec::new();
+        for key in keys.iter() {
+            match self.get_single_key(key)? {
+                Some(v) => data.extend_from_slice(v.as_ref()),
+                None => data.extend_from_slice("_".as_bytes()),
+            }
+        }
+        Ok(Some(data))
     }
 }
 impl AsRef<Document> for DB3Document {
@@ -305,7 +328,7 @@ mod tests {
             fields: vec![index_field],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!("John Doe", keys.as_str())
+            assert_eq!("John Doe", std::str::from_utf8(keys.as_ref()).unwrap())
         } else {
             assert!(false);
         }
@@ -339,7 +362,8 @@ mod tests {
             fields: vec![index_field],
         };
         let res = document.get_keys(&index);
-        assert!(res.is_err());
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_none());
     }
 
     #[test]
@@ -373,7 +397,7 @@ mod tests {
             ],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!("John Doe43", keys.as_str());
+            assert_eq!("John Doe43", std::str::from_utf8(keys.as_ref()).unwrap());
         } else {
             assert!(false);
         }
@@ -408,8 +432,7 @@ mod tests {
                 },
             ],
         };
-        assert!(document.get_keys(&index_has_key_not_exist).is_err());
-
+        assert!(document.get_keys(&index_has_key_not_exist).is_ok());
         let index_empty_keys = Index {
             id: 0,
             name: "idx1".to_string(),

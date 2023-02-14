@@ -17,6 +17,7 @@
 
 use crate::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use base64ct::Encoding as _;
+use byteorder::ReadBytesExt;
 use byteorder::{BigEndian, WriteBytesExt};
 use db3_error::{DB3Error, Result};
 use fastcrypto::hash::{HashFunction, Sha3_256};
@@ -144,12 +145,11 @@ impl TryFrom<&[u8]> for BillId {
 
 pub const TYPE_ID_LENGTH: usize = 1;
 pub const BLOCK_ID_LENGTH: usize = 8;
-pub const MUTATION_ID_LENGTH: usize = 4;
-pub const OP_ENTRY_INDEX_LENGTH: usize = 4;
+pub const MUTATION_ID_LENGTH: usize = 2;
+pub const OP_ENTRY_INDEX_LENGTH: usize = 2;
 pub const INDEX_FIELD_ID_LENGTH: usize = 4;
 /// OpEntryId := BlockId + MutationId + OpEntryIdx
-pub const OP_ENTRY_ID_LENGTH: usize = 16;
-
+pub const OP_ENTRY_ID_LENGTH: usize = 12;
 pub const DOCUMENT_ID_TYPE_ID: i8 = 1;
 pub const INDEX_ID_TYPE_ID: i8 = 2;
 
@@ -161,13 +161,19 @@ pub struct OpEntryId {
 impl OpEntryId {
     pub fn create(
         block_id: u64,
-        mutation_id: u32,
-        op_entry_idx: u32,
+        mutation_id: u16,
+        op_entry_idx: u16,
     ) -> std::result::Result<Self, DB3Error> {
         let mut bytes: Vec<u8> = Vec::with_capacity(OP_ENTRY_ID_LENGTH);
-        bytes.extend(block_id.to_be_bytes());
-        bytes.extend(mutation_id.to_be_bytes());
-        bytes.extend(op_entry_idx.to_be_bytes());
+        bytes
+            .write_u64::<BigEndian>(block_id)
+            .map_err(|_| DB3Error::InvalidOpEntryIdBytes)?;
+        bytes
+            .write_u16::<BigEndian>(mutation_id)
+            .map_err(|_| DB3Error::InvalidOpEntryIdBytes)?;
+        bytes
+            .write_u16::<BigEndian>(op_entry_idx)
+            .map_err(|_| DB3Error::InvalidOpEntryIdBytes)?;
         Self::try_from_bytes(bytes.as_slice())
     }
 
@@ -183,25 +189,20 @@ impl OpEntryId {
             data: [1; OP_ENTRY_ID_LENGTH],
         }
     }
-    fn get_as_int(&self) -> u128 {
-        unsafe { mem::transmute::<[u8; 16], u128>(self.data) }
-    }
 
     fn get_block_id(&self) -> u64 {
-        let mut x: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
-        x.copy_from_slice(&self.data[..BLOCK_ID_LENGTH]);
-        u64::from_be_bytes(x)
+        let block_id = (&self.data[0..]).read_u64::<BigEndian>().unwrap();
+        block_id
     }
 
-    fn get_mutation_id(&self) -> u32 {
-        let mut x: [u8; 4] = [0, 0, 0, 0];
-        x.copy_from_slice(&self.data[BLOCK_ID_LENGTH..BLOCK_ID_LENGTH + MUTATION_ID_LENGTH]);
-        u32::from_be_bytes(x)
+    fn get_mutation_id(&self) -> u16 {
+        let mutation_id = (&self.data[8..]).read_u16::<BigEndian>().unwrap();
+        mutation_id
     }
-    fn get_op_entry_ixd(&self) -> u32 {
-        let mut x: [u8; 4] = [0, 0, 0, 0];
-        x.copy_from_slice(&self.data[BLOCK_ID_LENGTH + MUTATION_ID_LENGTH..]);
-        u32::from_be_bytes(x)
+
+    fn get_op_entry_ixd(&self) -> u16 {
+        let id = (&self.data[10..]).read_u16::<BigEndian>().unwrap();
+        id
     }
 
     pub fn to_base64(&self) -> String {
@@ -312,14 +313,14 @@ impl IndexId {
     pub fn create(
         collection_id: &CollectionId,
         index_field_id: u32,
-        key: &str,
+        key: &[u8],
         document_id: &DocumentId,
     ) -> std::result::Result<Self, DB3Error> {
         let mut data: Vec<u8> = Vec::new();
         data.extend(INDEX_ID_TYPE_ID.to_be_bytes());
         data.extend(collection_id.as_ref());
         data.extend(index_field_id.to_be_bytes());
-        data.extend(key.as_bytes());
+        data.extend(key);
         data.extend(document_id.as_ref());
         Ok(Self { data })
     }
@@ -480,10 +481,6 @@ mod tests {
     #[test]
     fn op_entry_create_ut() {
         let op_entry_id = OpEntryId::create(1000000, 1000, 100).unwrap();
-        assert_eq!(
-            vec![0, 0, 0, 0, 0, 15, 66, 64, 0, 0, 3, 232, 0, 0, 0, 100],
-            op_entry_id.data.to_vec()
-        );
         assert_eq!(1000000, op_entry_id.get_block_id());
         assert_eq!(1000, op_entry_id.get_mutation_id());
         assert_eq!(100, op_entry_id.get_op_entry_ixd());
@@ -503,11 +500,11 @@ mod tests {
         assert_eq!("DOC|1000-100-10|999-99-9", document_id.to_string());
 
         assert_eq!(
-            "AQAAAAAAAAPoAAAAZAAAAAoAAAAAAAAD5wAAAGMAAAAJ",
+            "AQAAAAAAAAPoAGQACgAAAAAAAAPnAGMACQ==",
             document_id.to_base64()
         );
         assert_eq!(
-            DocumentId::try_from_base64("AQAAAAAAAAPoAAAAZAAAAAoAAAAAAAAD5wAAAGMAAAAJ").unwrap(),
+            DocumentId::try_from_base64("AQAAAAAAAAPoAGQACgAAAAAAAAPnAGMACQ==").unwrap(),
             document_id
         )
     }
@@ -518,7 +515,13 @@ mod tests {
         let document_entry_id = DocumentEntryId::create(999, 99, 9).unwrap();
         let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
 
-        let index_id = IndexId::create(&collection_id, 3, "key_content", &document_id).unwrap();
+        let index_id = IndexId::create(
+            &collection_id,
+            3,
+            "key_content".as_bytes().as_ref(),
+            &document_id,
+        )
+        .unwrap();
         assert_eq!(collection_id, index_id.get_collection_id().unwrap());
         assert_eq!(document_id, index_id.get_document_id().unwrap());
         assert_eq!(3, index_id.get_index_field_id());

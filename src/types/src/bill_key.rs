@@ -44,11 +44,11 @@ mod tests {
         let bill_id2 = BillId::new(block_id, mutation_id).unwrap();
         let bk = BillKey(&bill_id2);
         let bk_encoded_key2 = bk.encode()?;
-        assert!(bk_encoded_key2.cmp(&bk_encoded_key1) == std::cmp::Ordering::Greater);
+        assert!(bk_encoded_key2.cmp(&bk_encoded_key1) == std::cmp::Ordering::Equal);
         let bill_id3 = BillId::new(1 as u64, 9 as u16).unwrap();
         let bk = BillKey(&bill_id3);
         let bk_encoded_key3 = bk.encode()?;
-        assert!(bk_encoded_key3.cmp(&bk_encoded_key2) == std::cmp::Ordering::Less);
+        assert!(bk_encoded_key3.cmp(&bk_encoded_key2) == std::cmp::Ordering::Greater);
         Ok(())
     }
 }

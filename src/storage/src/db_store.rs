@@ -47,10 +47,10 @@ impl DbStore {
         mutation: &DatabaseMutation,
         tx_id: &TxId,
         block_id: u64,
-        mutation_id: u32,
+        mutation_id: u16,
     ) -> Result<(Database, DbStoreOp)> {
         let mut new_collections: HashMap<String, Collection> = HashMap::new();
-        let mut idx = 0;
+        let mut idx: u16 = 0;
         let mut collection_ops: u64 = 0;
         let mut index_ops: u64 = 0;
         for new_collection in mutation.collection_mutations.iter() {
@@ -107,10 +107,10 @@ impl DbStore {
         txid: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
+        mutation_id: u16,
     ) -> (Database, DbStoreOp) {
         //TODO check the duplicated collection id
-        let mut idx = 0;
+        let mut idx: u16 = 0;
         let mut collection_count: u64 = 0;
         let mut index_count: u64 = 0;
         let collections: HashMap<String, Collection> = mutation
@@ -155,7 +155,7 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
+        mutation_id: u16,
     ) -> Result<(BatchEntry, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
         let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
@@ -189,7 +189,7 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
+        mutation_id: u16,
     ) -> Result<DbStoreOp> {
         let mut entries: Vec<BatchEntry> = Vec::new();
         let (batch_entry, ops) = Self::convert(sender, nonce, tx, mutation, block_id, mutation_id)?;
@@ -211,7 +211,7 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
+        mutation_id: u16,
     ) -> Result<DbStoreOp> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
@@ -292,7 +292,7 @@ impl DbStore {
                                             let index_id = IndexId::create(
                                                 &collection_id,
                                                 index.id,
-                                                k.as_str(),
+                                                k.as_ref(),
                                                 &document_id,
                                             )?;
                                             entries.push((index_id.as_ref().to_vec(), Op::Delete));
@@ -341,7 +341,7 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
+        mutation_id: u16,
     ) -> Result<(DbStoreOp, Vec<DocumentId>)> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
@@ -365,7 +365,7 @@ impl DbStore {
                             let document_entry_id = DocumentEntryId::create(
                                 block_id,
                                 mutation_id,
-                                entries.len() as u32,
+                                entries.len() as u16,
                             )
                             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
                             .unwrap();
@@ -400,7 +400,7 @@ impl DbStore {
                                             &collection_id,
                                             index.id,
                                             // TODO: convert key into bson bytes
-                                            key.as_str(),
+                                            key.as_ref(),
                                             &document_id,
                                         )?;
                                         // put indexId->documentId
@@ -514,7 +514,7 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
+        mutation_id: u16,
     ) -> Result<DbStoreOp> {
         let action = DatabaseAction::from_i32(mutation.action);
         match action {
