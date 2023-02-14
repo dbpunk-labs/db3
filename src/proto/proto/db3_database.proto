@@ -17,7 +17,6 @@
 //
 
 syntax = "proto3";
-import "db3_base.proto";
 package db3_database_proto;
 
 //

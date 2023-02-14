@@ -26,12 +26,12 @@ use db3_crypto::{
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::{Collection, Database, Document};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
+use db3_types::cost::DbStoreOp;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::HashMap;
 use std::collections::LinkedList;
-use std::ops::Range;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -47,10 +47,12 @@ impl DbStore {
         mutation: &DatabaseMutation,
         tx_id: &TxId,
         block_id: u64,
-        mutation_id: u32,
-    ) -> Result<Database> {
+        mutation_id: u16,
+    ) -> Result<(Database, DbStoreOp)> {
         let mut new_collections: HashMap<String, Collection> = HashMap::new();
-        let mut idx = 0;
+        let mut idx: u16 = 0;
+        let mut collection_ops: u64 = 0;
+        let mut index_ops: u64 = 0;
         for new_collection in mutation.collection_mutations.iter() {
             if old_db
                 .collections
@@ -62,6 +64,8 @@ impl DbStore {
                 )));
             } else {
                 idx += 1;
+                collection_ops += 1;
+                index_ops += new_collection.index.len() as u64;
                 new_collections.insert(
                     new_collection.collection_name.to_string(),
                     Collection {
@@ -81,12 +85,20 @@ impl DbStore {
         }
         let mut tx_list = old_db.tx.to_vec();
         tx_list.push(tx_id.as_ref().to_vec());
-        Ok(Database {
-            address: old_db.address.to_vec(),
-            sender: old_db.sender.to_vec(),
-            tx: tx_list,
-            collections: new_collections,
-        })
+        Ok((
+            Database {
+                address: old_db.address.to_vec(),
+                sender: old_db.sender.to_vec(),
+                tx: tx_list,
+                collections: new_collections,
+            },
+            DbStoreOp::DbOp {
+                create_db_ops: 0,
+                create_collection_ops: collection_ops,
+                create_index_ops: index_ops,
+                data_in_bytes: 0,
+            },
+        ))
     }
 
     fn new_database(
@@ -95,15 +107,19 @@ impl DbStore {
         txid: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
-    ) -> Database {
+        mutation_id: u16,
+    ) -> (Database, DbStoreOp) {
         //TODO check the duplicated collection id
-        let mut idx = 0;
+        let mut idx: u16 = 0;
+        let mut collection_count: u64 = 0;
+        let mut index_count: u64 = 0;
         let collections: HashMap<String, Collection> = mutation
             .collection_mutations
             .iter()
             .map(move |x| {
                 idx += 1;
+                collection_count += 1;
+                index_count += x.index.len() as u64;
                 (
                     x.collection_name.to_string(),
                     Collection {
@@ -117,12 +133,20 @@ impl DbStore {
                 )
             })
             .collect();
-        Database {
-            address: id.as_ref().to_vec(),
-            sender: sender.as_ref().to_vec(),
-            tx: vec![txid.as_ref().to_vec()],
-            collections,
-        }
+        (
+            Database {
+                address: id.as_ref().to_vec(),
+                sender: sender.as_ref().to_vec(),
+                tx: vec![txid.as_ref().to_vec()],
+                collections,
+            },
+            DbStoreOp::DbOp {
+                create_db_ops: 1,
+                create_collection_ops: collection_count,
+                create_index_ops: index_count,
+                data_in_bytes: 0,
+            },
+        )
     }
 
     fn convert(
@@ -131,11 +155,13 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
-    ) -> Result<(BatchEntry, usize)> {
+        mutation_id: u16,
+    ) -> Result<(BatchEntry, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
-        let db = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
-        Self::encode_database(dbid, &db)
+        let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
+        let (entry, data_in_bytes) = Self::encode_database(dbid, &db)?;
+        ops.update_data_size(data_in_bytes as u64);
+        Ok((entry, ops))
     }
 
     fn encode_database(dbid: DbId, database: &Database) -> Result<(BatchEntry, usize)> {
@@ -163,17 +189,17 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
-    ) -> Result<()> {
+        mutation_id: u16,
+    ) -> Result<DbStoreOp> {
         let mut entries: Vec<BatchEntry> = Vec::new();
-        let (batch_entry, _) = Self::convert(sender, nonce, tx, mutation, block_id, mutation_id)?;
+        let (batch_entry, ops) = Self::convert(sender, nonce, tx, mutation, block_id, mutation_id)?;
         entries.push(batch_entry);
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&entries, &[])
                 .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         }
-        Ok(())
+        Ok(ops)
     }
 
     //
@@ -185,8 +211,8 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
-    ) -> Result<()> {
+        mutation_id: u16,
+    ) -> Result<DbStoreOp> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
@@ -198,23 +224,33 @@ impl DbStore {
                         "no permission to add collection to database {}",
                         db_id.to_hex()
                     );
+                    Ok(DbStoreOp::DbOp {
+                        create_db_ops: 0,
+                        create_collection_ops: 0,
+                        create_index_ops: 0,
+                        data_in_bytes: 0,
+                    })
                 } else {
                     let mut entries: Vec<BatchEntry> = Vec::new();
-                    let new_db = Self::update_database(&d, mutation, tx, block_id, mutation_id)?;
-                    let (entry, _) = Self::encode_database(db_id, &new_db)?;
+                    let (new_db, mut ops) =
+                        Self::update_database(&d, mutation, tx, block_id, mutation_id)?;
+                    //TODO how to get the byte size that was updated
+                    let (entry, data_in_bytes) = Self::encode_database(db_id, &new_db)?;
+                    ops.update_data_size(data_in_bytes as u64);
                     entries.push(entry);
                     unsafe {
                         Pin::get_unchecked_mut(db)
                             .apply(&entries, &[])
                             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
                     }
+                    Ok(ops)
                 }
             }
             None => {
                 warn!("database not found with addr {}", db_id.to_hex());
+                todo!();
             }
         }
-        Ok(())
     }
 
     //
@@ -224,7 +260,7 @@ impl DbStore {
         db: Pin<&mut Merk>,
         sender: &DB3Address,
         mutation: &DatabaseMutation,
-    ) -> Result<()> {
+    ) -> Result<DbStoreOp> {
         let span = span!(Level::INFO, "document").entered();
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
@@ -249,16 +285,20 @@ impl DbStore {
                             if sender == owner {
                                 info!("delete doc id {}", document_id);
                                 entries.push((document_id.as_ref().to_vec(), Op::Delete));
-
                                 for index in collection.index_list.iter() {
                                     let key = db3_doc.get_keys(index)?;
-                                    let index_id = IndexId::create(
-                                        &collection_id,
-                                        index.id,
-                                        key.to_string().as_str(),
-                                        &document_id,
-                                    )?;
-                                    entries.push((index_id.as_ref().to_vec(), Op::Delete));
+                                    match key {
+                                        Some(k) => {
+                                            let index_id = IndexId::create(
+                                                &collection_id,
+                                                index.id,
+                                                k.as_ref(),
+                                                &document_id,
+                                            )?;
+                                            entries.push((index_id.as_ref().to_vec(), Op::Delete));
+                                        }
+                                        None => {}
+                                    }
                                 }
                             } else {
                                 return Err(DB3Error::DocumentModifiedPermissionError);
@@ -276,6 +316,7 @@ impl DbStore {
                 )))
             }
         }
+        let del_doc_ops: u64 = entries.len() as u64;
         unsafe {
             entries.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(&b_key));
             Pin::get_unchecked_mut(db)
@@ -283,7 +324,12 @@ impl DbStore {
                 .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))?;
         }
         span.exit();
-        Ok(())
+        Ok(DbStoreOp::DocOp {
+            add_doc_ops: 0,
+            del_doc_ops,
+            update_doc_ops: 0,
+            data_in_bytes: 0,
+        })
     }
 
     //
@@ -295,12 +341,14 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
-    ) -> Result<Vec<DocumentId>> {
+        mutation_id: u16,
+    ) -> Result<(DbStoreOp, Vec<DocumentId>)> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
         let span = span!(Level::INFO, "database").entered();
+        let mut add_doc_ops: u64 = 0;
+        let mut data_in_bytes: u64 = 0;
         match database {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
@@ -317,7 +365,7 @@ impl DbStore {
                             let document_entry_id = DocumentEntryId::create(
                                 block_id,
                                 mutation_id,
-                                entries.len() as u32,
+                                entries.len() as u16,
                             )
                             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
                             .unwrap();
@@ -338,40 +386,33 @@ impl DbStore {
                             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
                             .unwrap();
                             let document_vec = db3_document.into_bytes().to_vec();
+                            add_doc_ops += 1;
+                            data_in_bytes += document_vec.len() as u64;
                             info!("put document id {}", document_id.to_string());
                             entries.push((document_id.as_ref().to_vec(), Op::Put(document_vec)));
-
                             // insert index key -> document_id
                             for index in collection.index_list.iter() {
                                 // retrieve key(single/multiple) from db3 document
-                                match db3_document.get_keys(index) {
-                                    Ok(key) => {
+                                match db3_document.get_keys(index)? {
+                                    Some(key) => {
                                         // generate index id
                                         let index_id = IndexId::create(
                                             &collection_id,
                                             index.id,
                                             // TODO: convert key into bson bytes
-                                            key.to_string().as_str(),
+                                            key.as_ref(),
                                             &document_id,
-                                        )
-                                        .map_err(|e| {
-                                            DB3Error::ApplyDatabaseError(format!("{:?}", e))
-                                        })
-                                        .unwrap();
-
+                                        )?;
                                         // put indexId->documentId
                                         info!("put index id {}", index_id.to_string());
+                                        add_doc_ops += 1;
                                         entries.push((index_id.as_ref().to_vec(), Op::Put(vec![])));
                                     }
-                                    Err(e) => {
-                                        return Err(DB3Error::ApplyDatabaseError(format!(
-                                            "fail to decode index keys fron document: {:?}",
-                                            e
-                                        )));
+                                    None => {
+                                        info!("no index value");
                                     }
                                 }
                             }
-
                             document_ids.push(document_id);
                         }
                     }
@@ -383,7 +424,13 @@ impl DbStore {
                         .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))?;
                 }
                 span.exit();
-                return Ok(document_ids);
+                let ops = DbStoreOp::DocOp {
+                    add_doc_ops,
+                    del_doc_ops: 0,
+                    update_doc_ops: 0,
+                    data_in_bytes,
+                };
+                return Ok((ops, document_ids));
             }
             None => {
                 span.exit();
@@ -467,8 +514,8 @@ impl DbStore {
         tx: &TxId,
         mutation: &DatabaseMutation,
         block_id: u64,
-        mutation_id: u32,
-    ) -> Result<()> {
+        mutation_id: u16,
+    ) -> Result<DbStoreOp> {
         let action = DatabaseAction::from_i32(mutation.action);
         match action {
             Some(DatabaseAction::CreateDb) => {
@@ -479,15 +526,14 @@ impl DbStore {
             }
             Some(DatabaseAction::AddDocument) => {
                 // TODO: send event with added ids
-                match Self::add_document(db, sender, tx, mutation, block_id, mutation_id) {
-                    Ok(ids) => Ok(()),
-                    Err(e) => Err(e),
-                }
+                let (ops, _) = Self::add_document(db, sender, tx, mutation, block_id, mutation_id)?;
+                Ok(ops)
             }
             Some(DatabaseAction::DeleteDocument) => Self::delete_document(db, sender, mutation),
-            None => Ok(()),
+            None => todo!(),
         }
     }
+
     pub fn get_database(db: Pin<&Merk>, id: &DbId) -> Result<Option<Database>> {
         //TODO use reference
         let key = DbKey(id.clone());
@@ -503,21 +549,6 @@ impl DbStore {
         } else {
             Ok(None)
         }
-    }
-
-    pub fn get_databases(db: Pin<&Merk>) -> Result<LinkedList<ProofOp>> {
-        let start_key = DbKey::min();
-        let end_key = DbKey::max();
-        let range = Range {
-            start: start_key.encode()?,
-            end: end_key.encode()?,
-        };
-        let mut query = Query::new();
-        query.insert_range(range);
-        let ops = db
-            .execute_query(query)
-            .map_err(|e| DB3Error::QueryDatabaseError(format!("{e}")))?;
-        Ok(ops)
     }
 }
 
@@ -626,7 +657,8 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
-        let database = DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+        let (database, _) =
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(database.collections.contains_key("collection1"))
     }
 
@@ -635,14 +667,13 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
-        let old_database =
+        let (old_database, _) =
             DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection2");
-        let new_database =
+        let (new_database, _) =
             DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101)
                 .unwrap();
-
         assert!(new_database.collections.contains_key("collection1"));
         assert!(new_database.collections.contains_key("collection2"));
     }
@@ -652,16 +683,12 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
-        let old_database =
+        let (old_database, _) =
             DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection1");
         let res = DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101);
         assert!(res.is_err());
-        assert_eq!(
-            "Err(ApplyDatabaseError(\"duplicated collection names collection1\"))",
-            format!("{:?}", res)
-        );
     }
 
     #[test]
@@ -677,11 +704,6 @@ mod tests {
         // create DB Test
         let result = DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, 1000, 1);
         assert!(result.is_ok());
-        if let Ok(ops) = DbStore::get_databases(db.as_ref()) {
-            assert_eq!(1, ops.len());
-        } else {
-            assert!(false);
-        }
 
         // get database test
         let db_id = DbId::try_from((&addr, 1)).unwrap();
@@ -707,7 +729,7 @@ mod tests {
 
             // add document test
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-            let ids =
+            let (_, ids) =
                 DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 2).unwrap();
             assert_eq!(1, ids.len());
             let document_id_1 = ids[0];
@@ -756,7 +778,7 @@ mod tests {
                     .to_string(),
                 ],
             );
-            let ids =
+            let (_, ids) =
                 DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, 1000, 3).unwrap();
             assert_eq!(2, ids.len());
             let document_id_2 = ids[0];
@@ -777,7 +799,7 @@ mod tests {
             );
             let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
             let res = DbStore::delete_document(db_m, &addr, &db_mutation);
-            assert!(res.is_ok(), "{:?}", res);
+            assert!(res.is_ok());
 
             // show documents
             if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {

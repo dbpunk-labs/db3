@@ -16,6 +16,7 @@
 //
 
 use bytes::BytesMut;
+use db3_crypto::id::BillId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_bill_proto::Bill;
 use db3_types::bill_key::BillKey;
@@ -29,8 +30,8 @@ use std::pin::Pin;
 pub struct BillStore {}
 
 impl BillStore {
-    pub fn apply(db: Pin<&mut Merk>, bill: &Bill) -> Result<()> {
-        let key = BillKey(bill.block_height, bill.bill_id);
+    pub fn apply(db: Pin<&mut Merk>, bill_id: &BillId, bill: &Bill) -> Result<()> {
+        let key = BillKey(bill_id);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024);
         bill.encode(&mut buf)
@@ -41,14 +42,31 @@ impl BillStore {
         unsafe {
             Pin::get_unchecked_mut(db)
                 .apply(&[entry], &[])
-                .map_err(|e| DB3Error::ApplyMutationError(format!("{}", e)))?;
+                .map_err(|e| DB3Error::ApplyBillError(format!("{}", e)))?;
         }
         Ok(())
     }
 
-    pub fn scan(db: Pin<&Merk>, height: u64, start: u64, end: u64) -> Result<LinkedList<ProofOp>> {
-        let skey = BillKey(height, start);
-        let ekey = BillKey(height, end);
+    pub fn get_bill(db: Pin<&Merk>, bill_id: &BillId) -> Result<Option<Bill>> {
+        let key = BillKey(bill_id);
+        let encoded_key = key.encode()?;
+        let values = db
+            .get(encoded_key.as_ref())
+            .map_err(|e| DB3Error::BillQueryError(format!("{}", e)))?;
+        if let Some(v) = values {
+            match Bill::decode(v.as_ref()) {
+                Ok(a) => Ok(Some(a)),
+                Err(e) => Err(DB3Error::BillQueryError(format!("{}", e))),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_block_bills(db: Pin<&Merk>, height: u64) -> Result<LinkedList<ProofOp>> {
+        let (start, end) = BillId::get_block_range(height)?;
+        let skey = BillKey(&start);
+        let ekey = BillKey(&end);
         let range = Range {
             start: skey.encode()?,
             end: ekey.encode()?,
@@ -72,7 +90,7 @@ mod tests {
     use std::boxed::Box;
     use tempdir::TempDir;
     #[test]
-    fn it_apply_bill() {
+    fn it_apply_bill_test() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
         let addr = get_a_static_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
@@ -84,15 +102,16 @@ mod tests {
                 amount: 1,
             }),
             block_height: 11,
-            bill_id: 111,
             bill_type: BillType::BillForMutation.into(),
             time: 111,
-            bill_target_id: target_id.as_bytes().to_vec(),
-            query_addr: vec![],
+            tx_id: target_id.as_bytes().to_vec(),
             owner: addr.as_bytes().to_vec(),
+            to: vec![],
         };
+
+        let bill_id = BillId::new(11, 111).unwrap();
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = BillStore::apply(db_m, &bill);
+        let result = BillStore::apply(db_m, &bill_id, &bill);
 
         assert!(result.is_ok());
         let bill = Bill {
@@ -101,48 +120,19 @@ mod tests {
                 amount: 1,
             }),
             block_height: 11,
-            bill_id: 1,
             bill_type: BillType::BillForMutation.into(),
             time: 111,
-            bill_target_id: target_id.as_bytes().to_vec(),
-            query_addr: vec![],
+            tx_id: target_id.as_bytes().to_vec(),
             owner: addr.as_bytes().to_vec(),
+            to: vec![],
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = BillStore::apply(db_m, &bill);
+        let bill_id = BillId::new(11, 1).unwrap();
+        let result = BillStore::apply(db_m, &bill_id, &bill);
         assert!(result.is_ok());
-
-        let skey = BillKey(11, 0).encode().unwrap();
-        let ekey = BillKey(11, 200).encode().unwrap();
-        let mut query = Query::new();
-        let range = Range {
-            start: skey,
-            end: ekey,
-        };
-        query.insert_range(range);
-        let result = db.as_ref().prove(query);
-        if let Ok(r) = result {
-            let mut decoder = Decoder::new(r.as_ref());
-            loop {
-                if let Some(Ok(op)) = decoder.next() {
-                    match op {
-                        ProofOp::Push(Node::KV(k, v)) => {
-                            println!("k {:?} v {:?}", k, v);
-                        }
-                        ProofOp::Push(Node::KVHash(h)) => {
-                            println!("kvhash {:?}", h);
-                        }
-                        ProofOp::Push(Node::Hash(h)) => {
-                            println!("hash {:?}", h);
-                        }
-                        _ => {
-                            println!("other");
-                        }
-                    }
-                    continue;
-                }
-                break;
-            }
-        }
+        let result = BillStore::get_block_bills(db.as_ref(), 11);
+        assert!(result.is_ok());
+        let ops = result.unwrap();
+        assert_eq!(ops.len(), 2);
     }
 }

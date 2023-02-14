@@ -52,28 +52,29 @@ mod tests {
     use crate::key_derive;
     use crate::signature_scheme::SignatureScheme;
     use bytes::BytesMut;
-    use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use db3_proto::db3_mutation_proto::Mutation;
-    use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
+    use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
+    use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
+
     use prost::Message;
     fn db3_signer_smoke_test(scheme: &SignatureScheme) {
-        let kv = KvPair {
-            key: "k1".as_bytes().to_vec(),
-            value: "value1".as_bytes().to_vec(),
-            action: MutationAction::InsertKv.into(),
-        };
-        let mutation = Mutation {
-            ns: "my_twitter".as_bytes().to_vec(),
-            kv_pairs: vec![kv],
+        let meta = BroadcastMeta {
+            //TODO get from network
             nonce: 1,
-            chain_id: ChainId::MainNet.into(),
+            //TODO use config
+            chain_id: ChainId::DevNet.into(),
+            //TODO use config
             chain_role: ChainRole::StorageShardChain.into(),
-            gas_price: None,
-            gas: 10,
         };
+        let dm = DatabaseMutation {
+            meta: Some(meta),
+            collection_mutations: vec![],
+            db_address: vec![],
+            action: DatabaseAction::CreateDb.into(),
+            document_mutations: vec![],
+        };
+
         let mut buf = BytesMut::with_capacity(1024 * 8);
-        mutation
-            .encode(&mut buf)
+        dm.encode(&mut buf)
             .map_err(|e| DB3Error::SignError(format!("{e}")))
             .unwrap();
         let buf = buf.freeze();

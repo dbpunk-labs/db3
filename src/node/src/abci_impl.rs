@@ -20,14 +20,13 @@ shadow!(build);
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
-use db3_proto::db3_mutation_proto::{DatabaseMutation, Mutation, PayloadType, WriteRequest};
+use db3_proto::db3_mutation_proto::{DatabaseMutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
-use db3_storage::kv_store::KvStore;
+use fastcrypto::encoding::{Base64, Encoding};
 use hex;
 use prost::Message;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use tendermint_abci::Application;
 use tendermint_proto::abci::{
@@ -38,19 +37,10 @@ use tendermint_proto::abci::{
 use tracing::{debug, info, span, warn, Level};
 
 #[derive(Clone)]
-pub struct NodeState {
-    total_storage_bytes: Arc<AtomicU64>,
-    total_mutations: Arc<AtomicU64>,
-    total_query_sessions: Arc<AtomicU64>,
-}
-
-#[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    pending_mutation: Arc<Mutex<Vec<(AccountAddress, TxId, Mutation)>>>,
     pending_query_session:
         Arc<Mutex<Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)>>>,
-    node_state: Arc<NodeState>,
     pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
@@ -58,20 +48,9 @@ impl AbciImpl {
     pub fn new(node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>) -> Self {
         Self {
             node_store,
-            pending_mutation: Arc::new(Mutex::new(Vec::new())),
             pending_query_session: Arc::new(Mutex::new(Vec::new())),
-            node_state: Arc::new(NodeState {
-                total_storage_bytes: Arc::new(AtomicU64::new(0)),
-                total_mutations: Arc::new(AtomicU64::new(0)),
-                total_query_sessions: Arc::new(AtomicU64::new(0)),
-            }),
             pending_databases: Arc::new(Mutex::new(Vec::new())),
         }
-    }
-
-    #[inline]
-    pub fn get_node_state(&self) -> &Arc<NodeState> {
-        &self.node_state
     }
 }
 
@@ -161,31 +140,6 @@ impl Application for AbciImpl {
                             }
                         }
 
-                        Some(PayloadType::MutationPayload) => {
-                            match Mutation::decode(request.payload.as_ref()) {
-                                Ok(mutation) => {
-                                    if KvStore::is_valid(&mutation) {
-                                        return ResponseCheckTx {
-                                            code: 0,
-                                            data: Bytes::new(),
-                                            log: "".to_string(),
-                                            info: "".to_string(),
-                                            gas_wanted: 1,
-                                            gas_used: 0,
-                                            events: vec![],
-                                            codespace: "".to_string(),
-                                            ..Default::default()
-                                        };
-                                    } else {
-                                        warn!("invalid mutation for kv store");
-                                    }
-                                }
-                                Err(e) => {
-                                    warn!("invalid transaction has been checked for error {}", e);
-                                }
-                            }
-                        }
-
                         Some(PayloadType::QuerySessionPayload) => {
                             match QuerySession::decode(request.payload.as_ref()) {
                                 Ok(query_session) => {
@@ -224,11 +178,18 @@ impl Application for AbciImpl {
                     }
                 }
                 Err(e) => {
+                    let payload: &[u8] = request.payload.as_ref();
+                    let signature: &[u8] = request.signature.as_ref();
                     warn!("invalid transaction has been checked for error {}", e);
+                    warn!(
+                        "payload {}, signature {}",
+                        Base64::encode(payload),
+                        Base64::encode(signature)
+                    );
                 }
             },
             Err(e) => {
-                warn!("invalid transaction has been checked for error {}", e);
+                warn!("fail to decode WriteRequest for error {}", e);
             }
         }
         // the tx should be removed from mempool
@@ -277,30 +238,6 @@ impl Application for AbciImpl {
                                 _ => {
                                     todo!();
                                 }
-                            }
-                        }
-                    }
-                    Some(PayloadType::MutationPayload) => {
-                        if let Ok(mutation) = Mutation::decode(wrequest.payload.as_ref()) {
-                            match self.pending_mutation.lock() {
-                                Ok(mut s) => {
-                                    //TODO add gas check
-                                    s.push((account_id.addr, tx_id, mutation));
-                                    return ResponseDeliverTx {
-                                        code: 0,
-                                        data: Bytes::new(),
-                                        log: "".to_string(),
-                                        info: "deliver_mutation".to_string(),
-                                        gas_wanted: 0,
-                                        gas_used: 0,
-                                        events: vec![Event {
-                                            r#type: "deliver".to_string(),
-                                            attributes: vec![],
-                                        }],
-                                        codespace: "".to_string(),
-                                    };
-                                }
-                                Err(_) => todo!(),
                             }
                         }
                     }
@@ -360,16 +297,6 @@ impl Application for AbciImpl {
     }
 
     fn commit(&self) -> ResponseCommit {
-        let pending_mutation: Vec<(AccountAddress, TxId, Mutation)> =
-            match self.pending_mutation.lock() {
-                Ok(mut q) => {
-                    let clone_q = q.drain(..).collect();
-                    clone_q
-                }
-                Err(_) => {
-                    todo!();
-                }
-            };
         let pending_query_session: Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)> =
             match self.pending_query_session.lock() {
                 Ok(mut q) => {
@@ -395,32 +322,10 @@ impl Application for AbciImpl {
             Ok(mut store) => {
                 let s = store.get_auth_store();
                 let span = span!(Level::INFO, "commit").entered();
-                let pending_mutation_len = pending_mutation.len();
-                for item in pending_mutation {
-                    match s.apply_mutation(&item.0, &item.1, &item.2) {
-                        Ok((_gas, total_bytes)) => {
-                            self.node_state
-                                .total_mutations
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            self.node_state.total_storage_bytes.fetch_add(
-                                total_bytes as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
-                        }
-                        Err(e) => {
-                            warn!("fail to apply mutation for {}", e);
-                            todo!();
-                        }
-                    }
-                }
                 let pending_query_session_len = pending_query_session.len();
                 for item in pending_query_session {
                     match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
-                        Ok(_) => {
-                            self.node_state
-                                .total_query_sessions
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        }
+                        Ok(_) => {}
                         Err(e) => {
                             warn!("fail to apply mutation for {}", e);
                             todo!();
@@ -436,16 +341,14 @@ impl Application for AbciImpl {
                     };
                     match s.apply_database(&item.0, nonce, &item.2, &item.1) {
                         Ok(_) => {}
-                        Err(_) => {
+                        Err(e) => {
+                            warn!("fail to apply database for {e}");
                             todo!()
                         }
                     }
                 }
                 span.exit();
-                if pending_mutation_len > 0
-                    || pending_query_session_len > 0
-                    || pending_databases_len > 0
-                {
+                if pending_query_session_len > 0 || pending_databases_len > 0 {
                     //TODO how to revert
                     if let Ok(hash) = s.commit() {
                         ResponseCommit {

@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use crate::abci_impl::{AbciImpl, NodeState};
+use crate::abci_impl::AbciImpl;
 use crate::auth_storage::AuthStorage;
 use crate::context::Context;
 use crate::json_rpc_impl;
@@ -207,7 +207,7 @@ impl DB3Command {
                     }
                     _ => todo!(),
                 }
-                let (_node_state, abci_handler) =
+                let abci_handler =
                     Self::start_abci_service(abci_port, read_buf_size, node_store.clone());
                 let tm_addr = format!("http://127.0.0.1:{tendermint_port}");
                 info!("db3 json rpc server will connect to tendermint {tm_addr}");
@@ -323,10 +323,9 @@ impl DB3Command {
         abci_port: u16,
         read_buf_size: usize,
         store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    ) -> (Arc<NodeState>, JoinHandle<()>) {
+    ) -> JoinHandle<()> {
         let addr = format!("{}:{}", "127.0.0.1", abci_port);
         let abci_impl = AbciImpl::new(store);
-        let node_state = abci_impl.get_node_state().clone();
         let handler = thread::spawn(move || {
             let server = ServerBuilder::new(read_buf_size).bind(addr, abci_impl);
             match server {
@@ -340,7 +339,7 @@ impl DB3Command {
                 }
             }
         });
-        (node_state, handler)
+        handler
     }
 }
 #[cfg(test)]

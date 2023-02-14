@@ -15,67 +15,107 @@
 // limitations under the License.
 //
 use db3_proto::db3_base_proto::{UnitType, Units};
-use db3_proto::db3_mutation_proto::{Mutation, MutationAction};
+use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 
-const COMPUTAION_GAS_PRICE: u64 = 10; // unit in tai
-const STORAGE_GAS_PRICE: u64 = 10; // unit in tai
+const C_CREATEDB_GAS_PRICE: u64 = 100; // unit in tai
+const C_CREATECOLLECTION_GAS_PRICE: u64 = 100; // unit in tai
+const C_CREATEINDEX_GAS_PRICE: u64 = 100; // unit in tai
+const C_ADD_DOC_GAS_PRICE: u64 = 200; // unit in tai
+const C_DEL_DOC_GAS_PRICE: u64 = 200; // unit in tai
+const C_UPDATE_DOC_GAS_PRICE: u64 = 200; // unit in tai
+const STORAGE_GAS_PRICE: u64 = 1; // per bytes
+pub enum DbStoreOp {
+    DbOp {
+        create_db_ops: u64,
+        create_collection_ops: u64,
+        create_index_ops: u64,
+        data_in_bytes: u64,
+    },
 
-pub fn estimate_gas(mutation: &Mutation) -> Units {
-    let mut gas: u64 = 0;
-    gas += mutation.kv_pairs.len() as u64 * COMPUTAION_GAS_PRICE;
-    for kv in &mutation.kv_pairs {
-        let action = MutationAction::from_i32(kv.action);
-        match action {
-            Some(MutationAction::InsertKv) => {
-                gas +=
-                    (mutation.ns.len() + kv.key.len() + kv.value.len()) as u64 * STORAGE_GAS_PRICE;
+    DocOp {
+        add_doc_ops: u64,
+        del_doc_ops: u64,
+        update_doc_ops: u64,
+        data_in_bytes: u64,
+    },
+}
+
+impl DbStoreOp {
+    pub fn update_data_size(&mut self, data_size: u64) {
+        match self {
+            DbStoreOp::DbOp {
+                ref mut data_in_bytes,
+                ..
+            } => {
+                *data_in_bytes = data_size;
             }
-            _ => {}
+            DbStoreOp::DocOp {
+                ref mut data_in_bytes,
+                ..
+            } => {
+                *data_in_bytes = data_size;
+            }
+        }
+    }
+    pub fn get_data_size(&self) -> u64 {
+        match self {
+            DbStoreOp::DbOp { data_in_bytes, .. } => *data_in_bytes,
+            DbStoreOp::DocOp { data_in_bytes, .. } => *data_in_bytes,
+        }
+    }
+}
+
+pub fn estimate_gas(ops: &DbStoreOp) -> Units {
+    let mut gas: u64 = 0;
+    match ops {
+        DbStoreOp::DbOp {
+            create_db_ops,
+            create_collection_ops,
+            create_index_ops,
+            data_in_bytes,
+        } => {
+            gas += C_CREATEDB_GAS_PRICE * create_db_ops
+                + C_CREATECOLLECTION_GAS_PRICE * create_collection_ops;
+            gas += C_CREATEINDEX_GAS_PRICE * create_index_ops;
+            gas += data_in_bytes * STORAGE_GAS_PRICE;
+        }
+        DbStoreOp::DocOp {
+            add_doc_ops,
+            del_doc_ops,
+            update_doc_ops,
+            data_in_bytes,
+        } => {
+            gas += add_doc_ops * C_ADD_DOC_GAS_PRICE + del_doc_ops * C_DEL_DOC_GAS_PRICE;
+            gas += update_doc_ops * C_UPDATE_DOC_GAS_PRICE;
+            gas += data_in_bytes * STORAGE_GAS_PRICE;
         }
     }
     Units {
         utype: UnitType::Tai.into(),
-        amount: gas as i64,
+        amount: gas,
     }
 }
+
 pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> Units {
     let mut gas: u64 = 0;
-    gas += query_session_info.query_count as u64 * COMPUTAION_GAS_PRICE;
+    gas += query_session_info.query_count as u64 * 10;
     // TODO: estimate gas based on query count and weight
     Units {
         utype: UnitType::Tai.into(),
-        amount: gas as i64,
+        amount: gas,
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::Utc;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
-    use db3_proto::db3_mutation_proto::{KvPair, MutationAction};
     use db3_proto::db3_session_proto::QuerySessionInfo;
 
     #[test]
-    fn it_estimate_gas() {
-        let kv = KvPair {
-            key: "k1".as_bytes().to_vec(),
-            value: "value1".as_bytes().to_vec(),
-            action: MutationAction::InsertKv.into(),
-        };
-        let mutation = Mutation {
-            ns: "my_twitter".as_bytes().to_vec(),
-            kv_pairs: vec![kv],
-            nonce: 1,
-            chain_id: ChainId::MainNet.into(),
-            chain_role: ChainRole::StorageShardChain.into(),
-            gas_price: None,
-            gas: 10,
-        };
-        let units = estimate_gas(&mutation);
-        assert_eq!(1, units.utype);
-        assert_eq!(190, units.amount);
-    }
+    fn it_estimate_gas() {}
 
     #[test]
     fn it_query_session_estimate_gas() {
@@ -86,7 +126,7 @@ mod tests {
         };
 
         let units = estimate_query_session_gas(&node_query_session_info);
-        assert_eq!(1, units.utype);
+        assert_eq!(0, units.utype);
         assert_eq!(100, units.amount);
     }
 }

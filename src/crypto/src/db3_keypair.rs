@@ -244,4 +244,15 @@ mod tests {
             serde_json::to_string(&ts_address).unwrap()
         );
     }
+
+    #[test]
+    fn keypair_ts_secp259k1_case() {
+        let ts_signature = "AEAgHci5wbl0OEsqPVjjGAStTVZn3CbatXuAmF2KJ7jVDgYGk/t6Bdre99eNCEyfV3387dVY//D0+J8YuuXgI94BA+NxdDVYKrM9LjFdIem8ThlQCh/EyM3HOhU2WJF3SxMf";
+        let msg = Base64::decode("CgUIt0oYCg==").unwrap();
+        let ts_signature_ret =
+            Secp256k1DB3Signature::from_bytes(Base64::decode(ts_signature).unwrap().as_ref());
+        assert_eq!(true, ts_signature_ret.is_ok());
+        let is_ok = ts_signature_ret.unwrap().verify(msg.as_ref());
+        assert_eq!(true, is_ok.is_ok());
+    }
 }

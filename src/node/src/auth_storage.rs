@@ -15,23 +15,21 @@
 // limitations under the License.
 //
 
-use db3_crypto::id::{CollectionId, DbId, DocumentId};
+use db3_crypto::id::{BillId, CollectionId, DbId, DocumentId};
 use db3_crypto::{db3_address::DB3Address, id::TxId};
 use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
-use db3_proto::db3_base_proto::Units;
+use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_database_proto::{Database, Document};
-use db3_proto::db3_mutation_proto::{DatabaseMutation, KvPair, Mutation, MutationAction};
-use db3_proto::db3_node_proto::{BatchGetKey, BatchGetValue, RangeKey, RangeValue};
+use db3_proto::db3_mutation_proto::DatabaseMutation;
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
 use db3_storage::commit_store::CommitStore;
 use db3_storage::db_store::DbStore;
-use db3_storage::key::Key;
-use db3_storage::kv_store::KvStore;
 use db3_types::cost;
+use db3_types::cost::DbStoreOp;
 use db3_types::gas;
 use hex;
 use merkdb::proofs::{Node, Op as ProofOp};
@@ -39,28 +37,38 @@ use merkdb::Merk;
 use prost::Message;
 use std::boxed::Box;
 use std::pin::Pin;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use tracing::info;
+
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
+
+pub struct NetworkState {
+    total_storage_bytes: Arc<AtomicU64>,
+    total_mutation_count: Arc<AtomicU64>,
+    total_session_count: Arc<AtomicU64>,
+    total_database_count: Arc<AtomicU64>,
+    total_collection_count: Arc<AtomicU64>,
+    total_index_count: Arc<AtomicU64>,
+    total_document_count: Arc<AtomicU64>,
+}
 
 // the block state for db3
 #[derive(Debug, Clone)]
 pub struct BlockState {
     pub block_height: i64,
     pub abci_hash: Hash,
-    //TODO remove and use hash of bill as it's id
-    pub bill_id_counter: u64,
+    pub tx_counter: u16,
     pub block_time: u64,
-    pub database_mutation_counter: u32,
 }
 
 impl BlockState {
     pub fn reset(&mut self) {
         self.block_height = 0;
         self.abci_hash = [0; 32];
-        self.bill_id_counter = 0;
         self.block_time = 0;
-        self.database_mutation_counter = 0;
+        self.tx_counter = 0;
     }
 }
 
@@ -69,9 +77,8 @@ impl BlockState {
         Self {
             block_height: 0,
             abci_hash: [0; HASH_LENGTH],
-            bill_id_counter: 0,
             block_time: 0,
-            database_mutation_counter: 0,
+            tx_counter: 0,
         }
     }
 }
@@ -81,7 +88,7 @@ pub struct AuthStorage {
     last_block_state: BlockState,
     current_block_state: BlockState,
     db: Pin<Box<Merk>>,
-    //TODO add chain id and chain role
+    network_state: Arc<NetworkState>, //TODO add chain id and chain role
 }
 
 impl AuthStorage {
@@ -90,6 +97,15 @@ impl AuthStorage {
             last_block_state: BlockState::new(),
             current_block_state: BlockState::new(),
             db: Box::pin(merk),
+            network_state: Arc::new(NetworkState {
+                total_storage_bytes: Arc::new(AtomicU64::new(0)),
+                total_mutation_count: Arc::new(AtomicU64::new(0)),
+                total_session_count: Arc::new(AtomicU64::new(0)),
+                total_database_count: Arc::new(AtomicU64::new(0)),
+                total_collection_count: Arc::new(AtomicU64::new(0)),
+                total_index_count: Arc::new(AtomicU64::new(0)),
+                total_document_count: Arc::new(AtomicU64::new(0)),
+            }),
         }
     }
 
@@ -117,60 +133,7 @@ impl AuthStorage {
         &self.last_block_state
     }
 
-    pub fn get_range(&self, addr: &DB3Address, range_key: &RangeKey) -> Result<RangeValue> {
-        let proofs_ops = KvStore::get_range(self.db.as_ref(), addr, range_key)?;
-        let ns = range_key.ns.as_ref();
-        let mut kv_pairs: Vec<KvPair> = Vec::new();
-        for op in proofs_ops {
-            match op {
-                ProofOp::Push(Node::KV(k, v)) => {
-                    let new_key = Key::decode(k.as_ref(), ns)?;
-                    kv_pairs.push(KvPair {
-                        key: new_key.2.to_owned(),
-                        value: v,
-                        action: MutationAction::Nonce.into(),
-                    });
-                }
-                _ => {}
-            }
-        }
-
-        Ok(RangeValue {
-            values: kv_pairs.to_owned(),
-            ns: ns.to_vec(),
-            session_token: range_key.session_token.clone(),
-        })
-    }
-
-    pub fn batch_get(
-        &self,
-        addr: &DB3Address,
-        batch_get_keys: &BatchGetKey,
-    ) -> Result<BatchGetValue> {
-        let proofs_ops = KvStore::batch_get(self.db.as_ref(), addr, batch_get_keys)?;
-        let ns = batch_get_keys.ns.as_ref();
-        let mut kv_pairs: Vec<KvPair> = Vec::new();
-        for op in proofs_ops {
-            match op {
-                ProofOp::Push(Node::KV(k, v)) => {
-                    let new_key = Key::decode(k.as_ref(), ns)?;
-                    kv_pairs.push(KvPair {
-                        key: new_key.2.to_owned(),
-                        value: v,
-                        action: MutationAction::Nonce.into(),
-                    });
-                }
-                _ => {}
-            }
-        }
-        Ok(BatchGetValue {
-            values: kv_pairs.to_owned(),
-            session_token: batch_get_keys.session_token.clone(),
-            ns: ns.to_vec(),
-        })
-    }
-
-    pub fn get_account(&self, addr: &DB3Address) -> Result<Account> {
+    pub fn get_account(&self, addr: &DB3Address) -> Result<Option<Account>> {
         AccountStore::get_account(self.db.as_ref(), addr)
     }
 
@@ -181,13 +144,11 @@ impl AuthStorage {
     pub fn get_documents(&self, id: &CollectionId) -> Result<Vec<Document>> {
         DbStore::get_documents(self.db.as_ref(), id)
     }
-
     pub fn get_document(&self, id: &DocumentId) -> Result<Option<Document>> {
         DbStore::get_document(self.db.as_ref(), id)
     }
-
-    pub fn get_bills(&self, height: u64, start_id: u64, end_id: u64) -> Result<Vec<Bill>> {
-        let proofs_ops = BillStore::scan(self.db.as_ref(), height, start_id, end_id)?;
+    pub fn get_bills(&self, height: u64) -> Result<Vec<Bill>> {
+        let proofs_ops = BillStore::get_block_bills(self.db.as_ref(), height)?;
         let mut bills: Vec<Bill> = Vec::new();
         for op in proofs_ops {
             match op {
@@ -205,8 +166,7 @@ impl AuthStorage {
     pub fn begin_block(&mut self, height: u64, time: u64) {
         self.current_block_state.block_time = time;
         self.current_block_state.block_height = height as i64;
-        self.current_block_state.bill_id_counter = 0;
-        self.current_block_state.database_mutation_counter = 0;
+        self.current_block_state.tx_counter = 0;
     }
 
     pub fn apply_query_session(
@@ -216,30 +176,104 @@ impl AuthStorage {
         tx_id: &TxId,
         query_session_info: &QuerySessionInfo,
     ) -> Result<Units> {
-        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
-        self.current_block_state.bill_id_counter = self.current_block_state.bill_id_counter + 1;
+        let mut account = match AccountStore::get_account(self.db.as_ref(), addr)? {
+            Some(account) => Ok(account),
+            None => {
+                //TODO remove the action for adding a new user
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::new_account(db, addr)
+            }
+        }?;
+        self.current_block_state.tx_counter = self.current_block_state.tx_counter + 1;
         let gas_fee = cost::estimate_query_session_gas(query_session_info);
+        let old_credits = account.credits.unwrap();
+        let new_credits = gas::gas_consume(&old_credits, &gas_fee);
+        match new_credits {
+            Ok(credits) => {
+                account.credits = Some(credits);
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
+                account.bills = Some(new_bills);
+                account.total_session_count += 1;
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::update_account(db, addr, &account)?;
+            }
+            Err(_) => {
+                //TODO throw out of gas error
+                account.credits = Some(Units {
+                    utype: UnitType::Db3.into(),
+                    amount: 0,
+                });
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
+                account.bills = Some(new_bills);
+                account.total_session_count += 1;
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::update_account(db, addr, &account)?;
+            }
+        }
+
+        let bill_id = BillId::new(
+            self.current_block_state.block_height as u64,
+            self.current_block_state.tx_counter as u16,
+        )?;
+
         let bill = Bill {
             gas_fee: Some(gas_fee.clone()),
             block_height: self.current_block_state.block_height as u64,
-            bill_id: self.current_block_state.bill_id_counter,
             bill_type: BillType::BillForQuery.into(),
             time: self.current_block_state.block_time,
-            bill_target_id: tx_id.as_ref().to_vec(),
+            tx_id: tx_id.as_ref().to_vec(),
             owner: addr.to_vec(),
-            query_addr: query_addr.to_vec(),
+            to: query_addr.to_vec(),
         };
-
+        self.network_state
+            .total_session_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        BillStore::apply(db, &bill)?;
-
-        let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
-        account.total_bills = Some(accumulate_gas);
-        account.total_query_session_count =
-            account.total_query_session_count + query_session_info.query_count as u64;
-        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        AccountStore::apply(db, &addr, &account)?;
+        BillStore::apply(db, &bill_id, &bill)?;
         Ok(gas_fee)
+    }
+
+    fn update_metric(&self, ops: &DbStoreOp) {
+        match ops {
+            DbStoreOp::DbOp {
+                create_db_ops,
+                create_collection_ops,
+                create_index_ops,
+                data_in_bytes,
+            } => {
+                self.network_state
+                    .total_database_count
+                    .fetch_add(*create_db_ops, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_storage_bytes
+                    .fetch_add(*data_in_bytes, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_collection_count
+                    .fetch_add(*create_collection_ops, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_index_count
+                    .fetch_add(*create_index_ops, std::sync::atomic::Ordering::Relaxed);
+            }
+            DbStoreOp::DocOp {
+                add_doc_ops,
+                del_doc_ops,
+                data_in_bytes,
+                ..
+            } => {
+                self.network_state
+                    .total_document_count
+                    .fetch_add(*add_doc_ops, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_storage_bytes
+                    .fetch_add(*data_in_bytes, std::sync::atomic::Ordering::Relaxed);
+                self.network_state
+                    .total_document_count
+                    .fetch_sub(*del_doc_ops, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+        self.network_state
+            .total_mutation_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn apply_database(
@@ -248,49 +282,75 @@ impl AuthStorage {
         nonce: u64,
         tx: &TxId,
         mutation: &DatabaseMutation,
-    ) -> Result<()> {
+    ) -> Result<Units> {
+        //
+        let mut account = match AccountStore::get_account(self.db.as_ref(), sender)? {
+            Some(account) => Ok(account),
+            None => {
+                //TODO remove the action for adding a new user
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::new_account(db, sender)
+            }
+        }?;
+
+        //TODO make sure the account has enough credits
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        self.current_block_state.database_mutation_counter += 1;
-        DbStore::apply_mutation(
+        self.current_block_state.tx_counter += 1;
+        let ops = DbStore::apply_mutation(
             db,
             sender,
             nonce,
             tx,
             mutation,
             self.current_block_state.block_height as u64,
-            self.current_block_state.database_mutation_counter,
-        )
-    }
+            self.current_block_state.tx_counter.into(),
+        )?;
+        self.update_metric(&ops);
+        let gas_fee = cost::estimate_gas(&ops);
+        let old_credits = account.credits.unwrap();
+        let new_credits = gas::gas_consume(&old_credits, &gas_fee);
+        match new_credits {
+            Ok(credits) => {
+                account.credits = Some(credits);
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
+                account.bills = Some(new_bills);
+                account.total_mutation_count += 1;
+                account.total_storage_in_bytes += ops.get_data_size();
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::update_account(db, sender, &account)?;
+            }
+            Err(_) => {
+                //TODO throw out of gas error
+                account.credits = Some(Units {
+                    utype: UnitType::Db3.into(),
+                    amount: 0,
+                });
+                let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
+                account.bills = Some(new_bills);
+                account.total_mutation_count += 1;
+                account.total_storage_in_bytes += ops.get_data_size();
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::update_account(db, sender, &account)?;
+            }
+        }
 
-    pub fn apply_mutation(
-        &mut self,
-        addr: &DB3Address,
-        tx_id: &TxId,
-        mutation: &Mutation,
-    ) -> Result<(Units, u64)> {
-        let mut account = AccountStore::get_account(self.db.as_ref(), &addr)?;
-        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        let (gas_fee, total_bytes) = KvStore::apply(db, &addr, &mutation)?;
-        let accumulate_gas = gas::gas_add(&gas_fee, &account.total_bills.unwrap());
-        account.total_bills = Some(accumulate_gas);
-        account.total_mutation_count = account.total_mutation_count + 1;
-        account.total_storage_in_bytes = account.total_storage_in_bytes + total_bytes as u64;
-        self.current_block_state.bill_id_counter = self.current_block_state.bill_id_counter + 1;
+        let bill_id = BillId::new(
+            self.current_block_state.block_height as u64,
+            self.current_block_state.tx_counter as u16,
+        )?;
+
         let bill = Bill {
             gas_fee: Some(gas_fee.clone()),
             block_height: self.current_block_state.block_height as u64,
-            bill_id: self.current_block_state.bill_id_counter,
             bill_type: BillType::BillForMutation.into(),
             time: self.current_block_state.block_time,
-            bill_target_id: tx_id.as_ref().to_vec(),
-            owner: addr.to_vec(),
-            query_addr: vec![],
+            tx_id: tx.as_ref().to_vec(),
+            owner: sender.to_vec(),
+            to: vec![],
         };
         let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        BillStore::apply(db, &bill)?;
-        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-        AccountStore::apply(db, &addr, &account)?;
-        Ok((gas_fee, total_bytes as u64))
+        BillStore::apply(db, &bill_id, &bill)?;
+        Ok(gas_fee)
     }
 
     /// return the root hash
