@@ -399,6 +399,13 @@ mod tests {
         assert_eq!(documents.documents.len(), 1);
         let result = sdk.close_session().await;
         assert!(result.is_ok());
+
+        std::thread::sleep(ten_millis);
+        let account_ret = sdk.get_account(&addr).await;
+        assert!(account_ret.is_ok());
+        let account = account_ret.unwrap();
+        assert_eq!(account.total_mutation_count, 3);
+        assert_eq!(account.total_session_count, 1);
     }
 
     #[tokio::test]
