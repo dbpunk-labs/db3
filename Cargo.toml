@@ -10,7 +10,6 @@ members = [
     "src/node",
     "src/sdk",
     "src/cmd",
-    "src/status",
 ]
 
 [workspace.dependencies]
