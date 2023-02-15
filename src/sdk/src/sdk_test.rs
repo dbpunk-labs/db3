@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use db3_base::{bson_util, get_a_random_nonce};
+use db3_base::bson_util;
 use db3_crypto::{
     db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner, key_derive,
     signature_scheme::SignatureScheme,
