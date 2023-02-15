@@ -47,14 +47,24 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
             Ok(Some(data))
         }
         Bson::Int64(n) => {
-            data.write_i128::<BigEndian>(1 + i64::MAX as i128 + (*n) as i128)
+            if *n >= 0 {
+                data.push(1);
+            } else {
+                data.push(0);
+            }
+            data.write_i64::<BigEndian>(*n)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok(Some(data[7..16].to_vec()))
+            Ok(Some(data))
         }
         Bson::Int32(n) => {
-            data.write_i64::<BigEndian>(1 + i32::MAX as i64 + *n as i64)
+            if *n >= 0 {
+                data.push(1);
+            } else {
+                data.push(0);
+            }
+            data.write_i32::<BigEndian>(*n)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok(Some(data[3..8].to_vec()))
+            Ok(Some(data))
         }
         Bson::String(s) => {
             data.extend_from_slice(s.as_bytes());
