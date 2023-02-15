@@ -84,7 +84,6 @@ impl BillStore {
 mod tests {
     use super::*;
     use db3_base::get_a_static_address;
-    use db3_proto::db3_base_proto::{UnitType, Units};
     use db3_proto::db3_bill_proto::BillType;
     use merkdb::proofs::{Decoder, Node};
     use std::boxed::Box;
@@ -97,11 +96,8 @@ mod tests {
         let mut db = Box::pin(merk);
         let target_id: &str = "id";
         let bill = Bill {
-            gas_fee: Some(Units {
-                utype: UnitType::Db3.into(),
-                amount: 1,
-            }),
-            block_height: 11,
+            gas_fee: 1,
+            block_id: 11,
             bill_type: BillType::BillForMutation.into(),
             time: 111,
             tx_id: target_id.as_bytes().to_vec(),
@@ -115,11 +111,8 @@ mod tests {
 
         assert!(result.is_ok());
         let bill = Bill {
-            gas_fee: Some(Units {
-                utype: UnitType::Db3.into(),
-                amount: 1,
-            }),
-            block_height: 11,
+            gas_fee: 1,
+            block_id: 11,
             bill_type: BillType::BillForMutation.into(),
             time: 111,
             tx_id: target_id.as_bytes().to_vec(),

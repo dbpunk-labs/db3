@@ -19,7 +19,6 @@ use super::json_rpc;
 use actix_web::{web, Error, HttpResponse};
 use bytes::Bytes;
 use db3_crypto::db3_address::DB3Address;
-use db3_proto::db3_base_proto::Units;
 use db3_proto::db3_bill_proto::Bill;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -38,12 +37,9 @@ fn bills_to_value(bills: &Vec<Bill>) -> Value {
         new_bill.insert("tx_id".to_string(), Value::from(base64_string));
         //TODO add owner address
         new_bill.insert("time".to_string(), Value::from(bill.time));
-        new_bill.insert("block_height".to_string(), Value::from(bill.block_height));
+        new_bill.insert("block_id".to_string(), Value::from(bill.block_id));
         new_bill.insert("bill_type".to_string(), Value::from(bill.bill_type));
-        if let Some(ref gas) = bill.gas_fee {
-            new_bill.insert("gas_fee_amount".to_string(), Value::from(gas.amount));
-            new_bill.insert("gas_fee_utype".to_string(), Value::from(gas.utype));
-        }
+        new_bill.insert("gas_fee".to_string(), Value::from(bill.gas_fee));
         new_bills.push(Value::Object(new_bill));
     }
     Value::Array(new_bills)
@@ -59,29 +55,6 @@ pub struct Wrapper<R> {
 
     /// Results of request (if successful)
     result: Option<R>,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-pub struct ReadableKvPair {
-    #[serde(with = "tendermint::serializers::bytes::string")]
-    key: Vec<u8>,
-    #[serde(with = "tendermint::serializers::bytes::hexstring")]
-    value: Vec<u8>,
-    action: i32,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-pub struct ReadableMutation {
-    #[serde(with = "tendermint::serializers::bytes::string")]
-    ns: Vec<u8>,
-    kv_pairs: Option<Vec<ReadableKvPair>>,
-    nonce: u64,
-    chain_id: i32,
-    chain_role: i32,
-    gas_price: Option<Units>,
-    gas: u64,
-    #[serde(with = "tendermint::serializers::bytes::hexstring")]
-    signature: Vec<u8>,
 }
 
 enum ResponseWrapper {
