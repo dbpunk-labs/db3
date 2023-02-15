@@ -316,6 +316,10 @@ impl AuthStorage {
                 account.bills = Some(new_bills);
                 account.total_mutation_count += 1;
                 account.total_storage_in_bytes += ops.get_data_size();
+                println!(
+                    "account.total_mutation_count {}",
+                    account.total_mutation_count
+                );
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
                 AccountStore::update_account(db, sender, &account)?;
             }
@@ -328,6 +332,10 @@ impl AuthStorage {
                 let new_bills = gas::gas_add(&account.bills.unwrap(), &gas_fee);
                 account.bills = Some(new_bills);
                 account.total_mutation_count += 1;
+                println!(
+                    "account.total_mutation_count {}",
+                    account.total_mutation_count
+                );
                 account.total_storage_in_bytes += ops.get_data_size();
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
                 AccountStore::update_account(db, sender, &account)?;

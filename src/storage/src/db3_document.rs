@@ -1,7 +1,6 @@
 use bson::spec::BinarySubtype;
 use bson::Document;
 use bson::{Binary, Bson};
-use byteorder::{BigEndian, WriteBytesExt};
 use db3_base::bson_util;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::{DocumentId, TxId};
@@ -125,33 +124,8 @@ impl DB3Document {
     }
 
     fn get_single_key(&self, key: &str) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
-        let mut data: Vec<u8> = Vec::new();
         match self.get_document()?.get(key) {
-            Some(value) => match value {
-                Bson::Null => Ok(None),
-                Bson::Boolean(b) => {
-                    data.write_u8(*b as u8)
-                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                    Ok(Some(data))
-                }
-                Bson::Int64(n) => {
-                    data.write_i64::<BigEndian>(*n)
-                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                    Ok(Some(data))
-                }
-                Bson::Int32(n) => {
-                    data.write_i32::<BigEndian>(*n)
-                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                    Ok(Some(data))
-                }
-                Bson::String(s) => {
-                    data.extend_from_slice(s.as_bytes());
-                    Ok(Some(data))
-                }
-                _ => Err(DB3Error::DocumentDecodeError(
-                    "value type is not supported".to_string(),
-                )),
-            },
+            Some(value) => bson_util::bson_into_comparison_bytes(value),
             None => Ok(None),
         }
     }
@@ -187,6 +161,7 @@ impl TryFrom<Vec<u8>> for DB3Document {
 mod tests {
     use super::*;
     use bson::spec::ElementType;
+    use byteorder::ReadBytesExt;
     use db3_crypto::id::{AccountId, CollectionId, DocumentEntryId};
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
@@ -329,6 +304,70 @@ mod tests {
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
             assert_eq!("John Doe", std::str::from_utf8(keys.as_ref()).unwrap())
+        } else {
+            assert!(false);
+        }
+    }
+    #[test]
+    fn get_single_string_key_ut_happy_path() {
+        let data = r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#;
+        let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        let document_id = mock_document_id();
+        let document =
+            DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr).unwrap();
+        let index_field = IndexField {
+            field_path: "name".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![index_field],
+        };
+        if let Ok(Some(keys)) = document.get_keys(&index) {
+            assert_eq!("John Doe", std::str::from_utf8(keys.as_ref()).unwrap())
+        } else {
+            assert!(false);
+        }
+    }
+    #[test]
+    fn get_single_i64_key_ut_happy_path() {
+        let data = r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#;
+        let addr = DB3Address::try_from("0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b").unwrap();
+        let tx_id = TxId::try_from_base64("iLO992XuyfmsgWq7Ob81E86dfzIKeK6MvzFmNDk99R8=").unwrap();
+        let document_id = mock_document_id();
+        let document =
+            DB3Document::create_from_json_str(data, &document_id, &tx_id, &addr).unwrap();
+        let index_field = IndexField {
+            field_path: "age".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![index_field],
+        };
+        if let Ok(Some(keys)) = document.get_keys(&index) {
+            assert_eq!(vec![0, 128, 0, 0, 0, 0, 0, 0, 43], keys);
         } else {
             assert!(false);
         }

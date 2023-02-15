@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use db3_base::bson_util;
+use db3_base::{bson_util, get_a_random_nonce};
 use db3_crypto::{
     db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner, key_derive,
     signature_scheme::SignatureScheme,
@@ -25,10 +25,11 @@ use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;
 use db3_proto::db3_mutation_proto::DocumentMutation;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
-
+use rand::random;
 use std::time::{SystemTime, UNIX_EPOCH};
-pub fn gen_ed25519_signer() -> (DB3Address, Db3MultiSchemeSigner) {
-    let seed: [u8; 32] = [0; 32];
+
+pub fn gen_ed25519_signer(seed_u8: u8) -> (DB3Address, Db3MultiSchemeSigner) {
+    let seed: [u8; 32] = [seed_u8; 32];
     let (addr, kp) =
         key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
     (addr, Db3MultiSchemeSigner::new(kp))
@@ -50,7 +51,7 @@ fn current_seconds() -> u64 {
 pub fn create_a_database_mutation() -> DatabaseMutation {
     let meta = BroadcastMeta {
         //TODO get from network
-        nonce: current_seconds(),
+        nonce: current_seconds() + get_a_random_nonce(),
         //TODO use config
         chain_id: ChainId::DevNet.into(),
         //TODO use config
