@@ -25,7 +25,6 @@ use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;
 use db3_proto::db3_mutation_proto::DocumentMutation;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
-use rand::random;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn gen_ed25519_signer(seed_u8: u8) -> (DB3Address, Db3MultiSchemeSigner) {
@@ -51,7 +50,7 @@ fn current_seconds() -> u64 {
 pub fn create_a_database_mutation() -> DatabaseMutation {
     let meta = BroadcastMeta {
         //TODO get from network
-        nonce: current_seconds() + get_a_random_nonce(),
+        nonce: current_seconds(),
         //TODO use config
         chain_id: ChainId::DevNet.into(),
         //TODO use config

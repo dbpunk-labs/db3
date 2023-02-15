@@ -366,7 +366,7 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         let seed_u8: u8 = random();
 
-        let (owner, signer) = sdk_test::gen_ed25519_signer(seed_u8);
+        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let msdk = MutationSDK::new(client.clone(), signer);
         // create a database
         let dm = sdk_test::create_a_database_mutation();
@@ -386,7 +386,7 @@ mod tests {
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
         if let Ok(Some(db)) = database {
             assert_eq!(&db.address, db_id.address().as_ref());
-            assert_eq!(&db.sender, owner.as_ref());
+            assert_eq!(&db.sender, addr.as_ref());
             assert_eq!(db.tx.len(), 2);
             assert_eq!(db.collections.len(), 1);
         } else {
