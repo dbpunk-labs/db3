@@ -365,6 +365,8 @@ mod tests {
         let (_, signer) = sdk_test::gen_ed25519_signer();
         let msdk = MutationSDK::new(client.clone(), signer);
         // create a database
+        //
+        let ten_millis = time::Duration::from_millis(2000);
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
         assert!(result.is_ok());

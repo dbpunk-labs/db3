@@ -19,8 +19,7 @@ use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_account_proto::Account;
-use db3_proto::db3_base_proto::{UnitType, Units};
-use db3_types::{account_key::AccountKey, gas};
+use db3_types::account_key::AccountKey;
 use merkdb::{Merk, Op};
 use prost::Message;
 use std::pin::Pin;
@@ -76,14 +75,8 @@ impl AccountStore {
             }
         } else {
             let new_account = Account {
-                bills: Some(Units {
-                    utype: UnitType::Tai.into(),
-                    amount: 0,
-                }),
-                credits: Some(Units {
-                    utype: UnitType::Db3.into(),
-                    amount: 10,
-                }),
+                bills: 0,
+                credits: 0,
                 total_storage_in_bytes: 0,
                 total_mutation_count: 0,
                 total_session_count: 0,
@@ -140,23 +133,12 @@ mod tests {
         let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
-        let account = Account {
-            bills: Some(Units {
-                utype: UnitType::Db3.into(),
-                amount: 2,
-            }),
-            credits: Some(Units {
-                utype: UnitType::Db3.into(),
-                amount: 10,
-            }),
-            total_storage_in_bytes: 10,
-            total_mutation_count: 10,
-            total_session_count: 5,
-            nonce: 10,
-        };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let result = AccountStore::new_account(db_m, &addr);
         assert!(result.is_ok());
+        let new_account = result.unwrap();
+        assert_eq!(0, new_account.bills);
+        assert_eq!(10, new_account.credits);
         let account_opt = AccountStore::get_account(db.as_ref(), &addr);
         assert!(account_opt.is_ok());
         assert!(account_opt.unwrap().is_some());

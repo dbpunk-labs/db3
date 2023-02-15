@@ -31,7 +31,6 @@ use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::HashMap;
-use std::collections::LinkedList;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 

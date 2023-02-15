@@ -1,5 +1,6 @@
-use crate::auth_storage::AuthStorage;
+use crate::auth_storage::{AuthStorage, NetworkState};
 use db3_session::session_manager::SessionStore;
+use std::sync::Arc;
 
 pub struct NodeStorage {
     auth_store: AuthStorage,
@@ -18,5 +19,9 @@ impl NodeStorage {
     }
     pub fn get_session_store(&mut self) -> &mut SessionStore {
         &mut self.session_store
+    }
+
+    pub fn get_state(&self) -> Arc<NetworkState> {
+        self.auth_store.get_state()
     }
 }

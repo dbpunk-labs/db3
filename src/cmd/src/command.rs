@@ -229,8 +229,8 @@ impl DB3ClientCommand {
         ]);
         table.add_row(row![
             AccountId::new(*addr).to_hex(),
-            strings::units_to_readable_num_str(account.bills.as_ref().unwrap()),
-            strings::units_to_readable_num_str(account.credits.as_ref().unwrap()),
+            strings::units_to_readable_num_str(account.bills),
+            strings::units_to_readable_num_str(account.credits),
             strings::bytes_to_readable_num_str(account.total_storage_in_bytes),
             account.total_mutation_count,
             account.total_session_count,

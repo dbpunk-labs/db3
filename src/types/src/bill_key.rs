@@ -15,9 +15,8 @@
 // limitations under the License.
 //
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use db3_crypto::id::{BillId, BILL_ID_LENGTH};
-use db3_error::{DB3Error, Result};
+use db3_error::Result;
 const BLOCK_BILL: &str = "/bl/";
 
 pub struct BillKey<'a>(pub &'a BillId);

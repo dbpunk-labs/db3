@@ -20,14 +20,16 @@ use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_crypto::{db3_verifier::DB3Verifier, id::CollectionId, id::DbId, id::DocumentId};
 
+use bytes::BytesMut;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
     CloseSessionResponse, GetAccountRequest, GetAccountResponse, GetDocumentRequest,
     GetDocumentResponse, GetSessionInfoRequest, GetSessionInfoResponse, ListDocumentsRequest,
-    ListDocumentsResponse, OpenSessionRequest, OpenSessionResponse, QueryBillRequest,
-    QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
+    ListDocumentsResponse, NetworkStatus, OpenSessionRequest, OpenSessionResponse,
+    QueryBillRequest, QueryBillResponse, ShowDatabaseRequest, ShowDatabaseResponse,
+    ShowNetworkStatusRequest,
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
@@ -37,11 +39,10 @@ use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
 use prost::Message;
 use std::boxed::Box;
+use std::sync::atomic::Ordering;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tendermint_rpc::Client;
 use tonic::{Request, Response, Status};
-
-use bytes::BytesMut;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::info;
 pub struct StorageNodeImpl {
     context: Context,
@@ -428,6 +429,28 @@ impl StorageNode for StorageNodeImpl {
         Ok(Response::new(BroadcastResponse {
             hash: response.hash.as_ref().to_vec(),
         }))
+    }
+    async fn show_network_status(
+        &self,
+        _request: Request<ShowNetworkStatusRequest>,
+    ) -> std::result::Result<Response<NetworkStatus>, Status> {
+        match self.context.node_store.lock() {
+            Ok(node_store) => {
+                let state = node_store.get_state();
+                let status = NetworkStatus {
+                    total_database_count: state.total_database_count.load(Ordering::Relaxed),
+                    total_collection_count: state.total_collection_count.load(Ordering::Relaxed),
+                    total_document_count: state.total_document_count.load(Ordering::Relaxed),
+                    total_account_count: state.total_account_count.load(Ordering::Relaxed),
+                    total_mutation_count: state.total_mutation_count.load(Ordering::Relaxed),
+                    total_session_count: state.total_session_count.load(Ordering::Relaxed),
+                    total_storage_in_bytes: state.total_storage_bytes.load(Ordering::Relaxed),
+                };
+
+                Ok(Response::new(status))
+            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
+        }
     }
 }
 
