@@ -132,7 +132,29 @@ db3>-$ show-doc --addr 0x22fb51848e26b34e242dd16a1224e8f23ee9b42e  --collection-
  AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAABLAAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(44), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
  AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAABPgAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(45), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
  ```
- * [ ] get a document
+
+* [x] get a document
+
+ ```
+ db3>-$ get-doc --id AQAAAAAAAAAVAAAAAQAAAAEAAAAAAAAAOQAAAAEAAAAA
+ id_base64                                    | owner                                      | document
+----------------------------------------------+--------------------------------------------+-----------------------------------------------------------------------------------------------------------------------
+ AQAAAAAAAAAVAAAAAQAAAAEAAAAAAAAAOQAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("Mike"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
+ ```
+ * [x] show network state
+
+```
+db3>-$ show-state
+ name       | state
+------------+---------
+ database   | 1
+ collection | 0
+ documemt   | 0
+ account    | 1
+ mutation   | 1
+ session    | 0
+ storage    | 102.00
+```
  * [ ] query documents by index
 
 ### Build a dapp with db3.js

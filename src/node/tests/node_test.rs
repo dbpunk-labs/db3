@@ -12,9 +12,6 @@ mod node_integration {
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_sdk::mutation_sdk::MutationSDK;
     use db3_sdk::store_sdk::StoreSDK;
-    use db3_session::session_manager::{
-        SessionStatus, DEFAULT_SESSION_PERIOD, DEFAULT_SESSION_QUERY_LIMIT,
-    };
     use prost::Message;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};

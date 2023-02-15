@@ -19,7 +19,7 @@ use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_account_proto::Account;
-use db3_types::account_key::AccountKey;
+use db3_types::{account_key::AccountKey, token};
 use merkdb::{Merk, Op};
 use prost::Message;
 use std::pin::Pin;
@@ -76,7 +76,7 @@ impl AccountStore {
         } else {
             let new_account = Account {
                 bills: 0,
-                credits: 0,
+                credits: 10 * token::TOKEN_COVERSION,
                 total_storage_in_bytes: 0,
                 total_mutation_count: 0,
                 total_session_count: 0,
@@ -138,7 +138,7 @@ mod tests {
         assert!(result.is_ok());
         let new_account = result.unwrap();
         assert_eq!(0, new_account.bills);
-        assert_eq!(10, new_account.credits);
+        assert_eq!(10 * token::TOKEN_COVERSION, new_account.credits);
         let account_opt = AccountStore::get_account(db.as_ref(), &addr);
         assert!(account_opt.is_ok());
         assert!(account_opt.unwrap().is_some());

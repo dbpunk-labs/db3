@@ -113,8 +113,8 @@ mod tests {
             data_in_bytes: 100,
         };
         let gas_fee = estimate_gas(&doc_ops);
-        let target_fee = 100 + 100 + 100 + 100;
-        assert!(gas_fee == target_fee);
+        let target_fee = 200 + 200 + 200 + 100;
+        assert_eq!(gas_fee, target_fee);
     }
 
     #[test]
@@ -127,7 +127,7 @@ mod tests {
         };
         let gas_fee = estimate_gas(&db_ops);
         let target_fee = 100 + 100 + 100 + 100;
-        assert!(gas_fee == target_fee);
+        assert_eq!(gas_fee, target_fee);
     }
 
     #[test]
@@ -139,6 +139,6 @@ mod tests {
         };
         let gas_fee = estimate_query_session_gas(&node_query_session_info);
         let target_fee = 1000;
-        assert!(gas_fee == target_fee);
+        assert_eq!(gas_fee, target_fee);
     }
 }

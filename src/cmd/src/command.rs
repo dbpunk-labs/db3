@@ -27,6 +27,7 @@ use db3_proto::db3_database_proto::{Database, Document, Index};
 use db3_proto::db3_mutation_proto::{
     CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMutation,
 };
+use db3_proto::db3_node_proto::NetworkStatus;
 use db3_sdk::{mutation_sdk::MutationSDK, store_sdk::StoreSDK};
 use prettytable::{format, Table};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -124,6 +125,8 @@ pub enum DB3ClientCommand {
     },
     #[clap(name = "show-account")]
     ShowAccount {},
+    #[clap(name = "show-state")]
+    ShowState {},
 }
 
 impl DB3ClientCommand {
@@ -239,6 +242,23 @@ impl DB3ClientCommand {
         Ok(table)
     }
 
+    fn show_state(state: &NetworkStatus) -> std::result::Result<Table, String> {
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+        table.set_titles(row!["name", "state"]);
+        table.add_row(row!["database".to_string(), state.total_database_count]);
+        table.add_row(row!["collection".to_string(), state.total_collection_count]);
+        table.add_row(row!["documemt".to_string(), state.total_document_count]);
+        table.add_row(row!["account".to_string(), state.total_account_count]);
+        table.add_row(row!["mutation".to_string(), state.total_mutation_count]);
+        table.add_row(row!["session".to_string(), state.total_session_count]);
+        table.add_row(row![
+            "storage".to_string(),
+            strings::bytes_to_readable_num_str(state.total_storage_in_bytes)
+        ]);
+        Ok(table)
+    }
+
     pub async fn execute(self, ctx: &mut DB3ClientContext) -> std::result::Result<Table, String> {
         match self {
             DB3ClientCommand::Init {} => match KeyStore::recover_keypair() {
@@ -252,6 +272,12 @@ impl DB3ClientCommand {
                     "no key was found, you can use init command to create a new one".to_string(),
                 ),
             },
+            DB3ClientCommand::ShowState {} => {
+                match ctx.store_sdk.as_ref().unwrap().get_state().await {
+                    Ok(status) => Self::show_state(&status),
+                    Err(e) => Err("fail to get account".to_string()),
+                }
+            }
             DB3ClientCommand::ShowAccount {} => match KeyStore::recover_keypair() {
                 Ok(ks) => {
                     let addr = ks.get_address().unwrap();
