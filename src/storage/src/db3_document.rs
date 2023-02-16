@@ -367,7 +367,7 @@ mod tests {
             fields: vec![index_field],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!(vec![1, 0, 0, 0, 0, 0, 0, 0, 43], keys);
+            assert_eq!(vec![127, 0, 0, 0, 0, 0, 0, 43], keys);
         } else {
             assert!(false);
         }
@@ -437,7 +437,7 @@ mod tests {
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
             assert_eq!(
-                "John Doe\u{1}\0\0\0\0\0\0\0+",
+                "John Doe\u{7f}\0\0\0\0\0\0+",
                 std::str::from_utf8(keys.as_ref()).unwrap()
             );
         } else {

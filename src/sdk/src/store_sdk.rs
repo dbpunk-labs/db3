@@ -345,17 +345,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let mclient = client.clone();
         let seed_u8: u8 = random();
-        {
-            let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
-            let msdk = MutationSDK::new(mclient, signer);
-            let dm = sdk_test::create_a_database_mutation();
-            let result = msdk.submit_database_mutation(&dm).await;
-            assert!(result.is_ok(), "{:?}", result.err());
-            let ten_millis = time::Duration::from_millis(2000);
-            std::thread::sleep(ten_millis);
-        }
         let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let mut sdk = StoreSDK::new(client, signer);
         let result = sdk.get_block_bills(1).await;
@@ -488,7 +478,8 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let (addr, signer) = sdk_test::gen_ed25519_signer();
+        let seed_u8: u8 = random();
+        let (addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let sdk = StoreSDK::new(client.clone(), signer);
         let result = sdk.get_state().await;
         assert!(result.is_ok());

@@ -94,7 +94,7 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
             Ok(Some(data))
         }
         Bson::DateTime(dt) => {
-            let value: u64 = dt.timestamp_millis() as u64;
+            let value: u64 = keep_order_i64(dt.timestamp_millis());
             data.write_u64::<BigEndian>(value)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
             Ok(Some(data))
