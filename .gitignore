@@ -19,3 +19,4 @@ db3.log
 
 /java/target/
 /src/db3js/src/pkg/
+/node_modules

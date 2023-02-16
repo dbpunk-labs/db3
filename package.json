@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "hardhat": "^2.12.7"
+  }
+}
