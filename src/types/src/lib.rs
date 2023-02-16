@@ -30,11 +30,4 @@ pub fn ensure_len_eq(data: &[u8], len: usize) -> Result<()> {
 pub mod account_key;
 pub mod bill_key;
 pub mod cost;
-pub mod gas;
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {}
-}
+pub mod token;

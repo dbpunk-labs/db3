@@ -17,7 +17,6 @@
 //
 
 syntax = "proto3";
-import "db3_base.proto";
 package db3_bill_proto;
 
 enum BillType {
@@ -26,8 +25,10 @@ enum BillType {
 }
 
 message Bill {
-    db3_base_proto.Units gas_fee = 1;
-    uint64 block_height = 2;
+    // uint256
+    uint64 gas_fee = 1;
+    // the block id 
+    uint64 block_id = 2;
     // query session or mutation
     BillType bill_type = 4;
     // time on block created

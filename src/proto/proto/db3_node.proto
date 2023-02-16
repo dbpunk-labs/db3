@@ -31,7 +31,6 @@ message NetworkStatus {
     uint64 total_mutation_count = 5;
     uint64 total_session_count = 6;
     uint64 total_storage_in_bytes = 7;
-    uint64 total_gas = 8;
 }
 
 message QueryBillKey {
@@ -130,6 +129,8 @@ message ListDocumentsResponse {
     // TODO: support next_page_token for page loading
 }
 
+message ShowNetworkStatusRequest {}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
@@ -148,4 +149,6 @@ service StorageNode {
     rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse) {}
     // method for get document
     rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
+    // method for show the network status
+    rpc ShowNetworkStatus(ShowNetworkStatusRequest) returns (NetworkStatus){}
 }

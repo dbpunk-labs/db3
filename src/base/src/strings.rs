@@ -15,7 +15,6 @@
 // limitations under the License.
 //
 
-use db3_proto::db3_base_proto::{UnitType, Units};
 const STORAGE_LABELS: [char; 7] = [' ', 'K', 'M', 'G', 'T', 'P', 'E'];
 pub fn bytes_to_readable_num_str(bytes_size: u64) -> String {
     let max_shift = 7;
@@ -31,10 +30,6 @@ pub fn bytes_to_readable_num_str(bytes_size: u64) -> String {
     format!("{0:.2}{1}", value, STORAGE_LABELS[shift])
 }
 
-pub fn units_to_readable_num_str(units: &Units) -> String {
-    if units.utype == UnitType::Tai as i32 {
-        format!("{:.6} db3", units.amount as f64 / 1000_000_000.0)
-    } else {
-        format!("{} db3", units.amount)
-    }
+pub fn units_to_readable_num_str(units: u64) -> String {
+    format!("{:.6} db3", units as f64 / 1000_000_000.0)
 }
