@@ -36,6 +36,39 @@ pub fn bson_document_into_bytes(doc: &Document) -> Vec<u8> {
     let row_doc = RawDocumentBuf::from_document(doc).unwrap();
     row_doc.into_bytes()
 }
+
+fn keep_order_i32(input: i32) -> u32 {
+    match input < 0 {
+        true => {
+            if input == i32::MIN {
+                0
+            } else {
+                -input as u32
+            }
+        }
+        false => {
+            let new_input = input as u32;
+            (new_input | 0x7F000000) as u32
+        }
+    }
+}
+
+fn keep_order_i64(input: i64) -> u64 {
+    match input < 0 {
+        true => {
+            if input == i64::MIN {
+                0
+            } else {
+                -input as u64
+            }
+        }
+        false => {
+            let new_input = input as u64;
+            (new_input | 0x7F00000000000000) as u64
+        }
+    }
+}
+
 /// convert bson value to bytes for key comparation
 pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
     let mut data: Vec<u8> = Vec::new();
@@ -47,22 +80,12 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
             Ok(Some(data))
         }
         Bson::Int64(n) => {
-            if *n >= 0 {
-                data.push(1);
-            } else {
-                data.push(0);
-            }
-            data.write_i64::<BigEndian>(*n)
+            data.write_u64::<BigEndian>(keep_order_i64(*n))
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
             Ok(Some(data))
         }
         Bson::Int32(n) => {
-            if *n >= 0 {
-                data.push(1);
-            } else {
-                data.push(0);
-            }
-            data.write_i32::<BigEndian>(*n)
+            data.write_u32::<BigEndian>(keep_order_i32(*n))
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
             Ok(Some(data))
         }
@@ -70,7 +93,12 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
             data.extend_from_slice(s.as_bytes());
             Ok(Some(data))
         }
-        Bson::DateTime(dt) => bson_into_comparison_bytes(&Bson::Int64(dt.timestamp_millis())),
+        Bson::DateTime(dt) => {
+            let value: u64 = dt.timestamp_millis() as u64;
+            data.write_u64::<BigEndian>(value)
+                .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+            Ok(Some(data))
+        }
         _ => Err(DB3Error::DocumentDecodeError(
             "value type is not supported".to_string(),
         )),
