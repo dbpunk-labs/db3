@@ -24,8 +24,8 @@ use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
-    GetDocumentRequest, GetSessionInfoRequest, RunQueryRequest, RunQueryResponse,
-    NetworkStatus, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
+    GetDocumentRequest, GetSessionInfoRequest, NetworkStatus, OpenSessionRequest,
+    OpenSessionResponse, QueryBillKey, QueryBillRequest, RunQueryRequest, RunQueryResponse,
     SessionIdentifier, ShowDatabaseRequest, ShowNetworkStatusRequest,
 };
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};

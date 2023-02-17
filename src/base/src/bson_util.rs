@@ -176,7 +176,6 @@ mod tests {
         )
     }
 
-
     #[test]
     fn i64_bson_into_comparison_bytes_ut() {
         let i64_neg_2 = bson_into_comparison_bytes(&Bson::Int64(-2)).unwrap();
@@ -299,7 +298,7 @@ mod tests {
             bson_value_from_proto_value(&Value {
                 value_type: Some(ValueType::BooleanValue(true))
             })
-                .unwrap()
+            .unwrap()
         );
 
         assert_eq!(
@@ -307,7 +306,7 @@ mod tests {
             bson_value_from_proto_value(&Value {
                 value_type: Some(ValueType::BooleanValue(false))
             })
-                .unwrap()
+            .unwrap()
         );
 
         assert_eq!(
@@ -315,21 +314,21 @@ mod tests {
             bson_value_from_proto_value(&Value {
                 value_type: Some(ValueType::IntegerValue(i64::MAX))
             })
-                .unwrap()
+            .unwrap()
         );
         assert_eq!(
             (Bson::Int64(i64::MIN)),
             bson_value_from_proto_value(&Value {
                 value_type: Some(ValueType::IntegerValue(i64::MIN))
             })
-                .unwrap()
+            .unwrap()
         );
         assert_eq!(
             (Bson::Int64(0)),
             bson_value_from_proto_value(&Value {
                 value_type: Some(ValueType::IntegerValue(0))
             })
-                .unwrap()
+            .unwrap()
         );
 
         assert_eq!(
@@ -337,7 +336,7 @@ mod tests {
             bson_value_from_proto_value(&Value {
                 value_type: Some(ValueType::StringValue("".to_string()))
             })
-                .unwrap()
+            .unwrap()
         );
 
         assert_eq!(
@@ -347,7 +346,7 @@ mod tests {
                     "aaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()
                 ))
             })
-                .unwrap()
+            .unwrap()
         );
     }
 }
