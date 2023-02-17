@@ -790,19 +790,30 @@ mod tests {
     }
 
     fn build_database_mutation(addr: &DB3Address, collection_name: &str) -> DatabaseMutation {
-        let index_field = IndexField {
+        let index_field_name = IndexField {
             field_path: "name".to_string(),
             value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
         };
 
-        let index = Index {
+        let index_name = Index {
             id: 0,
             name: "idx1".to_string(),
-            fields: vec![index_field],
+            fields: vec![index_field_name],
+        };
+
+        let index_field_age = IndexField {
+            field_path: "age".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index_age = Index {
+            id: 1,
+            name: "idx2".to_string(),
+            fields: vec![index_field_age],
         };
 
         let index_mutation = CollectionMutation {
-            index: vec![index],
+            index: vec![index_name, index_age],
             collection_name: collection_name.to_string(),
         };
 
@@ -949,7 +960,7 @@ mod tests {
                 r#"
         {
             "name": "Bill",
-            "age": 45,
+            "age": 44,
             "phones": [
                 "+44 1234567",
                 "+44 2345678"
@@ -959,7 +970,7 @@ mod tests {
                 r#"
         {
             "name": "Bill",
-            "age": 46,
+            "age": 45,
             "phones": [
                 "+44 1234567",
                 "+44 2345678"
@@ -1078,6 +1089,28 @@ mod tests {
         assert_eq!(1, docs.len());
         let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
         assert_eq!("Mike", document.get_str("name").unwrap());
+
+        // run query: select * from collection where age = 44
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: Some(Filter {
+                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                    field: "age".to_string(),
+                    op: Operator::Equal.into(),
+                    value: Some(Value {
+                        value_type: Some(ValueType::IntegerValue(44 as i64)),
+                    }),
+                })),
+            }),
+            limit: None,
+        };
+        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+        assert_eq!(2, docs.len());
+        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
+        assert_eq!(44, document.get_i64("age").unwrap());
+        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
+        assert_eq!(44, document.get_i64("age").unwrap());
     }
 
     #[test]

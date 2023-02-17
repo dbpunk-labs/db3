@@ -3,17 +3,17 @@ use bson::Document;
 use bson::RawDocumentBuf;
 use byteorder::{BigEndian, WriteBytesExt};
 use db3_error::DB3Error;
+use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
+use db3_proto::db3_database_proto::structured_query::filter::FilterType;
 use db3_proto::db3_database_proto::structured_query::value::ValueType;
+use db3_proto::db3_database_proto::structured_query::FieldFilter;
+use db3_proto::db3_database_proto::structured_query::Filter;
 use db3_proto::db3_database_proto::structured_query::Value;
 use serde_json::Value as JsonValue;
 /// convert json string to Bson::Document
 pub fn json_str_to_bson_document(json_str: &str) -> std::result::Result<Document, String> {
-    let value: JsonValue = serde_json::from_str(json_str)
-        .map_err(|e| format!("{}", e))
-        .unwrap();
-    let bson_document = bson::to_document(&value)
-        .map_err(|e| format!("{}", e))
-        .unwrap();
+    let value: JsonValue = serde_json::from_str(json_str).map_err(|e| format!("{}", e))?;
+    let bson_document = bson::to_document(&value).map_err(|e| format!("{}", e))?;
     Ok(bson_document)
 }
 
@@ -26,9 +26,7 @@ pub fn json_str_to_bson_bytes(json_str: &str) -> std::result::Result<Vec<u8>, St
 
 /// convert bytes to Bson::Document
 pub fn bytes_to_bson_document(buf: Vec<u8>) -> std::result::Result<Document, String> {
-    let doc = RawDocumentBuf::from_bytes(buf)
-        .map_err(|e| format!("{}", e))
-        .unwrap();
+    let doc = RawDocumentBuf::from_bytes(buf).map_err(|e| format!("{}", e))?;
     let bson_document = doc.to_document().map_err(|e| format!("{}", e)).unwrap();
     Ok(bson_document)
 }
@@ -86,28 +84,28 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Vec<u8>, 
         Bson::Boolean(b) => {
             data.write_u8(*b as u8)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok((data))
+            Ok(data)
         }
         Bson::Int64(n) => {
             data.write_u64::<BigEndian>(keep_order_i64(*n))
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok((data))
+            Ok(data)
         }
         Bson::Int32(n) => {
             data.write_u32::<BigEndian>(keep_order_i32(*n))
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok((data))
+            Ok(data)
         }
         // TODO: add \0 as the end of string.
         Bson::String(s) => {
             data.extend_from_slice(s.as_bytes());
-            Ok((data))
+            Ok(data)
         }
         Bson::DateTime(dt) => {
             let value: u64 = keep_order_i64(dt.timestamp_millis());
             data.write_u64::<BigEndian>(value)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok((data))
+            Ok(data)
         }
         _ => Err(DB3Error::DocumentDecodeError(
             "value type is not supported".to_string(),
@@ -127,6 +125,69 @@ pub fn bson_value_from_proto_value(value: &Value) -> std::result::Result<Bson, D
         }
     } else {
         Err(DB3Error::InvalidFilterValue("value is none".to_string()))
+    }
+}
+pub fn filter_from_json_value(json_str: &str) -> std::result::Result<Option<Filter>, DB3Error> {
+    if json_str.is_empty() {
+        Ok(None)
+    } else {
+        let filter_doc =
+            json_str_to_bson_document(json_str).map_err(|e| DB3Error::InvalidFilterValue(e))?;
+        let field = filter_doc.get_str("field").map_err(|e| {
+            DB3Error::InvalidFilterJson("filed is required in filter json".to_string())
+        })?;
+        let value = match filter_doc.get("value") {
+            Some(v) => filter_value_from_bson_value(v)?,
+            None => {
+                return Err(DB3Error::InvalidFilterJson(
+                    "value is required in filter json".to_string(),
+                ));
+            }
+        };
+
+        let op_str = filter_doc.get_str("op").map_err(|e| {
+            DB3Error::InvalidFilterJson("op is required in filter json".to_string())
+        })?;
+        let op = match op_str {
+            "==" => Operator::Equal,
+            ">" | "<" | ">=" | "<=" | "!=" => {
+                return Err(DB3Error::InvalidFilterOp(format!(
+                    "OP {} un-support currently",
+                    op_str
+                )));
+            }
+            _ => {
+                return Err(DB3Error::InvalidFilterOp(format!("Invalid OP {}", op_str)));
+            }
+        };
+
+        Ok(Some(Filter {
+            filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                field: field.to_string(),
+                op: op.into(),
+                value: Some(value),
+            })),
+        }))
+    }
+}
+pub fn filter_value_from_bson_value(value: &Bson) -> std::result::Result<Value, DB3Error> {
+    match value {
+        Bson::Boolean(b) => Ok(Value {
+            value_type: Some(ValueType::BooleanValue(*b)),
+        }),
+        Bson::Int32(n) => Ok(Value {
+            value_type: Some(ValueType::IntegerValue(*n as i64)),
+        }),
+        Bson::Int64(n) => Ok(Value {
+            value_type: Some(ValueType::IntegerValue(*n)),
+        }),
+        Bson::String(s) => Ok(Value {
+            value_type: Some(ValueType::StringValue(s.to_string())),
+        }),
+        _ => Err(DB3Error::InvalidFilterValue(format!(
+            "type {:?} un-support for filter value",
+            value.element_type()
+        ))),
     }
 }
 #[cfg(test)]
@@ -290,6 +351,38 @@ mod tests {
         assert!(now_plus_one < max_ts);
     }
 
+    #[test]
+    fn filter_from_json_value_ut() {
+        let filter = filter_from_json_value("").unwrap();
+        assert!(filter.is_none());
+
+        let filter = filter_from_json_value(r#"{"field": "name", "value": "Bill", "op": "=="}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"{"filter_type":{"FieldFilter":{"field":"name","op":5,"value":{"value_type":{"StringValue":"Bill"}}}}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
+
+        let filter = filter_from_json_value(r#"{"field": "name", "value": 45, "op": "=="}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"{"filter_type":{"FieldFilter":{"field":"name","op":5,"value":{"value_type":{"IntegerValue":45}}}}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
+
+        let filter = filter_from_json_value(r#"{"field": "flag", "value": true, "op": "=="}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"{"filter_type":{"FieldFilter":{"field":"flag","op":5,"value":{"value_type":{"BooleanValue":true}}}}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
+
+        assert!(filter_from_json_value("{}").is_err());
+        assert!(filter_from_json_value(r#"{"field": "name"}"#).is_err());
+    }
     #[test]
     fn bson_value_from_proto_value_ut() {
         assert!(bson_value_from_proto_value(&Value { value_type: None }).is_err());

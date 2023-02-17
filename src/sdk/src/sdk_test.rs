@@ -93,7 +93,7 @@ pub fn create_a_collection_mutataion(name: &str, addr: &DB3Address) -> DatabaseM
     dm
 }
 
-pub fn add_a_document(name: &str, addr: &DB3Address) -> DatabaseMutation {
+pub fn add_documents(name: &str, addr: &DB3Address, doc_vec: &Vec<&str>) -> DatabaseMutation {
     let meta = BroadcastMeta {
         //TODO get from network
         nonce: current_seconds(),
@@ -102,13 +102,13 @@ pub fn add_a_document(name: &str, addr: &DB3Address) -> DatabaseMutation {
         //TODO use config
         chain_role: ChainRole::StorageShardChain.into(),
     };
-
-    let doc_str: String =
-        r#"{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#.to_string();
-    let document = bson_util::json_str_to_bson_bytes(doc_str.as_str()).unwrap();
+    let documents = doc_vec
+        .iter()
+        .map(|doc_str| bson_util::json_str_to_bson_bytes(doc_str).unwrap())
+        .collect();
     let document_mut = DocumentMutation {
         collection_name: name.to_string(),
-        documents: vec![document],
+        documents,
         ids: vec![],
     };
     let dm = DatabaseMutation {

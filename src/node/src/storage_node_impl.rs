@@ -18,7 +18,7 @@
 use super::context::Context;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
-use db3_crypto::{db3_verifier::DB3Verifier, id::CollectionId, id::DbId, id::DocumentId};
+use db3_crypto::{db3_verifier::DB3Verifier, id::DbId, id::DocumentId};
 
 use bytes::BytesMut;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
@@ -163,8 +163,7 @@ impl StorageNode for StorageNodeImpl {
                         let documents = node_store
                             .get_auth_store()
                             .run_query(&db_id, &query)
-                            .map_err(|e| Status::internal(format!("{:?}", e)))
-                            .unwrap();
+                            .map_err(|e| Status::internal(format!("{:?}", e)))?;
                         node_store
                             .get_session_store()
                             .get_session_mut(&run_query_req.session_token)

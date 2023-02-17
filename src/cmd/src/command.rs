@@ -23,7 +23,8 @@ use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::{AccountId, DbId, DocumentId, TxId};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
-use db3_proto::db3_database_proto::{Database, Document, Index};
+use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
+use db3_proto::db3_database_proto::{Database, Document, Index, StructuredQuery};
 use db3_proto::db3_mutation_proto::{
     CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMutation,
 };
@@ -119,9 +120,9 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         collection_name: String,
 
-        /// show document by key
+        /// show document with filter condition
         #[clap(long, default_value = "")]
-        key: String,
+        filter: String,
         /// limit output
         #[clap(long, default_value = "-1")]
         limit: i32,
@@ -271,14 +272,14 @@ impl DB3ClientCommand {
 
             DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair() {
                 Ok(ks) => ks.show_key(),
-                Err(e) => Err(
+                Err(_) => Err(
                     "no key was found, you can use init command to create a new one".to_string(),
                 ),
             },
             DB3ClientCommand::ShowState {} => {
                 match ctx.store_sdk.as_ref().unwrap().get_state().await {
                     Ok(status) => Self::show_state(&status),
-                    Err(e) => Err("fail to get account".to_string()),
+                    Err(_) => Err("fail to get account".to_string()),
                 }
             }
             DB3ClientCommand::ShowAccount {} => match KeyStore::recover_keypair() {
@@ -286,10 +287,10 @@ impl DB3ClientCommand {
                     let addr = ks.get_address().unwrap();
                     match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
                         Ok(account) => Self::show_account(&account, &addr),
-                        Err(e) => Err("fail to get account".to_string()),
+                        Err(_) => Err("fail to get account".to_string()),
                     }
                 }
-                Err(e) => Err(
+                Err(_) => Err(
                     "no key was found, you can use init command to create a new one".to_string(),
                 ),
             },
@@ -358,16 +359,28 @@ impl DB3ClientCommand {
             DB3ClientCommand::ShowDocument {
                 addr,
                 collection_name,
-                key,
+                filter,
                 limit,
             } => {
                 // TODO(chenjing): construct index keys from json key string
-                let limit = if limit < 0 { None } else { Some(limit) };
+                let limit = if limit < 0 {
+                    None
+                } else {
+                    Some(Limit { limit })
+                };
+                let filter = bson_util::filter_from_json_value(filter.as_str())
+                    .map_err(|e| format!("{:?}", e))?;
+                let query = StructuredQuery {
+                    collection_name: collection_name.to_string(),
+                    select: Some(Projection { fields: vec![] }),
+                    r#where: filter,
+                    limit,
+                };
                 match ctx
                     .store_sdk
                     .as_mut()
                     .unwrap()
-                    .list_documents(addr.as_ref(), collection_name.as_ref(), limit)
+                    .run_query(addr.as_ref(), query)
                     .await
                 {
                     Ok(response) => Self::show_document(response.documents),
