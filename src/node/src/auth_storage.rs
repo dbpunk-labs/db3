@@ -142,7 +142,8 @@ impl AuthStorage {
     }
 
     pub fn get_documents(&self, id: &CollectionId) -> Result<Vec<Document>> {
-        DbStore::get_documents(self.db.as_ref(), id)
+        // TODO(chanjing): support get documents with limit
+        DbStore::get_documents(self.db.as_ref(), id, None)
     }
     pub fn get_document(&self, id: &DocumentId) -> Result<Option<Document>> {
         DbStore::get_document(self.db.as_ref(), id)

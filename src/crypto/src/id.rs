@@ -261,6 +261,18 @@ impl DocumentId {
         bytes.extend(document_entry_id.as_ref());
         Self::try_from_bytes(bytes.as_slice())
     }
+    #[inline]
+    pub fn zero() -> Self {
+        Self {
+            data: [0; DOCUMENT_ID_LENGTH],
+        }
+    }
+    #[inline]
+    pub fn one() -> Self {
+        Self {
+            data: [1; DOCUMENT_ID_LENGTH],
+        }
+    }
 
     /// collection id = document_id[OP_ENTRY_ID_LENGTH..]
     pub fn get_collection_id(&self) -> std::result::Result<CollectionId, DB3Error> {
@@ -310,6 +322,9 @@ pub struct IndexId {
 }
 
 impl IndexId {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
+    }
     pub fn create(
         collection_id: &CollectionId,
         index_field_id: u32,

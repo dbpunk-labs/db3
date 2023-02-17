@@ -20,7 +20,7 @@ use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
-use db3_proto::db3_database_proto::{Database, Document};
+use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
     GetDocumentRequest, GetSessionInfoRequest, ListDocumentsRequest, ListDocumentsResponse,
@@ -168,6 +168,35 @@ impl StoreSDK {
         }
     }
 
+    /// query the document with structure query
+    // pub async fn run_query(
+    //     &mut self,
+    //     query: &StructuredQuery,
+    // ) -> std::result::Result<Option<Document>, Status> {
+    //     let token = self.keep_session().await?;
+    //     match self.session_pool.get_session_mut(token.as_ref()) {
+    //         Some(session) => {
+    //             if session.check_session_running() {
+    //                 let r = GetDocumentRequest {
+    //                     session_token: token.to_string(),
+    //                     id: id.to_string(),
+    //                 };
+    //                 let request = tonic::Request::new(r);
+    //                 let mut client = self.client.as_ref().clone();
+    //                 let response = client.get_document(request).await?.into_inner();
+    //                 session.increase_query(1);
+    //                 Ok(response.document)
+    //             } else {
+    //                 Err(Status::permission_denied(
+    //                     "Fail to query in this session. Please restart query session",
+    //                 ))
+    //             }
+    //         }
+    //         None => Err(Status::not_found(format!(
+    //             "Fail to query, session with token {token} not found"
+    //         ))),
+    //     }
+    // }
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),

@@ -3,10 +3,12 @@ use bson::Document;
 use bson::RawDocumentBuf;
 use byteorder::{BigEndian, WriteBytesExt};
 use db3_error::DB3Error;
-use serde_json::Value;
+use db3_proto::db3_database_proto::structured_query::value::ValueType;
+use db3_proto::db3_database_proto::structured_query::Value;
+use serde_json::Value as JsonValue;
 /// convert json string to Bson::Document
 pub fn json_str_to_bson_document(json_str: &str) -> std::result::Result<Document, String> {
-    let value: Value = serde_json::from_str(json_str)
+    let value: JsonValue = serde_json::from_str(json_str)
         .map_err(|e| format!("{}", e))
         .unwrap();
     let bson_document = bson::to_document(&value)
@@ -37,14 +39,19 @@ pub fn bson_document_into_bytes(doc: &Document) -> Vec<u8> {
     row_doc.into_bytes()
 }
 /// convert bson value to bytes for key comparation
-pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
+pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Vec<u8>, DB3Error> {
     let mut data: Vec<u8> = Vec::new();
     match value {
-        Bson::Null => Ok(None),
+        Bson::Null => {
+            // TODO(chanjing): suuport NULL encode bytes in the future. P1
+            Err(DB3Error::DocumentDecodeError(
+                "null type is not supported".to_string(),
+            ))
+        }
         Bson::Boolean(b) => {
             data.write_u8(*b as u8)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok(Some(data))
+            Ok(data)
         }
         Bson::Int64(n) => {
             if *n >= 0 {
@@ -54,7 +61,7 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
             }
             data.write_i64::<BigEndian>(*n)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok(Some(data))
+            Ok(data)
         }
         Bson::Int32(n) => {
             if *n >= 0 {
@@ -64,11 +71,11 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
             }
             data.write_i32::<BigEndian>(*n)
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-            Ok(Some(data))
+            Ok(data)
         }
         Bson::String(s) => {
             data.extend_from_slice(s.as_bytes());
-            Ok(Some(data))
+            Ok(data)
         }
         Bson::DateTime(dt) => bson_into_comparison_bytes(&Bson::Int64(dt.timestamp_millis())),
         _ => Err(DB3Error::DocumentDecodeError(
@@ -77,8 +84,23 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
     }
 }
 
+pub fn bson_value_from_proto_value(value: &Value) -> std::result::Result<Bson, DB3Error> {
+    if let Some(value_type) = &value.value_type {
+        match value_type {
+            ValueType::BooleanValue(b) => Ok(Bson::Boolean(*b)),
+            ValueType::IntegerValue(n) => Ok(Bson::Int64(*n)),
+            ValueType::StringValue(s) => Ok(Bson::String(s.to_string())),
+            _ => Err(DB3Error::InvalidFilterValue(
+                "value is not support".to_string(),
+            )),
+        }
+    } else {
+        Err(DB3Error::InvalidFilterValue("value is none".to_string()))
+    }
+}
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::bson_util::{
         bson_document_into_bytes, bson_into_comparison_bytes, bytes_to_bson_document,
         json_str_to_bson_document,
@@ -192,5 +214,65 @@ mod tests {
         assert!(now_minus_one < now);
         assert!(now < now_plus_one);
         assert!(now_plus_one < max_ts);
+    }
+
+    #[test]
+    fn bson_value_from_proto_value_ut() {
+        assert!(bson_value_from_proto_value(&Value { value_type: None }).is_err());
+        assert_eq!(
+            (Bson::Boolean(true)),
+            bson_value_from_proto_value(&Value {
+                value_type: Some(ValueType::BooleanValue(true))
+            })
+            .unwrap()
+        );
+
+        assert_eq!(
+            (Bson::Boolean(false)),
+            bson_value_from_proto_value(&Value {
+                value_type: Some(ValueType::BooleanValue(false))
+            })
+            .unwrap()
+        );
+
+        assert_eq!(
+            (Bson::Int64(i64::MAX)),
+            bson_value_from_proto_value(&Value {
+                value_type: Some(ValueType::IntegerValue(i64::MAX))
+            })
+            .unwrap()
+        );
+        assert_eq!(
+            (Bson::Int64(i64::MIN)),
+            bson_value_from_proto_value(&Value {
+                value_type: Some(ValueType::IntegerValue(i64::MIN))
+            })
+            .unwrap()
+        );
+        assert_eq!(
+            (Bson::Int64(0)),
+            bson_value_from_proto_value(&Value {
+                value_type: Some(ValueType::IntegerValue(0))
+            })
+            .unwrap()
+        );
+
+        assert_eq!(
+            (Bson::String("".to_string())),
+            bson_value_from_proto_value(&Value {
+                value_type: Some(ValueType::StringValue("".to_string()))
+            })
+            .unwrap()
+        );
+
+        assert_eq!(
+            (Bson::String("aaaaaaaaaaaaaaaaaaaaaaaaaa".to_string())),
+            bson_value_from_proto_value(&Value {
+                value_type: Some(ValueType::StringValue(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()
+                ))
+            })
+            .unwrap()
+        );
     }
 }

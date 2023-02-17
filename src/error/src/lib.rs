@@ -93,6 +93,12 @@ pub enum DB3Error {
     DocumentNotExist(String),
     #[error("document modified permission error")]
     DocumentModifiedPermissionError,
+    #[error("invalid filter value {0}")]
+    InvalidFilterValue(String),
+    #[error("invalid filter type {0}")]
+    InvalidFilterType(String),
+    #[error("index not found for filed filter {0}")]
+    IndexNotFoundForFiledFilter(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
