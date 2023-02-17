@@ -25,10 +25,10 @@ use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;
 use db3_proto::db3_mutation_proto::DocumentMutation;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
-
 use std::time::{SystemTime, UNIX_EPOCH};
-pub fn gen_ed25519_signer() -> (DB3Address, Db3MultiSchemeSigner) {
-    let seed: [u8; 32] = [0; 32];
+
+pub fn gen_ed25519_signer(seed_u8: u8) -> (DB3Address, Db3MultiSchemeSigner) {
+    let seed: [u8; 32] = [seed_u8; 32];
     let (addr, kp) =
         key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
     (addr, Db3MultiSchemeSigner::new(kp))

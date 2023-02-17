@@ -333,6 +333,7 @@ mod tests {
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_proto::db3_node_proto::OpenSessionRequest;
     use db3_proto::db3_session_proto::OpenSessionPayload;
+    use rand::random;
     use std::sync::Arc;
     use std::time;
     use tonic::transport::Endpoint;
@@ -344,17 +345,8 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let mclient = client.clone();
-        {
-            let (_, signer) = sdk_test::gen_ed25519_signer();
-            let msdk = MutationSDK::new(mclient, signer);
-            let dm = sdk_test::create_a_database_mutation();
-            let result = msdk.submit_database_mutation(&dm).await;
-            assert!(result.is_ok());
-            let ten_millis = time::Duration::from_millis(2000);
-            std::thread::sleep(ten_millis);
-        }
-        let (_, signer) = sdk_test::gen_ed25519_signer();
+        let seed_u8: u8 = random();
+        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let mut sdk = StoreSDK::new(client, signer);
         let result = sdk.get_block_bills(1).await;
         if let Err(ref e) = result {
@@ -370,13 +362,15 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let (_, signer) = sdk_test::gen_ed25519_signer();
+        let seed_u8: u8 = random();
+
+        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let msdk = MutationSDK::new(client.clone(), signer);
         // create a database
         //
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:?}", result.err());
         let ten_millis = time::Duration::from_millis(2000);
         std::thread::sleep(ten_millis);
         // add a collection
@@ -386,7 +380,7 @@ mod tests {
         let result = msdk.submit_database_mutation(&cm).await;
         assert!(result.is_ok());
         std::thread::sleep(ten_millis);
-        let (addr, signer) = sdk_test::gen_ed25519_signer();
+        let (addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let mut sdk = StoreSDK::new(client.clone(), signer);
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
         if let Ok(Some(db)) = database {
@@ -423,7 +417,8 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let (_, signer) = sdk_test::gen_ed25519_signer();
+        let seed_u8: u8 = random();
+        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp(),
@@ -455,7 +450,8 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let (_, signer) = sdk_test::gen_ed25519_signer();
+        let seed_u8: u8 = random();
+        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp() - 6,
@@ -482,7 +478,8 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let (addr, signer) = sdk_test::gen_ed25519_signer();
+        let seed_u8: u8 = random();
+        let (addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let sdk = StoreSDK::new(client.clone(), signer);
         let result = sdk.get_state().await;
         assert!(result.is_ok());
