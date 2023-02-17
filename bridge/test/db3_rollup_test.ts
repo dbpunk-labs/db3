@@ -21,15 +21,18 @@ import hre from "hardhat";
 describe("DB3 Rollup test", function () {
   it("test get locked balance", async function () {
     const [owner, otherAccount] = await hre.ethers.getSigners();
-    const total_apply = 1000_000_000_000;
+    const owner_balance = 1000_000_000_000;
     // deploy a lock contract where funds can be withdrawn
     // one year in the future
     const Token = await hre.ethers.getContractFactory("Db3Token");
     const token = await Token.deploy();
     const Rollup = await hre.ethers.getContractFactory("DB3Rollup");
     const rollup = await Rollup.deploy(token.address);
-    expect(await token.balanceOf(owner.address)).to.equal(total_apply);
-    expect(await rollup.connect(owner).deposit(1)).to.equal(true);
-    expect(await rollup.connect(owner).getLockedBalance()).to.equal(990);
+    await token.approve(rollup.address, 10 * 1000_000_000);
+    expect(await token.balanceOf(owner.address)).to.equal(owner_balance);
+    await rollup.deposit(1 * 1000_000_000);
+    expect(await rollup.getLockedBalance()).to.equal(1 * 1000_000_000);
+    expect(await token.balanceOf(owner.address)).to.equal(999 * 1000_000_000);
+    expect(await token.balanceOf(rollup.address)).to.equal(1 * 1000_000_000);
   });
 });

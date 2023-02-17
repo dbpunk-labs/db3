@@ -94,9 +94,8 @@ jobs:
           token: ${{secrets.COV_TOKEN}}
           directory: .
           flags: rust
-      - name: Setup benchmark env
+      - name: Run Bridge test
         run: |
-          cargo build --release
-          cd tools
-          sh start_localnet.sh release >tm.log 2>&1 &
-
+          cd bridge
+          yarn install
+          npx hardhat test

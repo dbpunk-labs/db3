@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "./DB3Token.sol";
+import "hardhat/console.sol";
 
 contract DB3Rollup {
     Db3Token private _tokenContract;
@@ -12,8 +13,8 @@ contract DB3Rollup {
         _tokenContract = tokenContract;
     }
 
-    function deposit(uint256 amount) public returns (bool) {
-        _tokenContract.transfer(address(this), amount);
+    function deposit(uint256 amount) public payable returns (bool) {
+        _tokenContract.transferFrom(msg.sender, address(this), amount);
         _balances[msg.sender] += amount;
         return true;
     }
