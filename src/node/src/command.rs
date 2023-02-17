@@ -434,12 +434,14 @@ mod tests {
         }
         std::thread::sleep(time::Duration::from_millis(2000));
 
+        // run show document
         let mut doc_id1 = String::new();
         let mut doc_id2 = String::new();
         let cmd = DB3ClientCommand::ShowDocument {
             addr: addr.clone(),
             collection_name: collection_books.to_string(),
             key: "".to_string(),
+            limit: -1,
         };
         if let Ok(table) = cmd.execute(&mut ctx).await {
             assert_eq!(2, table.len());
@@ -448,6 +450,16 @@ mod tests {
         } else {
             assert!(false)
         }
+
+        // run show document limit 1
+        let cmd = DB3ClientCommand::ShowDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            key: "".to_string(),
+            limit: 1,
+        };
+        let table = cmd.execute(&mut ctx).await.unwrap();
+        assert_eq!(1, table.len());
 
         let cmd = DB3ClientCommand::GetDocument {
             id: doc_id1.to_string(),

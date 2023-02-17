@@ -20,11 +20,12 @@ use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
+use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
-    GetDocumentRequest, GetSessionInfoRequest, ListDocumentsRequest, ListDocumentsResponse,
-    OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest, SessionIdentifier,
+    GetDocumentRequest, GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse,
+    QueryBillKey, QueryBillRequest, RunQueryRequest, RunQueryResponse, SessionIdentifier,
     ShowDatabaseRequest,
 };
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
@@ -80,19 +81,28 @@ impl StoreSDK {
         &mut self,
         addr: &str,
         collection_name: &str,
-    ) -> std::result::Result<ListDocumentsResponse, Status> {
+        limit: Option<i32>,
+    ) -> std::result::Result<RunQueryResponse, Status> {
         let token = self.keep_session().await?;
         match self.session_pool.get_session_mut(token.as_ref()) {
             Some(session) => {
                 if session.check_session_running() {
-                    let r = ListDocumentsRequest {
+                    let r = RunQueryRequest {
                         session_token: token.to_string(),
                         address: addr.to_string(),
-                        collection_name: collection_name.to_string(),
+                        query: Some(StructuredQuery {
+                            collection_name: collection_name.to_string(),
+                            limit: match limit {
+                                Some(v) => Some(Limit { limit: v }),
+                                None => None,
+                            },
+                            select: Some(Projection { fields: vec![] }),
+                            r#where: None,
+                        }),
                     };
                     let request = tonic::Request::new(r);
                     let mut client = self.client.as_ref().clone();
-                    let response = client.list_documents(request).await?.into_inner();
+                    let response = client.run_query(request).await?.into_inner();
                     session.increase_query(1);
                     Ok(response)
                 } else {
@@ -426,7 +436,7 @@ mod tests {
         assert!(result.is_ok());
         std::thread::sleep(ten_millis);
         let documents = sdk
-            .list_documents(db_id.to_hex().as_str(), "collection1")
+            .list_documents(db_id.to_hex().as_str(), "collection1", None)
             .await
             .unwrap();
         assert_eq!(documents.documents.len(), 1);

@@ -21,7 +21,7 @@ use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{UnitType, Units};
 use db3_proto::db3_bill_proto::{Bill, BillType};
-use db3_proto::db3_database_proto::{Database, Document};
+use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_mutation_proto::DatabaseMutation;
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
@@ -147,6 +147,9 @@ impl AuthStorage {
     }
     pub fn get_document(&self, id: &DocumentId) -> Result<Option<Document>> {
         DbStore::get_document(self.db.as_ref(), id)
+    }
+    pub fn run_query(&self, db_id: &DbId, query: &StructuredQuery) -> Result<Vec<Document>> {
+        DbStore::run_query(self.db.as_ref(), db_id, query)
     }
     pub fn get_bills(&self, height: u64) -> Result<Vec<Bill>> {
         let proofs_ops = BillStore::get_block_bills(self.db.as_ref(), height)?;

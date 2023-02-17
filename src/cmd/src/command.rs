@@ -121,6 +121,9 @@ pub enum DB3ClientCommand {
         /// show document by key
         #[clap(long, default_value = "")]
         key: String,
+        /// limit output
+        #[clap(long, default_value = "-1")]
+        limit: i32,
     },
     #[clap(name = "show-account")]
     ShowAccount {},
@@ -330,13 +333,15 @@ impl DB3ClientCommand {
                 addr,
                 collection_name,
                 key,
+                limit,
             } => {
                 // TODO(chenjing): construct index keys from json key string
+                let limit = if limit < 0 { None } else { Some(limit) };
                 match ctx
                     .store_sdk
                     .as_mut()
                     .unwrap()
-                    .list_documents(addr.as_ref(), collection_name.as_ref())
+                    .list_documents(addr.as_ref(), collection_name.as_ref(), limit)
                     .await
                 {
                     Ok(response) => Self::show_document(response.documents),
