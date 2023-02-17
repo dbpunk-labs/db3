@@ -43,12 +43,13 @@ fn keep_order_i32(input: i32) -> u32 {
             if input == i32::MIN {
                 0
             } else {
-                -input as u32
+                let new_input = input as u32;
+                (new_input & 0x7fffffff) as u32
             }
         }
         false => {
             let new_input = input as u32;
-            (new_input | 0x7F000000) as u32
+            (new_input | 0x80000000) as u32
         }
     }
 }
@@ -59,12 +60,13 @@ fn keep_order_i64(input: i64) -> u64 {
             if input == i64::MIN {
                 0
             } else {
-                -input as u64
+                let new_input = input as u64;
+                (new_input & 0x7fffffffffffffff) as u64
             }
         }
         false => {
             let new_input = input as u64;
-            (new_input | 0x7F00000000000000) as u64
+            (new_input | 0x8000000000000000) as u64
         }
     }
 }
@@ -153,39 +155,82 @@ mod tests {
 
     #[test]
     fn i64_bson_into_comparison_bytes_ut() {
+        let i64_neg_2 = bson_into_comparison_bytes(&Bson::Int64(-2)).unwrap();
         let i64_neg_1 = bson_into_comparison_bytes(&Bson::Int64(-1)).unwrap();
+        let i64_small_value1 = -(0x7F00000000000000 as i64);
+        let i64_small_1 = bson_into_comparison_bytes(&Bson::Int64(i64_small_value1)).unwrap();
+        let i64_small_value2 = -(0x7000000000000000 as i64);
+        let i64_small_2 = bson_into_comparison_bytes(&Bson::Int64(i64_small_value2)).unwrap();
         let i64_0 = bson_into_comparison_bytes(&Bson::Int64(0)).unwrap();
         let i64_1 = bson_into_comparison_bytes(&Bson::Int64(1)).unwrap();
+        let i64_big_value1 =
+            bson_into_comparison_bytes(&Bson::Int64(0x7000000000000000 as i64)).unwrap();
+        let i64_big_value2 =
+            bson_into_comparison_bytes(&Bson::Int64(0x7F00000000000000 as i64)).unwrap();
         let i64_max = bson_into_comparison_bytes(&Bson::Int64(i64::MAX)).unwrap();
         let i64_min = bson_into_comparison_bytes(&Bson::Int64(i64::MIN)).unwrap();
         println!("i64_min: {:?}", i64_min);
+        println!("{} i64_small_value1: {:?}", i64_small_value1, i64_small_1);
+        println!("{} i64_small_value2: {:?}", i64_small_value2, i64_small_2);
+        println!("i64_-2: {:?}", i64_neg_2);
         println!("i64_-1: {:?}", i64_neg_1);
         println!("i64_0: {:?}", i64_0);
         println!("i64_1: {:?}", i64_1);
+        println!(
+            "{} i64_big_value1: {:?}",
+            0x7000000000000000 as i64, i64_big_value1
+        );
+        println!(
+            "{} i64_big_value2: {:?}",
+            0x7F00000000000000 as i64, i64_big_value2
+        );
         println!("i64_max: {:?}", i64_max);
 
-        assert!(i64_min < i64_neg_1);
+        assert!(i64_min < i64_small_1);
+        assert!(i64_small_1 < i64_small_2);
+        assert!(i64_small_2 < i64_neg_1);
+        assert!(i64_neg_2 < i64_1);
         assert!(i64_neg_1 < i64_0);
         assert!(i64_0 < i64_1);
-        assert!(i64_1 < i64_max);
+        assert!(i64_1 < i64_big_value1);
+        assert!(i64_big_value1 < i64_big_value2);
+        assert!(i64_big_value2 < i64_max);
     }
     #[test]
     fn i32_bson_into_comparison_bytes_ut() {
+        let i32_small_value1 = -(0x7F000000 as i32);
+        let i32_small_1 = bson_into_comparison_bytes(&Bson::Int32(i32_small_value1)).unwrap();
+        let i32_small_value2 = -(0x70000000 as i32);
+        let i32_small_2 = bson_into_comparison_bytes(&Bson::Int32(i32_small_value2)).unwrap();
+        let i32_neg_2 = bson_into_comparison_bytes(&Bson::Int32(-2)).unwrap();
         let i32_neg_1 = bson_into_comparison_bytes(&Bson::Int32(-1)).unwrap();
         let i32_0 = bson_into_comparison_bytes(&Bson::Int32(0)).unwrap();
         let i32_1 = bson_into_comparison_bytes(&Bson::Int32(1)).unwrap();
+        let i32_big_value1 = bson_into_comparison_bytes(&Bson::Int32(0x70000000 as i32)).unwrap();
+        let i32_big_value2 = bson_into_comparison_bytes(&Bson::Int32(0x7F000000 as i32)).unwrap();
         let i32_max = bson_into_comparison_bytes(&Bson::Int32(i32::MAX)).unwrap();
         let i32_min = bson_into_comparison_bytes(&Bson::Int32(i32::MIN)).unwrap();
+
         println!("i32_min: {:?}", i32_min);
+        println!("{} i32_small_1: {:?}", i32_small_value1, i32_small_1);
+        println!("{} i32_small_2: {:?}", i32_small_value2, i32_small_2);
+        println!("i32_-2: {:?}", i32_neg_2);
         println!("i32_-1: {:?}", i32_neg_1);
         println!("i32_0: {:?}", i32_0);
         println!("i32_1: {:?}", i32_1);
+        println!("{} i32_big_value1: {:?}", 0x70000000 as i32, i32_big_value1);
+        println!("{} i32_big_value2: {:?}", 0x7F000000 as i32, i32_big_value2);
         println!("i32_max: {:?}", i32_max);
 
-        assert!(i32_min < i32_neg_1);
+        assert!(i32_min < i32_small_1);
+        assert!(i32_small_1 < i32_small_2);
+        assert!(i32_small_2 < i32_neg_2);
+        assert!(i32_neg_2 < i32_neg_1);
         assert!(i32_neg_1 < i32_0);
         assert!(i32_0 < i32_1);
-        assert!(i32_1 < i32_max);
+        assert!(i32_1 < i32_big_value1);
+        assert!(i32_big_value1 < i32_big_value2);
+        assert!(i32_big_value2 < i32_max);
     }
 
     #[test]
