@@ -91,6 +91,7 @@ pub fn bson_into_comparison_bytes(value: &Bson) -> std::result::Result<Option<Ve
                 .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
             Ok(Some(data))
         }
+        // TODO: add \0 as the end of string.
         Bson::String(s) => {
             data.extend_from_slice(s.as_bytes());
             Ok(Some(data))
