@@ -1,7 +1,6 @@
 //
-//
-// db3_account.proto
-// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+// token.rs
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,17 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-syntax = "proto3";
 
-package db3_account_proto;
-
-//
-//
-message Account {
-    uint64 bills = 1;
-    uint64 credits = 2;
-    uint64 total_storage_in_bytes = 3;
-    uint64 total_mutation_count = 4;
-    uint64 total_session_count = 5;
-    uint64 nonce = 6;
-}
+pub const TOKEN_UNIT: [&str; 2] = ["db3", "tai"];
+// 1 db3 = 1000_000_000 tai
+pub const TOKEN_COVERSION: u64 = 1000_000_000;

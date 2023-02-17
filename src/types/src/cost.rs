@@ -14,8 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use db3_proto::db3_base_proto::{UnitType, Units};
-use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 
 const C_CREATEDB_GAS_PRICE: u64 = 100; // unit in tai
@@ -25,6 +23,9 @@ const C_ADD_DOC_GAS_PRICE: u64 = 200; // unit in tai
 const C_DEL_DOC_GAS_PRICE: u64 = 200; // unit in tai
 const C_UPDATE_DOC_GAS_PRICE: u64 = 200; // unit in tai
 const STORAGE_GAS_PRICE: u64 = 1; // per bytes
+                                  //
+const C_QUERY_OP_GAS_PRICE: u64 = 100;
+
 pub enum DbStoreOp {
     DbOp {
         create_db_ops: u64,
@@ -66,8 +67,7 @@ impl DbStoreOp {
     }
 }
 
-pub fn estimate_gas(ops: &DbStoreOp) -> Units {
-    let mut gas: u64 = 0;
+pub fn estimate_gas(ops: &DbStoreOp) -> u64 {
     match ops {
         DbStoreOp::DbOp {
             create_db_ops,
@@ -75,10 +75,10 @@ pub fn estimate_gas(ops: &DbStoreOp) -> Units {
             create_index_ops,
             data_in_bytes,
         } => {
-            gas += C_CREATEDB_GAS_PRICE * create_db_ops
-                + C_CREATECOLLECTION_GAS_PRICE * create_collection_ops;
-            gas += C_CREATEINDEX_GAS_PRICE * create_index_ops;
-            gas += data_in_bytes * STORAGE_GAS_PRICE;
+            C_CREATEDB_GAS_PRICE * create_db_ops
+                + C_CREATECOLLECTION_GAS_PRICE * create_collection_ops
+                + C_CREATEINDEX_GAS_PRICE * create_index_ops
+                + STORAGE_GAS_PRICE * data_in_bytes
         }
         DbStoreOp::DocOp {
             add_doc_ops,
@@ -86,25 +86,16 @@ pub fn estimate_gas(ops: &DbStoreOp) -> Units {
             update_doc_ops,
             data_in_bytes,
         } => {
-            gas += add_doc_ops * C_ADD_DOC_GAS_PRICE + del_doc_ops * C_DEL_DOC_GAS_PRICE;
-            gas += update_doc_ops * C_UPDATE_DOC_GAS_PRICE;
-            gas += data_in_bytes * STORAGE_GAS_PRICE;
+            C_DEL_DOC_GAS_PRICE * add_doc_ops
+                + C_ADD_DOC_GAS_PRICE * del_doc_ops
+                + C_UPDATE_DOC_GAS_PRICE * update_doc_ops
+                + STORAGE_GAS_PRICE * data_in_bytes
         }
-    }
-    Units {
-        utype: UnitType::Tai.into(),
-        amount: gas,
     }
 }
 
-pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> Units {
-    let mut gas: u64 = 0;
-    gas += query_session_info.query_count as u64 * 10;
-    // TODO: estimate gas based on query count and weight
-    Units {
-        utype: UnitType::Tai.into(),
-        amount: gas,
-    }
+pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> u64 {
+    C_QUERY_OP_GAS_PRICE * query_session_info.query_count as u64
 }
 
 #[cfg(test)]
@@ -113,9 +104,31 @@ mod tests {
     use chrono::Utc;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_session_proto::QuerySessionInfo;
+    #[test]
+    fn it_estimate_gas_doc_ops() {
+        let doc_ops = DbStoreOp::DocOp {
+            add_doc_ops: 1,
+            del_doc_ops: 1,
+            update_doc_ops: 1,
+            data_in_bytes: 100,
+        };
+        let gas_fee = estimate_gas(&doc_ops);
+        let target_fee = 200 + 200 + 200 + 100;
+        assert_eq!(gas_fee, target_fee);
+    }
 
     #[test]
-    fn it_estimate_gas() {}
+    fn it_estimate_gas_db_ops() {
+        let db_ops = DbStoreOp::DbOp {
+            create_db_ops: 1,
+            create_collection_ops: 1,
+            create_index_ops: 1,
+            data_in_bytes: 100,
+        };
+        let gas_fee = estimate_gas(&db_ops);
+        let target_fee = 100 + 100 + 100 + 100;
+        assert_eq!(gas_fee, target_fee);
+    }
 
     #[test]
     fn it_query_session_estimate_gas() {
@@ -124,9 +137,8 @@ mod tests {
             start_time: Utc::now().timestamp(),
             query_count: 10,
         };
-
-        let units = estimate_query_session_gas(&node_query_session_info);
-        assert_eq!(0, units.utype);
-        assert_eq!(100, units.amount);
+        let gas_fee = estimate_query_session_gas(&node_query_session_info);
+        let target_fee = 1000;
+        assert_eq!(gas_fee, target_fee);
     }
 }

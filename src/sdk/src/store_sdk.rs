@@ -24,9 +24,9 @@ use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
-    GetDocumentRequest, GetSessionInfoRequest, OpenSessionRequest, OpenSessionResponse,
-    QueryBillKey, QueryBillRequest, RunQueryRequest, RunQueryResponse, SessionIdentifier,
-    ShowDatabaseRequest,
+    GetDocumentRequest, GetSessionInfoRequest, RunQueryRequest, RunQueryResponse,
+    NetworkStatus, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
+    SessionIdentifier, ShowDatabaseRequest, ShowNetworkStatusRequest,
 };
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
@@ -322,6 +322,14 @@ impl StoreSDK {
         }
     }
 
+    pub async fn get_state(&self) -> std::result::Result<NetworkStatus, Status> {
+        let r = ShowNetworkStatusRequest {};
+        let request = tonic::Request::new(r);
+        let mut client = self.client.as_ref().clone();
+        let status = client.show_network_status(request).await?.into_inner();
+        Ok(status)
+    }
+
     pub async fn get_account(&self, addr: &DB3Address) -> std::result::Result<Account, Status> {
         let r = GetAccountRequest {
             addr: addr.to_vec(),
@@ -408,6 +416,7 @@ mod tests {
         let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let msdk = MutationSDK::new(client.clone(), signer);
         // create a database
+        //
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
         assert!(result.is_ok(), "{:?}", result.err());
@@ -510,5 +519,18 @@ mod tests {
         let request = tonic::Request::new(r.clone());
         let response = client.open_query_session(request).await;
         assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn network_status_test() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let seed_u8: u8 = random();
+        let (addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
+        let sdk = StoreSDK::new(client.clone(), signer);
+        let result = sdk.get_state().await;
+        assert!(result.is_ok());
     }
 }
