@@ -17,7 +17,7 @@ contract Db3Token is ERC20 {
 
     /// the smallest unit is tai
     /// 1 db3 = 1000_000_000 tai
-    function decimals() public view override returns (uint8) {
+    function decimals() public pure override returns (uint8) {
         return 9;
     }
 }

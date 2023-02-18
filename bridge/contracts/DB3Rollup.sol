@@ -8,7 +8,6 @@ contract DB3Rollup {
     // the locked balance of an address
     mapping(address => uint256) private _balances;
     event Deposit(address _from, uint256 amount);
-
     constructor(Db3Token tokenContract) {
         _tokenContract = tokenContract;
     }
