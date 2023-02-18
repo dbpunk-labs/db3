@@ -159,25 +159,51 @@ db3>-$ show-state
 
 ### Build a dapp with db3.js
 
+#### Build db3 client
+
 ```typescript
-/*
-|----------------------------|
-| use db3js open a database  |
-|----------------------------|
-*/
+// the key seed
+const mnemonic ='...'
+// create a wallet
+const wallet = DB3BrowserWallet.createNew(mnemonic, 'DB3_SECP259K1')
+// build db3 client
+const client = new DB3Client('http://127.0.0.1:26659', wallet)
+```
+#### Create a database
 
-// build sign function
-const sign = await getSign()
+```typescript
+const [dbId, txId] = await client.createDatabase()
+const db = initializeDB3('http://127.0.0.1:26659', dbId, wallet)
+```
 
-// build database factory
-const dbFactory = new DB3Factory({
-    node: 'http://127.0.0.1:26659',
-    sign,
-    nonce
+#### Create a collection
+
+```typescript
+// add a index to collection
+const indexList: Index[] = [
+            {
+                name: 'idx1',
+                id: 1,
+                fields: [
+                    {
+                        fieldPath: 'name',
+                        valueMode: {
+                            oneofKind: 'order',
+                            order: Index_IndexField_Order.ASCENDING,
+                        },
+                    },
+                ],
+            },
+]
+// create a collecion
+const collectionRef = await collection(db, 'cities', indexList)
+// add a doc to collection
+const result = await addDoc(collectionRef, {
+    name: 'beijing',
+    address: 'north',
 })
-
-// open database with an address
-const db = dbFactory.open("0x5ca8d43c15fb366d80e221d11a34894eb0975da6")
+// get all docs from collection                                                                                                                                                                  
+const docs = await getDocs(collectionRef)
 ```
 for more please go to [db3.js](https://github.com/dbpunk-labs/db3.js)
 
