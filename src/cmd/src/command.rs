@@ -268,14 +268,14 @@ impl DB3ClientCommand {
 
             DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair() {
                 Ok(ks) => ks.show_key(),
-                Err(e) => Err(
+                Err(_) => Err(
                     "no key was found, you can use init command to create a new one".to_string(),
                 ),
             },
             DB3ClientCommand::ShowState {} => {
                 match ctx.store_sdk.as_ref().unwrap().get_state().await {
                     Ok(status) => Self::show_state(&status),
-                    Err(e) => Err("fail to get account".to_string()),
+                    Err(_) => Err("fail to get account".to_string()),
                 }
             }
             DB3ClientCommand::ShowAccount {} => match KeyStore::recover_keypair() {
@@ -283,10 +283,10 @@ impl DB3ClientCommand {
                     let addr = ks.get_address().unwrap();
                     match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
                         Ok(account) => Self::show_account(&account, &addr),
-                        Err(e) => Err("fail to get account".to_string()),
+                        Err(_) => Err("fail to get account".to_string()),
                     }
                 }
-                Err(e) => Err(
+                Err(_) => Err(
                     "no key was found, you can use init command to create a new one".to_string(),
                 ),
             },
@@ -336,7 +336,7 @@ impl DB3ClientCommand {
                         table.add_row(row![tx_id.to_base64()]);
                         Ok(table)
                     }
-                    Err(e) => Err(format!("fail to add collection: {:?}", e)),
+                    Err(e) => Err(format!("fail to add collection: {e}")),
                 }
             }
             DB3ClientCommand::GetDocument { id } => {
@@ -355,7 +355,7 @@ impl DB3ClientCommand {
             DB3ClientCommand::ShowDocument {
                 addr,
                 collection_name,
-                key,
+                ..
             } => {
                 // TODO(chenjing): construct index keys from json key string
                 match ctx

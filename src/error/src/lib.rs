@@ -93,6 +93,8 @@ pub enum DB3Error {
     DocumentNotExist(String),
     #[error("document modified permission error")]
     DocumentModifiedPermissionError,
+    #[error("fail to store event for {0}")]
+    StoreEventError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

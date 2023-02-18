@@ -29,6 +29,7 @@ fn main() {
                 "proto/db3_account.proto",
                 "proto/db3_node.proto",
                 "proto/db3_database.proto",
+                "proto/db3_message.proto",
             ],
             &["proto"],
         )

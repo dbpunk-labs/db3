@@ -37,3 +37,6 @@ pub mod db3_node_proto {
 pub mod db3_database_proto {
     tonic::include_proto!("db3_database_proto");
 }
+pub mod db3_message_proto {
+    tonic::include_proto!("db3_message_proto");
+}
