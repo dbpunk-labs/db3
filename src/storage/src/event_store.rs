@@ -33,18 +33,18 @@ impl EventStore {
     /// store a new DepositEvent. Return DB3Error if the DepositEvent does exist
     ///
     pub fn store_deposit_event(tx: WriteTransaction, event: &DepositEvent) -> Result<()> {
+        let key: Vec<u8> = event_key::build_event_key(
+            event_key::EventType::DepositEvent,
+            event.chain_id,
+            event.block_id,
+            event.transaction_id.as_ref(),
+        )?;
+        let key_ref: &[u8] = key.as_ref();
         //TODO validate the event
         {
             let read_table = tx
                 .open_table(DEPOSIT_EVENT_TABLE)
                 .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-            let key: Vec<u8> = event_key::build_event_key(
-                event_key::EventType::DepositEvent,
-                event.chain_id,
-                event.block_id,
-                event.transaction_id.as_ref(),
-            )?;
-            let key_ref: &[u8] = key.as_ref();
             let value = read_table
                 .get(key_ref)
                 .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
@@ -53,6 +53,8 @@ impl EventStore {
                     "deposit event exists".to_string(),
                 ));
             }
+        }
+        {
             let mut mut_table = tx
                 .open_table(DEPOSIT_EVENT_TABLE)
                 .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
@@ -68,5 +70,32 @@ impl EventStore {
         tx.commit()
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use redb::Database;
+    use tempdir::TempDir;
+    #[test]
+    fn test_store_event() {
+        let tmp_dir_path = TempDir::new("event_store_test").expect("create temp dir");
+        let db_path = tmp_dir_path.path().join("event_store.db");
+        let db = Database::create(db_path.as_path().to_str().unwrap()).unwrap();
+        let event = DepositEvent {
+            chain_id: 1,
+            sender: vec![0],
+            amount: 1000_000_000,
+            block_id: 10,
+            transaction_id: vec![1],
+            signature: vec![255],
+        };
+        let write_txn = db.begin_write().unwrap();
+        let result = EventStore::store_deposit_event(write_txn, &event);
+        assert!(result.is_ok());
+        let write_txn = db.begin_write().unwrap();
+        let result = EventStore::store_deposit_event(write_txn, &event);
+        assert!(result.is_err());
     }
 }

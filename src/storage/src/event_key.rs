@@ -47,7 +47,8 @@ mod tests {
         assert!(key1.is_ok());
         let key2 = build_event_key(EventType::DepositEvent, 1, 21, tx.as_ref());
         assert!(key2.is_ok());
-        assert!(key1.unwrap() > key2.unwrap());
-        assert_eq!(key1.unwrap().len(), 15);
+        let key1 = key1.unwrap();
+        assert!(key1 > key2.unwrap());
+        assert_eq!(key1.len(), 15);
     }
 }

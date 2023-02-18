@@ -5,7 +5,6 @@ mod node_integration {
     use db3_base::get_a_random_nonce;
     use db3_crypto::db3_signer::Db3MultiSchemeSigner;
     use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
-    use db3_proto::db3_database_proto::Database;
     use db3_proto::db3_mutation_proto::{
         DatabaseAction, DatabaseMutation, PayloadType, WriteRequest,
     };
