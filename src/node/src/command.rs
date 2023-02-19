@@ -429,7 +429,7 @@ mod tests {
             addr: addr.clone(),
             collection_name: collection_books.to_string(),
             documents: vec![
-                r#"{"name": "Make","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
+                r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
                 r#"{"name": "Bill","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
                 r#"{"name": "Bill","age": 45,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
             ],
@@ -535,5 +535,44 @@ mod tests {
         };
         let res = cmd.execute(&mut ctx).await;
         assert!(res.is_err(), "{:?}", res.unwrap());
+
+        // update documents
+        let cmd = DB3ClientCommand::UpdateDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            ids: vec![doc_id3.clone(), doc_id4.clone()],
+            documents: vec![
+                r#"{"name": "Jack","age": 44,"phones": ["+1234567","+2345678"]}"#.to_string(),
+                r#"{"name": "Bill","age": 46,"phones": ["+1234567","+2345678"]}"#.to_string(),
+            ],
+        };
+        assert!(cmd.execute(&mut ctx).await.is_ok());
+        std::thread::sleep(time::Duration::from_millis(2000));
+
+        let cmd = DB3ClientCommand::GetDocument {
+            id: doc_id3.clone(),
+        };
+
+        let table = cmd.execute(&mut ctx).await.unwrap();
+        assert!(table
+            .get_row(0)
+            .unwrap()
+            .get_cell(2)
+            .unwrap()
+            .get_content()
+            .contains(r#""name": String("Jack")"#));
+
+        let cmd = DB3ClientCommand::GetDocument {
+            id: doc_id4.clone(),
+        };
+
+        let table = cmd.execute(&mut ctx).await.unwrap();
+        assert!(table
+            .get_row(0)
+            .unwrap()
+            .get_cell(2)
+            .unwrap()
+            .get_content()
+            .contains(r#""age": Int64(46)"#));
     }
 }
