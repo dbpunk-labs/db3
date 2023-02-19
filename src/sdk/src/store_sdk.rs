@@ -20,11 +20,12 @@ use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::Bill;
-use db3_proto::db3_database_proto::{Database, Document};
+use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
+use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
-    GetDocumentRequest, GetSessionInfoRequest, ListDocumentsRequest, ListDocumentsResponse,
-    NetworkStatus, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
+    GetDocumentRequest, GetSessionInfoRequest, NetworkStatus, OpenSessionRequest,
+    OpenSessionResponse, QueryBillKey, QueryBillRequest, RunQueryRequest, RunQueryResponse,
     SessionIdentifier, ShowDatabaseRequest, ShowNetworkStatusRequest,
 };
 use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
@@ -76,35 +77,26 @@ impl StoreSDK {
         }
     }
 
+    /// show document with given db addr and collection name
     pub async fn list_documents(
         &mut self,
         addr: &str,
         collection_name: &str,
-    ) -> std::result::Result<ListDocumentsResponse, Status> {
-        let token = self.keep_session().await?;
-        match self.session_pool.get_session_mut(token.as_ref()) {
-            Some(session) => {
-                if session.check_session_running() {
-                    let r = ListDocumentsRequest {
-                        session_token: token.to_string(),
-                        address: addr.to_string(),
-                        collection_name: collection_name.to_string(),
-                    };
-                    let request = tonic::Request::new(r);
-                    let mut client = self.client.as_ref().clone();
-                    let response = client.list_documents(request).await?.into_inner();
-                    session.increase_query(1);
-                    Ok(response)
-                } else {
-                    Err(Status::permission_denied(
-                        "Fail to query in this session. Please restart query session",
-                    ))
-                }
-            }
-            None => Err(Status::not_found(format!(
-                "Fail to query, session with token {token} not found"
-            ))),
-        }
+        limit: Option<i32>,
+    ) -> std::result::Result<RunQueryResponse, Status> {
+        self.run_query(
+            addr,
+            StructuredQuery {
+                collection_name: collection_name.to_string(),
+                limit: match limit {
+                    Some(v) => Some(Limit { limit: v }),
+                    None => None,
+                },
+                select: Some(Projection { fields: vec![] }),
+                r#where: None,
+            },
+        )
+        .await
     }
 
     /// get the document with a base64 format id
@@ -168,6 +160,37 @@ impl StoreSDK {
         }
     }
 
+    /// query the document with structure query
+    pub async fn run_query(
+        &mut self,
+        addr: &str,
+        query: StructuredQuery,
+    ) -> std::result::Result<RunQueryResponse, Status> {
+        let token = self.keep_session().await?;
+        match self.session_pool.get_session_mut(token.as_ref()) {
+            Some(session) => {
+                if session.check_session_running() {
+                    let r = RunQueryRequest {
+                        session_token: token.to_string(),
+                        address: addr.to_string(),
+                        query: Some(query),
+                    };
+                    let request = tonic::Request::new(r);
+                    let mut client = self.client.as_ref().clone();
+                    let response = client.run_query(request).await?.into_inner();
+                    session.increase_query(1);
+                    Ok(response)
+                } else {
+                    Err(Status::permission_denied(
+                        "Fail to query in this session. Please restart query session",
+                    ))
+                }
+            }
+            None => Err(Status::not_found(format!(
+                "Fail to query, session with token {token} not found"
+            ))),
+        }
+    }
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
@@ -330,6 +353,12 @@ mod tests {
 
     use chrono::Utc;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
+    use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
+    use db3_proto::db3_database_proto::structured_query::filter::FilterType;
+    use db3_proto::db3_database_proto::structured_query::value::ValueType;
+    use db3_proto::db3_database_proto::structured_query::{
+        FieldFilter, Filter, Limit, Projection, Value,
+    };
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_proto::db3_node_proto::OpenSessionRequest;
     use db3_proto::db3_session_proto::OpenSessionPayload;
@@ -345,7 +374,17 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
+        let mclient = client.clone();
         let seed_u8: u8 = random();
+        {
+            let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
+            let msdk = MutationSDK::new(mclient, signer);
+            let dm = sdk_test::create_a_database_mutation();
+            let result = msdk.submit_database_mutation(&dm).await;
+            assert!(result.is_ok(), "{:?}", result.err());
+            let ten_millis = time::Duration::from_millis(2000);
+            std::thread::sleep(ten_millis);
+        }
         let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let mut sdk = StoreSDK::new(client, signer);
         let result = sdk.get_block_bills(1).await;
@@ -371,15 +410,15 @@ mod tests {
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
         assert!(result.is_ok(), "{:?}", result.err());
-        let ten_millis = time::Duration::from_millis(2000);
-        std::thread::sleep(ten_millis);
+        let two_seconds = time::Duration::from_millis(2000);
+        std::thread::sleep(two_seconds);
         // add a collection
-        let (db_id, tx_id) = result.unwrap();
+        let (db_id, _) = result.unwrap();
         println!("db id {}", db_id.to_hex());
         let cm = sdk_test::create_a_collection_mutataion("collection1", db_id.address());
         let result = msdk.submit_database_mutation(&cm).await;
         assert!(result.is_ok());
-        std::thread::sleep(ten_millis);
+        std::thread::sleep(two_seconds);
         let (addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let mut sdk = StoreSDK::new(client.clone(), signer);
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
@@ -391,19 +430,59 @@ mod tests {
         } else {
             assert!(false);
         }
-        let docm = sdk_test::add_a_document("collection1", db_id.address());
+        // add 4 documents
+        let docm = sdk_test::add_documents(
+            "collection1",
+            db_id.address(),
+            &vec![
+                r#"{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#,
+                r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#,
+                r#"{"name": "Bill","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#,
+                r#"{"name": "Bill","age": 45,"phones": ["+44 1234567","+44 2345678"]}"#,
+            ],
+        );
         let result = msdk.submit_database_mutation(&docm).await;
         assert!(result.is_ok());
-        std::thread::sleep(ten_millis);
+        std::thread::sleep(two_seconds);
+
+        // show all documents
         let documents = sdk
-            .list_documents(db_id.to_hex().as_str(), "collection1")
+            .list_documents(db_id.to_hex().as_str(), "collection1", None)
             .await
             .unwrap();
-        assert_eq!(documents.documents.len(), 1);
+        assert_eq!(documents.documents.len(), 4);
+
+        // list documents with limit=3
+        let documents = sdk
+            .list_documents(db_id.to_hex().as_str(), "collection1", Some(3))
+            .await
+            .unwrap();
+        assert_eq!(documents.documents.len(), 3);
+
+        // run query equivalent to SQL: select * from collection1 where name = "Bill"
+        let query = StructuredQuery {
+            collection_name: "collection1".to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: Some(Filter {
+                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                    field: "name".to_string(),
+                    op: Operator::Equal.into(),
+                    value: Some(Value {
+                        value_type: Some(ValueType::StringValue("Bill".to_string())),
+                    }),
+                })),
+            }),
+            limit: None,
+        };
+        println!("{}", serde_json::to_string(&query).unwrap());
+
+        let documents = sdk.run_query(db_id.to_hex().as_str(), query).await.unwrap();
+        assert_eq!(documents.documents.len(), 2);
+
         let result = sdk.close_session().await;
         assert!(result.is_ok());
 
-        std::thread::sleep(ten_millis);
+        std::thread::sleep(two_seconds);
         let account_ret = sdk.get_account(&addr).await;
         assert!(account_ret.is_ok());
         let account = account_ret.unwrap();
@@ -479,7 +558,7 @@ mod tests {
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
         let seed_u8: u8 = random();
-        let (addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
+        let (_addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
         let sdk = StoreSDK::new(client.clone(), signer);
         let result = sdk.get_state().await;
         assert!(result.is_ok());
