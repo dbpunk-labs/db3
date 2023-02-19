@@ -1642,6 +1642,13 @@ mod tests {
                 assert!(false);
             }
 
+            // show documents
+            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id, Some(2)) {
+                assert_eq!(2, documents.len());
+            } else {
+                assert!(false);
+            }
+
             // delete document
             let db_mutation = build_delete_document_mutation(
                 db_id.address(),
