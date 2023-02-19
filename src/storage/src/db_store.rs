@@ -823,6 +823,10 @@ impl DbStore {
                 let (ops, _) = Self::add_document(db, sender, tx, mutation, block_id, mutation_id)?;
                 Ok(ops)
             }
+            Some(DatabaseAction::UpdateDocument) => {
+                Self::update_document(db, sender, tx, mutation, block_id, mutation_id)
+            }
+
             Some(DatabaseAction::DeleteDocument) => Self::delete_document(db, sender, mutation),
             None => todo!(),
         }
@@ -885,7 +889,7 @@ mod tests {
             collection_mutations: vec![],
             document_mutations,
             db_address: addr.to_vec(),
-            action: DatabaseAction::CreateDb.into(),
+            action: DatabaseAction::DeleteDocument.into(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
@@ -911,7 +915,7 @@ mod tests {
             collection_mutations: vec![],
             document_mutations,
             db_address: addr.to_vec(),
-            action: DatabaseAction::CreateDb.into(),
+            action: DatabaseAction::AddDocument.into(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
@@ -938,7 +942,7 @@ mod tests {
             collection_mutations: vec![],
             document_mutations,
             db_address: addr.to_vec(),
-            action: DatabaseAction::CreateDb.into(),
+            action: DatabaseAction::UpdateDocument.into(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
