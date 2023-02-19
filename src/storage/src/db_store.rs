@@ -1500,8 +1500,7 @@ mod tests {
             )
         );
 
-        // update document test
-        // update document - name and age related index update
+        // update document, id not exist
         let id_not_exist = DocumentId::zero().to_base64();
         let db_mutation = build_update_document_mutation(
             db_id.address(),
