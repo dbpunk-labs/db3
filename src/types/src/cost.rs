@@ -25,7 +25,7 @@ const C_UPDATE_DOC_GAS_PRICE: u64 = 200; // unit in tai
 const STORAGE_GAS_PRICE: u64 = 1; // per bytes
                                   //
 const C_QUERY_OP_GAS_PRICE: u64 = 100;
-
+#[derive(PartialEq, Eq, Debug)]
 pub enum DbStoreOp {
     DbOp {
         create_db_ops: u64,
