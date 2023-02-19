@@ -473,7 +473,6 @@ mod tests {
         };
         if let Ok(table) = cmd.execute(&mut ctx).await {
             assert_eq!(2, table.len());
-            table.printstd();
             assert!(table
                 .get_row(0)
                 .unwrap()
@@ -501,14 +500,6 @@ mod tests {
         };
         let res = cmd.execute(&mut ctx).await;
         assert!(res.is_ok(), "{:?}", res);
-        // if let Ok(table) = cmd.execute(&mut ctx).await {
-        //     assert_eq!(2, table.len());
-        //     table.printstd();
-        //     assert!(table.get_row(0).unwrap().get_cell(2).unwrap().get_content().contains(r#""age": Int64(44)"#));
-        //     assert!(table.get_row(1).unwrap().get_cell(2).unwrap().get_content().contains(r#""age": Int64(44)"#));
-        // } else {
-        //     assert!(false)
-        // }
 
         // verify document is added
         let cmd = DB3ClientCommand::GetDocument {

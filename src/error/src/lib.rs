@@ -49,6 +49,8 @@ pub enum DB3Error {
     ApplyCommitError(String),
     #[error("fail to apply database with error {0}")]
     ApplyDatabaseError(String),
+    #[error("fail to apply document with error {0}")]
+    ApplyDocumentError(String),
     #[error("fail to get commit with error {0}")]
     GetCommitError(String),
     #[error("fail to query account with error {0}")]
