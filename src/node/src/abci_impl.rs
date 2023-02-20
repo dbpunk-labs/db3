@@ -53,7 +53,7 @@ impl AbciImpl {
             node_store,
             pending_query_session: Arc::new(Mutex::new(Vec::new())),
             pending_databases: Arc::new(Mutex::new(Vec::new())),
-            pending_credits: Arc::new(Mutex::new(Vec::new()))
+            pending_credits: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }

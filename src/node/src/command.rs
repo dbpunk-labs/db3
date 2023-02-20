@@ -116,6 +116,29 @@ pub enum DB3Command {
         #[clap(subcommand)]
         cmd: Option<DB3ClientCommand>,
     },
+
+    /// Run db3 bridge
+    #[clap(name = "bridge")]
+    Bridge {
+        /// the websocket addres of evm chain
+        #[clap(long)]
+        evm_chain_ws: String,
+        /// the evm chain id
+        #[clap(long, default_value = "1")]
+        evm_chain_id: u32,
+        /// the roll contract address
+        #[clap(long)]
+        contract_address: String,
+        /// the db3 storage chain grpc url
+        #[clap(
+            long = "db3_storage_grpc_url",
+            default_value = "http://127.0.0.1:26659"
+        )]
+        db3_storage_grpc_url: String,
+        /// the database path to store all events
+        #[clap(long = "db_path", default_value = "./db")]
+        db_path: String,
+    },
 }
 
 impl DB3Command {

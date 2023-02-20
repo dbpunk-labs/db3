@@ -293,7 +293,7 @@ impl AuthStorage {
                 AccountStore::new_account(db, sender, 10)
             }
         }?;
-        let to_address_ref:&[u8] = mint.to.as_ref();
+        let to_address_ref: &[u8] = mint.to.as_ref();
         let to_address = DB3Address::try_from(to_address_ref)?;
         match AccountStore::get_account(self.db.as_ref(), &to_address)? {
             Some(mut account) => {
