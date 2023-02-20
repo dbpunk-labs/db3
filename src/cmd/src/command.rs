@@ -89,6 +89,24 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         documents: Vec<String>,
     },
+
+    /// Update a document
+    #[clap(name = "update-doc")]
+    UpdateDocument {
+        /// the address of database
+        #[clap(long)]
+        addr: String,
+        /// the name of collection
+        #[clap(long)]
+        collection_name: String,
+        /// the id of document
+        #[clap(long)]
+        ids: Vec<String>,
+        /// the content of document
+        #[clap(long)]
+        documents: Vec<String>,
+    },
+
     #[clap(name = "del-doc")]
     DeleteDocument {
         /// the address of database
@@ -343,6 +361,55 @@ impl DB3ClientCommand {
                     Err(e) => Err(format!("fail to add collection: {:?}", e)),
                 }
             }
+            DB3ClientCommand::NewCollection {
+                addr,
+                name,
+                index_list,
+            } => {
+                //TODO validate the index
+                let index_vec: Vec<Index> = index_list
+                    .iter()
+                    .map(|i| serde_json::from_str::<Index>(i.as_str()).unwrap())
+                    .collect();
+                let collection = CollectionMutation {
+                    index: index_vec.to_owned(),
+                    collection_name: name.to_string(),
+                };
+                //TODO check database id and collection name
+                let db_id = DbId::try_from(addr.as_str()).unwrap();
+                let meta = BroadcastMeta {
+                    //TODO get from network
+                    nonce: Self::current_seconds(),
+                    //TODO use config
+                    chain_id: ChainId::DevNet.into(),
+                    //TODO use config
+                    chain_role: ChainRole::StorageShardChain.into(),
+                };
+                let dm = DatabaseMutation {
+                    meta: Some(meta),
+                    collection_mutations: vec![collection],
+                    db_address: db_id.as_ref().to_vec(),
+                    action: DatabaseAction::AddCollection.into(),
+                    document_mutations: vec![],
+                };
+                match ctx
+                    .mutation_sdk
+                    .as_ref()
+                    .unwrap()
+                    .submit_database_mutation(&dm)
+                    .await
+                {
+                    Ok((_, tx_id)) => {
+                        println!("send add collection done!");
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["tx_id"]);
+                        table.add_row(row![tx_id.to_base64()]);
+                        Ok(table)
+                    }
+                    Err(e) => Err(format!("fail to add collection: {:?}", e)),
+                }
+            }
             DB3ClientCommand::GetDocument { id } => {
                 match ctx
                     .store_sdk
@@ -489,6 +556,57 @@ impl DB3ClientCommand {
                 {
                     Ok((_, tx_id)) => {
                         println!("send add document done");
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["transaction id"]);
+                        table.add_row(row![tx_id.to_base64()]);
+                        Ok(table)
+                    }
+                    Err(e) => Err(format!("fail to add document: {:?}", e)),
+                }
+            }
+            DB3ClientCommand::UpdateDocument {
+                addr,
+                collection_name,
+                documents,
+                ids,
+            } => {
+                //TODO validate the index existing in the document
+                //TODO check database id and collection name
+                let db_id = DbId::try_from(addr.as_str()).unwrap();
+                let meta = BroadcastMeta {
+                    //TODO get from network
+                    nonce: Self::current_seconds(),
+                    //TODO use config
+                    chain_id: ChainId::DevNet.into(),
+                    //TODO use config
+                    chain_role: ChainRole::StorageShardChain.into(),
+                };
+                let bson_documents = documents
+                    .iter()
+                    .map(|x| bson_util::json_str_to_bson_bytes(x.as_str()).unwrap())
+                    .collect();
+                let document_mut = DocumentMutation {
+                    collection_name,
+                    documents: bson_documents,
+                    ids,
+                };
+                let dm = DatabaseMutation {
+                    meta: Some(meta),
+                    action: DatabaseAction::UpdateDocument.into(),
+                    db_address: db_id.as_ref().to_vec(),
+                    document_mutations: vec![document_mut],
+                    collection_mutations: vec![],
+                };
+                match ctx
+                    .mutation_sdk
+                    .as_ref()
+                    .unwrap()
+                    .submit_database_mutation(&dm)
+                    .await
+                {
+                    Ok((_, tx_id)) => {
+                        println!("send update document done");
                         let mut table = Table::new();
                         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
                         table.set_titles(row!["transaction id"]);
