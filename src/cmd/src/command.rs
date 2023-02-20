@@ -26,7 +26,7 @@ use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, Index, StructuredQuery};
 use db3_proto::db3_mutation_proto::{
-    CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMutation,
+    CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMask, DocumentMutation,
 };
 use db3_proto::db3_node_proto::NetworkStatus;
 use db3_sdk::{mutation_sdk::MutationSDK, store_sdk::StoreSDK};
@@ -105,6 +105,9 @@ pub enum DB3ClientCommand {
         /// the content of document
         #[clap(long)]
         documents: Vec<String>,
+        /// the update mask of document
+        #[clap(long)]
+        masks: Vec<String>,
     },
 
     #[clap(name = "del-doc")]
@@ -539,6 +542,7 @@ impl DB3ClientCommand {
                     collection_name,
                     documents: bson_documents,
                     ids: vec![],
+                    masks: vec![],
                 };
                 let dm = DatabaseMutation {
                     meta: Some(meta),
@@ -570,6 +574,7 @@ impl DB3ClientCommand {
                 collection_name,
                 documents,
                 ids,
+                masks,
             } => {
                 //TODO validate the index existing in the document
                 //TODO check database id and collection name
@@ -582,6 +587,12 @@ impl DB3ClientCommand {
                     //TODO use config
                     chain_role: ChainRole::StorageShardChain.into(),
                 };
+                let masks: Vec<DocumentMask> = masks
+                    .iter()
+                    .map(|str| DocumentMask {
+                        fields: str.split(",").map(|m| m.trim().to_string()).collect(),
+                    })
+                    .collect();
                 let bson_documents = documents
                     .iter()
                     .map(|x| bson_util::json_str_to_bson_bytes(x.as_str()).unwrap())
@@ -590,6 +601,7 @@ impl DB3ClientCommand {
                     collection_name,
                     documents: bson_documents,
                     ids,
+                    masks,
                 };
                 let dm = DatabaseMutation {
                     meta: Some(meta),
@@ -637,6 +649,7 @@ impl DB3ClientCommand {
                     collection_name,
                     documents: vec![],
                     ids,
+                    masks: vec![],
                 };
                 let dm = DatabaseMutation {
                     meta: Some(meta),

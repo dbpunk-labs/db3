@@ -11,13 +11,15 @@ use db3_proto::db3_database_proto::structured_query::Filter;
 use db3_proto::db3_database_proto::structured_query::Value;
 use serde_json::Value as JsonValue;
 /// convert json string to Bson::Document
-pub fn json_str_to_bson_document(json_str: &str) -> std::result::Result<Document, String> {
-    let value: JsonValue = serde_json::from_str(json_str).map_err(|e| format!("{}", e))?;
-    let bson_document = bson::to_document(&value).map_err(|e| format!("{}", e))?;
+pub fn json_str_to_bson_document(json_str: &str) -> std::result::Result<Document, DB3Error> {
+    let value: JsonValue =
+        serde_json::from_str(json_str).map_err(|e| DB3Error::InvalidJson(format!("{}", e)))?;
+    let bson_document =
+        bson::to_document(&value).map_err(|e| DB3Error::InvalidDocumentBytes(format!("{}", e)))?;
     Ok(bson_document)
 }
 
-pub fn json_str_to_bson_bytes(json_str: &str) -> std::result::Result<Vec<u8>, String> {
+pub fn json_str_to_bson_bytes(json_str: &str) -> std::result::Result<Vec<u8>, DB3Error> {
     match json_str_to_bson_document(json_str) {
         Ok(doc) => Ok(bson_document_into_bytes(&doc)),
         Err(err) => Err(err),
@@ -25,9 +27,13 @@ pub fn json_str_to_bson_bytes(json_str: &str) -> std::result::Result<Vec<u8>, St
 }
 
 /// convert bytes to Bson::Document
-pub fn bytes_to_bson_document(buf: Vec<u8>) -> std::result::Result<Document, String> {
-    let doc = RawDocumentBuf::from_bytes(buf).map_err(|e| format!("{}", e))?;
-    let bson_document = doc.to_document().map_err(|e| format!("{}", e)).unwrap();
+pub fn bytes_to_bson_document(buf: Vec<u8>) -> std::result::Result<Document, DB3Error> {
+    let doc = RawDocumentBuf::from_bytes(buf)
+        .map_err(|e| DB3Error::InvalidDocumentBytes(format!("{}", e)))?;
+    let bson_document = doc
+        .to_document()
+        .map_err(|e| DB3Error::InvalidDocumentBytes(format!("{}", e)))
+        .unwrap();
     Ok(bson_document)
 }
 
@@ -131,8 +137,8 @@ pub fn filter_from_json_value(json_str: &str) -> std::result::Result<Option<Filt
     if json_str.is_empty() {
         Ok(None)
     } else {
-        let filter_doc =
-            json_str_to_bson_document(json_str).map_err(|e| DB3Error::InvalidFilterValue(e))?;
+        let filter_doc = json_str_to_bson_document(json_str)
+            .map_err(|e| DB3Error::InvalidFilterValue(format!("{:?}", e)))?;
         let field = filter_doc.get_str("field").map_err(|e| {
             DB3Error::InvalidFilterJson("filed is required in filter json".to_string())
         })?;
