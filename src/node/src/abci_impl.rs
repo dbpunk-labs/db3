@@ -20,7 +20,9 @@ shadow!(build);
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
-use db3_proto::db3_mutation_proto::{DatabaseMutation, PayloadType, WriteRequest};
+use db3_proto::db3_mutation_proto::{
+    DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
+};
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use fastcrypto::encoding::{Base64, Encoding};
@@ -42,6 +44,7 @@ pub struct AbciImpl {
     pending_query_session:
         Arc<Mutex<Vec<(AccountAddress, AccountAddress, TxId, QuerySessionInfo)>>>,
     pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
+    pending_credits: Arc<Mutex<Vec<(AccountAddress, MintCreditsMutation, TxId)>>>,
 }
 
 impl AbciImpl {
@@ -50,6 +53,7 @@ impl AbciImpl {
             node_store,
             pending_query_session: Arc::new(Mutex::new(Vec::new())),
             pending_databases: Arc::new(Mutex::new(Vec::new())),
+            pending_credits: Arc::new(Mutex::new(Vec::new()))
         }
     }
 }
@@ -140,6 +144,15 @@ impl Application for AbciImpl {
                             }
                         }
 
+                        Some(PayloadType::MintCreditsPayload) => {
+                            match MintCreditsMutation::decode(request.payload.as_ref()) {
+                                Ok(mint_credits) => {}
+                                Err(e) => {
+                                    warn!("invalid mint credist mutation has been checked for error {}", e);
+                                }
+                            }
+                        }
+
                         Some(PayloadType::QuerySessionPayload) => {
                             match QuerySession::decode(request.payload.as_ref()) {
                                 Ok(query_session) => {
@@ -216,6 +229,31 @@ impl Application for AbciImpl {
             ) {
                 let payload_type = PayloadType::from_i32(wrequest.payload_type);
                 match payload_type {
+                    Some(PayloadType::MintCreditsPayload) => {
+                        if let Ok(mint_credits) =
+                            MintCreditsMutation::decode(wrequest.payload.as_ref())
+                        {
+                            match self.pending_credits.lock() {
+                                Ok(mut s) => {
+                                    s.push((account_id.addr, mint_credits, tx_id));
+                                    return ResponseDeliverTx {
+                                        code: 0,
+                                        data: Bytes::new(),
+                                        log: "".to_string(),
+                                        info: "apply_mint_credits".to_string(),
+                                        gas_wanted: 0,
+                                        gas_used: 0,
+                                        events: vec![Event {
+                                            r#type: "apply".to_string(),
+                                            attributes: vec![],
+                                        }],
+                                        codespace: "".to_string(),
+                                    };
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                     Some(PayloadType::DatabasePayload) => {
                         if let Ok(dr) = DatabaseMutation::decode(wrequest.payload.as_ref()) {
                             match self.pending_databases.lock() {
@@ -317,11 +355,23 @@ impl Application for AbciImpl {
                     todo!();
                 }
             };
+        let pending_mint_credits: Vec<(AccountAddress, MintCreditsMutation, TxId)> =
+            match self.pending_credits.lock() {
+                Ok(mut q) => {
+                    let clone_q = q.drain(..).collect();
+                    clone_q
+                }
+                Err(_) => {
+                    todo!();
+                }
+            };
 
         match self.node_store.lock() {
             Ok(mut store) => {
                 let s = store.get_auth_store();
                 let span = span!(Level::INFO, "commit").entered();
+                let pending_credits_lens = pending_mint_credits.len();
+
                 let pending_query_session_len = pending_query_session.len();
                 for item in pending_query_session {
                     match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
