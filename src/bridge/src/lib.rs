@@ -15,4 +15,4 @@
 // limitations under the License.
 //
 
-mod evm_chain_watcher;
+pub mod evm_chain_watcher;

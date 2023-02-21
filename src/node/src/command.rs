@@ -24,6 +24,7 @@ use crate::storage_node_impl::StorageNodeImpl;
 use actix_cors::Cors;
 use actix_web::{rt, web, App, HttpServer};
 use clap::Parser;
+use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
 use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
@@ -32,8 +33,10 @@ use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use http::Uri;
 use merkdb::Merk;
+use redb::Database;
 use std::boxed::Box;
 use std::io::{stderr, stdout};
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -176,12 +179,32 @@ impl DB3Command {
 
     pub async fn execute(self) {
         match self {
+            DB3Command::Bridge {
+                evm_chain_ws,
+                evm_chain_id,
+                contract_address,
+                db3_storage_grpc_url,
+                db_path,
+            } => {
+                let path = Path::new(&db_path);
+                let db = Arc::new(Database::create(&path).unwrap());
+                let node_list: Vec<String> = vec![evm_chain_ws];
+                let config = EvmChainConfig {
+                    chain_id: evm_chain_id,
+                    node_list,
+                    contract_address: contract_address.to_string(),
+                };
+                let watcher = EvmChainWatcher::new(config, db).await.unwrap();
+                watcher.start().await.unwrap();
+            }
+
             DB3Command::Console { public_grpc_url } => {
                 let ctx = Self::build_context(public_grpc_url.as_ref());
                 db3_cmd::console::start_console(ctx, &mut stdout(), &mut stderr())
                     .await
                     .unwrap();
             }
+
             DB3Command::Client {
                 cmd,
                 public_grpc_url,

@@ -17,7 +17,6 @@
 syntax = "proto3";
 package db3_message_proto;
 
-
 message DepositEvent {
     // the evm chain id
     uint32 chain_id = 1;
@@ -30,7 +29,6 @@ message DepositEvent {
     // the transacion id
     bytes transaction_id = 5;
     // the signature of transacion
-    bytes v = 6;
-    bytes r = 7;
-    bytes s = 8;
+    bytes signature = 6;
+    bytes tx_signed_hash = 7;
 }

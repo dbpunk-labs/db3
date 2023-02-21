@@ -51,7 +51,6 @@ async fn main() -> Result<()> {
             "block: {:?}, tx: {:?}, token: {:?}, event:{:?}",
             log.block_number, log.transaction_hash, log.address, event
         );
-        let transacion = provider_arc.get_transaction(log.transaction_hash).unwrap();
     }
     Ok(())
 }

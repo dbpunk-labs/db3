@@ -146,7 +146,19 @@ impl Application for AbciImpl {
 
                         Some(PayloadType::MintCreditsPayload) => {
                             match MintCreditsMutation::decode(request.payload.as_ref()) {
-                                Ok(mint_credits) => {}
+                                Ok(_) => {
+                                    return ResponseCheckTx {
+                                        code: 0,
+                                        data: Bytes::new(),
+                                        log: "".to_string(),
+                                        info: "".to_string(),
+                                        gas_wanted: 1,
+                                        gas_used: 0,
+                                        events: vec![],
+                                        codespace: "".to_string(),
+                                        ..Default::default()
+                                    };
+                                }
                                 Err(e) => {
                                     warn!("invalid mint credist mutation has been checked for error {}", e);
                                 }
@@ -235,6 +247,7 @@ impl Application for AbciImpl {
                         {
                             match self.pending_credits.lock() {
                                 Ok(mut s) => {
+                                    info!("put mint credits request to queue");
                                     s.push((account_id.addr, mint_credits, tx_id));
                                     return ResponseDeliverTx {
                                         code: 0,
@@ -252,6 +265,8 @@ impl Application for AbciImpl {
                                 }
                                 _ => {}
                             }
+                        } else {
+                            warn!("fail to decode mint credits");
                         }
                     }
                     Some(PayloadType::DatabasePayload) => {
@@ -370,9 +385,24 @@ impl Application for AbciImpl {
             Ok(mut store) => {
                 let s = store.get_auth_store();
                 let span = span!(Level::INFO, "commit").entered();
-                let pending_credits_lens = pending_mint_credits.len();
+                let mut mutation_size: usize = 0;
+                mutation_size += pending_mint_credits.len();
+                for item in pending_mint_credits {
+                    let nonce: u64 = match &item.1.meta {
+                        Some(m) => m.nonce,
+                        //TODO will not go to here
+                        None => 1,
+                    };
+                    match s.apply_mint_credits(&item.0, nonce, &item.2, &item.1) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!("fail to apply mint credits  for {}", e);
+                            todo!();
+                        }
+                    }
+                }
 
-                let pending_query_session_len = pending_query_session.len();
+                mutation_size += pending_query_session.len();
                 for item in pending_query_session {
                     match s.apply_query_session(&item.0, &item.1, &item.2, &item.3) {
                         Ok(_) => {}
@@ -382,7 +412,7 @@ impl Application for AbciImpl {
                         }
                     }
                 }
-                let pending_databases_len = pending_databases.len();
+                mutation_size += pending_databases.len();
                 for item in pending_databases {
                     let nonce: u64 = match &item.1.meta {
                         Some(m) => m.nonce,
@@ -398,7 +428,7 @@ impl Application for AbciImpl {
                     }
                 }
                 span.exit();
-                if pending_query_session_len > 0 || pending_databases_len > 0 {
+                if mutation_size > 0 {
                     //TODO how to revert
                     if let Ok(hash) = s.commit() {
                         ResponseCommit {

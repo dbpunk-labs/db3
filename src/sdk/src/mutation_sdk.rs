@@ -21,7 +21,9 @@ use db3_crypto::{
     id::{DbId, TxId, TX_ID_LENGTH},
 };
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_proto::{DatabaseMutation, PayloadType, WriteRequest};
+use db3_proto::db3_mutation_proto::{
+    DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
+};
 use db3_proto::db3_node_proto::{storage_node_client::StorageNodeClient, BroadcastRequest};
 use prost::Message;
 use std::sync::Arc;
@@ -37,6 +39,50 @@ impl MutationSDK {
         signer: Db3MultiSchemeSigner,
     ) -> Self {
         Self { client, signer }
+    }
+
+    pub async fn submit_mint_credit_mutation(
+        &self,
+        mutation: &MintCreditsMutation,
+    ) -> Result<TxId> {
+        let _nonce: u64 = match &mutation.meta {
+            Some(m) => Ok(m.nonce),
+            None => Err(DB3Error::SubmitMutationError(
+                "meta in mutation is none".to_string(),
+            )),
+        }?;
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        mutation
+            .encode(&mut mbuf)
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{e}")))?;
+        let mbuf = mbuf.freeze();
+        let signature = self.signer.sign(mbuf.as_ref())?;
+        let request = WriteRequest {
+            signature: signature.as_ref().to_vec().to_owned(),
+            payload: mbuf.as_ref().to_vec().to_owned(),
+            payload_type: PayloadType::MintCreditsPayload.into(),
+        };
+        let mut buf = BytesMut::with_capacity(1024 * 4);
+        request
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{e}")))?;
+        let buf = buf.freeze();
+        let r = BroadcastRequest {
+            body: buf.as_ref().to_vec(),
+        };
+        let request = tonic::Request::new(r);
+        let mut client = self.client.as_ref().clone();
+        let response = client
+            .broadcast(request)
+            .await
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{e}")))?
+            .into_inner();
+        let hash: [u8; TX_ID_LENGTH] = response
+            .hash
+            .try_into()
+            .map_err(|_| DB3Error::InvalidAddress)?;
+        let tx_id = TxId::from(hash);
+        Ok(tx_id)
     }
 
     pub async fn submit_database_mutation(
@@ -102,6 +148,26 @@ mod tests {
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
+
+    #[tokio::test]
+    async fn it_mint_credits_mutation_smoke_test() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let (to_address, _signer) = sdk_test::gen_ed25519_signer(127);
+        let (sender_address, signer) = sdk_test::gen_secp256k1_signer();
+        let sdk = MutationSDK::new(client.clone(), signer);
+        let dm = sdk_test::create_a_mint_mutation(&sender_address, &to_address);
+        let result = sdk.submit_mint_credit_mutation(&dm).await;
+        assert!(result.is_ok());
+        let millis = time::Duration::from_millis(2000);
+        thread::sleep(millis);
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
+        let store_sdk = StoreSDK::new(client, signer);
+        let account = store_sdk.get_account(&to_address).await.unwrap();
+        assert_eq!(account.credits, 9 * 1000_000_000);
+    }
 
     #[tokio::test]
     async fn it_database_mutation_smoke_test() {
