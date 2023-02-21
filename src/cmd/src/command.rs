@@ -146,7 +146,11 @@ pub enum DB3ClientCommand {
         limit: i32,
     },
     #[clap(name = "show-account")]
-    ShowAccount {},
+    ShowAccount {
+        /// the address of account
+        #[clap(long, default_value = "")]
+        addr: String,
+    },
     #[clap(name = "show-state")]
     ShowState {},
 }
@@ -300,18 +304,35 @@ impl DB3ClientCommand {
                     Err(_) => Err("fail to get account".to_string()),
                 }
             }
-            DB3ClientCommand::ShowAccount {} => match KeyStore::recover_keypair() {
-                Ok(ks) => {
-                    let addr = ks.get_address().unwrap();
-                    match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
-                        Ok(account) => Self::show_account(&account, &addr),
+            DB3ClientCommand::ShowAccount { addr } => {
+                if addr.is_empty() {
+                    match KeyStore::recover_keypair() {
+                        Ok(ks) => {
+                            let addr = ks.get_address().unwrap();
+                            match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
+                                Ok(account) => Self::show_account(&account, &addr),
+                                Err(_) => Err("fail to get account".to_string()),
+                            }
+                        }
+                        Err(_) => Err(
+                            "no key was found, you can use init command to create a new one"
+                                .to_string(),
+                        ),
+                    }
+                } else {
+                    let account_addr = DB3Address::try_from(addr.as_str()).unwrap();
+                    match ctx
+                        .store_sdk
+                        .as_ref()
+                        .unwrap()
+                        .get_account(&account_addr)
+                        .await
+                    {
+                        Ok(account) => Self::show_account(&account, &account_addr),
                         Err(_) => Err("fail to get account".to_string()),
                     }
                 }
-                Err(_) => Err(
-                    "no key was found, you can use init command to create a new one".to_string(),
-                ),
-            },
+            }
             DB3ClientCommand::NewCollection {
                 addr,
                 name,

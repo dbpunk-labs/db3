@@ -2,5 +2,5 @@
 #
 # deploy_to_scoll.sh
 
-export PRIVATE_KEY=57c9180841f22d653004f548fbb85af55580cce0b360044723cc3c9d308bbea8
+export PRIVATE_KEY=0xad689d9b7751da07b0fb39c5091672cbfe50f59131db015f8a0e76c9790a6fcc
 npx hardhat run --network ganache scripts/deploy.ts

@@ -25,12 +25,14 @@ use actix_cors::Cors;
 use actix_web::{rt, web, App, HttpServer};
 use clap::Parser;
 use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
+use db3_bridge::storage_chain_minter::StorageChainMinter;
 use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
+use db3_storage::event_store::EventStore;
 use http::Uri;
 use merkdb::Merk;
 use redb::Database;
@@ -141,6 +143,11 @@ pub enum DB3Command {
         /// the database path to store all events
         #[clap(long = "db_path", default_value = "./db")]
         db_path: String,
+        #[clap(short, long)]
+        verbose: bool,
+        /// Suppress all output logging (overrides --verbose).
+        #[clap(short, long)]
+        quiet: bool,
     },
 }
 
@@ -185,17 +192,60 @@ impl DB3Command {
                 contract_address,
                 db3_storage_grpc_url,
                 db_path,
+                verbose,
+                quiet,
             } => {
+                let log_level = if quiet {
+                    LevelFilter::OFF
+                } else if verbose {
+                    LevelFilter::DEBUG
+                } else {
+                    LevelFilter::INFO
+                };
+                tracing_subscriber::fmt().with_max_level(log_level).init();
+                info!("{ABOUT}");
+
+                let (sender, receiver) = std::sync::mpsc::sync_channel::<(u32, u64)>(1024);
                 let path = Path::new(&db_path);
                 let db = Arc::new(Database::create(&path).unwrap());
+                {
+                    let write_txn = db.begin_write().unwrap();
+                    EventStore::init_table(write_txn).unwrap();
+                }
+
                 let node_list: Vec<String> = vec![evm_chain_ws];
                 let config = EvmChainConfig {
                     chain_id: evm_chain_id,
                     node_list,
                     contract_address: contract_address.to_string(),
                 };
-                let watcher = EvmChainWatcher::new(config, db).await.unwrap();
-                watcher.start().await.unwrap();
+
+                let watcher = EvmChainWatcher::new(config, db.clone()).await.unwrap();
+                let watcher_handler = thread::spawn(move || {
+                    rt::System::new()
+                        .block_on(async { watcher.start(sender).await })
+                        .unwrap();
+                });
+                let ctx = Self::build_context(db3_storage_grpc_url.as_ref());
+                let sdk = ctx.mutation_sdk.unwrap();
+                let minter = StorageChainMinter::new(db, sdk);
+                minter.start(receiver).await.unwrap();
+                let running = Arc::new(AtomicBool::new(true));
+                let r = running.clone();
+                ctrlc::set_handler(move || {
+                    r.store(false, Ordering::SeqCst);
+                })
+                .expect("Error setting Ctrl-C handler");
+                loop {
+                    if running.load(Ordering::SeqCst) {
+                        let ten_millis = Duration::from_millis(10);
+                        thread::sleep(ten_millis);
+                    } else {
+                        info!("stop db3 bridge ...");
+                        watcher_handler.join().unwrap();
+                        break;
+                    }
+                }
             }
 
             DB3Command::Console { public_grpc_url } => {

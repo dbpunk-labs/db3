@@ -32,6 +32,7 @@ use ethers::{
 use redb::Database;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use tracing::{info, warn};
 abigen!(
@@ -69,7 +70,12 @@ impl EvmChainWatcher {
         })
     }
 
-    fn process_event(&self, log: &Log, t: &Transaction) -> Result<()> {
+    fn process_event(
+        &self,
+        log: &Log,
+        t: &Transaction,
+        sender: &SyncSender<(u32, u64)>,
+    ) -> Result<()> {
         let row_log = RawLog {
             topics: log.topics.clone(),
             data: log.data.to_vec(),
@@ -111,9 +117,12 @@ impl EvmChainWatcher {
             .begin_write()
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         match EventStore::store_deposit_event(tx, &deposit_event) {
-            Ok(_) => info!("store event for block number {:?} transacion {:?} sender address {:?} amount {:?} done",
+            Ok(_) => {
+                info!("store event for block number {:?} transacion {:?} sender address {:?} amount {:?} done",
                   log.block_number, log.transaction_hash, log.address, event.amount.as_u64()
-                  ),
+                  );
+                sender.send((self.config.chain_id, log.block_number.unwrap().as_u64())).map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            }
             Err(e) => warn!("store event for block number {:?} transacion {:?} sender address {:?} amount {:?} with error {e}",
                   log.block_number, log.transaction_hash, log.address, event.amount.as_u64()
                   ),
@@ -121,7 +130,8 @@ impl EvmChainWatcher {
         Ok(())
     }
 
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(&self, sender: SyncSender<(u32, u64)>) -> Result<()> {
+        info!("watcher is started");
         self.running
             .store(true, std::sync::atomic::Ordering::Relaxed);
         let address = self
@@ -147,27 +157,21 @@ impl EvmChainWatcher {
         // check the transaction whether it has been processed by the bridge
         //
         while let Some(log) = stream.next().await {
-            let row_log = RawLog {
-                topics: log.topics.clone(),
-                data: log.data.to_vec(),
-            };
-            let event = DepositFilter::decode_log(&row_log)
-                .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
             let transacion = self
                 .provider
                 .clone()
                 .get_transaction(log.transaction_hash.unwrap())
                 .await
                 .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-
             if let Some(t) = transacion {
-                self.process_event(&log, &t)?;
+                self.process_event(&log, &t, &sender)?;
             } else {
                 return Err(DB3Error::StoreEventError(
                     "fail to get transaction".to_string(),
                 ));
             }
         }
+        warn!("watcher is exited");
         Ok(())
     }
 }

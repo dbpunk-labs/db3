@@ -16,3 +16,4 @@
 //
 
 pub mod evm_chain_watcher;
+pub mod storage_chain_minter;
