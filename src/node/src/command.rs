@@ -438,6 +438,10 @@ mod tests {
         std::thread::sleep(time::Duration::from_millis(2000));
 
         // run show document limit 2
+        // r#"{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#
+        // r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
+        // r#"{"name": "Bill","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
+        // r#"{"name": "Bill","age": 45,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
         let mut doc_id1 = String::new();
         let mut doc_id2 = String::new();
         let mut doc_id3 = String::new();
@@ -501,6 +505,53 @@ mod tests {
         let res = cmd.execute(&mut ctx).await;
         assert!(res.is_ok(), "{:?}", res);
 
+        // r#"{"name": "Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#
+        // r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
+        // r#"{"name": "Jack","age": 44,"phones": ["+1234567","+2345678"]}"#.to_string(),
+        // r#"{"name": "Bill","age": 46,"phones": ["+1234567","+2345678"]}"#.to_string(),
+        // update documents
+        let cmd = DB3ClientCommand::UpdateDocument {
+            addr: addr.clone(),
+            collection_name: collection_books.to_string(),
+            ids: vec![doc_id3.clone(), doc_id4.clone()],
+            documents: vec![
+                r#"{"name": "Jack"}"#.to_string(),
+                r#"{"age": 46}"#.to_string(),
+            ],
+            masks: vec![
+                r#"name, age"#.to_string(),   // update name ,remove age, keep phones
+                r#"age, phones"#.to_string(), // keep name, update age, remove phones
+            ],
+        };
+        assert!(cmd.execute(&mut ctx).await.is_ok());
+        std::thread::sleep(time::Duration::from_millis(2000));
+
+        let cmd = DB3ClientCommand::GetDocument {
+            id: doc_id3.clone(),
+        };
+
+        let table = cmd.execute(&mut ctx).await.unwrap();
+        table.printstd();
+        assert!(table
+            .get_row(0)
+            .unwrap()
+            .get_cell(2)
+            .unwrap()
+            .get_content()
+            .contains(r#""name": String("Jack"), "phones": Array([String("+44 1234567"), String("+44 2345678")])"#));
+        let cmd = DB3ClientCommand::GetDocument {
+            id: doc_id4.clone(),
+        };
+
+        let table = cmd.execute(&mut ctx).await.unwrap();
+        table.printstd();
+        assert!(table
+            .get_row(0)
+            .unwrap()
+            .get_cell(2)
+            .unwrap()
+            .get_content()
+            .contains(r#"{"name": String("Bill"), "age": Int64(46)}"#));
         // verify document is added
         let cmd = DB3ClientCommand::GetDocument {
             id: doc_id2.to_string(),
@@ -535,44 +586,5 @@ mod tests {
         };
         let res = cmd.execute(&mut ctx).await;
         assert!(res.is_err(), "{:?}", res.unwrap());
-
-        // update documents
-        let cmd = DB3ClientCommand::UpdateDocument {
-            addr: addr.clone(),
-            collection_name: collection_books.to_string(),
-            ids: vec![doc_id3.clone(), doc_id4.clone()],
-            documents: vec![
-                r#"{"name": "Jack","age": 44,"phones": ["+1234567","+2345678"]}"#.to_string(),
-                r#"{"name": "Bill","age": 46,"phones": ["+1234567","+2345678"]}"#.to_string(),
-            ],
-        };
-        assert!(cmd.execute(&mut ctx).await.is_ok());
-        std::thread::sleep(time::Duration::from_millis(2000));
-
-        let cmd = DB3ClientCommand::GetDocument {
-            id: doc_id3.clone(),
-        };
-
-        let table = cmd.execute(&mut ctx).await.unwrap();
-        assert!(table
-            .get_row(0)
-            .unwrap()
-            .get_cell(2)
-            .unwrap()
-            .get_content()
-            .contains(r#""name": String("Jack")"#));
-
-        let cmd = DB3ClientCommand::GetDocument {
-            id: doc_id4.clone(),
-        };
-
-        let table = cmd.execute(&mut ctx).await.unwrap();
-        assert!(table
-            .get_row(0)
-            .unwrap()
-            .get_cell(2)
-            .unwrap()
-            .get_content()
-            .contains(r#""age": Int64(46)"#));
     }
 }

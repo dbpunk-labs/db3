@@ -110,6 +110,7 @@ pub fn add_documents(name: &str, addr: &DB3Address, doc_vec: &Vec<&str>) -> Data
         collection_name: name.to_string(),
         documents,
         ids: vec![],
+        masks: vec![],
     };
     let dm = DatabaseMutation {
         meta: Some(meta),

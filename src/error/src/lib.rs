@@ -105,6 +105,8 @@ pub enum DB3Error {
     IndexNotFoundForFiledFilter(String),
     #[error("invalid filter json string {0}")]
     InvalidFilterJson(String),
+    #[error("invalid json string {0}")]
+    InvalidJson(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
