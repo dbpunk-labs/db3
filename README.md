@@ -179,7 +179,7 @@ const db = initializeDB3('http://127.0.0.1:26659', dbId, wallet)
 #### Create a collection
 
 ```typescript
-// add a index to collection
+// add an index to collection
 const indexList: Index[] = [
             {
                 name: 'idx1',
