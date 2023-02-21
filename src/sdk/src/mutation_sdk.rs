@@ -114,7 +114,7 @@ mod tests {
         let dm = sdk_test::create_a_database_mutation();
         let result = sdk.submit_database_mutation(&dm).await;
         assert!(result.is_ok());
-        let (db_id, tx_id) = result.unwrap();
+        let (db_id, _) = result.unwrap();
         let millis = time::Duration::from_millis(2000);
         thread::sleep(millis);
         let (_, signer) = sdk_test::gen_secp256k1_signer();

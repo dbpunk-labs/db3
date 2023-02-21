@@ -261,6 +261,18 @@ impl DocumentId {
         bytes.extend(document_entry_id.as_ref());
         Self::try_from_bytes(bytes.as_slice())
     }
+    #[inline]
+    pub fn zero() -> Self {
+        Self {
+            data: [0; DOCUMENT_ID_LENGTH],
+        }
+    }
+    #[inline]
+    pub fn one() -> Self {
+        Self {
+            data: [1; DOCUMENT_ID_LENGTH],
+        }
+    }
 
     /// collection id = document_id[OP_ENTRY_ID_LENGTH..]
     pub fn get_collection_id(&self) -> std::result::Result<CollectionId, DB3Error> {
@@ -310,6 +322,9 @@ pub struct IndexId {
 }
 
 impl IndexId {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
+    }
     pub fn create(
         collection_id: &CollectionId,
         index_field_id: u32,
@@ -343,13 +358,8 @@ impl IndexId {
     }
 
     pub fn get_key(&self) -> std::result::Result<&str, DB3Error> {
-        match std::str::from_utf8(
-            &self.data[TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH + INDEX_FIELD_ID_LENGTH
-                ..self.data.len() - DOCUMENT_ID_LENGTH],
-        ) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(DB3Error::InvalidIndexIdBytes(format!("{:?}", e))),
-        }
+        // TODO: format get key
+        todo!()
     }
 }
 impl AsRef<Vec<u8>> for IndexId {
@@ -362,13 +372,12 @@ impl fmt::Display for IndexId {
         // Customize so only `x` and `y` are denoted.
         let collection_id = self.get_collection_id().map_err(|e| e).unwrap();
         let document_id = self.get_document_id().map_err(|e| e).unwrap();
-        let key = self.get_key().map_err(|e| e).unwrap();
         write!(
             f,
             "INDEX|{}|{}|{}|{}",
             collection_id,
             self.get_index_field_id(),
-            key,
+            "KEY_HIDE",
             document_id
         )
     }
@@ -525,9 +534,8 @@ mod tests {
         assert_eq!(collection_id, index_id.get_collection_id().unwrap());
         assert_eq!(document_id, index_id.get_document_id().unwrap());
         assert_eq!(3, index_id.get_index_field_id());
-        assert_eq!("key_content", index_id.get_key().unwrap());
         assert_eq!(
-            "INDEX|1000-100-10|3|key_content|DOC|1000-100-10|999-99-9",
+            "INDEX|1000-100-10|3|KEY_HIDE|DOC|1000-100-10|999-99-9",
             index_id.to_string()
         );
     }

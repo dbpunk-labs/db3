@@ -49,6 +49,8 @@ pub enum DB3Error {
     ApplyCommitError(String),
     #[error("fail to apply database with error {0}")]
     ApplyDatabaseError(String),
+    #[error("fail to apply document with error {0}")]
+    ApplyDocumentError(String),
     #[error("fail to get commit with error {0}")]
     GetCommitError(String),
     #[error("fail to query account with error {0}")]
@@ -95,6 +97,16 @@ pub enum DB3Error {
     DocumentModifiedPermissionError,
     #[error("fail to store event for {0}")]
     StoreEventError(String),
+    #[error("invalid filter value {0}")]
+    InvalidFilterValue(String),
+    #[error("invalid filter op {0}")]
+    InvalidFilterOp(String),
+    #[error("invalid filter type {0}")]
+    InvalidFilterType(String),
+    #[error("index not found for filed filter {0}")]
+    IndexNotFoundForFiledFilter(String),
+    #[error("invalid filter json string {0}")]
+    InvalidFilterJson(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

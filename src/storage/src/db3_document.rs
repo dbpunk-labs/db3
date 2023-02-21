@@ -125,7 +125,7 @@ impl DB3Document {
 
     fn get_single_key(&self, key: &str) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
         match self.get_document()?.get(key) {
-            Some(value) => bson_util::bson_into_comparison_bytes(value),
+            Some(value) => Ok(Some(bson_util::bson_into_comparison_bytes(value)?)),
             None => Ok(None),
         }
     }

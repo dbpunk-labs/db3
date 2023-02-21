@@ -24,13 +24,20 @@ use db3_crypto::{
     id::IndexId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_proto::{Collection, Database, Document};
+use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
+use db3_proto::db3_database_proto::structured_query::filter::FilterType;
+use db3_proto::db3_database_proto::structured_query::value::ValueType;
+use db3_proto::db3_database_proto::structured_query::{
+    FieldFilter, Filter, Limit, Projection, Value,
+};
+use db3_proto::db3_database_proto::{Collection, Database, Document, Index, StructuredQuery};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
+use itertools::Itertools;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{BatchEntry, Merk, Op};
 use prost::Message;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -312,7 +319,7 @@ impl DbStore {
                 return Err(DB3Error::ApplyDatabaseError(format!(
                     "database not found with addr {}",
                     db_id.to_hex()
-                )))
+                )));
             }
         }
         let del_doc_ops: u64 = entries.len() as u64;
@@ -345,7 +352,7 @@ impl DbStore {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;
         let database = Self::get_database(db.as_ref(), &db_id)?;
-        let span = span!(Level::INFO, "database").entered();
+        let span = span!(Level::INFO, "document").entered();
         let mut add_doc_ops: u64 = 0;
         let mut data_in_bytes: u64 = 0;
         match database {
@@ -357,8 +364,7 @@ impl DbStore {
                     if let Some(collection) = cid_index_map.get(&document_mutation.collection_name)
                     {
                         let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())
-                            .map_err(|e| DB3Error::InvalidCollectionIdBytes(format!("{:?}", e)))
-                            .unwrap();
+                            .map_err(|e| DB3Error::InvalidCollectionIdBytes(format!("{:?}", e)))?;
                         for document in document_mutation.documents.iter() {
                             // generate document entry id
                             let document_entry_id = DocumentEntryId::create(
@@ -366,14 +372,13 @@ impl DbStore {
                                 mutation_id,
                                 entries.len() as u16,
                             )
-                            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
-                            .unwrap();
+                            .map_err(|e| DB3Error::ApplyDocumentError(format!("{:?}", e)))?;
 
                             // generate document id
                             let document_id =
-                                DocumentId::create(&collection_id, &document_entry_id)
-                                    .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
-                                    .unwrap();
+                                DocumentId::create(&collection_id, &document_entry_id).map_err(
+                                    |e| DB3Error::ApplyDocumentError(format!("{:?}", e)),
+                                )?;
 
                             // construct db3 document with tx_id and owner addr
                             let db3_document = DB3Document::create_from_document_bytes(
@@ -382,8 +387,7 @@ impl DbStore {
                                 &tx,
                                 &sender,
                             )
-                            .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))
-                            .unwrap();
+                            .map_err(|e| DB3Error::ApplyDocumentError(format!("{:?}", e)))?;
                             let document_vec = db3_document.into_bytes().to_vec();
                             add_doc_ops += 1;
                             data_in_bytes += document_vec.len() as u64;
@@ -420,7 +424,7 @@ impl DbStore {
                     entries.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(&b_key));
                     Pin::get_unchecked_mut(db)
                         .apply(&entries, &[])
-                        .map_err(|e| DB3Error::ApplyDatabaseError(format!("{:?}", e)))?;
+                        .map_err(|e| DB3Error::ApplyDocumentError(format!("{:?}", e)))?;
                 }
                 span.exit();
                 let ops = DbStoreOp::DocOp {
@@ -433,11 +437,292 @@ impl DbStore {
             }
             None => {
                 span.exit();
-                return Err(DB3Error::ApplyDatabaseError(format!(
+                return Err(DB3Error::ApplyDocumentError(format!(
                     "database not found with addr {}",
                     db_id.to_hex()
                 )));
             }
+        }
+    }
+
+    //
+    // update document
+    //
+    fn update_document(
+        db: Pin<&mut Merk>,
+        sender: &DB3Address,
+        tx: &TxId,
+        mutation: &DatabaseMutation,
+        block_id: u64,
+        mutation_id: u16,
+    ) -> Result<DbStoreOp> {
+        let addr_ref: &[u8] = mutation.db_address.as_ref();
+        let db_id = DbId::try_from(addr_ref)?;
+        let database = Self::get_database(db.as_ref(), &db_id)?;
+        let span = span!(Level::INFO, "document").entered();
+        let mut data_in_bytes: u64 = 0;
+        match database {
+            Some(d) => {
+                let mut entries: Vec<BatchEntry> = Vec::new();
+                let cid_index_map: &HashMap<String, _> = &d.collections;
+                for document_mutation in &mutation.document_mutations {
+                    if let Some(collection) = cid_index_map.get(&document_mutation.collection_name)
+                    {
+                        let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())
+                            .map_err(|e| DB3Error::InvalidCollectionIdBytes(format!("{:?}", e)))?;
+
+                        let field_index_map = Self::collect_field_index_map(collection);
+                        for idx in 0..document_mutation.documents.len() {
+                            let document_id =
+                                DocumentId::try_from_base64(document_mutation.ids[idx].as_str())?;
+                            let old_document = if let Some(v) = db
+                                .get(document_id.as_ref())
+                                .map_err(|e| DB3Error::QueryDocumentError(format!("{e}")))?
+                            {
+                                DB3Document::try_from(v.clone())?
+                            } else {
+                                return Err(DB3Error::DocumentNotExist(
+                                    document_mutation.ids[idx].to_string(),
+                                ));
+                            };
+
+                            if sender != &old_document.get_owner()? {
+                                return Err(DB3Error::DocumentModifiedPermissionError);
+                            }
+                            // construct new db3 document with new tx_id and new document
+                            let new_document = DB3Document::create_from_document_bytes(
+                                document_mutation.documents[idx].clone(),
+                                &document_id,
+                                &tx,
+                                &sender,
+                            )?;
+
+                            let old_doc = old_document.get_document()?;
+                            let new_doc = new_document.get_document()?;
+
+                            // collection modified index set
+                            let mut updated_index_set: HashMap<String, &Index> = HashMap::new();
+                            for (field, index_vec) in field_index_map.iter() {
+                                if old_doc.get(field) == new_doc.get(field) {
+                                    continue;
+                                }
+                                index_vec.iter().for_each(|index| {
+                                    updated_index_set.insert(index.name.to_string(), *index);
+                                });
+                            }
+
+                            // update index filed related index
+                            for (_, index) in updated_index_set.iter() {
+                                // step 1. remove old index entry
+                                if let Some(old_key) = old_document.get_keys(index)? {
+                                    let index_id = IndexId::create(
+                                        &collection_id,
+                                        index.id,
+                                        &old_key,
+                                        &document_id,
+                                    )?;
+                                    // remove old index entry
+                                    info!("update doc: delete index id {}", index_id);
+                                    entries.push((index_id.as_ref().to_vec(), Op::Delete));
+                                } else {
+                                    info!("update doc: skip delete index");
+                                }
+
+                                // step 2. add new index entry
+                                if let Some(new_key) = new_document.get_keys(index)? {
+                                    let index_id = IndexId::create(
+                                        &collection_id,
+                                        index.id,
+                                        &new_key,
+                                        &document_id,
+                                    )?;
+                                    // add new index entry
+                                    info!("update doc: add index id {}", index_id);
+                                    entries.push((index_id.as_ref().to_vec(), Op::Put(vec![])));
+                                } else {
+                                    info!("update doc: skip add index");
+                                }
+                            }
+
+                            let document_vec = new_document.into_bytes().to_vec();
+                            data_in_bytes += document_vec.len() as u64;
+                            info!("update doc: put document id {}", document_id.to_string());
+                            entries.push((document_id.as_ref().to_vec(), Op::Put(document_vec)));
+                        }
+                    }
+                }
+                let update_doc_ops: u64 = entries.len() as u64;
+                unsafe {
+                    entries.sort_by(|(a_key, _), (b_key, _)| a_key.cmp(&b_key));
+                    Pin::get_unchecked_mut(db)
+                        .apply(&entries, &[])
+                        .map_err(|e| DB3Error::ApplyDocumentError(format!("{:?}", e)))?;
+                }
+                span.exit();
+                let ops = DbStoreOp::DocOp {
+                    add_doc_ops: 0,
+                    del_doc_ops: 0,
+                    update_doc_ops,
+                    data_in_bytes,
+                };
+                return Ok(ops);
+            }
+            None => {
+                span.exit();
+                return Err(DB3Error::ApplyDocumentError(format!(
+                    "database not found with addr {}",
+                    db_id.to_hex()
+                )));
+            }
+        }
+    }
+
+    fn collect_field_index_map(collection: &Collection) -> HashMap<String, Vec<&Index>> {
+        let mut field_index_map: HashMap<String, Vec<_>> = HashMap::new();
+
+        for index in collection.index_list.iter() {
+            for field in index.fields.iter() {
+                if let Some(list) = field_index_map.get_mut(&field.field_path) {
+                    list.push(index);
+                } else {
+                    field_index_map.insert(field.field_path.to_string(), vec![index]);
+                }
+            }
+        }
+        field_index_map
+    }
+    /// run a query to fetch target documents from given database and collection
+    pub fn run_query(
+        db: Pin<&Merk>,
+        db_id: &DbId,
+        query: &StructuredQuery,
+    ) -> Result<Vec<Document>> {
+        debug!("run_query : {:?}", query);
+        match Self::get_database(db, db_id) {
+            Ok(Some(database)) => {
+                if let Some(collection) = database.collections.get(&query.collection_name) {
+                    let limit = match &query.limit {
+                        Some(v) => Some(v.limit),
+                        None => None,
+                    };
+                    let field_index_map = Self::collect_field_index_map(collection);
+                    let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())?;
+                    if let Some(where_filter) = &query.r#where {
+                        match &where_filter.filter_type {
+                            Some(FilterType::FieldFilter(field_filter)) => {
+                                let index = match field_index_map.get(&field_filter.field) {
+                                    Some(index_list) => {
+                                        match index_list
+                                            .iter()
+                                            .find_or_first(|i| i.fields.len() == 1)
+                                        {
+                                            Some(index_match) => index_match,
+                                            None => {
+                                                return Err(DB3Error::IndexNotFoundForFiledFilter(
+                                                    field_filter.field.to_string(),
+                                                ));
+                                            }
+                                        }
+                                    }
+                                    None => {
+                                        return Err(DB3Error::IndexNotFoundForFiledFilter(
+                                            field_filter.field.to_string(),
+                                        ));
+                                    }
+                                };
+
+                                let keys = match &field_filter.value {
+                                    Some(value) => bson_util::bson_into_comparison_bytes(
+                                        &bson_util::bson_value_from_proto_value(value)?,
+                                    )?,
+                                    None => {
+                                        return Err(DB3Error::InvalidFilterValue(
+                                            "None field filter value un-support".to_string(),
+                                        ));
+                                    }
+                                };
+                                let range = match Operator::from_i32(field_filter.op) {
+                                    Some(Operator::Equal) => {
+                                        let start_key = IndexId::create(
+                                            &collection_id,
+                                            index.id,
+                                            keys.as_slice(),
+                                            &DocumentId::zero(),
+                                        )?;
+
+                                        let end_key = IndexId::create(
+                                            &collection_id,
+                                            index.id,
+                                            keys.as_slice(),
+                                            &DocumentId::one(),
+                                        )?;
+                                        std::ops::Range {
+                                            start: start_key.as_ref().to_vec(),
+                                            end: end_key.as_ref().to_vec(),
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(DB3Error::InvalidFilterType(format!(
+                                            "Filed Filter Op {:?} un-support",
+                                            &field_filter.op
+                                        )));
+                                    }
+                                };
+
+                                let mut query = Query::new();
+                                query.insert_range(range);
+                                let ops = db
+                                    .execute_query(query)
+                                    .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
+
+                                let mut values: Vec<_> = Vec::new();
+                                let mut idx = 0;
+                                for op in ops.iter() {
+                                    match op {
+                                        ProofOp::Push(Node::KV(k, _)) => {
+                                            let index_id = IndexId::new(k.clone());
+                                            let document_id = index_id.get_document_id()?;
+                                            if let Ok(Some(document)) =
+                                                Self::get_document(db, &document_id)
+                                            {
+                                                if limit.is_some() && idx >= limit.unwrap() {
+                                                    break;
+                                                }
+                                                idx += 1;
+                                                values.push(document)
+                                            } else {
+                                                warn!(
+                                                    "document not exist with target id {}",
+                                                    document_id
+                                                );
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                Ok(values)
+                            }
+                            None => {
+                                return Err(DB3Error::InvalidFilterType(
+                                    "None filter type unsupport".to_string(),
+                                ));
+                            }
+                        }
+                    } else {
+                        Self::get_documents(db, &collection_id, limit)
+                    }
+                } else {
+                    Err(DB3Error::QueryDocumentError(format!(
+                        "collection not exist with target name {}",
+                        query.collection_name
+                    )))
+                }
+            }
+            Ok(None) => Err(DB3Error::QueryDocumentError(format!(
+                "database not exist with target id {}",
+                db_id.to_hex()
+            ))),
+            Err(e) => Err(e),
         }
     }
     //
@@ -467,7 +752,11 @@ impl DbStore {
     //
     // get documents
     //
-    pub fn get_documents(db: Pin<&Merk>, collection_id: &CollectionId) -> Result<Vec<Document>> {
+    pub fn get_documents(
+        db: Pin<&Merk>,
+        collection_id: &CollectionId,
+        limit: Option<i32>,
+    ) -> Result<Vec<Document>> {
         //TODO use reference
         let start_key = DocumentId::create(collection_id, &DocumentEntryId::zero())
             .unwrap()
@@ -487,6 +776,7 @@ impl DbStore {
             .execute_query(query)
             .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
         let mut values: Vec<_> = Vec::new();
+        let mut idx = 0;
         for op in ops.iter() {
             match op {
                 ProofOp::Push(Node::KV(k, v)) => {
@@ -494,6 +784,11 @@ impl DbStore {
                     let doc = bson_util::bson_document_into_bytes(db3_doc.get_document()?);
                     let owner = db3_doc.get_owner()?.to_vec();
                     let tx_id = db3_doc.get_tx_id()?.as_ref().to_vec();
+
+                    if limit.is_some() && idx >= limit.unwrap() {
+                        break;
+                    }
+                    idx += 1;
                     values.push(Document {
                         id: k.to_vec(),
                         doc,
@@ -528,6 +823,10 @@ impl DbStore {
                 let (ops, _) = Self::add_document(db, sender, tx, mutation, block_id, mutation_id)?;
                 Ok(ops)
             }
+            Some(DatabaseAction::UpdateDocument) => {
+                Self::update_document(db, sender, tx, mutation, block_id, mutation_id)
+            }
+
             Some(DatabaseAction::DeleteDocument) => Self::delete_document(db, sender, mutation),
             None => todo!(),
         }
@@ -590,12 +889,13 @@ mod tests {
             collection_mutations: vec![],
             document_mutations,
             db_address: addr.to_vec(),
-            action: DatabaseAction::CreateDb.into(),
+            action: DatabaseAction::DeleteDocument.into(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
         dm
     }
+
     fn build_add_document_mutation(
         addr: &DB3Address,
         collection_name: &str,
@@ -615,7 +915,34 @@ mod tests {
             collection_mutations: vec![],
             document_mutations,
             db_address: addr.to_vec(),
-            action: DatabaseAction::CreateDb.into(),
+            action: DatabaseAction::AddDocument.into(),
+        };
+        let json_data = serde_json::to_string(&dm).unwrap();
+        println!("{json_data}");
+        dm
+    }
+
+    fn build_update_document_mutation(
+        addr: &DB3Address,
+        collection_name: &str,
+        ids: Vec<String>,
+        docs: Vec<String>,
+    ) -> DatabaseMutation {
+        let documents = docs
+            .iter()
+            .map(|data| bson_util::json_str_to_bson_bytes(data).unwrap())
+            .collect();
+        let document_mutations = vec![DocumentMutation {
+            collection_name: collection_name.to_string(),
+            documents,
+            ids,
+        }];
+        let dm = DatabaseMutation {
+            meta: None,
+            collection_mutations: vec![],
+            document_mutations,
+            db_address: addr.to_vec(),
+            action: DatabaseAction::UpdateDocument.into(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
@@ -623,19 +950,30 @@ mod tests {
     }
 
     fn build_database_mutation(addr: &DB3Address, collection_name: &str) -> DatabaseMutation {
-        let index_field = IndexField {
+        let index_field_name = IndexField {
             field_path: "name".to_string(),
             value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
         };
 
-        let index = Index {
+        let index_name = Index {
             id: 0,
             name: "idx1".to_string(),
-            fields: vec![index_field],
+            fields: vec![index_field_name],
+        };
+
+        let index_field_age = IndexField {
+            field_path: "age".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index_age = Index {
+            id: 1,
+            name: "idx2".to_string(),
+            fields: vec![index_field_age],
         };
 
         let index_mutation = CollectionMutation {
-            index: vec![index],
+            index: vec![index_name, index_age],
             collection_name: collection_name.to_string(),
         };
 
@@ -649,6 +987,53 @@ mod tests {
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
         dm
+    }
+
+    #[test]
+    fn collect_field_index_map_ut() {
+        let index_field1 = IndexField {
+            field_path: "name".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+        let index_field2 = IndexField {
+            field_path: "age".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+        let index1 = Index {
+            name: "index1".to_string(),
+            id: 1,
+            fields: vec![index_field1.clone()],
+        };
+        let index2 = Index {
+            name: "index2".to_string(),
+            id: 1,
+            fields: vec![index_field2.clone()],
+        };
+        let index3 = Index {
+            name: "index3".to_string(),
+            id: 1,
+            fields: vec![index_field1.clone(), index_field2.clone()],
+        };
+        let collection = Collection {
+            id: vec![],
+            name: "collection1".to_string(),
+            index_list: vec![index1, index2, index3],
+        };
+
+        let field_index_map = DbStore::collect_field_index_map(&collection);
+        assert_eq!(2, field_index_map.len());
+        assert!(field_index_map.contains_key("name"));
+        assert!(field_index_map.contains_key("age"));
+
+        let name_related_index = field_index_map.get("name").unwrap();
+        assert_eq!(2, name_related_index.len());
+        assert_eq!("index1", name_related_index[0].name);
+        assert_eq!("index3", name_related_index[1].name);
+
+        let age_related_index = field_index_map.get("age").unwrap();
+        assert_eq!(2, age_related_index.len());
+        assert_eq!("index2", age_related_index[0].name);
+        assert_eq!("index3", age_related_index[1].name);
     }
 
     #[test]
@@ -690,6 +1075,469 @@ mod tests {
         assert!(res.is_err());
     }
 
+    #[test]
+    fn db_store_run_query_test() {
+        let tmp_dir_path = TempDir::new("db_store_run_query_test").expect("create temp dir");
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let mut db = Box::pin(merk);
+        let collection_name = "collection_run_query_test".to_string();
+        let block_id: u64 = 1001;
+
+        // create DB Test
+        let addr = gen_address();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        let db_mutation = build_database_mutation(&db_id.address(), collection_name.as_str());
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result =
+            DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, block_id, 1);
+        assert!(result.is_ok());
+
+        // add 4 documents into collection
+        let db_mutation = build_add_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![
+                r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+            ],
+        );
+
+        // add document test
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let (_, ids) =
+            DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, block_id, 2).unwrap();
+        assert_eq!(4, ids.len());
+
+        // run query db not exist
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: None,
+            limit: None,
+        };
+        let db_id_not_exist = DbId::try_from((&addr, 999)).unwrap();
+        let res = DbStore::run_query(db.as_ref(), &db_id_not_exist, &query);
+        assert!(res.is_err(), "{:?}", res);
+
+        // run query collection not exist
+        let query = StructuredQuery {
+            collection_name: "collection_not_exist".to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: None,
+            limit: None,
+        };
+        let res = DbStore::run_query(db.as_ref(), &db_id, &query);
+        assert!(res.is_err(), "{:?}", res);
+
+        // run query: select * from collection
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: None,
+            limit: None,
+        };
+        let res = DbStore::run_query(db.as_ref(), &db_id, &query);
+        assert!(res.is_ok(), "{:?}", res);
+        assert_eq!(4, res.unwrap().len());
+
+        // run query: select * from collection limit 2
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: None,
+            limit: Some(Limit { limit: 2 }),
+        };
+        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+        assert_eq!(2, docs.len());
+
+        // run query: select * from collection where name = "Bill"
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: Some(Filter {
+                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                    field: "name".to_string(),
+                    op: Operator::Equal.into(),
+                    value: Some(Value {
+                        value_type: Some(ValueType::StringValue("Bill".to_string())),
+                    }),
+                })),
+            }),
+            limit: None,
+        };
+        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+        assert_eq!(2, docs.len());
+        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
+        assert_eq!("Bill", document.get_str("name").unwrap());
+        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
+        assert_eq!("Bill", document.get_str("name").unwrap());
+
+        // run query: select * from collection where name = "Bill" limit 1
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: Some(Filter {
+                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                    field: "name".to_string(),
+                    op: Operator::Equal.into(),
+                    value: Some(Value {
+                        value_type: Some(ValueType::StringValue("Bill".to_string())),
+                    }),
+                })),
+            }),
+            limit: Some(Limit { limit: 1 }),
+        };
+        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+        assert_eq!(1, docs.len());
+        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
+        assert_eq!("Bill", document.get_str("name").unwrap());
+
+        // run query: select * from collection where name = "Mike"
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: Some(Filter {
+                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                    field: "name".to_string(),
+                    op: Operator::Equal.into(),
+                    value: Some(Value {
+                        value_type: Some(ValueType::StringValue("Mike".to_string())),
+                    }),
+                })),
+            }),
+            limit: None,
+        };
+        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+        assert_eq!(1, docs.len());
+        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
+        assert_eq!("Mike", document.get_str("name").unwrap());
+
+        // run query: select * from collection where age = 44
+        let query = StructuredQuery {
+            collection_name: collection_name.to_string(),
+            select: Some(Projection { fields: vec![] }),
+            r#where: Some(Filter {
+                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                    field: "age".to_string(),
+                    op: Operator::Equal.into(),
+                    value: Some(Value {
+                        value_type: Some(ValueType::IntegerValue(44 as i64)),
+                    }),
+                })),
+            }),
+            limit: None,
+        };
+        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+        assert_eq!(2, docs.len());
+        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
+        assert_eq!(44, document.get_i64("age").unwrap());
+        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
+        assert_eq!(44, document.get_i64("age").unwrap());
+    }
+
+    #[test]
+    fn db_store_update_document_test() {
+        let tmp_dir_path = TempDir::new("db_store_update_document_test").expect("create temp dir");
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let mut db = Box::pin(merk);
+        let collection_name = "collection_update_document_test".to_string();
+        let block_id: u64 = 1002;
+        let mut mutation_id: u16 = 1;
+
+        // create DB Test
+        let addr = gen_address();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        let db_mutation = build_database_mutation(&db_id.address(), collection_name.as_str());
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result = DbStore::apply_mutation(
+            db_m,
+            &addr,
+            1,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        );
+        mutation_id += 1;
+        assert!(result.is_ok());
+
+        // add 4 documents into collection
+        let db_mutation = build_add_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![
+                r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+            ],
+        );
+
+        // add document test
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let (_, ids) = DbStore::add_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        )
+        .unwrap();
+        mutation_id += 1;
+        assert_eq!(4, ids.len());
+
+        // update document - no index key modified
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![ids[0].to_base64()],
+            vec![r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+1234567",
+                "+2345678"
+            ]
+        }"#
+            .to_string()],
+        );
+        // update document test
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let store_ops = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        )
+        .unwrap();
+        mutation_id += 1;
+        assert_eq!(
+            DbStoreOp::DocOp {
+                add_doc_ops: 0,
+                del_doc_ops: 0,
+                update_doc_ops: 1,
+                data_in_bytes: 214,
+            },
+            store_ops
+        );
+        let document = DbStore::get_document(db.as_ref(), &ids[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"Document({"name": String("John Doe"), "age": Int64(43), "phones": Array([String("+1234567"), String("+2345678")])})"#,
+            format!(
+                "{:?}",
+                bson_util::bytes_to_bson_document(document.doc).unwrap()
+            )
+        );
+
+        // update document - name related index update
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![ids[0].to_base64()],
+            vec![r#"
+        {
+            "name": "Bill",
+            "age": 43,
+            "phones": [
+                "+1234567",
+                "+2345678"
+            ]
+        }"#
+            .to_string()],
+        );
+        // update document test
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let store_ops = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        )
+        .unwrap();
+        mutation_id += 1;
+        assert_eq!(
+            DbStoreOp::DocOp {
+                add_doc_ops: 0,
+                del_doc_ops: 0,
+                update_doc_ops: 3,
+                data_in_bytes: 210,
+            },
+            store_ops
+        );
+        let document = DbStore::get_document(db.as_ref(), &ids[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"Document({"name": String("Bill"), "age": Int64(43), "phones": Array([String("+1234567"), String("+2345678")])})"#,
+            format!(
+                "{:?}",
+                bson_util::bytes_to_bson_document(document.doc).unwrap()
+            )
+        );
+        // update document - name and age related index update
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![ids[0].to_base64()],
+            vec![r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+1234567",
+                "+2345678"
+            ]
+        }"#
+            .to_string()],
+        );
+        // update document test
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let store_ops = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        )
+        .unwrap();
+        mutation_id += 1;
+        assert_eq!(
+            DbStoreOp::DocOp {
+                add_doc_ops: 0,
+                del_doc_ops: 0,
+                update_doc_ops: 5,
+                data_in_bytes: 210,
+            },
+            store_ops
+        );
+        let document = DbStore::get_document(db.as_ref(), &ids[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"Document({"name": String("Mike"), "age": Int64(44), "phones": Array([String("+1234567"), String("+2345678")])})"#,
+            format!(
+                "{:?}",
+                bson_util::bytes_to_bson_document(document.doc).unwrap()
+            )
+        );
+
+        // update document, id not exist
+        let id_not_exist = DocumentId::zero().to_base64();
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![id_not_exist],
+            vec![r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+1234567",
+                "+2345678"
+            ]
+        }"#
+            .to_string()],
+        );
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let res = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        );
+        println!("{:?}", res);
+        assert!(res.is_err(), "{:?}", res);
+        assert_eq!(
+            r#"DocumentNotExist("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==")"#,
+            format!("{:?}", res.err().unwrap())
+        );
+        mutation_id += 1;
+    }
     #[test]
     fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("db_store_test").expect("create temp dir");
@@ -784,8 +1632,22 @@ mod tests {
             let document_id_3 = ids[1];
 
             // show documents
-            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {
+            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id, None) {
                 assert_eq!(3, documents.len());
+            } else {
+                assert!(false);
+            }
+
+            // show documents
+            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id, Some(2)) {
+                assert_eq!(2, documents.len());
+            } else {
+                assert!(false);
+            }
+
+            // show documents
+            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id, Some(2)) {
+                assert_eq!(2, documents.len());
             } else {
                 assert!(false);
             }
@@ -801,7 +1663,7 @@ mod tests {
             assert!(res.is_ok());
 
             // show documents
-            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id) {
+            if let Ok(documents) = DbStore::get_documents(db.as_ref(), &collection_id, None) {
                 assert_eq!(1, documents.len());
             } else {
                 assert!(false);

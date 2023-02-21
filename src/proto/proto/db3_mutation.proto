@@ -26,6 +26,7 @@ enum DatabaseAction {
     AddCollection = 1;
     AddDocument = 2;
     DeleteDocument = 3;
+    UpdateDocument = 4;
 }
 
 message DatabaseMutation {
