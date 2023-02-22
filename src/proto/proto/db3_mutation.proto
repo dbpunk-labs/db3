@@ -46,6 +46,17 @@ message DocumentMutation {
     string collection_name = 1;
     repeated bytes documents = 2;
     repeated string ids = 3;
+    // The fields to update.
+    // None of the field paths in the mask may contain a reserved name.
+    //
+    // If the document exists on the server and has fields not referenced in the
+    // mask, they are left unchanged.
+    // Fields referenced in the mask, but not present in the input document, are
+    // deleted from the document on the server.
+    repeated DocumentMask masks = 4;
+}
+message DocumentMask {
+    repeated string fields = 1;
 }
 
 message MintCreditsMutation {

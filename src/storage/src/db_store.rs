@@ -466,6 +466,18 @@ impl DbStore {
                 let mut entries: Vec<BatchEntry> = Vec::new();
                 let cid_index_map: &HashMap<String, _> = &d.collections;
                 for document_mutation in &mutation.document_mutations {
+                    if document_mutation.ids.len() != document_mutation.documents.len() {
+                        return Err(DB3Error::ApplyDocumentError(
+                            "invalid update document mutation, ids and documents size different"
+                                .to_string(),
+                        ));
+                    }
+                    if document_mutation.ids.len() != document_mutation.masks.len() {
+                        return Err(DB3Error::ApplyDocumentError(
+                            "invalid update document mutation, ids and masks size different"
+                                .to_string(),
+                        ));
+                    }
                     if let Some(collection) = cid_index_map.get(&document_mutation.collection_name)
                     {
                         let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())
@@ -473,6 +485,10 @@ impl DbStore {
 
                         let field_index_map = Self::collect_field_index_map(collection);
                         for idx in 0..document_mutation.documents.len() {
+                            if document_mutation.masks[idx].fields.len() == 0 {
+                                info!("skip update doc when masks fields are empty");
+                                continue;
+                            }
                             let document_id =
                                 DocumentId::try_from_base64(document_mutation.ids[idx].as_str())?;
                             let old_document = if let Some(v) = db
@@ -489,9 +505,35 @@ impl DbStore {
                             if sender != &old_document.get_owner()? {
                                 return Err(DB3Error::DocumentModifiedPermissionError);
                             }
+                            let mut new_doc = old_document.get_document()?.clone();
+                            let update_doc = bson_util::bytes_to_bson_document(
+                                document_mutation.documents[idx].clone(),
+                            )?;
+
+                            // update document based on update_doc and update masks
+                            //
+                            // update masks - The fields to update.
+                            // None of the field paths in the mask may contain a reserved name.
+                            //
+                            // If the document exists on the server and has fields not referenced in the
+                            // mask, they are left unchanged.
+                            // Fields referenced in the mask, but not present in the input document, are
+                            // deleted from the document on the server.
+                            for field in document_mutation.masks[idx].fields.iter() {
+                                match update_doc.get(field) {
+                                    Some(bson) => {
+                                        // update the fields with the value from updated document
+                                        new_doc.insert(field, bson);
+                                    }
+                                    None => {
+                                        // deleted from the document
+                                        new_doc.remove(field);
+                                    }
+                                }
+                            }
                             // construct new db3 document with new tx_id and new document
                             let new_document = DB3Document::create_from_document_bytes(
-                                document_mutation.documents[idx].clone(),
+                                bson_util::bson_document_into_bytes(&new_doc),
                                 &document_id,
                                 &tx,
                                 &sender,
@@ -862,6 +904,7 @@ mod tests {
         Index,
     };
     use db3_proto::db3_mutation_proto::CollectionMutation;
+    use db3_proto::db3_mutation_proto::DocumentMask;
     use db3_proto::db3_mutation_proto::DocumentMutation;
     use merkdb::rocksdb::merge_operator::delete_callback;
     use std::boxed::Box;
@@ -883,6 +926,7 @@ mod tests {
             collection_name: collection_name.to_string(),
             documents: vec![],
             ids,
+            masks: vec![],
         }];
         let dm = DatabaseMutation {
             meta: None,
@@ -909,6 +953,7 @@ mod tests {
             collection_name: collection_name.to_string(),
             documents,
             ids: vec![],
+            masks: vec![],
         }];
         let dm = DatabaseMutation {
             meta: None,
@@ -927,15 +972,21 @@ mod tests {
         collection_name: &str,
         ids: Vec<String>,
         docs: Vec<String>,
+        masks: Vec<Vec<String>>,
     ) -> DatabaseMutation {
         let documents = docs
             .iter()
             .map(|data| bson_util::json_str_to_bson_bytes(data).unwrap())
             .collect();
+        let masks: Vec<_> = masks
+            .iter()
+            .map(|m| DocumentMask { fields: m.to_vec() })
+            .collect();
         let document_mutations = vec![DocumentMutation {
             collection_name: collection_name.to_string(),
             documents,
             ids,
+            masks,
         }];
         let dm = DatabaseMutation {
             meta: None,
@@ -1376,6 +1427,11 @@ mod tests {
             ]
         }"#
             .to_string()],
+            vec![vec![
+                "name".to_string(),
+                "age".to_string(),
+                "phones".to_string(),
+            ]],
         );
         // update document test
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
@@ -1416,14 +1472,10 @@ mod tests {
             vec![ids[0].to_base64()],
             vec![r#"
         {
-            "name": "Bill",
-            "age": 43,
-            "phones": [
-                "+1234567",
-                "+2345678"
-            ]
+            "name": "Bill"
         }"#
             .to_string()],
+            vec![vec!["name".to_string()]],
         );
         // update document test
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
@@ -1464,13 +1516,10 @@ mod tests {
             vec![r#"
         {
             "name": "Mike",
-            "age": 44,
-            "phones": [
-                "+1234567",
-                "+2345678"
-            ]
+            "age": 44
         }"#
             .to_string()],
+            vec![vec!["name".to_string(), "age".to_string()]],
         );
         // update document test
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
@@ -1504,6 +1553,135 @@ mod tests {
             )
         );
 
+        // update document - delete age and update phone
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![ids[0].to_base64()],
+            vec![r#"
+        {
+            "phones": [
+                "+86 1234567",
+                "+86 2345678"
+            ]
+        }"#
+            .to_string()],
+            vec![vec!["phones".to_string(), "age".to_string()]],
+        );
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let store_ops = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        )
+        .unwrap();
+        mutation_id += 1;
+        assert_eq!(
+            DbStoreOp::DocOp {
+                add_doc_ops: 0,
+                del_doc_ops: 0,
+                update_doc_ops: 2, // update doc entry, remove age index
+                data_in_bytes: 203,
+            },
+            store_ops
+        );
+        let document = DbStore::get_document(db.as_ref(), &ids[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"Document({"name": String("Mike"), "phones": Array([String("+86 1234567"), String("+86 2345678")])})"#,
+            format!(
+                "{:?}",
+                bson_util::bytes_to_bson_document(document.doc).unwrap()
+            )
+        );
+
+        // update document - empty update doc, delete phones
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![ids[0].to_base64()],
+            vec![r#"
+        {
+        }"#
+            .to_string()],
+            vec![vec!["phones".to_string()]],
+        );
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let store_ops = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        )
+        .unwrap();
+        mutation_id += 1;
+        assert_eq!(
+            DbStoreOp::DocOp {
+                add_doc_ops: 0,
+                del_doc_ops: 0,
+                update_doc_ops: 1, // update doc entry
+                data_in_bytes: 152,
+            },
+            store_ops
+        );
+        let document = DbStore::get_document(db.as_ref(), &ids[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"Document({"name": String("Mike")})"#,
+            format!(
+                "{:?}",
+                bson_util::bytes_to_bson_document(document.doc).unwrap()
+            )
+        );
+
+        // update document - empty update doc, delete phones
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![ids[0].to_base64()],
+            vec![r#"
+        {
+        }"#
+            .to_string()],
+            vec![vec![]],
+        );
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let store_ops = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        )
+        .unwrap();
+        mutation_id += 1;
+        assert_eq!(
+            DbStoreOp::DocOp {
+                add_doc_ops: 0,
+                del_doc_ops: 0,
+                update_doc_ops: 0, // update doc entry
+                data_in_bytes: 0,
+            },
+            store_ops
+        );
+        let document = DbStore::get_document(db.as_ref(), &ids[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"Document({"name": String("Mike")})"#,
+            format!(
+                "{:?}",
+                bson_util::bytes_to_bson_document(document.doc).unwrap()
+            )
+        );
         // update document, id not exist
         let id_not_exist = DocumentId::zero().to_base64();
         let db_mutation = build_update_document_mutation(
@@ -1520,6 +1698,11 @@ mod tests {
             ]
         }"#
             .to_string()],
+            vec![vec![
+                "name".to_string(),
+                "age".to_string(),
+                "phones".to_string(),
+            ]],
         );
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let res = DbStore::update_document(
@@ -1534,6 +1717,41 @@ mod tests {
         assert!(res.is_err(), "{:?}", res);
         assert_eq!(
             r#"DocumentNotExist("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==")"#,
+            format!("{:?}", res.err().unwrap())
+        );
+        mutation_id += 1;
+
+        // update document, id not exist
+        let id_not_exist = DocumentId::zero().to_base64();
+        let db_mutation = build_update_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![id_not_exist],
+            vec![r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+1234567",
+                "+2345678"
+            ]
+        }"#
+            .to_string()],
+            vec![],
+        );
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let res = DbStore::update_document(
+            db_m,
+            &addr,
+            &TxId::zero(),
+            &db_mutation,
+            block_id,
+            mutation_id,
+        );
+        println!("{:?}", res);
+        assert!(res.is_err(), "{:?}", res);
+        assert_eq!(
+            r#"ApplyDocumentError("invalid update document mutation, ids and masks size different")"#,
             format!("{:?}", res.err().unwrap())
         );
         mutation_id += 1;
