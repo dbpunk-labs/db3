@@ -62,7 +62,7 @@ impl AccountStore {
     /// Create a account for the storage chains
     ///
     ///
-    pub fn new_account(db: Pin<&mut Merk>, addr: &DB3Address) -> Result<Account> {
+    pub fn new_account(db: Pin<&mut Merk>, addr: &DB3Address, credits: u64) -> Result<Account> {
         let key = AccountKey(addr);
         let encoded_key = key.encode()?;
         let values = db
@@ -76,7 +76,7 @@ impl AccountStore {
         } else {
             let new_account = Account {
                 bills: 0,
-                credits: 10 * token::TOKEN_COVERSION,
+                credits: credits * token::TOKEN_COVERSION,
                 total_storage_in_bytes: 0,
                 total_mutation_count: 0,
                 total_session_count: 0,
@@ -134,7 +134,7 @@ mod tests {
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
-        let result = AccountStore::new_account(db_m, &addr);
+        let result = AccountStore::new_account(db_m, &addr, 10);
         assert!(result.is_ok());
         let new_account = result.unwrap();
         assert_eq!(0, new_account.bills);

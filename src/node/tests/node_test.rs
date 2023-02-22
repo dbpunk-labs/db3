@@ -5,7 +5,6 @@ mod node_integration {
     use db3_base::get_a_random_nonce;
     use db3_crypto::db3_signer::Db3MultiSchemeSigner;
     use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
-    use db3_proto::db3_database_proto::Database;
     use db3_proto::db3_mutation_proto::{
         DatabaseAction, DatabaseMutation, PayloadType, WriteRequest,
     };
@@ -21,9 +20,9 @@ mod node_integration {
 
     fn get_mutation_sdk() -> MutationSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
-        db3_cmd::keystore::KeyStore::recover_keypair().unwrap();
+        db3_cmd::keystore::KeyStore::recover_keypair(None).unwrap();
         // create storage node sdk
-        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -36,7 +35,7 @@ mod node_integration {
     fn get_store_sdk() -> StoreSDK {
         let public_grpc_url = "http://127.0.0.1:26659";
         // create storage node sdk
-        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
         let channel = rpc_endpoint.connect_lazy();
@@ -74,7 +73,7 @@ mod node_integration {
     async fn json_rpc_database_smoke_test() {
         let json_rpc_url = "http://127.0.0.1:26670";
         let client = awc::Client::default();
-        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         let dm = create_a_database_mutation();
         let mut mbuf = BytesMut::with_capacity(1024 * 4);

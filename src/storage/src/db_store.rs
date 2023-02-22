@@ -453,8 +453,8 @@ impl DbStore {
         sender: &DB3Address,
         tx: &TxId,
         mutation: &DatabaseMutation,
-        block_id: u64,
-        mutation_id: u16,
+        _block_id: u64,
+        _mutation_id: u16,
     ) -> Result<DbStoreOp> {
         let addr_ref: &[u8] = mutation.db_address.as_ref();
         let db_id = DbId::try_from(addr_ref)?;

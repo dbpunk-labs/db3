@@ -19,3 +19,6 @@ db3.log
 
 /java/target/
 /src/db3js/src/pkg/
+/bridge/node_modules/
+/bridge/cache/
+/bridge/artifacts/

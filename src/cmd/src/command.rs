@@ -17,7 +17,9 @@
 
 use clap::*;
 
+use crate::deposit;
 use crate::keystore::KeyStore;
+use crate::show_evm_account;
 use db3_base::{bson_util, strings};
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::{AccountId, DbId, DocumentId, TxId};
@@ -25,13 +27,19 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, Index, StructuredQuery};
+use db3_proto::db3_faucet_proto::faucet_node_client::FaucetNodeClient;
 use db3_proto::db3_mutation_proto::{
     CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMask, DocumentMutation,
 };
 use db3_proto::db3_node_proto::NetworkStatus;
-use db3_sdk::{mutation_sdk::MutationSDK, store_sdk::StoreSDK};
+use db3_sdk::{faucet_sdk::FaucetSDK, mutation_sdk::MutationSDK, store_sdk::StoreSDK};
+use ethers::signers::LocalWallet;
+use ethers::types::Address;
+use http::Uri;
 use prettytable::{format, Table};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 
 pub struct DB3ClientContext {
     pub mutation_sdk: Option<MutationSDK>,
@@ -149,9 +157,47 @@ pub enum DB3ClientCommand {
         limit: i32,
     },
     #[clap(name = "show-account")]
-    ShowAccount {},
+    ShowAccount {
+        /// the address of account
+        #[clap(long, default_value = "")]
+        addr: String,
+    },
     #[clap(name = "show-state")]
     ShowState {},
+    #[clap(name = "faucet")]
+    Faucet {
+        /// the url of db3 faucet grpc api
+        #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26649")]
+        faucet_grpc_url: String,
+    },
+
+    #[clap(name = "show-evm-account")]
+    ShowEvmAccount {
+        /// the url of evm chain websocket url
+        #[clap(long)]
+        evm_chain_ws: String,
+        /// the db3 erc20 contract address
+        #[clap(long)]
+        token_address: String,
+        /// the db3 rollup contract address
+        #[clap(long)]
+        contract_address: String,
+    },
+    #[clap(name = "deposit")]
+    Deposit {
+        /// the url of evm chain websocket url
+        #[clap(long)]
+        evm_chain_ws: String,
+        /// the db3 erc20 contract address
+        #[clap(long)]
+        token_address: String,
+        /// the db3 rollup contract address
+        #[clap(long)]
+        contract_address: String,
+        /// deposit db3 to rollup contract in db3
+        #[clap(long)]
+        amount: f32,
+    },
 }
 
 impl DB3ClientCommand {
@@ -243,27 +289,47 @@ impl DB3ClientCommand {
         Ok(table)
     }
 
-    fn show_account(account: &Account, addr: &DB3Address) -> std::result::Result<Table, String> {
+    fn show_account(
+        account: &Account,
+        addr: &DB3Address,
+        evm_addr: &Option<DB3Address>,
+    ) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-        table.set_titles(row![
-            "address",
-            "bills",
-            "credits",
-            "storage_used",
-            "mutations",
-            "session",
-            "nonce"
+        table.set_titles(row!["name", "value"]);
+        table.add_row(row![
+            "db3 address".to_string(),
+            AccountId::new(*addr).to_hex()
+        ]);
+        if let Some(ed) = evm_addr {
+            table.add_row(row![
+                "evm address".to_string(),
+                AccountId::new(*ed).to_hex()
+            ]);
+        } else {
+            table.add_row(row!["evm address".to_string(), "-".to_string()]);
+        }
+        table.add_row(row![
+            "bills".to_string(),
+            strings::units_to_readable_num_str(account.bills)
         ]);
         table.add_row(row![
-            AccountId::new(*addr).to_hex(),
-            strings::units_to_readable_num_str(account.bills),
-            strings::units_to_readable_num_str(account.credits),
-            strings::bytes_to_readable_num_str(account.total_storage_in_bytes),
-            account.total_mutation_count,
-            account.total_session_count,
-            account.nonce
+            "credits".to_string(),
+            strings::units_to_readable_num_str(account.credits)
         ]);
+        table.add_row(row![
+            "storage used".to_string(),
+            strings::bytes_to_readable_num_str(account.total_storage_in_bytes)
+        ]);
+        table.add_row(row![
+            "mutation count".to_string(),
+            account.total_mutation_count
+        ]);
+        table.add_row(row![
+            "session count".to_string(),
+            account.total_session_count
+        ]);
+        table.add_row(row!["nonce".to_string(), account.nonce]);
         Ok(table)
     }
 
@@ -286,12 +352,79 @@ impl DB3ClientCommand {
 
     pub async fn execute(self, ctx: &mut DB3ClientContext) -> std::result::Result<Table, String> {
         match self {
-            DB3ClientCommand::Init {} => match KeyStore::recover_keypair() {
+            DB3ClientCommand::Deposit {
+                evm_chain_ws,
+                token_address,
+                contract_address,
+                amount,
+            } => {
+                let pk = KeyStore::get_private_key(None).unwrap();
+                if let Ok(wallet) = pk.parse::<LocalWallet>() {
+                    let ok = deposit::lock_balance(
+                        token_address.as_str(),
+                        contract_address.as_str(),
+                        evm_chain_ws.as_str(),
+                        amount,
+                        wallet,
+                    )
+                    .await;
+                    if let Ok(_) = ok {
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["message"]);
+                        table.add_row(row!["deposit fund to db3 contract successfully"]);
+                        return Ok(table);
+                    }
+                }
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                table.set_titles(row!["message"]);
+                table.add_row(row!["fail to deposit to db3 rollup contract"]);
+                Ok(table)
+            }
+            DB3ClientCommand::ShowEvmAccount {
+                evm_chain_ws,
+                token_address,
+                contract_address,
+            } => match KeyStore::recover_keypair(None) {
+                Ok(ks) => {
+                    let evm_addr1 = ks.get_evm_address().unwrap();
+                    let evm_addr2 = Address::from_slice(&evm_addr1.to_vec());
+                    let (balance, locked_balance) = show_evm_account::get_account_balance(
+                        &evm_addr2,
+                        &token_address,
+                        &contract_address,
+                        &evm_chain_ws,
+                    )
+                    .await
+                    .unwrap();
+                    let mut table = Table::new();
+                    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                    table.set_titles(row!["name", "value"]);
+                    table.add_row(row![
+                        "address".to_string(),
+                        AccountId::new(evm_addr1).to_hex()
+                    ]);
+                    table.add_row(row![
+                        "balance".to_string(),
+                        strings::units_to_readable_num_str(balance)
+                    ]);
+                    table.add_row(row![
+                        "locked balance".to_string(),
+                        strings::units_to_readable_num_str(locked_balance)
+                    ]);
+                    Ok(table)
+                }
+                Err(_) => Err(
+                    "no key was found, you can use init command to create a new one".to_string(),
+                ),
+            },
+            DB3ClientCommand::Init {} => match KeyStore::recover_keypair(None) {
                 Ok(ks) => ks.show_key(),
                 Err(e) => Err(format!("{:?}", e)),
             },
 
-            DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair() {
+            DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair(None) {
                 Ok(ks) => ks.show_key(),
                 Err(_) => Err(
                     "no key was found, you can use init command to create a new one".to_string(),
@@ -303,67 +436,38 @@ impl DB3ClientCommand {
                     Err(_) => Err("fail to get account".to_string()),
                 }
             }
-            DB3ClientCommand::ShowAccount {} => match KeyStore::recover_keypair() {
-                Ok(ks) => {
-                    let addr = ks.get_address().unwrap();
-                    match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
-                        Ok(account) => Self::show_account(&account, &addr),
+            DB3ClientCommand::ShowAccount { addr } => {
+                if addr.is_empty() {
+                    match KeyStore::recover_keypair(None) {
+                        Ok(ks) => {
+                            let addr = ks.get_address().unwrap();
+                            let evm_addr = Some(ks.get_evm_address().unwrap());
+                            match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
+                                Ok(account) => Self::show_account(&account, &addr, &evm_addr),
+
+                                Err(_) => Err("fail to get account".to_string()),
+                            }
+                        }
+                        Err(_) => Err(
+                            "no key was found, you can use init command to create a new one"
+                                .to_string(),
+                        ),
+                    }
+                } else {
+                    let account_addr = DB3Address::try_from(addr.as_str()).unwrap();
+                    match ctx
+                        .store_sdk
+                        .as_ref()
+                        .unwrap()
+                        .get_account(&account_addr)
+                        .await
+                    {
+                        Ok(account) => Self::show_account(&account, &account_addr, &None),
                         Err(_) => Err("fail to get account".to_string()),
                     }
                 }
-                Err(_) => Err(
-                    "no key was found, you can use init command to create a new one".to_string(),
-                ),
-            },
-            DB3ClientCommand::NewCollection {
-                addr,
-                name,
-                index_list,
-            } => {
-                //TODO validate the index
-                let index_vec: Vec<Index> = index_list
-                    .iter()
-                    .map(|i| serde_json::from_str::<Index>(i.as_str()).unwrap())
-                    .collect();
-                let collection = CollectionMutation {
-                    index: index_vec.to_owned(),
-                    collection_name: name.to_string(),
-                };
-                //TODO check database id and collection name
-                let db_id = DbId::try_from(addr.as_str()).unwrap();
-                let meta = BroadcastMeta {
-                    //TODO get from network
-                    nonce: Self::current_seconds(),
-                    //TODO use config
-                    chain_id: ChainId::DevNet.into(),
-                    //TODO use config
-                    chain_role: ChainRole::StorageShardChain.into(),
-                };
-                let dm = DatabaseMutation {
-                    meta: Some(meta),
-                    collection_mutations: vec![collection],
-                    db_address: db_id.as_ref().to_vec(),
-                    action: DatabaseAction::AddCollection.into(),
-                    document_mutations: vec![],
-                };
-                match ctx
-                    .mutation_sdk
-                    .as_ref()
-                    .unwrap()
-                    .submit_database_mutation(&dm)
-                    .await
-                {
-                    Ok((_, tx_id)) => {
-                        println!("send add collection done!");
-                        let mut table = Table::new();
-                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                        table.set_titles(row!["tx_id"]);
-                        table.add_row(row![tx_id.to_base64()]);
-                        Ok(table)
-                    }
-                    Err(e) => Err(format!("fail to add collection: {:?}", e)),
-                }
             }
+
             DB3ClientCommand::NewCollection {
                 addr,
                 name,
@@ -628,6 +732,7 @@ impl DB3ClientCommand {
                     Err(e) => Err(format!("fail to add document: {:?}", e)),
                 }
             }
+
             DB3ClientCommand::DeleteDocument {
                 addr,
                 collection_name,
@@ -675,6 +780,42 @@ impl DB3ClientCommand {
                     }
                     Err(e) => Err(format!("fail to delete document: {:?}", e)),
                 }
+            }
+
+            DB3ClientCommand::Faucet { faucet_grpc_url } => {
+                let uri = faucet_grpc_url.parse::<Uri>().unwrap();
+                let endpoint = match uri.scheme_str() == Some("https") {
+                    true => {
+                        let rpc_endpoint = Endpoint::new(faucet_grpc_url.to_string())
+                            .unwrap()
+                            .tls_config(ClientTlsConfig::new())
+                            .unwrap();
+                        rpc_endpoint
+                    }
+                    false => {
+                        let rpc_endpoint = Endpoint::new(faucet_grpc_url.to_string()).unwrap();
+                        rpc_endpoint
+                    }
+                };
+                let channel = endpoint.connect_lazy();
+                let node = Arc::new(FaucetNodeClient::new(channel));
+                let pk = KeyStore::get_private_key(None).unwrap();
+                if let Ok(wallet) = pk.parse::<LocalWallet>() {
+                    let sdk = FaucetSDK::new(node, wallet);
+                    let result = sdk.faucet().await;
+                    if let Ok(_) = result {
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["message"]);
+                        table.add_row(row!["send faucet request successfully"]);
+                        return Ok(table);
+                    }
+                }
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                table.set_titles(row!["message"]);
+                table.add_row(row!["fail to send faucet request"]);
+                Ok(table)
             }
         }
     }

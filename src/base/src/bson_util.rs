@@ -151,7 +151,7 @@ pub fn filter_from_json_value(json_str: &str) -> std::result::Result<Option<Filt
             }
         };
 
-        let op_str = filter_doc.get_str("op").map_err(|e| {
+        let op_str = filter_doc.get_str("op").map_err(|_| {
             DB3Error::InvalidFilterJson("op is required in filter json".to_string())
         })?;
         let op = match op_str {

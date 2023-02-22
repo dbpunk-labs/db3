@@ -22,7 +22,6 @@ import "db3_session.proto";
 import "db3_database.proto";
 package db3_node_proto;
 
-
 message NetworkStatus {
     uint64 total_database_count = 1;
     uint64 total_collection_count = 2;
@@ -37,6 +36,7 @@ message QueryBillKey {
     uint64 height = 1;
     string session_token = 2;
 }
+
 message QueryBillRequest {
     QueryBillKey query_bill_key = 1;
 }
@@ -53,6 +53,7 @@ message SessionIdentifier {
 message GetAccountRequest {
     bytes addr = 1;
 }
+
 
 message GetAccountResponse {
     db3_account_proto.Account account = 1;

@@ -24,7 +24,7 @@ use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;
 use db3_proto::db3_mutation_proto::DocumentMutation;
-use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
+use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, MintCreditsMutation};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn gen_ed25519_signer(seed_u8: u8) -> (DB3Address, Db3MultiSchemeSigner) {
@@ -47,6 +47,26 @@ fn current_seconds() -> u64 {
     }
 }
 
+pub fn create_a_mint_mutation(sender: &DB3Address, to: &DB3Address) -> MintCreditsMutation {
+    let meta = BroadcastMeta {
+        //TODO get from network
+        nonce: current_seconds(),
+        //TODO use config
+        chain_id: ChainId::DevNet.into(),
+        //TODO use config
+        chain_role: ChainRole::StorageShardChain.into(),
+    };
+
+    MintCreditsMutation {
+        chain_id: 1,
+        block_id: 2,
+        tx_id: vec![0],
+        to: to.as_ref().to_vec(),
+        amount: 9 * 1000_000_000,
+        meta: Some(meta),
+    }
+}
+
 pub fn create_a_database_mutation() -> DatabaseMutation {
     let meta = BroadcastMeta {
         //TODO get from network
@@ -56,6 +76,7 @@ pub fn create_a_database_mutation() -> DatabaseMutation {
         //TODO use config
         chain_role: ChainRole::StorageShardChain.into(),
     };
+
     let dm = DatabaseMutation {
         meta: Some(meta),
         collection_mutations: vec![],

@@ -95,6 +95,10 @@ pub enum DB3Error {
     DocumentNotExist(String),
     #[error("document modified permission error")]
     DocumentModifiedPermissionError,
+    #[error("fail to store event for {0}")]
+    StoreEventError(String),
+    #[error("fail to store faucet for {0}")]
+    StoreFaucetError(String),
     #[error("invalid filter value {0}")]
     InvalidFilterValue(String),
     #[error("invalid filter op {0}")]
@@ -107,6 +111,8 @@ pub enum DB3Error {
     InvalidFilterJson(String),
     #[error("invalid json string {0}")]
     InvalidJson(String),
+    #[error("fail to request faucet for {0}")]
+    RequestFaucetError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

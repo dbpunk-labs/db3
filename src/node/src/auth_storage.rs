@@ -21,7 +21,7 @@ use db3_error::Result;
 use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_bill_proto::{Bill, BillType};
 use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
-use db3_proto::db3_mutation_proto::DatabaseMutation;
+use db3_proto::db3_mutation_proto::{DatabaseMutation, MintCreditsMutation};
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_storage::account_store::AccountStore;
 use db3_storage::bill_store::BillStore;
@@ -193,7 +193,7 @@ impl AuthStorage {
                     .total_account_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-                AccountStore::new_account(db, addr)
+                AccountStore::new_account(db, addr, 10)
             }
         }?;
         self.current_block_state.tx_counter = self.current_block_state.tx_counter + 1;
@@ -278,6 +278,62 @@ impl AuthStorage {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
+    pub fn apply_mint_credits(
+        &mut self,
+        sender: &DB3Address,
+        _nonce: u64,
+        tx: &TxId,
+        mint: &MintCreditsMutation,
+    ) -> Result<()> {
+        //TODO the sender address must be limited
+        let _account = match AccountStore::get_account(self.db.as_ref(), sender)? {
+            Some(account) => Ok(account),
+            None => {
+                //TODO remove the action for adding a new user
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                self.network_state
+                    .total_account_count
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                AccountStore::new_account(db, sender, 10)
+            }
+        }?;
+        let to_address_ref: &[u8] = mint.to.as_ref();
+        let to_address = DB3Address::try_from(to_address_ref)?;
+        match AccountStore::get_account(self.db.as_ref(), &to_address)? {
+            Some(mut account) => {
+                account.credits += mint.amount;
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                AccountStore::update_account(db, &to_address, &account)?;
+            }
+            None => {
+                //TODO remove the action for adding a new user
+                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+                self.network_state
+                    .total_account_count
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                AccountStore::new_account(db, &to_address, mint.amount / 1000_000_000)?;
+            }
+        };
+        let bill_id = BillId::new(
+            self.current_block_state.block_height as u64,
+            self.current_block_state.tx_counter as u16,
+        )?;
+
+        let bill = Bill {
+            //TODO update the gas calculator
+            gas_fee: 10000,
+            block_id: self.current_block_state.block_height as u64,
+            bill_type: BillType::BillForMint.into(),
+            time: self.current_block_state.block_time,
+            tx_id: tx.as_ref().to_vec(),
+            owner: sender.to_vec(),
+            to: vec![],
+        };
+        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+        BillStore::apply(db, &bill_id, &bill)?;
+        Ok(())
+    }
+
     pub fn apply_database(
         &mut self,
         sender: &DB3Address,
@@ -294,7 +350,7 @@ impl AuthStorage {
                 self.network_state
                     .total_account_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                AccountStore::new_account(db, sender)
+                AccountStore::new_account(db, sender, 10)
             }
         }?;
 

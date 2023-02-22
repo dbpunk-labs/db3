@@ -21,4 +21,8 @@ pub mod commit_store;
 mod db3_document;
 mod db_key;
 pub mod db_store;
+mod event_key;
+pub mod event_store;
+mod faucet_key;
+pub mod faucet_store;
 pub mod key;

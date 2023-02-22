@@ -59,9 +59,19 @@ message DocumentMask {
     repeated string fields = 1;
 }
 
+message MintCreditsMutation {
+    uint32 chain_id = 1;
+    uint64 block_id = 2;
+    bytes tx_id = 3;
+    bytes to = 5;
+    uint64 amount = 6;
+    db3_base_proto.BroadcastMeta meta = 7;
+}
+
 enum PayloadType {
     QuerySessionPayload =0;
     DatabasePayload = 1;
+    MintCreditsPayload = 2;
 }
 
 message WriteRequest {
