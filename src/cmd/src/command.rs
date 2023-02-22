@@ -25,13 +25,18 @@ use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, Index, StructuredQuery};
+use db3_proto::db3_faucet_proto::faucet_node_client::FaucetNodeClient;
 use db3_proto::db3_mutation_proto::{
     CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMask, DocumentMutation,
 };
 use db3_proto::db3_node_proto::NetworkStatus;
-use db3_sdk::{mutation_sdk::MutationSDK, store_sdk::StoreSDK};
+use db3_sdk::{faucet_sdk::FaucetSDK, mutation_sdk::MutationSDK, store_sdk::StoreSDK};
+use ethers::signers::LocalWallet;
+use http::Uri;
 use prettytable::{format, Table};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 
 pub struct DB3ClientContext {
     pub mutation_sdk: Option<MutationSDK>,
@@ -156,6 +161,12 @@ pub enum DB3ClientCommand {
     },
     #[clap(name = "show-state")]
     ShowState {},
+    #[clap(name = "faucet")]
+    Faucet {
+        /// the url of db3 faucet grpc api
+        #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26649")]
+        faucet_grpc_url: String,
+    },
 }
 
 impl DB3ClientCommand {
@@ -247,27 +258,47 @@ impl DB3ClientCommand {
         Ok(table)
     }
 
-    fn show_account(account: &Account, addr: &DB3Address) -> std::result::Result<Table, String> {
+    fn show_account(
+        account: &Account,
+        addr: &DB3Address,
+        evm_addr: &Option<DB3Address>,
+    ) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-        table.set_titles(row![
-            "address",
-            "bills",
-            "credits",
-            "storage_used",
-            "mutations",
-            "session",
-            "nonce"
+        table.set_titles(row!["name", "value"]);
+        table.add_row(row![
+            "db3 address".to_string(),
+            AccountId::new(*addr).to_hex()
+        ]);
+        if let Some(ed) = evm_addr {
+            table.add_row(row![
+                "evm address".to_string(),
+                AccountId::new(*ed).to_hex()
+            ]);
+        } else {
+            table.add_row(row!["evm address".to_string(), "-".to_string()]);
+        }
+        table.add_row(row![
+            "bills".to_string(),
+            strings::units_to_readable_num_str(account.bills)
         ]);
         table.add_row(row![
-            AccountId::new(*addr).to_hex(),
-            strings::units_to_readable_num_str(account.bills),
-            strings::units_to_readable_num_str(account.credits),
-            strings::bytes_to_readable_num_str(account.total_storage_in_bytes),
-            account.total_mutation_count,
-            account.total_session_count,
-            account.nonce
+            "credits".to_string(),
+            strings::units_to_readable_num_str(account.credits)
         ]);
+        table.add_row(row![
+            "storage used".to_string(),
+            strings::bytes_to_readable_num_str(account.total_storage_in_bytes)
+        ]);
+        table.add_row(row![
+            "mutation count".to_string(),
+            account.total_mutation_count
+        ]);
+        table.add_row(row![
+            "session count".to_string(),
+            account.total_session_count
+        ]);
+        table.add_row(row!["nonce".to_string(), account.nonce]);
         Ok(table)
     }
 
@@ -312,8 +343,10 @@ impl DB3ClientCommand {
                     match KeyStore::recover_keypair(None) {
                         Ok(ks) => {
                             let addr = ks.get_address().unwrap();
+                            let evm_addr = Some(ks.get_evm_address().unwrap());
                             match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
-                                Ok(account) => Self::show_account(&account, &addr),
+                                Ok(account) => Self::show_account(&account, &addr, &evm_addr),
+
                                 Err(_) => Err("fail to get account".to_string()),
                             }
                         }
@@ -331,7 +364,7 @@ impl DB3ClientCommand {
                         .get_account(&account_addr)
                         .await
                     {
-                        Ok(account) => Self::show_account(&account, &account_addr),
+                        Ok(account) => Self::show_account(&account, &account_addr, &None),
                         Err(_) => Err("fail to get account".to_string()),
                     }
                 }
@@ -601,6 +634,7 @@ impl DB3ClientCommand {
                     Err(e) => Err(format!("fail to add document: {:?}", e)),
                 }
             }
+
             DB3ClientCommand::DeleteDocument {
                 addr,
                 collection_name,
@@ -648,6 +682,42 @@ impl DB3ClientCommand {
                     }
                     Err(e) => Err(format!("fail to delete document: {:?}", e)),
                 }
+            }
+
+            DB3ClientCommand::Faucet { faucet_grpc_url } => {
+                let uri = faucet_grpc_url.parse::<Uri>().unwrap();
+                let endpoint = match uri.scheme_str() == Some("https") {
+                    true => {
+                        let rpc_endpoint = Endpoint::new(faucet_grpc_url.to_string())
+                            .unwrap()
+                            .tls_config(ClientTlsConfig::new())
+                            .unwrap();
+                        rpc_endpoint
+                    }
+                    false => {
+                        let rpc_endpoint = Endpoint::new(faucet_grpc_url.to_string()).unwrap();
+                        rpc_endpoint
+                    }
+                };
+                let channel = endpoint.connect_lazy();
+                let node = Arc::new(FaucetNodeClient::new(channel));
+                let pk = KeyStore::get_private_key(None).unwrap();
+                if let Ok(wallet) = pk.parse::<LocalWallet>() {
+                    let sdk = FaucetSDK::new(node, wallet);
+                    let result = sdk.faucet().await;
+                    if let Ok(_) = result {
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["message"]);
+                        table.add_row(row!["send faucet request successfully"]);
+                        return Ok(table);
+                    }
+                }
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                table.set_titles(row!["message"]);
+                table.add_row(row!["fail to send faucet request"]);
+                Ok(table)
             }
         }
     }

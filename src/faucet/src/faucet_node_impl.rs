@@ -25,6 +25,7 @@ use ethers::{
 use db3_error::{DB3Error, Result as DB3Result};
 use db3_proto::db3_faucet_proto::{faucet_node_server::FaucetNode, FaucetRequest, FaucetResponse};
 use db3_storage::faucet_store::FaucetStore;
+use hex;
 use redb::Database;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -63,8 +64,9 @@ impl FaucetNodeImpl {
             .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
         let address = wallet.address();
         info!(
-            "new faucet node  with config {:?} address {}",
-            config, address
+            "new faucet node  with config {:?} and faucet evm address 0x{}",
+            config,
+            hex::encode(address.0.as_ref())
         );
         let erc20_address = config
             .erc20_address

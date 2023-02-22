@@ -25,6 +25,8 @@ use db3_crypto::{
 };
 use db3_error::Result;
 use dirs;
+use ethers::signers::LocalWallet;
+use ethers::signers::Signer;
 use fastcrypto::encoding::{Base64, Encoding};
 use hex;
 use rand_core::OsRng;
@@ -121,7 +123,19 @@ impl KeyStore {
 
     pub fn get_address(&self) -> std::result::Result<DB3Address, String> {
         let pk = self.key_pair.public();
+
         Ok(DB3Address::from(&pk))
+    }
+
+    pub fn get_evm_address(&self) -> std::result::Result<DB3Address, String> {
+        let b64_str = self.key_pair.encode_base64();
+        let bytes: Vec<u8> = Base64::decode(b64_str.as_str()).unwrap();
+        let offset_bytes = &(bytes[1..]);
+        let private_key = hex::encode(offset_bytes);
+        let wallet = private_key.parse::<LocalWallet>().unwrap();
+        let address = wallet.address();
+        let db3_address = DB3Address::try_from(address.0.as_ref()).unwrap();
+        Ok(db3_address)
     }
 
     ///

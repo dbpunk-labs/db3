@@ -21,8 +21,7 @@ import hre from "hardhat";
 
 describe("DB3 Token test", function () {
   it("get current total apply", async function () {
-    const total_apply = 1000_000_000_000;
-
+    const total_apply = 10_000_000_000_000;
     // deploy a lock contract where funds can be withdrawn
     // one year in the future
     const Token = await hre.ethers.getContractFactory("Db3Token");

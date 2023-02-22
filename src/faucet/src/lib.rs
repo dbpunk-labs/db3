@@ -16,3 +16,4 @@
 //
 
 pub mod faucet_node_impl;
+pub mod fund_faucet;

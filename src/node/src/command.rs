@@ -28,7 +28,10 @@ use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
 use db3_bridge::storage_chain_minter::StorageChainMinter;
 use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
-use db3_faucet::faucet_node_impl::{FaucetNodeConfig, FaucetNodeImpl};
+use db3_faucet::{
+    faucet_node_impl::{FaucetNodeConfig, FaucetNodeImpl},
+    fund_faucet,
+};
 use db3_proto::db3_faucet_proto::faucet_node_server::FaucetNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
@@ -144,8 +147,8 @@ pub enum DB3Command {
         /// the database path to store all faucets
         #[clap(long = "db_path", default_value = "./faucet.db")]
         db_path: String,
-        /// the default amount = 10 db3
-        #[clap(long, default_value = "10000000000")]
+        /// the default amount = 1 db3
+        #[clap(long, default_value = "1000000000")]
         amount: u64,
         #[clap(short, long)]
         verbose: bool,
@@ -156,7 +159,7 @@ pub enum DB3Command {
     /// Run db3 bridge
     #[clap(name = "bridge")]
     Bridge {
-        /// the websocket addres of evm chain
+        /// the websocket address of evm chain
         #[clap(long)]
         evm_chain_ws: String,
         /// the evm chain id
@@ -179,6 +182,26 @@ pub enum DB3Command {
         /// Suppress all output logging (overrides --verbose).
         #[clap(short, long)]
         quiet: bool,
+    },
+
+    /// this is just for development
+    #[clap(name = "fund-faucet")]
+    FundFaucet {
+        /// the websocket address of evm chain
+        #[clap(long)]
+        evm_chain_ws: String,
+        /// the private key of wallet
+        #[clap(long)]
+        private_key: String,
+        /// the faucet evm address
+        #[clap(long)]
+        faucet_address: String,
+        /// the erc20 contract address
+        #[clap(long)]
+        erc20_address: String,
+        /// the fund amount 100 db3
+        #[clap(long, default_value = "100000000000")]
+        amount: u64,
     },
 }
 
@@ -217,6 +240,23 @@ impl DB3Command {
 
     pub async fn execute(self) {
         match self {
+            DB3Command::FundFaucet {
+                evm_chain_ws,
+                private_key,
+                faucet_address,
+                erc20_address,
+                amount,
+            } => {
+                fund_faucet::send_fund_to_faucet(
+                    evm_chain_ws.as_str(),
+                    private_key.as_str(),
+                    erc20_address.as_str(),
+                    faucet_address.as_str(),
+                    amount,
+                )
+                .await
+                .unwrap();
+            }
             DB3Command::Faucet {
                 public_host,
                 public_grpc_port,

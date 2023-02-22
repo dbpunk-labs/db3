@@ -24,4 +24,4 @@ db3-crypto={ path = "../crypto" }
 db3-sdk={ path = "../sdk" }
 tracing = "0.1"
 tonic = "0.8.3"
-
+hex = "0.4.3"
