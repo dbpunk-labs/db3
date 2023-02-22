@@ -137,11 +137,9 @@ pub fn filter_from_json_value(json_str: &str) -> std::result::Result<Option<Filt
     if json_str.is_empty() {
         Ok(None)
     } else {
-
         let filter_doc = json_str_to_bson_document(json_str)
             .map_err(|e| DB3Error::InvalidFilterValue(format!("{:?}", e)))?;
         let field = filter_doc.get_str("field").map_err(|e| {
-
             DB3Error::InvalidFilterJson("filed is required in filter json".to_string())
         })?;
         let value = match filter_doc.get("value") {
