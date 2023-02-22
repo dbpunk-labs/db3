@@ -40,3 +40,6 @@ pub mod db3_database_proto {
 pub mod db3_message_proto {
     tonic::include_proto!("db3_message_proto");
 }
+pub mod db3_faucet_proto {
+    tonic::include_proto!("db3_faucet_proto");
+}

@@ -43,6 +43,7 @@ impl EventStore {
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         Ok(())
     }
+
     ///
     /// store a new DepositEvent. Return DB3Error if the DepositEvent does exist
     ///

@@ -30,6 +30,7 @@ fn main() {
                 "proto/db3_node.proto",
                 "proto/db3_database.proto",
                 "proto/db3_message.proto",
+                "proto/db3_faucet.proto",
             ],
             &["proto"],
         )

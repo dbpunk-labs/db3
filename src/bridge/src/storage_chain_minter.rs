@@ -84,7 +84,6 @@ impl StorageChainMinter {
         let gas: &GenericArray<u8, U32> = GenericArray::from_slice(&s_bytes);
         let sig = K256Signature::from_scalars(*gar, *gas)
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-
         let rsig = RecoverableSignature::new(&sig, recovery_id)
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         let verify_key = rsig

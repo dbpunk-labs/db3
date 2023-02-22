@@ -28,6 +28,8 @@ db3-cmd={path="../cmd", version="0.1.0"}
 db3-sdk={path="../sdk", version="0.1.0"}
 db3-session={path="../session", version="0.1.0"}
 db3-bridge={path="../bridge", version="0.1.0"}
+db3-faucet={path="../faucet", version="0.1.0"}
+ethers = { version = "1.0.0", features = ["ws"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 fastcrypto = { workspace = true, features = ["copy_key"] }

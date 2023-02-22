@@ -97,6 +97,8 @@ pub enum DB3Error {
     DocumentModifiedPermissionError,
     #[error("fail to store event for {0}")]
     StoreEventError(String),
+    #[error("fail to store faucet for {0}")]
+    StoreFaucetError(String),
     #[error("invalid filter value {0}")]
     InvalidFilterValue(String),
     #[error("invalid filter op {0}")]

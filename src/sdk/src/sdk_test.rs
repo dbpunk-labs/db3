@@ -61,7 +61,6 @@ pub fn create_a_mint_mutation(sender: &DB3Address, to: &DB3Address) -> MintCredi
         chain_id: 1,
         block_id: 2,
         tx_id: vec![0],
-        raw_sender: sender.as_ref().to_vec(),
         to: to.as_ref().to_vec(),
         amount: 9 * 1000_000_000,
         meta: Some(meta),

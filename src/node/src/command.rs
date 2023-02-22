@@ -28,11 +28,15 @@ use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
 use db3_bridge::storage_chain_minter::StorageChainMinter;
 use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+use db3_faucet::faucet_node_impl::{FaucetNodeConfig, FaucetNodeImpl};
+use db3_proto::db3_faucet_proto::faucet_node_server::FaucetNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_storage::event_store::EventStore;
+use db3_storage::faucet_store::FaucetStore;
+use ethers::signers::LocalWallet;
 use http::Uri;
 use merkdb::Merk;
 use redb::Database;
@@ -122,6 +126,33 @@ pub enum DB3Command {
         cmd: Option<DB3ClientCommand>,
     },
 
+    /// Run db3 faucet
+    #[clap(name = "faucet")]
+    Faucet {
+        /// Bind the gprc server to this .
+        #[clap(long, default_value = "127.0.0.1")]
+        public_host: String,
+        /// The port of grpc api
+        #[clap(long, default_value = "26649")]
+        public_grpc_port: u16,
+        /// the websocket addres of evm chain
+        #[clap(long)]
+        evm_chain_ws: String,
+        /// the erc20 address
+        #[clap(long)]
+        token_address: String,
+        /// the database path to store all faucets
+        #[clap(long = "db_path", default_value = "./faucet.db")]
+        db_path: String,
+        /// the default amount = 10 db3
+        #[clap(long, default_value = "10000000000")]
+        amount: u64,
+        #[clap(short, long)]
+        verbose: bool,
+        /// Suppress all output logging (overrides --verbose).
+        #[clap(short, long)]
+        quiet: bool,
+    },
     /// Run db3 bridge
     #[clap(name = "bridge")]
     Bridge {
@@ -169,13 +200,13 @@ impl DB3Command {
         };
         let channel = endpoint.connect_lazy();
         let node = Arc::new(StorageNodeClient::new(channel));
-        if !db3_cmd::keystore::KeyStore::has_key() {
-            db3_cmd::keystore::KeyStore::recover_keypair().unwrap();
+        if !db3_cmd::keystore::KeyStore::has_key(None) {
+            db3_cmd::keystore::KeyStore::recover_keypair(None).unwrap();
         }
-        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         let mutation_sdk = MutationSDK::new(node.clone(), signer);
-        let kp = db3_cmd::keystore::KeyStore::get_keypair().unwrap();
+        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         let store_sdk = StoreSDK::new(node, signer);
         DB3ClientContext {
@@ -186,6 +217,63 @@ impl DB3Command {
 
     pub async fn execute(self) {
         match self {
+            DB3Command::Faucet {
+                public_host,
+                public_grpc_port,
+                evm_chain_ws,
+                token_address,
+                db_path,
+                amount,
+                verbose,
+                quiet,
+            } => {
+                let log_level = if quiet {
+                    LevelFilter::OFF
+                } else if verbose {
+                    LevelFilter::DEBUG
+                } else {
+                    LevelFilter::INFO
+                };
+                tracing_subscriber::fmt().with_max_level(log_level).init();
+                info!("{ABOUT}");
+                let path = Path::new(&db_path);
+                let db = Arc::new(Database::create(&path).unwrap());
+                {
+                    let write_txn = db.begin_write().unwrap();
+                    FaucetStore::init_table(write_txn).unwrap();
+                }
+                let mut home = dirs::home_dir().unwrap();
+                home.push(".faucet");
+                let home = Some(home);
+                if !db3_cmd::keystore::KeyStore::has_key(home.clone()) {
+                    db3_cmd::keystore::KeyStore::recover_keypair(home.clone()).unwrap();
+                }
+                let node_list: Vec<String> = vec![evm_chain_ws];
+                let config = FaucetNodeConfig {
+                    erc20_address: token_address,
+                    node_list,
+                    amount,
+                };
+                let pk = db3_cmd::keystore::KeyStore::get_private_key(home.clone()).unwrap();
+                if let Ok(wallet) = pk.parse::<LocalWallet>() {
+                    if let Ok(node) = FaucetNodeImpl::new(db, config, wallet).await {
+                        let addr = format!("{public_host}:{public_grpc_port}");
+                        info!("start db3 faucet node on public addr {}", addr);
+                        let cors_layer = CorsLayer::new()
+                            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+                            .allow_headers(Any)
+                            .allow_origin(Any);
+                        Server::builder()
+                            .accept_http1(true)
+                            .layer(cors_layer)
+                            .layer(tonic_web::GrpcWebLayer::new())
+                            .add_service(FaucetNodeServer::new(node))
+                            .serve(addr.parse().unwrap())
+                            .await
+                            .unwrap();
+                    }
+                }
+            }
             DB3Command::Bridge {
                 evm_chain_ws,
                 evm_chain_id,

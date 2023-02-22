@@ -281,7 +281,7 @@ impl AuthStorage {
     pub fn apply_mint_credits(
         &mut self,
         sender: &DB3Address,
-        nonce: u64,
+        _nonce: u64,
         tx: &TxId,
         mint: &MintCreditsMutation,
     ) -> Result<()> {

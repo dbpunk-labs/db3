@@ -1,6 +1,6 @@
 //
 // lib.rs
-// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#![feature(iter_intersperse)]
-pub mod account_store;
-pub mod bill_store;
-pub mod commit_store;
-mod db3_document;
-mod db_key;
-pub mod db_store;
-mod event_key;
-pub mod event_store;
-mod faucet_key;
-pub mod faucet_store;
-pub mod key;
+
+pub mod faucet_node_impl;

@@ -133,7 +133,7 @@ pub fn filter_from_json_value(json_str: &str) -> std::result::Result<Option<Filt
     } else {
         let filter_doc =
             json_str_to_bson_document(json_str).map_err(|e| DB3Error::InvalidFilterValue(e))?;
-        let field = filter_doc.get_str("field").map_err(|e| {
+        let field = filter_doc.get_str("field").map_err(|_| {
             DB3Error::InvalidFilterJson("filed is required in filter json".to_string())
         })?;
         let value = match filter_doc.get("value") {
@@ -145,7 +145,7 @@ pub fn filter_from_json_value(json_str: &str) -> std::result::Result<Option<Filt
             }
         };
 
-        let op_str = filter_doc.get_str("op").map_err(|e| {
+        let op_str = filter_doc.get_str("op").map_err(|_| {
             DB3Error::InvalidFilterJson("op is required in filter json".to_string())
         })?;
         let op = match op_str {

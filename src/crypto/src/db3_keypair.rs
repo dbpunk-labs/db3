@@ -167,6 +167,7 @@ mod tests {
     use crate::db3_signature::DB3Signature;
     use crate::key_derive;
     use bip39::{Language, Mnemonic, Seed};
+    use hex;
     #[test]
     fn keypair_smoke_test_secp256k1() {
         let mnemonic = Mnemonic::from_phrase(
@@ -254,5 +255,22 @@ mod tests {
         assert_eq!(true, ts_signature_ret.is_ok());
         let is_ok = ts_signature_ret.unwrap().verify(msg.as_ref());
         assert_eq!(true, is_ok.is_ok());
+    }
+
+    #[test]
+    fn test_generate_evm_address() {
+        let private_key_hex = "ad689d9b7751da07b0fb39c5091672cbfe50f59131db015f8a0e76c9790a6fcc";
+        let data = hex::decode(private_key_hex).unwrap();
+        let result = Secp256k1PrivateKey::from_bytes(data.as_ref());
+        assert!(result.is_ok());
+        let kp = Secp256k1KeyPair::from(result.unwrap());
+        let db3_kp = DB3KeyPair::Secp256k1(kp);
+        let msg: [u8; 1] = [0; 1];
+        let signature = db3_kp.try_sign(&msg).unwrap();
+        let db3_address = signature.verify(&msg).unwrap();
+        assert_eq!(
+            "\"0x94fdb38548dca0df72b2ff43ce0d77a8867dd123\"",
+            serde_json::to_string(&db3_address).unwrap()
+        );
     }
 }

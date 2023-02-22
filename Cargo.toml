@@ -11,6 +11,7 @@ members = [
     "src/sdk",
     "src/cmd",
     "src/bridge",
+    "src/faucet",
 ]
 
 [workspace.dependencies]

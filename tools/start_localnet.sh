@@ -41,7 +41,7 @@ echo "start db3 node..."
 ../target/${BUILD_MODE}/db3 start >db3.log 2>&1  &
 sleep 1
 echo "start tendermint node..."
-./tendermint unsafe_reset_all && ./tendermint start >> tm.log 2>&1 &
+./tendermint unsafe_reset_all >> tm.log 2>&1  && ./tendermint start >> tm.log 2>&1 &
 sleep 1
 echo "start evm chain network..."
 ganache --chain.chainId 1 -m 'road entire survey elevator employ toward city flee pupil vessel flock point' > evm.log 2>&1 &

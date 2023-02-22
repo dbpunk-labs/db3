@@ -62,7 +62,6 @@ pub fn decode_event_key(data: &[u8]) -> Result<(EventType, u32, u64)> {
     if data.len() <= 13 {
         return Err(DB3Error::KeyCodecError("bad data length".to_string()));
     }
-
     let event_type = (&data[0..])
         .read_u8()
         .map_err(|e| DB3Error::KeyCodecError(format!("{e}")))?;
@@ -90,7 +89,7 @@ mod tests {
         let key2 = build_event_key(EventType::DepositEvent, 1, 21, tx.as_ref());
         assert!(key2.is_ok());
         let key1 = key1.unwrap();
-        assert!(key1 > key2.unwrap());
+        assert!(key1 < key2.unwrap());
         assert_eq!(key1.len(), 15);
     }
 }

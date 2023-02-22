@@ -287,12 +287,12 @@ impl DB3ClientCommand {
 
     pub async fn execute(self, ctx: &mut DB3ClientContext) -> std::result::Result<Table, String> {
         match self {
-            DB3ClientCommand::Init {} => match KeyStore::recover_keypair() {
+            DB3ClientCommand::Init {} => match KeyStore::recover_keypair(None) {
                 Ok(ks) => ks.show_key(),
                 Err(e) => Err(format!("{:?}", e)),
             },
 
-            DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair() {
+            DB3ClientCommand::ShowKey {} => match KeyStore::recover_keypair(None) {
                 Ok(ks) => ks.show_key(),
                 Err(_) => Err(
                     "no key was found, you can use init command to create a new one".to_string(),
@@ -306,7 +306,7 @@ impl DB3ClientCommand {
             }
             DB3ClientCommand::ShowAccount { addr } => {
                 if addr.is_empty() {
-                    match KeyStore::recover_keypair() {
+                    match KeyStore::recover_keypair(None) {
                         Ok(ks) => {
                             let addr = ks.get_address().unwrap();
                             match ctx.store_sdk.as_ref().unwrap().get_account(&addr).await {
@@ -333,55 +333,7 @@ impl DB3ClientCommand {
                     }
                 }
             }
-            DB3ClientCommand::NewCollection {
-                addr,
-                name,
-                index_list,
-            } => {
-                //TODO validate the index
-                let index_vec: Vec<Index> = index_list
-                    .iter()
-                    .map(|i| serde_json::from_str::<Index>(i.as_str()).unwrap())
-                    .collect();
-                let collection = CollectionMutation {
-                    index: index_vec.to_owned(),
-                    collection_name: name.to_string(),
-                };
-                //TODO check database id and collection name
-                let db_id = DbId::try_from(addr.as_str()).unwrap();
-                let meta = BroadcastMeta {
-                    //TODO get from network
-                    nonce: Self::current_seconds(),
-                    //TODO use config
-                    chain_id: ChainId::DevNet.into(),
-                    //TODO use config
-                    chain_role: ChainRole::StorageShardChain.into(),
-                };
-                let dm = DatabaseMutation {
-                    meta: Some(meta),
-                    collection_mutations: vec![collection],
-                    db_address: db_id.as_ref().to_vec(),
-                    action: DatabaseAction::AddCollection.into(),
-                    document_mutations: vec![],
-                };
-                match ctx
-                    .mutation_sdk
-                    .as_ref()
-                    .unwrap()
-                    .submit_database_mutation(&dm)
-                    .await
-                {
-                    Ok((_, tx_id)) => {
-                        println!("send add collection done!");
-                        let mut table = Table::new();
-                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                        table.set_titles(row!["tx_id"]);
-                        table.add_row(row![tx_id.to_base64()]);
-                        Ok(table)
-                    }
-                    Err(e) => Err(format!("fail to add collection: {e}")),
-                }
-            }
+
             DB3ClientCommand::NewCollection {
                 addr,
                 name,

@@ -12,7 +12,7 @@ contract Db3Token is ERC20 {
     /// the constructor for DB3 Token
     constructor() ERC20("db3 token", "db3") {
         // assign the sender 1000 DB3
-        _mint(msg.sender, 1000 * 10 ** decimals());
+        _mint(msg.sender, 10000000 * 10 ** decimals());
     }
 
     /// the smallest unit is tai
