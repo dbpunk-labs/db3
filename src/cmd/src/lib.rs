@@ -20,5 +20,7 @@
 extern crate prettytable;
 pub mod command;
 pub mod console;
+pub mod deposit;
 pub mod keystore;
 pub mod shell;
+pub mod show_evm_account;

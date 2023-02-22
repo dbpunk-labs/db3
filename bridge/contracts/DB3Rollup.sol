@@ -19,7 +19,7 @@ contract DB3Rollup {
         return true;
     }
 
-    function getLockedBalance() public view returns (uint256) {
-        return _balances[msg.sender];
+    function getLockedBalance(address owner) public view returns (uint256) {
+        return _balances[owner];
     }
 }

@@ -31,7 +31,7 @@ describe("DB3 Rollup test", function () {
     await token.approve(rollup.address, 10 * 1000_000_000);
     expect(await token.balanceOf(owner.address)).to.equal(owner_balance);
     await rollup.deposit(1 * 1000_000_000);
-    expect(await rollup.getLockedBalance()).to.equal(1 * 1000_000_000);
+    expect(await rollup.getLockedBalance(owner.address)).to.equal(1 * 1000_000_000);
     expect(await token.balanceOf(owner.address)).to.equal(9999 * 1000_000_000);
     expect(await token.balanceOf(rollup.address)).to.equal(1 * 1000_000_000);
   });

@@ -16,9 +16,9 @@
 //
 use ethers::{
     contract::abigen,
-    core::types::{Address, Signature, H256},
+    core::types::{Address, Signature, TransactionRequest, H256},
     middleware::SignerMiddleware,
-    providers::{Provider, Ws},
+    providers::{Middleware, Provider, Ws},
     signers::{LocalWallet, Signer},
 };
 
@@ -129,6 +129,19 @@ impl FaucetNode for FaucetNodeImpl {
                 }
             }
         }
+        // 0.05 eth
+        let one_eth: u64 = 50_000_000_000_000_000;
+        // send x_eth to faucet account
+        let tx = TransactionRequest::new()
+            .to(address)
+            .value(one_eth)
+            .from(self.address);
+        self.client
+            .send_transaction(tx, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
         let token_contract = DB3TokenContract::new(self.erc20_address, self.client.clone());
         let balance = token_contract.balance_of(self.address).call().await;
         info!("the main account balance {:?}", balance);

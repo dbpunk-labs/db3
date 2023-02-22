@@ -17,7 +17,9 @@
 
 use clap::*;
 
+use crate::deposit;
 use crate::keystore::KeyStore;
+use crate::show_evm_account;
 use db3_base::{bson_util, strings};
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::{AccountId, DbId, DocumentId, TxId};
@@ -32,6 +34,7 @@ use db3_proto::db3_mutation_proto::{
 use db3_proto::db3_node_proto::NetworkStatus;
 use db3_sdk::{faucet_sdk::FaucetSDK, mutation_sdk::MutationSDK, store_sdk::StoreSDK};
 use ethers::signers::LocalWallet;
+use ethers::types::Address;
 use http::Uri;
 use prettytable::{format, Table};
 use std::sync::Arc;
@@ -166,6 +169,34 @@ pub enum DB3ClientCommand {
         /// the url of db3 faucet grpc api
         #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26649")]
         faucet_grpc_url: String,
+    },
+
+    #[clap(name = "show-evm-account")]
+    ShowEvmAccount {
+        /// the url of evm chain websocket url
+        #[clap(long)]
+        evm_chain_ws: String,
+        /// the db3 erc20 contract address
+        #[clap(long)]
+        token_address: String,
+        /// the db3 rollup contract address
+        #[clap(long)]
+        contract_address: String,
+    },
+    #[clap(name = "deposit")]
+    Deposit {
+        /// the url of evm chain websocket url
+        #[clap(long)]
+        evm_chain_ws: String,
+        /// the db3 erc20 contract address
+        #[clap(long)]
+        token_address: String,
+        /// the db3 rollup contract address
+        #[clap(long)]
+        contract_address: String,
+        /// deposit db3 to rollup contract in db3
+        #[clap(long)]
+        amount: f32,
     },
 }
 
@@ -321,6 +352,73 @@ impl DB3ClientCommand {
 
     pub async fn execute(self, ctx: &mut DB3ClientContext) -> std::result::Result<Table, String> {
         match self {
+            DB3ClientCommand::Deposit {
+                evm_chain_ws,
+                token_address,
+                contract_address,
+                amount,
+            } => {
+                let pk = KeyStore::get_private_key(None).unwrap();
+                if let Ok(wallet) = pk.parse::<LocalWallet>() {
+                    let ok = deposit::lock_balance(
+                        token_address.as_str(),
+                        contract_address.as_str(),
+                        evm_chain_ws.as_str(),
+                        amount,
+                        wallet,
+                    )
+                    .await;
+                    if let Ok(_) = ok {
+                        let mut table = Table::new();
+                        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                        table.set_titles(row!["message"]);
+                        table.add_row(row!["deposit fund to db3 contract successfully"]);
+                        return Ok(table);
+                    }
+                }
+                let mut table = Table::new();
+                table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                table.set_titles(row!["message"]);
+                table.add_row(row!["fail to deposit to db3 rollup contract"]);
+                Ok(table)
+            }
+            DB3ClientCommand::ShowEvmAccount {
+                evm_chain_ws,
+                token_address,
+                contract_address,
+            } => match KeyStore::recover_keypair(None) {
+                Ok(ks) => {
+                    let evm_addr1 = ks.get_evm_address().unwrap();
+                    let evm_addr2 = Address::from_slice(&evm_addr1.to_vec());
+                    let (balance, locked_balance) = show_evm_account::get_account_balance(
+                        &evm_addr2,
+                        &token_address,
+                        &contract_address,
+                        &evm_chain_ws,
+                    )
+                    .await
+                    .unwrap();
+                    let mut table = Table::new();
+                    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+                    table.set_titles(row!["name", "value"]);
+                    table.add_row(row![
+                        "address".to_string(),
+                        AccountId::new(evm_addr1).to_hex()
+                    ]);
+                    table.add_row(row![
+                        "balance".to_string(),
+                        strings::units_to_readable_num_str(balance)
+                    ]);
+                    table.add_row(row![
+                        "locked balance".to_string(),
+                        strings::units_to_readable_num_str(locked_balance)
+                    ]);
+                    Ok(table)
+                }
+                Err(_) => Err(
+                    "no key was found, you can use init command to create a new one".to_string(),
+                ),
+            },
             DB3ClientCommand::Init {} => match KeyStore::recover_keypair(None) {
                 Ok(ks) => ks.show_key(),
                 Err(e) => Err(format!("{:?}", e)),

@@ -1,5 +1,5 @@
 //
-// fund_faucet.rs
+// deposit.rs
 // Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,7 @@
 use ethers::providers::Middleware;
 use ethers::{
     contract::abigen,
-    core::types::{Address, TransactionRequest, U256},
+    core::types::{Address, U256},
     middleware::SignerMiddleware,
     providers::{Provider, Ws},
     signers::{LocalWallet, Signer},
@@ -32,36 +32,35 @@ abigen!(
     "bridge/artifacts/contracts/DB3Token.sol/Db3Token.json"
 );
 
+abigen!(
+    DB3RollupContract,
+    "bridge/artifacts/contracts/DB3Rollup.sol/DB3Rollup.json"
+);
+
 ///
+///TODO handle error
 ///
-/// this method is just for development
-///
-pub async fn send_fund_to_faucet(
-    ws: &str,
-    pk: &str,
+pub async fn lock_balance(
     erc20_token_addr: &str,
-    faucet_addr: &str,
-    amount: u64,
+    rollup_addr: &str,
+    ws: &str,
+    amount: f32,
+    wallet: LocalWallet,
 ) -> Result<()> {
     let provider = Provider::<Ws>::connect(ws).await?;
     let provider_arc = Arc::new(provider);
-    let wallet = pk.parse::<LocalWallet>()?;
     let token_address = erc20_token_addr.parse::<Address>().unwrap();
-    let faucet_address = faucet_addr.parse::<Address>().unwrap();
+    let rollup_address = rollup_addr.parse::<Address>().unwrap();
     let my_address = wallet.address();
     let signable_client = SignerMiddleware::new(provider_arc.clone(), wallet);
     let client = Arc::new(signable_client);
-    let ten_eth: u64 = 10_000_000_000_000_000_000;
-    // send x_eth to faucet account
-    let tx = TransactionRequest::new()
-        .to(faucet_address)
-        .value(ten_eth)
-        .from(my_address);
-    client.send_transaction(tx, None).await?.await?;
-    let token_contract = DB3TokenContract::new(token_address, client);
-    let transfer_amount = U256::from(amount);
-    let transfer_request = token_contract.transfer(faucet_address, transfer_amount);
-    let result = transfer_request.send().await;
-    println!("approve result {:?}", result);
+    let token_contract = DB3TokenContract::new(token_address, client.clone());
+    let approve_amount = U256::from(100_000_000_000 as u64); // 10 db3
+    let approve_request = token_contract.approve(rollup_address, approve_amount);
+    let result = approve_request.send().await;
+    let rollup_contract = DB3RollupContract::new(rollup_address, client);
+    let deposit_amount = U256::from((amount * 1000_000_000.0) as u64);
+    let deposit_request = rollup_contract.deposit(deposit_amount);
+    let result = deposit_request.send().await;
     Ok(())
 }

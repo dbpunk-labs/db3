@@ -40,6 +40,7 @@ fastcrypto = { workspace = true, features = ["copy_key"] }
 ethers = { version = "1.0.0", features = ["ws"] }
 tonic = "0.8.3"
 http = "0.2"
+eyre = "0.6"
 [dev-dependencies]
 db3-session={ path = "../session"}
 db3-crypto={ path = "../crypto"}
