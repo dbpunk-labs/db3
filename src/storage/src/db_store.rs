@@ -813,7 +813,6 @@ impl DbStore {
             start: start_key,
             end: end_key,
         });
-
         let ops = db
             .execute_query(query)
             .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
