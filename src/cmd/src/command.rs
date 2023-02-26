@@ -210,7 +210,7 @@ impl DB3ClientCommand {
     fn show_document(documents: Vec<Document>) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-        table.set_titles(row!["id_base64", "owner", "document", "tx_id"]);
+        table.set_titles(row!["id_base64", "owner", "document", "mutation_id"]);
         let mut error_cnt = 0;
         for document in documents {
             if let Ok(id) = DocumentId::try_from_bytes(document.id.as_slice()) {
@@ -263,7 +263,7 @@ impl DB3ClientCommand {
         table.set_titles(row![
             "database address",
             "sender address",
-            "related transactions",
+            "related mutations",
             "collections"
         ]);
         let tx_list: String = database
@@ -510,7 +510,7 @@ impl DB3ClientCommand {
                         println!("send add collection done!");
                         let mut table = Table::new();
                         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                        table.set_titles(row!["tx_id"]);
+                        table.set_titles(row!["mutation_id"]);
                         table.add_row(row![tx_id.to_base64()]);
                         Ok(table)
                     }
@@ -615,7 +615,7 @@ impl DB3ClientCommand {
                     Ok((db_id, tx_id)) => {
                         let mut table = Table::new();
                         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                        table.set_titles(row!["database address", "transaction id"]);
+                        table.set_titles(row!["database address", "mutation id"]);
                         table.add_row(row![db_id.to_hex(), tx_id.to_base64()]);
                         Ok(table)
                     }
@@ -666,7 +666,7 @@ impl DB3ClientCommand {
                         println!("send add document done");
                         let mut table = Table::new();
                         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                        table.set_titles(row!["transaction id"]);
+                        table.set_titles(row!["mutation id"]);
                         table.add_row(row![tx_id.to_base64()]);
                         Ok(table)
                     }
@@ -722,10 +722,9 @@ impl DB3ClientCommand {
                     .await
                 {
                     Ok((_, tx_id)) => {
-                        println!("send update document done");
                         let mut table = Table::new();
                         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                        table.set_titles(row!["transaction id"]);
+                        table.set_titles(row!["mutation id"]);
                         table.add_row(row![tx_id.to_base64()]);
                         Ok(table)
                     }
@@ -774,7 +773,7 @@ impl DB3ClientCommand {
                         println!("send delete document done");
                         let mut table = Table::new();
                         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-                        table.set_titles(row!["transaction id"]);
+                        table.set_titles(row!["mutation id"]);
                         table.add_row(row![tx_id.to_base64()]);
                         Ok(table)
                     }

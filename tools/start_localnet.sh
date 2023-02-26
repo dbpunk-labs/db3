@@ -38,6 +38,7 @@ then
 fi
 echo "start db3 node..."
 ./tendermint init > tm.log 2>&1 
+export RUST_BACKTRACE=1
 ../target/${BUILD_MODE}/db3 start >db3.log 2>&1  &
 sleep 1
 echo "start tendermint node..."

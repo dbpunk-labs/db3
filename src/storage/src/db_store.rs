@@ -489,6 +489,7 @@ impl DbStore {
                                 info!("skip update doc when masks fields are empty");
                                 continue;
                             }
+                            info!("document id {}", document_mutation.ids[idx].as_str());
                             let document_id =
                                 DocumentId::try_from_base64(document_mutation.ids[idx].as_str())?;
                             let old_document = if let Some(v) = db

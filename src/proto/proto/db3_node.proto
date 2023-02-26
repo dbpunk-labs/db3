@@ -132,6 +132,12 @@ message RunQueryResponse{
 
 message ShowNetworkStatusRequest {}
 
+message SubscribeEventRequest {}
+
+message MutationEvent {
+    bytes hash = 2;
+}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
@@ -152,4 +158,5 @@ service StorageNode {
     rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
     // method for show the network status
     rpc ShowNetworkStatus(ShowNetworkStatusRequest) returns (NetworkStatus){}
+    //rpc SubscribeEvent(SubscribeEventRequest) returns (stream MutationEvent) {}
 }

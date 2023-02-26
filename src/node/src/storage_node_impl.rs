@@ -434,6 +434,10 @@ impl StorageNode for StorageNodeImpl {
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
+
+    //type MutationEventStream = Pin<Box<dyn Stream<Item = Result<MutationEvent, Status>> + Send + 'static>>;
+    //async fn subscribe_event(&self,
+    //                             _request: Request<SubscribeEventRequest>) -> std::result::Result<>
 }
 
 #[cfg(test)]
