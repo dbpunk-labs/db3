@@ -146,7 +146,6 @@ impl AsRef<Document> for DB3Document {
         &self.root
     }
 }
-
 impl TryFrom<Vec<u8>> for DB3Document {
     type Error = DB3Error;
     fn try_from(buf: Vec<u8>) -> std::result::Result<Self, DB3Error> {

@@ -35,7 +35,7 @@ use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
 use itertools::Itertools;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
-use merkdb::{BatchEntry, Merk, Op};
+use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
@@ -310,7 +310,8 @@ impl DbStore {
                                 return Err(DB3Error::DocumentModifiedPermissionError);
                             }
                         } else {
-                            return Err(DB3Error::DocumentNotExist(doc_id_base64.clone()));
+                            warn!("delete doc with id {} not exist", doc_id_base64);
+                            //return Err(DB3Error::DocumentNotExist(doc_id_base64.clone()));
                         }
                     }
                 }
@@ -633,6 +634,7 @@ impl DbStore {
         }
         field_index_map
     }
+
     /// run a query to fetch target documents from given database and collection
     pub fn run_query(
         db: Pin<&Merk>,
@@ -767,6 +769,7 @@ impl DbStore {
             Err(e) => Err(e),
         }
     }
+
     //
     // add document
     //
@@ -791,15 +794,12 @@ impl DbStore {
             Ok(None)
         }
     }
-    //
-    // get documents
-    //
+
     pub fn get_documents(
         db: Pin<&Merk>,
         collection_id: &CollectionId,
         limit: Option<i32>,
     ) -> Result<Vec<Document>> {
-        //TODO use reference
         let start_key = DocumentId::create(collection_id, &DocumentEntryId::zero())
             .unwrap()
             .as_ref()
@@ -808,40 +808,46 @@ impl DbStore {
             .unwrap()
             .as_ref()
             .to_vec();
-        let mut query = Query::new();
-        query.insert_range(std::ops::Range {
-            start: start_key,
-            end: end_key,
-        });
-        let ops = db
-            .execute_query(query)
-            .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
-        let mut values: Vec<_> = Vec::new();
-        let mut idx = 0;
-        for op in ops.iter() {
-            match op {
-                ProofOp::Push(Node::KV(k, v)) => {
-                    let db3_doc = DB3Document::try_from(v.clone())?;
+        let mut it = db.raw_iter();
+        it.seek(start_key);
+        let mut count = 0;
+        let mut docs: Vec<Document> = Vec::new();
+        let end_key_ref: &[u8] = end_key.as_ref();
+        while it.valid() {
+            if limit.is_some() && count >= limit.unwrap() {
+                break;
+            }
+            if let Some(k) = it.key() {
+                if k >= end_key_ref {
+                    break;
+                }
+                if let Some(data) = it.value() {
+                    let tree: Tree = ed::Decode::decode(data).unwrap();
+                    let db3_doc = DB3Document::try_from(tree.value().to_vec())?;
+                    //TODO too much overhead
                     let doc = bson_util::bson_document_into_bytes(db3_doc.get_document()?);
                     let owner = db3_doc.get_owner()?.to_vec();
                     let tx_id = db3_doc.get_tx_id()?.as_ref().to_vec();
-
-                    if limit.is_some() && idx >= limit.unwrap() {
-                        break;
-                    }
-                    idx += 1;
-                    values.push(Document {
+                    docs.push(Document {
                         id: k.to_vec(),
                         doc,
                         owner,
                         tx_id,
-                    })
+                    });
                 }
-                _ => {}
+            } else {
+                //invalid key
+                break;
             }
+            if limit.is_some() && count >= limit.unwrap() {
+                break;
+            }
+            count += 1;
+            it.next();
         }
-        Ok(values)
+        Ok(docs)
     }
+
     pub fn apply_mutation(
         db: Pin<&mut Merk>,
         sender: &DB3Address,
