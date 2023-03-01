@@ -10,7 +10,7 @@ keywords = ["database", "web3", "db3"]
 
 [dependencies]
 
-ethers = { version = "1.0.0", features = ["ws"] }
+ethers = "1.5.0"
 db3-proto={path="../proto", version="0.1.0"}
 db3-error={path="../error", version="0.1.0"}
 db3-crypto={path="../crypto", version="0.1.0"}

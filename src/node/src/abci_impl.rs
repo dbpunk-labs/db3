@@ -20,11 +20,13 @@ shadow!(build);
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
+use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{
     DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
 };
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
+use ethers::core::types::transaction::eip712::{Eip712, TypedData};
 use fastcrypto::encoding::{Base64, Encoding};
 use hex;
 use prost::Message;
@@ -38,6 +40,28 @@ use tendermint_proto::abci::{
 };
 use tracing::{debug, info, span, warn, Level};
 
+macro_rules! parse_mutation {
+    ($func:ident, $type:ident) => {
+        fn $func(&self, payload: &[u8]) -> Result<$type> {
+            match $type::decode(payload) {
+                Ok(dm) => match &dm.meta {
+                    Some(_) => Ok(dm),
+                    None => {
+                        warn!("no meta for mutation");
+                        Err(DB3Error::ApplyMutationError("meta is none".to_string()))
+                    }
+                },
+                Err(e) => {
+                    //TODO add event ?
+                    warn!("invalid mutation data {e}");
+                    Err(DB3Error::ApplyMutationError(
+                        "invalid mutation data".to_string(),
+                    ))
+                }
+            }
+        }
+    };
+}
 #[derive(Clone)]
 pub struct AbciImpl {
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
@@ -54,6 +78,104 @@ impl AbciImpl {
             pending_query_session: Arc::new(Mutex::new(Vec::new())),
             pending_databases: Arc::new(Mutex::new(Vec::new())),
             pending_credits: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+    parse_mutation!(parse_database_mutation, DatabaseMutation);
+    parse_mutation!(parse_mint_credits_mutation, MintCreditsMutation);
+    parse_mutation!(parse_query_session, QuerySession);
+    fn check_payload(&self, payload: &[u8], payload_type: PayloadType) -> bool {
+        match payload_type {
+            Some(PayloadType::DatabasePayload) | Some(PayloadType::TypedDataDatabasePayload) => {
+                return self.parse_database_mutation(payload).is_ok();
+            }
+
+            Some(PayloadType::MintCreditsPayload)
+            | Some(PayloadType::TypedDataMintCreditsPayload) => {
+                return self.parse_mint_credits_mutation(payload).is_ok();
+            }
+
+            Some(PayloadType::QuerySessionPayload)
+            | Some(PayloadType::TypedDataQuerySessionPayload) => {
+                return self.parse_query_session(payload).is_ok();
+            }
+            _ => {
+                warn!("invalid transaction with null payload type");
+                return false;
+            }
+        }
+    }
+
+    fn unwrap_and_verify(&self, req: WriteRequest) -> Result<(Bytes, PayloadType, AccountId)> {
+        if req.payload_type == 3 {
+            // typed data
+            match serde_json::from_slice::<TypedData>(req.payload.as_ref()) {
+                Ok(data) => {
+                    let hashed_message =
+                        data.encode_eip712()
+                            .map_err(DB3Error::ApplyMutationError(format!(
+                                "invalid payload type {e}"
+                            )))?;
+                    let account_id = db3_verifier::DB3Verifier::verify_hashed(
+                        &hashed_message,
+                        req.signature.as_ref(),
+                    )?;
+                    if let (Some(payload), Some(payloadType)) =
+                        (data.message.get("payload"), data.message.get("payloadType"))
+                    {
+                        let data: Bytes = serde_json::from_value(payload)?;
+                        let dataType: PayloadType = PayloadType.from_i32(payloadType).ok_or(
+                            DB3Error::ApplyMutationError("invalid payload type".to_string()),
+                        )?;
+                        Ok((data, dataType, account_id))
+                    } else {
+                        Err(DB3Error::ApplyMutationError("bad typed data".to_string()))
+                    }
+                }
+                Err(e) => Err(DB3Error::ApplyMutationError(format!(
+                    "bad typed data for err {e}"
+                ))),
+            }
+        } else {
+            let account_id =
+                db3_verifier::DB3Verifier::verify(req.payload.as_ref(), req.signature.as_ref())?;
+            let dataType: PayloadType =
+                PayloadType
+                    .from_i32(req.payload_type)
+                    .ok_or(DB3Error::ApplyMutationError(
+                        "invalid payload type".to_string(),
+                    ))?;
+            let data = Bytes::from(req.payload);
+            Ok((data, dataType, account_id))
+        }
+    }
+
+    fn build_check_response(&self, ok: bool, msg: &str) -> RequestCheckTx {
+        if ok {
+            ResponseCheckTx {
+                code: 0,
+                ..Default::default()
+            }
+        } else {
+            ResponseCheckTx {
+                code: 1,
+                log: msg.to_string(),
+                ..Default::default()
+            }
+        }
+    }
+
+    fn build_delivered_response(&self, ok: bool, msg: &str) -> ResponseDeliverTx {
+        if ok {
+            return ResponseDeliverTx {
+                code: 0,
+                ..Default::default()
+            };
+        } else {
+            return ResponseDeliverTx {
+                code: 1,
+                log: msg.to_string(),
+                ..Default::default()
+            };
         }
     }
 }
@@ -107,133 +229,134 @@ impl Application for AbciImpl {
     }
 
     fn check_tx(&self, request: RequestCheckTx) -> ResponseCheckTx {
-        // decode the request
-        match WriteRequest::decode(request.tx.as_ref()) {
-            Ok(request) => match db3_verifier::DB3Verifier::verify(
-                request.payload.as_ref(),
-                request.signature.as_ref(),
-            ) {
-                Ok(_) => {
-                    let payload_type = PayloadType::from_i32(request.payload_type);
-                    match payload_type {
-                        Some(PayloadType::DatabasePayload) => {
-                            match DatabaseMutation::decode(request.payload.as_ref()) {
-                                Ok(dm) => match &dm.meta {
-                                    Some(_) => {
-                                        return ResponseCheckTx {
-                                            code: 0,
-                                            data: Bytes::new(),
-                                            log: "".to_string(),
-                                            info: "".to_string(),
-                                            gas_wanted: 1,
-                                            gas_used: 0,
-                                            events: vec![],
-                                            codespace: "".to_string(),
-                                            ..Default::default()
-                                        };
-                                    }
-                                    None => {
-                                        //TODO add event
-                                        warn!("no meta for database mutation");
-                                    }
-                                },
-                                Err(_) => {
-                                    //TODO add event ?
-                                    warn!("invalid database byte data");
-                                }
+        let wrequest = WriteRequest::decode(request.tx.as_ref());
+        match wrequest {
+            Ok(req) => match self.unwrap_request(req) {
+                Ok((data, data_type, _)) => match data_type {
+                    PayloadType::DatabasePayload => {
+                        match self.parse_database_mutation(data.as_ref()) {
+                            Ok(_) => {
+                                return self.build_check_response(true, "");
                             }
-                        }
-
-                        Some(PayloadType::MintCreditsPayload) => {
-                            match MintCreditsMutation::decode(request.payload.as_ref()) {
-                                Ok(_) => {
-                                    return ResponseCheckTx {
-                                        code: 0,
-                                        data: Bytes::new(),
-                                        log: "".to_string(),
-                                        info: "".to_string(),
-                                        gas_wanted: 1,
-                                        gas_used: 0,
-                                        events: vec![],
-                                        codespace: "".to_string(),
-                                        ..Default::default()
-                                    };
-                                }
-                                Err(e) => {
-                                    warn!("invalid mint credist mutation has been checked for error {}", e);
-                                }
+                            Err(e) => {
+                                let msg = format!("{e}");
+                                return self.build_check_response(false, msg.as_str());
                             }
-                        }
-
-                        Some(PayloadType::QuerySessionPayload) => {
-                            match QuerySession::decode(request.payload.as_ref()) {
-                                Ok(query_session) => {
-                                    match query_session_verifier::verify_query_session(
-                                        &query_session,
-                                    ) {
-                                        Ok(_) => {
-                                            return ResponseCheckTx {
-                                                code: 0,
-                                                data: Bytes::new(),
-                                                log: "".to_string(),
-                                                info: "".to_string(),
-                                                gas_wanted: 1,
-                                                gas_used: 0,
-                                                events: vec![],
-                                                codespace: "".to_string(),
-                                                ..Default::default()
-                                            };
-                                        }
-                                        Err(e) => {
-                                            warn!(
-                                                "invalid transaction has been checked for error {}",
-                                                e
-                                            );
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    warn!("invalid transaction has been checked for error {}", e);
-                                }
-                            }
-                        }
-                        _ => {
-                            warn!("invalid transaction with null payload type");
                         }
                     }
-                }
+                    PayloadType::QuerySessionPayload => {
+                        match self.parse_query_session(data.as_ref()) {
+                            Ok(_) => {
+                                return self.build_check_response(true, "");
+                            }
+                            Err(e) => {
+                                let msg = format!("{e}");
+                                return self.build_check_response(false, msg.as_str());
+                            }
+                        }
+                    }
+                    PayloadType::MintCreditsPayload => {
+                        match self.parse_mint_credits_mutation(data.as_ref()) {
+                            Ok(_) => {
+                                return self.build_check_response(true, "");
+                            }
+                            Err(e) => {
+                                let msg = format!("{e}");
+                                return self.build_check_response(false, msg.as_str());
+                            }
+                        }
+                    }
+                    _ => {
+                        return self.build_check_response(false, "bad mutation payload");
+                    }
+                },
                 Err(e) => {
-                    let payload: &[u8] = request.payload.as_ref();
-                    let signature: &[u8] = request.signature.as_ref();
-                    warn!("invalid transaction has been checked for error {}", e);
-                    warn!(
-                        "payload {}, signature {}",
-                        Base64::encode(payload),
-                        Base64::encode(signature)
-                    );
+                    let msg = format!("{e}");
+                    return self.build_check_response(false, msg.as_str());
                 }
             },
             Err(e) => {
-                warn!("fail to decode WriteRequest for error {}", e);
+                let msg = format!("{e}");
+                return self.build_check_response(false, msg.as_str());
             }
         }
-        // the tx should be removed from mempool
-        return ResponseCheckTx {
-            code: 1,
-            data: Bytes::new(),
-            log: "bad request".to_string(),
-            info: "".to_string(),
-            gas_wanted: 1,
-            gas_used: 0,
-            events: vec![],
-            codespace: "".to_string(),
-            ..Default::default()
-        };
     }
 
     fn deliver_tx(&self, request: RequestDeliverTx) -> ResponseDeliverTx {
         //TODO match the hash fucntion with tendermint
         let tx_id = TxId::from(request.tx.as_ref());
+        let wrequest = WriteRequest::decode(request.tx.as_ref());
+        match wrequest {
+            Ok(req) => match self.unwrap_request(req) {
+                Ok((data, data_type, account_id)) => match data_type {
+                    PayloadType::DatabasePayload => {
+                        match self.parse_database_mutation(data.as_ref()) {
+                            Ok(dm) => match self.pending_databases.lock() {
+                                Ok(mut s) => {
+                                    s.push((account_id.addr, dm, tx_id));
+                                    return self.build_delivered_response(true, "");
+                                }
+                                _ => {
+                                    todo!();
+                                }
+                            },
+                            Err(e) => {
+                                let msg = format!("{e}");
+                                return self.build_delivered_response(false, msg.as_str());
+                            }
+                        }
+                    }
+                    PayloadType::QuerySessionPayload => {
+                        match self.parse_query_session(data.as_ref()) {
+                            Ok(qm) => match self.pending_databases.lock() {
+                                Ok(mut s) => {
+                                    s.push((
+                                        client_account_id.addr,
+                                        account_id.addr,
+                                        tx_id,
+                                        query_session.node_query_session_info.unwrap(),
+                                    ));
+                                }
+                                Err(e) => {}
+                            },
+                            Err(e) => {
+                                let msg = format!("{e}");
+                                return self.build_delivered_response(false, msg.as_str());
+                            }
+                        }
+                    }
+                    PayloadType::MintCreditsPayload => {
+                        match self.parse_mint_credits_mutation(data.as_ref()) {
+                            Ok(mm) => match self.pending_credits.lock() {
+                                Ok(mut s) => {
+                                    s.push((account_id.addr, mm, tx_id));
+                                    return self.build_delivered_response(true, "");
+                                }
+                                Err(e) => {
+                                    let msg = format!("{e}");
+                                    return self.build_delivered_response(false, msg.as_str());
+                                }
+                            },
+                            Err(e) => {
+                                let msg = format!("{e}");
+                                return self.build_delivered_response(false, msg.as_str());
+                            }
+                        }
+                    }
+                    _ => {
+                        return self.build_check_response(false, "bad mutation payload");
+                    }
+                },
+                Err(e) => {
+                    let msg = format!("{e}");
+                    return self.build_check_response(false, msg.as_str());
+                }
+            },
+            Err(e) => {
+                let msg = format!("{e}");
+                return self.build_check_response(false, msg.as_str());
+            }
+        }
         if let Ok(wrequest) = WriteRequest::decode(request.tx.as_ref()) {
             if let Ok(account_id) = db3_verifier::DB3Verifier::verify(
                 wrequest.payload.as_ref(),

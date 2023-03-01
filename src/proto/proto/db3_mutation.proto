@@ -72,6 +72,8 @@ enum PayloadType {
     QuerySessionPayload =0;
     DatabasePayload = 1;
     MintCreditsPayload = 2;
+    // a evm chain request
+    TypedDataPayload = 3;
 }
 
 message WriteRequest {

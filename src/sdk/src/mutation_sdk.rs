@@ -142,9 +142,16 @@ mod tests {
     use crate::mutation_sdk::StorageNodeClient;
     use crate::sdk_test;
     use crate::store_sdk::StoreSDK;
+    use bytes::BytesMut;
     use db3_base::get_a_random_nonce;
     use db3_proto::db3_base_proto::{ChainId, ChainRole};
+    use ethers::core::types::{
+        transaction::eip712::{EIP712Domain, TypedData, Types},
+        Bytes,
+    };
+    use prost::Message;
     use rand::Rng;
+    use std::collections::BTreeMap;
     use std::sync::Arc;
     use std::{thread, time};
     use tonic::transport::Endpoint;
@@ -190,5 +197,30 @@ mod tests {
         assert!(database_ret.unwrap().is_some());
         let result = store_sdk.close_session().await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn typed_mutation_data_sign() {
+        let json = serde_json::json!({
+          "EIP712Domain": [
+          ],
+          "Message":[
+          {"name":"payload", "type":"bytes"},
+          {"name":"payloadType", "type":"int"}
+          ]
+        });
+        let types: Types = serde_json::from_value(json).unwrap();
+        assert_eq!(2, types.len());
+        let dm = sdk_test::create_a_database_mutation();
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        dm.encode(&mut mbuf).unwrap();
+        let buf = mbuf.freeze();
+        let mut message: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        message.insert(
+            "payload".to_string(),
+            serde_json::Value::from(buf.as_ref().to_vec()),
+        );
+        message.insert("payloadType".to_string(), 1);
+        assert_eq!(2, message.len());
     }
 }

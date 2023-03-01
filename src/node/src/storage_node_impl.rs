@@ -22,6 +22,7 @@ use db3_crypto::{db3_verifier::DB3Verifier, id::DbId, id::DocumentId};
 
 use bytes::BytesMut;
 use db3_proto::db3_base_proto::{ChainId, ChainRole};
+use db3_proto::db3_event_proto::EventMessage;
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
@@ -29,6 +30,7 @@ use db3_proto::db3_node_proto::{
     GetDocumentResponse, GetSessionInfoRequest, GetSessionInfoResponse, NetworkStatus,
     OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse, RunQueryRequest,
     RunQueryResponse, ShowDatabaseRequest, ShowDatabaseResponse, ShowNetworkStatusRequest,
+    SubscribeRequest,
 };
 use db3_proto::db3_session_proto::{
     CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
@@ -41,6 +43,7 @@ use std::boxed::Box;
 use std::sync::atomic::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tendermint_rpc::Client;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::info;
 
@@ -60,6 +63,7 @@ impl StorageNodeImpl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeImpl {
+    type SubscribeStream = ReceiverStream<std::result::Result<EventMessage, Status>>;
     async fn show_database(
         &self,
         request: Request<ShowDatabaseRequest>,
@@ -434,10 +438,12 @@ impl StorageNode for StorageNodeImpl {
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
-
-    //type MutationEventStream = Pin<Box<dyn Stream<Item = Result<MutationEvent, Status>> + Send + 'static>>;
-    //async fn subscribe_event(&self,
-    //                             _request: Request<SubscribeEventRequest>) -> std::result::Result<>
+    async fn subscribe(
+        &self,
+        _request: Request<SubscribeRequest>,
+    ) -> std::result::Result<Response<Self::SubscribeStream>, Status> {
+        Err(Status::internal(format!("")))
+    }
 }
 
 #[cfg(test)]

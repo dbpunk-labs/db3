@@ -17,8 +17,12 @@
 //
 
 use crate::account_id::AccountId;
+use crate::db3_address::DB3Address;
+use crate::db3_public_key::DB3PublicKey;
 use crate::db3_signature::{DB3Signature, Signature};
+use crate::signature_scheme::SignatureScheme;
 use db3_error::{DB3Error, Result};
+use fastcrypto::secp256k1::Secp256k1Signature;
 use signature::Signature as _;
 
 pub struct DB3Verifier {}
@@ -29,6 +33,35 @@ impl DB3Verifier {
             .map_err(|e| DB3Error::InvalidSignature(format!("{e}")))?;
         let db3_address = signature.verify(&msg)?;
         Ok(AccountId::new(db3_address))
+    }
+
+    pub fn verify_hashed(hashed: &[u8], signature_raw: &[u8]) -> Result<AccountId> {
+        let signature = Signature::from_bytes(signature_raw)
+            .map_err(|e| DB3Error::InvalidSignature(format!("{e}")))?;
+
+        if let Signature::Secp256k1DB3Signature(_) = signature {
+            let pk = DB3PublicKey::try_from_bytes(
+                SignatureScheme::Secp256k1,
+                signature.public_key_bytes(),
+            )
+            .map_err(|e| DB3Error::InvalidSignature(format!("{e}")))?;
+            let db3_address = DB3Address::from(&pk);
+            if let DB3PublicKey::Secp256k1(spk) = pk {
+                let sig = Secp256k1Signature::from_bytes(signature.signature_bytes())
+                    .map_err(|e| DB3Error::InvalidSignature(format!("{e}")))?;
+                spk.verify_hashed(hashed, &sig)
+                    .map_err(|e| DB3Error::InvalidSignature(format!("{e}")))?;
+                Ok(AccountId::new(db3_address))
+            } else {
+                return Err(DB3Error::InvalidSignature(
+                    "bad public secp256k1 expected".to_string(),
+                ));
+            }
+        } else {
+            return Err(DB3Error::InvalidSignature(
+                "bad signature secp256k1 expected".to_string(),
+            ));
+        }
     }
 }
 

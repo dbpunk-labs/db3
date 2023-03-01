@@ -20,6 +20,8 @@ import "db3_bill.proto";
 import "db3_account.proto";
 import "db3_session.proto";
 import "db3_database.proto";
+import "db3_event.proto";
+
 package db3_node_proto;
 
 message NetworkStatus {
@@ -132,10 +134,9 @@ message RunQueryResponse{
 
 message ShowNetworkStatusRequest {}
 
-message SubscribeEventRequest {}
-
-message MutationEvent {
-    bytes hash = 2;
+message SubscribeRequest {
+    string session_token = 1;
+    db3_event_proto.Subscribution sub = 2;
 }
 
 service StorageNode {
@@ -158,5 +159,5 @@ service StorageNode {
     rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
     // method for show the network status
     rpc ShowNetworkStatus(ShowNetworkStatusRequest) returns (NetworkStatus){}
-    //rpc SubscribeEvent(SubscribeEventRequest) returns (stream MutationEvent) {}
+    rpc Subscribe(SubscribeRequest) returns (stream db3_event_proto.EventMessage) {}
 }
