@@ -666,7 +666,6 @@ mod tests {
         // r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
         // r#"{"name": "Bill","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
         // r#"{"name": "Bill","age": 45,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
-        let mut doc_id1 = String::new();
         let mut doc_id2 = String::new();
         let mut doc_id3 = String::new();
         let mut doc_id4 = String::new();
@@ -678,7 +677,6 @@ mod tests {
         };
         let table = cmd.execute(&mut ctx).await.unwrap();
         assert_eq!(4, table.len());
-        doc_id1 = table.get_row(0).unwrap().get_cell(0).unwrap().get_content();
         doc_id2 = table.get_row(1).unwrap().get_cell(0).unwrap().get_content();
         doc_id3 = table.get_row(2).unwrap().get_cell(0).unwrap().get_content();
         doc_id4 = table.get_row(3).unwrap().get_cell(0).unwrap().get_content();

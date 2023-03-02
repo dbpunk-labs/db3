@@ -15,15 +15,9 @@
 // limitations under the License.
 //
 
-use bytes::BytesMut;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_faucet_proto::{faucet_node_client::FaucetNodeClient, FaucetRequest};
-use ethers::{
-    core::types::{Signature, H256},
-    core::utils::hash_message,
-    signers::{LocalWallet, Signer},
-};
-use prost::Message;
+use ethers::{core::utils::hash_message, signers::LocalWallet};
 use std::sync::Arc;
 
 pub struct FaucetSDK {

@@ -15,6 +15,11 @@
 // limitations under the License.
 //
 
+use ethers::core::types::{
+    transaction::eip712::{EIP712Domain, TypedData, Types},
+    Bytes,
+};
+
 use bytes::BytesMut;
 use db3_crypto::{
     db3_signer::Db3MultiSchemeSigner,
@@ -26,11 +31,13 @@ use db3_proto::db3_mutation_proto::{
 };
 use db3_proto::db3_node_proto::{storage_node_client::StorageNodeClient, BroadcastRequest};
 use prost::Message;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub struct MutationSDK {
     signer: Db3MultiSchemeSigner,
     client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+    types: Types,
 }
 
 impl MutationSDK {
@@ -38,7 +45,20 @@ impl MutationSDK {
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
         signer: Db3MultiSchemeSigner,
     ) -> Self {
-        Self { client, signer }
+        let json = serde_json::json!({
+          "EIP712Domain": [
+          ],
+          "Message":[
+          {"name":"payload", "type":"bytes"},
+          {"name":"payloadType", "type":"string"}
+          ]
+        });
+        let types: Types = serde_json::from_value(json).unwrap();
+        Self {
+            client,
+            signer,
+            types,
+        }
     }
 
     pub async fn submit_mint_credit_mutation(
@@ -83,6 +103,72 @@ impl MutationSDK {
             .map_err(|_| DB3Error::InvalidAddress)?;
         let tx_id = TxId::from(hash);
         Ok(tx_id)
+    }
+
+    pub async fn submit_in_typed_data(
+        &self,
+        database_mutation: &DatabaseMutation,
+    ) -> Result<(DbId, TxId)> {
+        let nonce: u64 = match &database_mutation.meta {
+            Some(m) => Ok(m.nonce),
+            None => Err(DB3Error::SubmitMutationError(
+                "meta in mutation is none".to_string(),
+            )),
+        }?;
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        database_mutation
+            .encode(&mut mbuf)
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{e}")))?;
+        let mbuf = Bytes(mbuf.freeze());
+        let mut message: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        message.insert(
+            "payload".to_string(),
+            serde_json::Value::from(format!("{mbuf}")),
+        );
+        message.insert("payloadType".to_string(), serde_json::Value::from("1"));
+        let typed_data = TypedData {
+            domain: EIP712Domain {
+                name: None,
+                version: None,
+                chain_id: None,
+                verifying_contract: None,
+                salt: None,
+            },
+            types: self.types.clone(),
+            primary_type: "Message".to_string(),
+            message,
+        };
+        let signature = self.signer.sign_typed_data(&typed_data)?;
+        let buf = serde_json::to_vec(&typed_data)
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{e}")))?;
+        let request = WriteRequest {
+            signature,
+            payload: buf,
+            payload_type: PayloadType::TypedDataPayload.into(),
+        };
+        let mut buf = BytesMut::with_capacity(1024 * 4);
+        request
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{e}")))?;
+        let buf = buf.freeze();
+        let r = BroadcastRequest {
+            body: buf.as_ref().to_vec(),
+        };
+        let request = tonic::Request::new(r);
+        let mut client = self.client.as_ref().clone();
+        let response = client
+            .broadcast(request)
+            .await
+            .map_err(|e| DB3Error::SubmitMutationError(format!("{e}")))?
+            .into_inner();
+        let hash: [u8; TX_ID_LENGTH] = response
+            .hash
+            .try_into()
+            .map_err(|_| DB3Error::InvalidAddress)?;
+        let tx_id = TxId::from(hash);
+        let sender = self.signer.get_address()?;
+        let db_id = DbId::try_from((&sender, nonce))?;
+        Ok((db_id, tx_id))
     }
 
     pub async fn submit_database_mutation(
@@ -200,27 +286,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn typed_mutation_data_sign() {
-        let json = serde_json::json!({
-          "EIP712Domain": [
-          ],
-          "Message":[
-          {"name":"payload", "type":"bytes"},
-          {"name":"payloadType", "type":"int"}
-          ]
-        });
-        let types: Types = serde_json::from_value(json).unwrap();
-        assert_eq!(2, types.len());
+    async fn typed_mutation_data_test() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
+        let sdk = MutationSDK::new(client.clone(), signer);
         let dm = sdk_test::create_a_database_mutation();
-        let mut mbuf = BytesMut::with_capacity(1024 * 4);
-        dm.encode(&mut mbuf).unwrap();
-        let buf = mbuf.freeze();
-        let mut message: BTreeMap<String, serde_json::Value> = BTreeMap::new();
-        message.insert(
-            "payload".to_string(),
-            serde_json::Value::from(buf.as_ref().to_vec()),
-        );
-        message.insert("payloadType".to_string(), 1);
-        assert_eq!(2, message.len());
+        let result = sdk.submit_in_typed_data(&dm).await;
+        assert!(result.is_ok());
+        let (db_id, _) = result.unwrap();
+        let millis = time::Duration::from_millis(2000);
+        thread::sleep(millis);
+        let (_, signer) = sdk_test::gen_secp256k1_signer();
+        let mut store_sdk = StoreSDK::new(client, signer);
+        let database_ret = store_sdk.get_database(db_id.to_hex().as_str()).await;
+        assert!(database_ret.is_ok());
+        assert!(database_ret.unwrap().is_some());
+        let result = store_sdk.close_session().await;
+        assert!(result.is_ok());
     }
 }

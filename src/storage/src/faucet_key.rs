@@ -28,6 +28,7 @@ pub fn build_faucet_key(addr: &[u8], ts: u32) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
+#[allow(dead_code)]
 pub fn decode_faucet_key(data: &[u8]) -> Result<(Vec<u8>, u32)> {
     if data.len() != 24 {
         return Err(DB3Error::KeyCodecError("bad data length".to_string()));

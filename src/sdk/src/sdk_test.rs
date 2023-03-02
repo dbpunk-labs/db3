@@ -25,8 +25,14 @@ use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;
 use db3_proto::db3_mutation_proto::DocumentMutation;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, MintCreditsMutation};
+use ethers::core::types::{
+    transaction::eip712::{EIP712Domain, TypedData, Types},
+    Bytes,
+};
+use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[cfg(test)]
 pub fn gen_ed25519_signer(seed_u8: u8) -> (DB3Address, Db3MultiSchemeSigner) {
     let seed: [u8; 32] = [seed_u8; 32];
     let (addr, kp) =
@@ -34,12 +40,15 @@ pub fn gen_ed25519_signer(seed_u8: u8) -> (DB3Address, Db3MultiSchemeSigner) {
     (addr, Db3MultiSchemeSigner::new(kp))
 }
 
+#[cfg(test)]
 pub fn gen_secp256k1_signer() -> (DB3Address, Db3MultiSchemeSigner) {
     let seed: [u8; 32] = [0; 32];
     let (addr, kp) =
         key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1).unwrap();
     (addr, Db3MultiSchemeSigner::new(kp))
 }
+
+#[cfg(test)]
 fn current_seconds() -> u64 {
     match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs(),
@@ -47,7 +56,8 @@ fn current_seconds() -> u64 {
     }
 }
 
-pub fn create_a_mint_mutation(sender: &DB3Address, to: &DB3Address) -> MintCreditsMutation {
+#[cfg(test)]
+pub fn create_a_mint_mutation(_sender: &DB3Address, to: &DB3Address) -> MintCreditsMutation {
     let meta = BroadcastMeta {
         //TODO get from network
         nonce: current_seconds(),
@@ -67,6 +77,7 @@ pub fn create_a_mint_mutation(sender: &DB3Address, to: &DB3Address) -> MintCredi
     }
 }
 
+#[cfg(test)]
 pub fn create_a_database_mutation() -> DatabaseMutation {
     let meta = BroadcastMeta {
         //TODO get from network
@@ -87,6 +98,7 @@ pub fn create_a_database_mutation() -> DatabaseMutation {
     dm
 }
 
+#[cfg(test)]
 pub fn create_a_collection_mutataion(name: &str, addr: &DB3Address) -> DatabaseMutation {
     let meta = BroadcastMeta {
         //TODO get from network
@@ -114,6 +126,7 @@ pub fn create_a_collection_mutataion(name: &str, addr: &DB3Address) -> DatabaseM
     dm
 }
 
+#[cfg(test)]
 pub fn add_documents(name: &str, addr: &DB3Address, doc_vec: &Vec<&str>) -> DatabaseMutation {
     let meta = BroadcastMeta {
         //TODO get from network

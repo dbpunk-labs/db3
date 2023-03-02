@@ -23,7 +23,7 @@ use db3_error::{DB3Error, Result};
 use fastcrypto::hash::{HashFunction, Sha3_256};
 use rust_secp256k1::hashes::{sha256, Hash};
 use rust_secp256k1::ThirtyTwoByteHash;
-use std::{fmt, mem};
+use std::fmt;
 
 // it's ethereum compatiable account id
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]

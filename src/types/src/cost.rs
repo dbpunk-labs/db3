@@ -136,6 +136,7 @@ mod tests {
             id: 1,
             start_time: Utc::now().timestamp(),
             query_count: 10,
+            meta: None,
         };
         let gas_fee = estimate_query_session_gas(&node_query_session_info);
         let target_fee = 1000;

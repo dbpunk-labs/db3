@@ -19,16 +19,18 @@ use bytes::BytesMut;
 use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
 use db3_proto::db3_account_proto::Account;
+use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_bill_proto::Bill;
 use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
+use db3_proto::db3_mutation_proto::PayloadType;
 use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
     GetDocumentRequest, GetSessionInfoRequest, NetworkStatus, OpenSessionRequest,
     OpenSessionResponse, QueryBillKey, QueryBillRequest, RunQueryRequest, RunQueryResponse,
     SessionIdentifier, ShowDatabaseRequest, ShowNetworkStatusRequest,
 };
-use db3_proto::db3_session_proto::{CloseSessionPayload, OpenSessionPayload, QuerySessionInfo};
+use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
 use num_traits::cast::FromPrimitive;
 use prost::Message;
@@ -230,28 +232,38 @@ impl StoreSDK {
         match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
-                let payload = CloseSessionPayload {
-                    session_info: Some(query_session_info.clone()),
-                    session_token: token.to_string(),
+                let meta = BroadcastMeta {
+                    //TODO get from network
+                    nonce: 1,
+                    //TODO use config
+                    chain_id: ChainId::DevNet.into(),
+                    //TODO use config
+                    chain_role: ChainRole::StorageShardChain.into(),
+                };
+
+                let session = QuerySessionInfo {
+                    meta: Some(meta),
+                    id: query_session_info.id,
+                    start_time: query_session_info.start_time,
+                    query_count: query_session_info.query_count,
                 };
 
                 let mut buf = BytesMut::with_capacity(1024 * 8);
-                payload
+                session
                     .encode(&mut buf)
                     .map_err(|e| Status::internal(format!("{e}")))?;
-
                 let buf = buf.freeze();
-
                 let signature = self
                     .signer
                     .sign(buf.as_ref())
                     .map_err(|e| Status::internal(format!("{e}")))?;
-
+                // protobuf payload
                 let r = CloseSessionRequest {
                     payload: buf.as_ref().to_vec(),
                     signature: signature.as_ref().to_vec(),
+                    session_token: token.to_string(),
+                    payload_type: PayloadType::QuerySessionPayload.into(),
                 };
-
                 let request = tonic::Request::new(r);
                 let mut client = self.client.as_ref().clone();
                 match client.close_query_session(request).await {
@@ -268,6 +280,7 @@ impl StoreSDK {
             None => Err(Status::internal(format!("Session {} not exist", token))),
         }
     }
+
     /// close session
     /// 1. verify Account
     /// 2. request close_query_session
@@ -356,9 +369,7 @@ mod tests {
     use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
     use db3_proto::db3_database_proto::structured_query::filter::FilterType;
     use db3_proto::db3_database_proto::structured_query::value::ValueType;
-    use db3_proto::db3_database_proto::structured_query::{
-        FieldFilter, Filter, Limit, Projection, Value,
-    };
+    use db3_proto::db3_database_proto::structured_query::{FieldFilter, Filter, Projection, Value};
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_proto::db3_node_proto::OpenSessionRequest;
     use db3_proto::db3_session_proto::OpenSessionPayload;

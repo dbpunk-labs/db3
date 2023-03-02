@@ -26,10 +26,6 @@ use db3_crypto::{
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
 use db3_proto::db3_database_proto::structured_query::filter::FilterType;
-use db3_proto::db3_database_proto::structured_query::value::ValueType;
-use db3_proto::db3_database_proto::structured_query::{
-    FieldFilter, Filter, Limit, Projection, Value,
-};
 use db3_proto::db3_database_proto::{Collection, Database, Document, Index, StructuredQuery};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
@@ -37,7 +33,7 @@ use itertools::Itertools;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -124,8 +120,8 @@ impl DbStore {
             .iter()
             .map(move |x| {
                 idx += 1;
-                collection_count += 1;
-                index_count += x.index.len() as u64;
+                collection_count = collection_count + 1;
+                index_count = index_count + x.index.len() as u64;
                 (
                     x.collection_name.to_string(),
                     Collection {
@@ -904,6 +900,9 @@ mod tests {
     use db3_base::bson_util;
     use db3_crypto::key_derive;
     use db3_crypto::signature_scheme::SignatureScheme;
+    use db3_proto::db3_database_proto::structured_query::{
+        value::ValueType, FieldFilter, Filter, Limit, Projection, Value,
+    };
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
         index::IndexField,

@@ -21,8 +21,10 @@ use ethereum_types::Address as AccountAddress;
 use hex::FromHex;
 use rand::Rng;
 
+//
 // this function is used for testing
 //
+#[allow(dead_code)]
 pub fn get_a_static_keypair() -> Keypair {
     let secret_key: &[u8] = b"833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42";
     let public_key: &[u8] = b"ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf";
@@ -43,6 +45,7 @@ pub fn get_a_static_address() -> AccountAddress {
     get_address_from_pk(&kp.public)
 }
 
+#[allow(dead_code)]
 pub fn get_a_ts_static_keypair() -> Keypair {
     let secret_key: &[u8] = b"ea82176302fbf6b10a6c7ff25dc77b4b7dee0126841af0fc3621d7ed0ac7c9c99806d5ba5c35c68ff63850fb3f4c5dfc79135c3c2c76a560eeaee6f2135830d6";
     let public_key: &[u8] = b"9806d5ba5c35c68ff63850fb3f4c5dfc79135c3c2c76a560eeaee6f2135830d6";

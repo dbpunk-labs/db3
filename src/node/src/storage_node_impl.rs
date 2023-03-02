@@ -21,7 +21,7 @@ use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_crypto::{db3_verifier::DB3Verifier, id::DbId, id::DocumentId};
 
 use bytes::BytesMut;
-use db3_proto::db3_base_proto::{ChainId, ChainRole};
+use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_event_proto::EventMessage;
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
@@ -32,9 +32,7 @@ use db3_proto::db3_node_proto::{
     RunQueryResponse, ShowDatabaseRequest, ShowDatabaseResponse, ShowNetworkStatusRequest,
     SubscribeRequest,
 };
-use db3_proto::db3_session_proto::{
-    CloseSessionPayload, OpenSessionPayload, QuerySession, QuerySessionInfo,
-};
+use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
@@ -221,16 +219,14 @@ impl StorageNode for StorageNodeImpl {
         let client_signature: &[u8] = r.signature.as_ref();
         DB3Verifier::verify(client_query_session, client_signature)
             .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        let payload = CloseSessionPayload::decode(r.payload.as_ref())
+        let query_session_info = QuerySessionInfo::decode(r.payload.as_ref())
             .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
-        let mut node_query_session_info: Option<QuerySessionInfo> = None;
-        match self.context.node_store.lock() {
+        let node_query_session_info = match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
                 // Verify query session sdk
-                match sess_store.get_session_mut(&payload.session_token) {
+                match sess_store.get_session_mut(&r.session_token) {
                     Some(sess) => {
-                        let query_session_info = &payload.session_info.unwrap();
                         if !query_session_verifier::check_query_session_info(
                             &sess.get_session_info(),
                             &query_session_info,
@@ -245,31 +241,37 @@ impl StorageNode for StorageNodeImpl {
                     None => {
                         return Err(Status::not_found(format!(
                             "session {} not found in the session store",
-                            payload.session_token
+                            r.session_token
                         )));
                     }
                 }
                 // Takes a reference and returns Option<&V>
                 let sess = sess_store
-                    .remove_session(&payload.session_token)
+                    .remove_session(&r.session_token)
                     .map_err(|e| Status::internal(format!("{}", e)))
                     .unwrap();
-                node_query_session_info = Some(sess.get_session_info());
+                Some(sess.get_session_info())
             }
             Err(e) => return Err(Status::internal(format!("{}", e))),
-        }
+        };
         // Generate Nonce
         let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(n) => n.as_secs(),
             Err(_) => 0,
         };
-        let query_session = QuerySession {
+        let meta = BroadcastMeta {
+            //TODO get from network
             nonce,
-            chain_id: ChainId::MainNet.into(),
+            //TODO use config
+            chain_id: ChainId::DevNet.into(),
+            //TODO use config
             chain_role: ChainRole::StorageShardChain.into(),
-            node_query_session_info: node_query_session_info.clone(),
-            client_query_session: client_query_session.to_vec().to_owned(),
+        };
+        let query_session = QuerySession {
+            payload: r.payload.to_vec(),
             client_signature: client_signature.to_vec().to_owned(),
+            meta: Some(meta),
+            payload_type: r.payload_type,
         };
         // Submit query session
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
@@ -277,28 +279,23 @@ impl StorageNode for StorageNodeImpl {
             Status::internal(format!("fail to submit query session with error {}", e))
         })?;
         let mbuf = mbuf.freeze();
-
         let signature = self.signer.sign(mbuf.as_ref()).map_err(|e| {
             Status::internal(format!("fail to submit query session with error {e}"))
         })?;
-
         let request = WriteRequest {
             signature: signature.as_ref().to_vec().to_owned(),
             payload: mbuf.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::QuerySessionPayload.into(),
         };
-
         //TODO add the capacity to mutation sdk configuration
         let mut buf = BytesMut::with_capacity(1024 * 4);
         request.encode(&mut buf).map_err(|e| {
             Status::internal(format!("fail to submit query session with error {e}"))
         })?;
-
         let buf = buf.freeze();
         let r = BroadcastRequest {
             body: buf.as_ref().to_vec(),
         };
-
         let request = tonic::Request::new(r);
         let response = self
             .broadcast(request)

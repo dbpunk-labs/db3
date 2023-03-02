@@ -50,11 +50,13 @@ impl DbKey {
         Ok(Self(id))
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn max() -> Self {
         DbKey(DbId::max_id())
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn min() -> Self {
         DbKey(DbId::min_id())

@@ -19,6 +19,7 @@
 syntax = "proto3";
 import "db3_base.proto";
 import "db3_database.proto";
+
 package db3_mutation_proto;
 
 enum DatabaseAction {

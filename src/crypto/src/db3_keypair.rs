@@ -52,6 +52,14 @@ impl DB3KeyPair {
             DB3KeyPair::Secp256k1(kp) => DB3PublicKey::Secp256k1(kp.public().clone()),
         }
     }
+    pub fn try_sign_hashed_message(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, DB3Error> {
+        match self {
+            DB3KeyPair::Ed25519(_) => Err(DB3Error::SignError(
+                "signing hashed message is not supperted with ed25519".to_string(),
+            )),
+            DB3KeyPair::Secp256k1(kp) => Secp256k1DB3Signature::new_hashed(&kp, msg),
+        }
+    }
 }
 
 impl Signer<Signature> for DB3KeyPair {

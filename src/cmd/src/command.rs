@@ -39,7 +39,7 @@ use http::Uri;
 use prettytable::{format, Table};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tonic::transport::{ClientTlsConfig, Endpoint, Server};
+use tonic::transport::{ClientTlsConfig, Endpoint};
 
 pub struct DB3ClientContext {
     pub mutation_sdk: Option<MutationSDK>,

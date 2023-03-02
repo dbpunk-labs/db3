@@ -21,6 +21,7 @@ import "db3_account.proto";
 import "db3_session.proto";
 import "db3_database.proto";
 import "db3_event.proto";
+import "db3_mutation.proto";
 
 package db3_node_proto;
 
@@ -79,8 +80,12 @@ message OpenSessionResponse {
 }
 
 message CloseSessionRequest {
+    // the query session info
     bytes payload = 1;
+    // the signature of query session info
     bytes signature = 2;
+    string session_token = 3;
+    db3_mutation_proto.PayloadType payload_type = 4;
 }
 
 message CloseSessionResponse {
@@ -159,5 +164,6 @@ service StorageNode {
     rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
     // method for show the network status
     rpc ShowNetworkStatus(ShowNetworkStatusRequest) returns (NetworkStatus){}
+    // method for subscribution
     rpc Subscribe(SubscribeRequest) returns (stream db3_event_proto.EventMessage) {}
 }
