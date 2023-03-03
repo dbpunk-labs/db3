@@ -70,6 +70,7 @@ message GetSessionInfoRequest {
 message OpenSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
+    db3_mutation_proto.PayloadType payload_type = 3;
 }
 
 message OpenSessionResponse {

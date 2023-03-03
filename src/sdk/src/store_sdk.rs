@@ -32,8 +32,13 @@ use db3_proto::db3_node_proto::{
 };
 use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
+use ethers::core::types::{
+    transaction::eip712::{EIP712Domain, TypedData, Types},
+    Bytes,
+};
 use num_traits::cast::FromPrimitive;
 use prost::Message;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tonic::Status;
 use uuid::Uuid;
@@ -42,17 +47,32 @@ pub struct StoreSDK {
     client: Arc<StorageNodeClient<tonic::transport::Channel>>,
     signer: Db3MultiSchemeSigner,
     session_pool: SessionPool,
+    types: Types,
+    use_typed_format: bool,
 }
 
 impl StoreSDK {
     pub fn new(
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
         signer: Db3MultiSchemeSigner,
+        use_typed_format: bool,
     ) -> Self {
+        let json = serde_json::json!({
+          "EIP712Domain": [
+          ],
+          "Message":[
+          {"name":"payload", "type":"bytes"},
+          {"name":"payloadType", "type":"string"}
+          ]
+        });
+        let types: Types = serde_json::from_value(json).unwrap();
+
         Self {
             client,
             signer,
             session_pool: SessionPool::new(),
+            types,
+            use_typed_format,
         }
     }
 
@@ -62,7 +82,8 @@ impl StoreSDK {
                 Some(session) => {
                     if session.get_session_query_count() > 2000 {
                         // close session
-                        self.close_session_internal(&token).await?;
+                        self.close_session_internal(&token, self.use_typed_format)
+                            .await?;
                         let response = self.open_session().await?;
                         Ok(response.session_token)
                     } else {
@@ -198,18 +219,16 @@ impl StoreSDK {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp(),
         };
-        let mut buf = BytesMut::with_capacity(1024 * 8);
-        payload
-            .encode(&mut buf)
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let buf = buf.freeze();
-        let signature = self
-            .signer
-            .sign(buf.as_ref())
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let r = OpenSessionRequest {
-            payload: buf.as_ref().to_vec(),
-            signature: signature.as_ref().to_vec(),
+
+        let r = match self.use_typed_format {
+            true => {
+                let r = self.wrap_typed_open_session(&payload)?;
+                r
+            }
+            false => {
+                let r = self.wrap_proto_open_session(&payload)?;
+                r
+            }
         };
         let request = tonic::Request::new(r);
         let mut client = self.client.as_ref().clone();
@@ -225,44 +244,163 @@ impl StoreSDK {
         }
     }
 
+    fn wrap_proto_open_session(
+        &self,
+        payload: &OpenSessionPayload,
+    ) -> std::result::Result<OpenSessionRequest, Status> {
+        let mut buf = BytesMut::with_capacity(1024 * 8);
+        payload
+            .encode(&mut buf)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let buf = buf.freeze();
+        let signature = self
+            .signer
+            .sign(buf.as_ref())
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let r = OpenSessionRequest {
+            payload: buf.as_ref().to_vec(),
+            signature: signature.as_ref().to_vec(),
+            payload_type: PayloadType::QuerySessionPayload.into(),
+        };
+        Ok(r)
+    }
+
+    fn wrap_typed_open_session(
+        &self,
+        payload: &OpenSessionPayload,
+    ) -> std::result::Result<OpenSessionRequest, Status> {
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        payload
+            .encode(&mut mbuf)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let mbuf = Bytes(mbuf.freeze());
+        let mut message: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        message.insert(
+            "payload".to_string(),
+            serde_json::Value::from(format!("{mbuf}")),
+        );
+        message.insert("payloadType".to_string(), serde_json::Value::from("0"));
+        let typed_data = TypedData {
+            domain: EIP712Domain {
+                name: None,
+                version: None,
+                chain_id: None,
+                verifying_contract: None,
+                salt: None,
+            },
+            types: self.types.clone(),
+            primary_type: "Message".to_string(),
+            message,
+        };
+        let signature = self
+            .signer
+            .sign_typed_data(&typed_data)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let buf = serde_json::to_vec(&typed_data).map_err(|e| Status::internal(format!("{e}")))?;
+        let r = OpenSessionRequest {
+            payload: buf,
+            signature,
+            payload_type: PayloadType::TypedDataPayload.into(),
+        };
+        Ok(r)
+    }
+
+    fn wrap_proto_close_session(
+        &self,
+        session: &QuerySessionInfo,
+        token: &str,
+    ) -> std::result::Result<CloseSessionRequest, Status> {
+        let mut buf = BytesMut::with_capacity(1024 * 8);
+        session
+            .encode(&mut buf)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let buf = buf.freeze();
+        let signature = self
+            .signer
+            .sign(buf.as_ref())
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        // protobuf payload
+        let r = CloseSessionRequest {
+            payload: buf.as_ref().to_vec(),
+            signature: signature.as_ref().to_vec(),
+            session_token: token.to_string(),
+            payload_type: PayloadType::QuerySessionPayload.into(),
+        };
+        Ok(r)
+    }
+    fn wrap_typed_close_session(
+        &self,
+        session: &QuerySessionInfo,
+        token: &str,
+    ) -> std::result::Result<CloseSessionRequest, Status> {
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        session
+            .encode(&mut mbuf)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let mbuf = Bytes(mbuf.freeze());
+        let mut message: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        message.insert(
+            "payload".to_string(),
+            serde_json::Value::from(format!("{mbuf}")),
+        );
+        message.insert("payloadType".to_string(), serde_json::Value::from("0"));
+        let typed_data = TypedData {
+            domain: EIP712Domain {
+                name: None,
+                version: None,
+                chain_id: None,
+                verifying_contract: None,
+                salt: None,
+            },
+            types: self.types.clone(),
+            primary_type: "Message".to_string(),
+            message,
+        };
+        let signature = self
+            .signer
+            .sign_typed_data(&typed_data)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let buf = serde_json::to_vec(&typed_data).map_err(|e| Status::internal(format!("{e}")))?;
+        let r = CloseSessionRequest {
+            payload: buf,
+            signature,
+            session_token: token.to_string(),
+            payload_type: PayloadType::TypedDataPayload.into(),
+        };
+        Ok(r)
+    }
+
     async fn close_session_internal(
         &mut self,
         token: &str,
+        use_typed_format: bool,
     ) -> std::result::Result<QuerySessionInfo, Status> {
         match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
                 let meta = BroadcastMeta {
                     //TODO get from network
-                    nonce: 1,
+                    nonce: Utc::now().timestamp() as u64,
                     //TODO use config
                     chain_id: ChainId::DevNet.into(),
                     //TODO use config
                     chain_role: ChainRole::StorageShardChain.into(),
                 };
-
                 let session = QuerySessionInfo {
                     meta: Some(meta),
                     id: query_session_info.id,
                     start_time: query_session_info.start_time,
                     query_count: query_session_info.query_count,
                 };
-
-                let mut buf = BytesMut::with_capacity(1024 * 8);
-                session
-                    .encode(&mut buf)
-                    .map_err(|e| Status::internal(format!("{e}")))?;
-                let buf = buf.freeze();
-                let signature = self
-                    .signer
-                    .sign(buf.as_ref())
-                    .map_err(|e| Status::internal(format!("{e}")))?;
-                // protobuf payload
-                let r = CloseSessionRequest {
-                    payload: buf.as_ref().to_vec(),
-                    signature: signature.as_ref().to_vec(),
-                    session_token: token.to_string(),
-                    payload_type: PayloadType::QuerySessionPayload.into(),
+                let r = match use_typed_format {
+                    true => {
+                        let close_request = self.wrap_typed_close_session(&session, token)?;
+                        close_request
+                    }
+                    false => {
+                        let close_request = self.wrap_proto_close_session(&session, token)?;
+                        close_request
+                    }
                 };
                 let request = tonic::Request::new(r);
                 let mut client = self.client.as_ref().clone();
@@ -287,7 +425,8 @@ impl StoreSDK {
     /// 3. return node's CloseSessionResponse(query session info and signature) and client's CloseSessionResponse (query session info and signature)
     pub async fn close_session(&mut self) -> std::result::Result<(), Status> {
         if let Some(token) = self.session_pool.get_last_token() {
-            self.close_session_internal(token.as_str()).await?;
+            self.close_session_internal(token.as_str(), self.use_typed_format)
+                .await?;
         }
         Ok(())
     }
@@ -372,51 +511,55 @@ mod tests {
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use db3_proto::db3_node_proto::OpenSessionRequest;
     use db3_proto::db3_session_proto::OpenSessionPayload;
-    use rand::random;
     use std::sync::Arc;
     use std::time;
     use tonic::transport::Endpoint;
     use uuid::Uuid;
 
-    #[tokio::test]
-    async fn it_get_bills() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
+    async fn run_get_bills_flow(
+        use_typed_format: bool,
+        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+        counter: i64,
+    ) {
         let mclient = client.clone();
-        let seed_u8: u8 = random();
         {
-            let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
-            let msdk = MutationSDK::new(mclient, signer);
+            let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+            let msdk = MutationSDK::new(mclient, signer, use_typed_format);
             let dm = sdk_test::create_a_database_mutation();
             let result = msdk.submit_database_mutation(&dm).await;
             assert!(result.is_ok(), "{:?}", result.err());
             let ten_millis = time::Duration::from_millis(2000);
             std::thread::sleep(ten_millis);
         }
-        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
-        let mut sdk = StoreSDK::new(client, signer);
+        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let mut sdk = StoreSDK::new(client, signer, use_typed_format);
         let result = sdk.get_block_bills(1).await;
         if let Err(ref e) = result {
             println!("{}", e);
             assert!(false);
         }
         assert!(result.is_ok());
+        let result = sdk.close_session().await;
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
-    async fn doc_curd_happy_path_smoke_test() {
+    async fn get_bills_smoke_test() {
         let ep = "http://127.0.0.1:26659";
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let seed_u8: u8 = random();
+        run_get_bills_flow(false, client.clone(), 3).await;
+        run_get_bills_flow(true, client.clone(), 5).await;
+    }
 
-        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
-        let msdk = MutationSDK::new(client.clone(), signer);
-        // create a database
-        //
+    async fn run_doc_crud_happy_path(
+        use_typed_format: bool,
+        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+        counter: i64,
+    ) {
+        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let msdk = MutationSDK::new(client.clone(), signer, use_typed_format);
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
         assert!(result.is_ok(), "{:?}", result.err());
@@ -429,8 +572,8 @@ mod tests {
         let result = msdk.submit_database_mutation(&cm).await;
         assert!(result.is_ok());
         std::thread::sleep(two_seconds);
-        let (addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
-        let mut sdk = StoreSDK::new(client.clone(), signer);
+        let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let mut sdk = StoreSDK::new(client.clone(), signer, use_typed_format);
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
         if let Ok(Some(db)) = database {
             assert_eq!(&db.address, db_id.address().as_ref());
@@ -490,6 +633,7 @@ mod tests {
         assert_eq!(documents.documents.len(), 2);
 
         let result = sdk.close_session().await;
+        println!("{:?}", result);
         assert!(result.is_ok());
 
         std::thread::sleep(two_seconds);
@@ -499,6 +643,23 @@ mod tests {
         assert_eq!(account.total_mutation_count, 3);
         assert_eq!(account.total_session_count, 1);
     }
+    #[tokio::test]
+    async fn proto_doc_curd_happy_path_smoke_test() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        run_doc_crud_happy_path(false, client.clone(), 32).await;
+    }
+
+    #[tokio::test]
+    async fn typed_data_doc_curd_happy_path_smoke_test() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+        run_doc_crud_happy_path(true, client.clone(), 31).await;
+    }
 
     #[tokio::test]
     async fn open_session_replay_attack() {
@@ -506,8 +667,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let seed_u8: u8 = random();
-        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
+        let (_, signer) = sdk_test::gen_ed25519_signer(40);
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp(),
@@ -522,6 +682,7 @@ mod tests {
         let r = OpenSessionRequest {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
+            payload_type: PayloadType::QuerySessionPayload.into(),
         };
         let request = tonic::Request::new(r.clone());
         let response = client.open_query_session(request).await;
@@ -539,8 +700,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let mut client = StorageNodeClient::new(channel);
-        let seed_u8: u8 = random();
-        let (_, signer) = sdk_test::gen_ed25519_signer(seed_u8);
+        let (_, signer) = sdk_test::gen_ed25519_signer(20);
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),
             start_time: Utc::now().timestamp() - 6,
@@ -555,6 +715,7 @@ mod tests {
         let r = OpenSessionRequest {
             payload: buf.as_ref().to_vec(),
             signature: signature.as_ref().to_vec(),
+            payload_type: PayloadType::QuerySessionPayload.into(),
         };
         let request = tonic::Request::new(r.clone());
         let response = client.open_query_session(request).await;
@@ -567,9 +728,8 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeClient::new(channel));
-        let seed_u8: u8 = random();
-        let (_addr, signer) = sdk_test::gen_ed25519_signer(seed_u8);
-        let sdk = StoreSDK::new(client.clone(), signer);
+        let (_addr, signer) = sdk_test::gen_ed25519_signer(50);
+        let sdk = StoreSDK::new(client.clone(), signer, false);
         let result = sdk.get_state().await;
         assert!(result.is_ok());
     }

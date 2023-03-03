@@ -28,18 +28,26 @@ use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, MintCredit
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
-pub fn gen_ed25519_signer(seed_u8: u8) -> (DB3Address, Db3MultiSchemeSigner) {
-    let seed: [u8; 32] = [seed_u8; 32];
+pub fn gen_ed25519_signer(seed: i64) -> (DB3Address, Db3MultiSchemeSigner) {
+    let mut seeds: Vec<u8> = vec![];
+    seeds.extend_from_slice(&seed.to_be_bytes());
+    seeds.extend_from_slice(&seed.to_be_bytes());
+    seeds.extend_from_slice(&seed.to_be_bytes());
+    seeds.extend_from_slice(&seed.to_be_bytes());
     let (addr, kp) =
-        key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
+        key_derive::derive_key_pair_from_path(&seeds, None, &SignatureScheme::ED25519).unwrap();
     (addr, Db3MultiSchemeSigner::new(kp))
 }
 
 #[cfg(test)]
-pub fn gen_secp256k1_signer() -> (DB3Address, Db3MultiSchemeSigner) {
-    let seed: [u8; 32] = [0; 32];
+pub fn gen_secp256k1_signer(seed: i64) -> (DB3Address, Db3MultiSchemeSigner) {
+    let mut seeds: Vec<u8> = vec![];
+    seeds.extend_from_slice(&seed.to_be_bytes());
+    seeds.extend_from_slice(&seed.to_be_bytes());
+    seeds.extend_from_slice(&seed.to_be_bytes());
+    seeds.extend_from_slice(&seed.to_be_bytes());
     let (addr, kp) =
-        key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::Secp256k1).unwrap();
+        key_derive::derive_key_pair_from_path(&seeds, None, &SignatureScheme::Secp256k1).unwrap();
     (addr, Db3MultiSchemeSigner::new(kp))
 }
 

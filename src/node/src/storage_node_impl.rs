@@ -19,6 +19,7 @@ use super::context::Context;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_crypto::{db3_verifier::DB3Verifier, id::DbId, id::DocumentId};
+use ethers::core::types::transaction::eip712::{Eip712, TypedData};
 
 use bytes::BytesMut;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
@@ -36,6 +37,7 @@ use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySession, QuerySessio
 use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
+use ethers::types::Bytes;
 use prost::Message;
 use std::boxed::Box;
 use std::sync::atomic::Ordering;
@@ -186,15 +188,42 @@ impl StorageNode for StorageNodeImpl {
         request: Request<OpenSessionRequest>,
     ) -> std::result::Result<Response<OpenSessionResponse>, Status> {
         let r = request.into_inner();
-        let account_id = DB3Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        let payload = OpenSessionPayload::decode(r.payload.as_ref())
-            .map_err(|_| Status::internal("fail to decode open session request ".to_string()))?;
-        let header = payload.header;
+        let (account_id, session) = match r.payload_type {
+            // Typeddatapayload
+            3 => {
+                let typed_data = serde_json::from_slice::<TypedData>(r.payload.as_ref())
+                    .map_err(|e| Status::internal(format!("bad typed data format for {e}")))?;
+                let hashed_message = typed_data.encode_eip712().map_err(|e| {
+                    Status::internal(format!("encode typed data to hash error {e}"))
+                })?;
+                let account_id = DB3Verifier::verify_hashed(&hashed_message, r.signature.as_ref())
+                    .map_err(|e| Status::internal(format!("bad typed data signature for {e}")))?;
+                let typed_payload = typed_data
+                    .message
+                    .get("payload")
+                    .ok_or(Status::internal("no typed payload was found".to_string()))?;
+                let binary_payload: Bytes = serde_json::from_value(typed_payload.to_owned())
+                    .map_err(|e| Status::internal(format!("invalid payload  for err {e}")))?;
+                let session = OpenSessionPayload::decode(binary_payload.as_ref()).map_err(|e| {
+                    Status::internal(format!("fail to decode open session request for {e} "))
+                })?;
+                (account_id, session)
+            }
+            // Querysessionpayload
+            _ => {
+                let account_id = DB3Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
+                    .map_err(|e| Status::internal(format!("bad signature for {e}")))?;
+                let payload = OpenSessionPayload::decode(r.payload.as_ref()).map_err(|e| {
+                    Status::internal(format!("fail to decode open session request for {e} "))
+                })?;
+                (account_id, payload)
+            }
+        };
+        let header = session.header;
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
-                match sess_store.add_new_session(&header, payload.start_time, account_id.addr) {
+                match sess_store.add_new_session(&header, session.start_time, account_id.addr) {
                     Ok((session_token, query_session_info)) => {
                         // Takes a reference and returns Option<&V>
                         Ok(Response::new(OpenSessionResponse {
@@ -210,17 +239,43 @@ impl StorageNode for StorageNodeImpl {
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
+
     async fn close_query_session(
         &self,
         request: Request<CloseSessionRequest>,
     ) -> std::result::Result<Response<CloseSessionResponse>, Status> {
         let r = request.into_inner();
-        let client_query_session: &[u8] = r.payload.as_ref();
-        let client_signature: &[u8] = r.signature.as_ref();
-        DB3Verifier::verify(client_query_session, client_signature)
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
-        let query_session_info = QuerySessionInfo::decode(r.payload.as_ref())
-            .map_err(|_| Status::internal("fail to decode query_session_info ".to_string()))?;
+        let (_, session) = match r.payload_type {
+            // Typeddatapayload
+            3 => {
+                let typed_data = serde_json::from_slice::<TypedData>(r.payload.as_ref())
+                    .map_err(|e| Status::internal(format!("bad typed data format for {e}")))?;
+                let hashed_message = typed_data.encode_eip712().map_err(|e| {
+                    Status::internal(format!("encode typed data to hash error {e}"))
+                })?;
+                let account_id = DB3Verifier::verify_hashed(&hashed_message, r.signature.as_ref())
+                    .map_err(|e| Status::internal(format!("bad typed data signature for {e}")))?;
+                let typed_payload = typed_data
+                    .message
+                    .get("payload")
+                    .ok_or(Status::internal("no typed payload was found".to_string()))?;
+                let binary_payload: Bytes = serde_json::from_value(typed_payload.to_owned())
+                    .map_err(|e| Status::internal(format!("invalid payload  for err {e}")))?;
+                let session = QuerySessionInfo::decode(binary_payload.as_ref()).map_err(|e| {
+                    Status::internal(format!("fail to decode open session request for {e} "))
+                })?;
+                (account_id, session)
+            }
+            // Querysessionpayload
+            _ => {
+                let account_id = DB3Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
+                    .map_err(|e| Status::internal(format!("bad signature for {e}")))?;
+                let payload = QuerySessionInfo::decode(r.payload.as_ref()).map_err(|e| {
+                    Status::internal(format!("fail to decode open session request for {e} "))
+                })?;
+                (account_id, payload)
+            }
+        };
         let node_query_session_info = match self.context.node_store.lock() {
             Ok(mut node_store) => {
                 let sess_store = node_store.get_session_store();
@@ -229,12 +284,12 @@ impl StorageNode for StorageNodeImpl {
                     Some(sess) => {
                         if !query_session_verifier::check_query_session_info(
                             &sess.get_session_info(),
-                            &query_session_info,
+                            &session,
                         ) {
                             return Err(Status::invalid_argument(format!(
                                 "query session verify fail. expect query count {} but {}",
                                 sess.get_session_query_count(),
-                                query_session_info.query_count
+                                session.query_count
                             )));
                         }
                     }
@@ -269,7 +324,7 @@ impl StorageNode for StorageNodeImpl {
         };
         let query_session = QuerySession {
             payload: r.payload.to_vec(),
-            client_signature: client_signature.to_vec().to_owned(),
+            client_signature: r.signature.to_vec(),
             meta: Some(meta),
             payload_type: r.payload_type,
         };

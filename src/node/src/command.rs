@@ -228,10 +228,10 @@ impl DB3Command {
         }
         let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
-        let mutation_sdk = MutationSDK::new(node.clone(), signer);
+        let mutation_sdk = MutationSDK::new(node.clone(), signer, true);
         let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
-        let store_sdk = StoreSDK::new(node, signer);
+        let store_sdk = StoreSDK::new(node, signer, true);
         DB3ClientContext {
             mutation_sdk: Some(mutation_sdk),
             store_sdk: Some(store_sdk),
