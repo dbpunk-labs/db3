@@ -102,7 +102,6 @@ pub fn estimate_query_session_gas(query_session_info: &QuerySessionInfo) -> u64 
 mod tests {
     use super::*;
     use chrono::Utc;
-    use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_session_proto::QuerySessionInfo;
     #[test]
     fn it_estimate_gas_doc_ops() {

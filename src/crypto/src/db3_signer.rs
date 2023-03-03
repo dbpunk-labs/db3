@@ -63,12 +63,8 @@ mod tests {
     use bytes::BytesMut;
     use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, PayloadType};
-    use ethers::abi::{HumanReadableParser, ParamType, Token};
-    use ethers::core::types::transaction::eip712::{
-        encode_data, encode_eip712_type, encode_field, hash_type, EIP712Domain, Eip712Error, Types,
-    };
+    use ethers::core::types::transaction::eip712::{EIP712Domain, Types};
     use ethers::core::types::Bytes;
-    use hex;
     use prost::Message;
     use std::collections::BTreeMap;
 
@@ -110,7 +106,6 @@ mod tests {
     }
 
     fn db3_signer_typed_data(scheme: &SignatureScheme) -> Result<()> {
-        let seed: [u8; 32] = [10; 32];
         let meta = BroadcastMeta {
             //TODO get from network
             nonce: 1,
@@ -164,7 +159,6 @@ mod tests {
             primary_type: "Message".to_string(),
             message,
         };
-        let (_, keypair) = key_derive::derive_key_pair_from_path(&seed, None, scheme).unwrap();
         let seed: [u8; 32] = [2; 32];
         let (address, keypair) =
             key_derive::derive_key_pair_from_path(&seed, None, scheme).unwrap();

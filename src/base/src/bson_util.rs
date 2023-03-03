@@ -203,9 +203,7 @@ mod tests {
         bson_document_into_bytes, bson_into_comparison_bytes, bytes_to_bson_document,
         json_str_to_bson_document,
     };
-    use bson::raw::RawBson;
     use bson::Bson;
-    use bson::Document;
     use chrono::Utc;
     #[test]
     fn json_str_to_bson_document_ut() {

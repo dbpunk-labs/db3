@@ -224,7 +224,7 @@ mod tests {
                     Ok(a) => {
                         assert_eq!(11, a.block_id);
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         assert!(false);
                     }
                 }

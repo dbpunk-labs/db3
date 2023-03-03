@@ -911,7 +911,6 @@ mod tests {
     use db3_proto::db3_mutation_proto::CollectionMutation;
     use db3_proto::db3_mutation_proto::DocumentMask;
     use db3_proto::db3_mutation_proto::DocumentMutation;
-    use merkdb::rocksdb::merge_operator::delete_callback;
     use std::boxed::Box;
     use tempdir::TempDir;
 
@@ -1759,8 +1758,8 @@ mod tests {
             r#"ApplyDocumentError("invalid update document mutation, ids and masks size different")"#,
             format!("{:?}", res.err().unwrap())
         );
-        mutation_id += 1;
     }
+
     #[test]
     fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("db_store_test").expect("create temp dir");

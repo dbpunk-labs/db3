@@ -365,7 +365,6 @@ mod tests {
     use bytes::BytesMut;
 
     use chrono::Utc;
-    use db3_proto::db3_base_proto::{ChainId, ChainRole};
     use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
     use db3_proto::db3_database_proto::structured_query::filter::FilterType;
     use db3_proto::db3_database_proto::structured_query::value::ValueType;

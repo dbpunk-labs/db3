@@ -20,7 +20,7 @@ use ethers::{
     core::types::{Address, U256},
     middleware::SignerMiddleware,
     providers::{Provider, Ws},
-    signers::{LocalWallet, Signer},
+    signers::LocalWallet,
 };
 
 use eyre::Result;

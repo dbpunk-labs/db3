@@ -25,11 +25,6 @@ use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;
 use db3_proto::db3_mutation_proto::DocumentMutation;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, MintCreditsMutation};
-use ethers::core::types::{
-    transaction::eip712::{EIP712Domain, TypedData, Types},
-    Bytes,
-};
-use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
