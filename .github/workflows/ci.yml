@@ -78,7 +78,7 @@ jobs:
           npx hardhat test
       - name: Setup test env
         run: |
-          sudo apt-get install protobuf-compiler openjdk-8-jdk maven
+          sudo apt-get install protobuf-compiler 
           protoc --version
           cargo build
           cd tools
