@@ -160,6 +160,7 @@ impl DbStore {
         mutation_id: u16,
     ) -> Result<(BatchEntry, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
+        info!("create a database with id {}", dbid.to_hex());
         let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
         let (entry, data_in_bytes) = Self::encode_database(dbid, &db)?;
         ops.update_data_size(data_in_bytes as u64);

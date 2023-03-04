@@ -47,7 +47,7 @@ impl DB3Verifier {
             let db3_address = DB3Address::from(&spk);
             if let DB3PublicKey::Secp256k1(internal_pk) = spk {
                 internal_pk.verify_hashed(hashed, &sig).map_err(|e| {
-                    DB3Error::InvalidSignature(format!("invalid hashed message fro {e}"))
+                    DB3Error::InvalidSignature(format!("invalid hashed message for {e}"))
                 })?;
                 Ok(AccountId::new(db3_address))
             } else {
@@ -74,4 +74,5 @@ mod tests {
         let result = DB3Verifier::verify(msg.as_ref(), signature.as_ref());
         assert_eq!(true, result.is_ok());
     }
+
 }

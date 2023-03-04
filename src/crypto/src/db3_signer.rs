@@ -67,6 +67,7 @@ mod tests {
     use ethers::core::types::Bytes;
     use prost::Message;
     use std::collections::BTreeMap;
+    use hex;
 
     fn db3_signer_smoke_test(scheme: &SignatureScheme) {
         let meta = BroadcastMeta {
@@ -173,6 +174,7 @@ mod tests {
             Ok(())
         }
     }
+
     #[test]
     fn db3_signer_ed25519_typed_data_smoke_test() {
         assert!(db3_signer_typed_data(&SignatureScheme::ED25519).is_err());
@@ -194,4 +196,50 @@ mod tests {
     fn db3_signer_secp256k1_smoke_test() {
         db3_signer_smoke_test(&SignatureScheme::Secp256k1);
     }
+
+    #[test]
+    fn test_metamask_signature() {
+        let signature_hex = "0175fc4a2894184c644b0369a9fbea2425c86ffbd7b60a23d07ce3c25a394ebb05673e5970ad937c5d949f2c34e30c69345e345451fe1f40283cd85d2b00220c9e00032d4ebab1b807ed6b326f88fb44c68e674103a9c39c371592eec75c5f7955f419";
+        let hashed_msg_hex = "fee42a65dfa333a4f14c957d51bf69518c241b0e16d0df524a0dc0cdce19cf25";
+        let json = serde_json::json!({
+          "EIP712Domain": [
+          ],
+          "Message":[
+          {"name":"payload", "type":"bytes"},
+          {"name":"payloadType", "type":"string"}
+          ]
+        });
+        let types: Types = serde_json::from_value(json).unwrap();
+        let mut message: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        let payload = "0x48656c6c6f20776f726c6421";
+        message.insert(
+            "payload".to_string(),
+            serde_json::Value::from(payload.to_string()),
+        );
+        message.insert(
+            "payloadType".to_string(),
+            serde_json::Value::from("1".to_string()),
+        );
+        let typed_data = TypedData {
+            domain: EIP712Domain {
+                name: None,
+                version: None,
+                chain_id: None,
+                verifying_contract: None,
+                salt: None,
+            },
+            types,
+            primary_type: "Message".to_string(),
+            message,
+        };
+        let hashed_message: [u8; 32] = typed_data.encode_eip712().unwrap();
+        assert_eq!(hex::encode(&hashed_message).as_str(), hashed_msg_hex);
+        let signature = hex::decode(signature_hex).unwrap();
+        let result = DB3Verifier::verify_hashed(&hashed_message, signature.as_ref());
+        assert!(result.is_ok());
+        let account = result.unwrap();
+        println!("{}", serde_json::to_string(&account.addr).unwrap());
+        println!("0x2df74619717c29a7253455e5767f4d992cfb6e3e");
+    }
+
 }
