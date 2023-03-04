@@ -74,5 +74,4 @@ mod tests {
         let result = DB3Verifier::verify(msg.as_ref(), signature.as_ref());
         assert_eq!(true, result.is_ok());
     }
-
 }

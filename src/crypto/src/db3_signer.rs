@@ -65,9 +65,9 @@ mod tests {
     use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, PayloadType};
     use ethers::core::types::transaction::eip712::{EIP712Domain, Types};
     use ethers::core::types::Bytes;
+    use hex;
     use prost::Message;
     use std::collections::BTreeMap;
-    use hex;
 
     fn db3_signer_smoke_test(scheme: &SignatureScheme) {
         let meta = BroadcastMeta {
@@ -241,5 +241,4 @@ mod tests {
         println!("{}", serde_json::to_string(&account.addr).unwrap());
         println!("0x2df74619717c29a7253455e5767f4d992cfb6e3e");
     }
-
 }

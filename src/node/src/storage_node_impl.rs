@@ -191,6 +191,7 @@ impl StorageNode for StorageNodeImpl {
         let (account_id, session) = match r.payload_type {
             // Typeddatapayload
             3 => {
+                info!("get open session request");
                 let typed_data = serde_json::from_slice::<TypedData>(r.payload.as_ref())
                     .map_err(|e| Status::internal(format!("bad typed data format for {e}")))?;
                 let hashed_message = typed_data.encode_eip712().map_err(|e| {
@@ -207,6 +208,7 @@ impl StorageNode for StorageNodeImpl {
                 let session = OpenSessionPayload::decode(binary_payload.as_ref()).map_err(|e| {
                     Status::internal(format!("fail to decode open session request for {e} "))
                 })?;
+                info!("session account {}", account_id.to_hex());
                 (account_id, session)
             }
             // Querysessionpayload

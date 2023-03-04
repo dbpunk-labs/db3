@@ -175,8 +175,8 @@ mod tests {
     use crate::db3_signature::DB3Signature;
     use crate::key_derive;
     use bip39::{Language, Mnemonic, Seed};
-    use hex;
     use fastcrypto::hash::{HashFunction, Sha3_256};
+    use hex;
     #[test]
     fn keypair_smoke_test_secp256k1() {
         let mnemonic = Mnemonic::from_phrase(
@@ -264,23 +264,5 @@ mod tests {
         assert_eq!(true, ts_signature_ret.is_ok());
         let is_ok = ts_signature_ret.unwrap().verify(msg.as_ref());
         assert_eq!(true, is_ok.is_ok());
-    }
-
-    #[test]
-    fn test_generate_evm_address() {
-        //let private_key_hex = "ad689d9b7751da07b0fb39c5091672cbfe50f59131db015f8a0e76c9790a6fcc";
-        let private_key_hex = "895dbd0085c4a9df410e88ca8f8b7a2748095134660689966cc74843ab575813";
-        let data = hex::decode(private_key_hex).unwrap();
-        let result = Secp256k1PrivateKey::from_bytes(data.as_ref());
-        assert!(result.is_ok());
-        let kp = Secp256k1KeyPair::from(result.unwrap());
-        let public_key = kp.public();
-        let mut hasher = Sha3_256::default();
-        hasher.update(public_key.as_ref());
-        let g_arr = hasher.finalize();
-        println!("public key size {}", public_key.as_ref().len());
-        let mut res = [0u8; 20];
-        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..20]);
-        println!("{}", hex::encode(&res));
     }
 }
