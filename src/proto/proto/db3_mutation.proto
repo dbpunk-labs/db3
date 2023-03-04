@@ -19,6 +19,7 @@
 syntax = "proto3";
 import "db3_base.proto";
 import "db3_database.proto";
+
 package db3_mutation_proto;
 
 enum DatabaseAction {
@@ -72,6 +73,8 @@ enum PayloadType {
     QuerySessionPayload =0;
     DatabasePayload = 1;
     MintCreditsPayload = 2;
+    // a evm chain request
+    TypedDataPayload = 3;
 }
 
 message WriteRequest {

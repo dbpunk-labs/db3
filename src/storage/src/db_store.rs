@@ -26,10 +26,6 @@ use db3_crypto::{
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
 use db3_proto::db3_database_proto::structured_query::filter::FilterType;
-use db3_proto::db3_database_proto::structured_query::value::ValueType;
-use db3_proto::db3_database_proto::structured_query::{
-    FieldFilter, Filter, Limit, Projection, Value,
-};
 use db3_proto::db3_database_proto::{Collection, Database, Document, Index, StructuredQuery};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
@@ -37,7 +33,7 @@ use itertools::Itertools;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -124,8 +120,8 @@ impl DbStore {
             .iter()
             .map(move |x| {
                 idx += 1;
-                collection_count += 1;
-                index_count += x.index.len() as u64;
+                collection_count = collection_count + 1;
+                index_count = index_count + x.index.len() as u64;
                 (
                     x.collection_name.to_string(),
                     Collection {
@@ -164,6 +160,7 @@ impl DbStore {
         mutation_id: u16,
     ) -> Result<(BatchEntry, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
+        info!("create a database with id {}", dbid.to_hex());
         let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
         let (entry, data_in_bytes) = Self::encode_database(dbid, &db)?;
         ops.update_data_size(data_in_bytes as u64);
@@ -490,6 +487,7 @@ impl DbStore {
                                 info!("skip update doc when masks fields are empty");
                                 continue;
                             }
+                            info!("document id {}", document_mutation.ids[idx].as_str());
                             let document_id =
                                 DocumentId::try_from_base64(document_mutation.ids[idx].as_str())?;
                             let old_document = if let Some(v) = db
@@ -903,6 +901,9 @@ mod tests {
     use db3_base::bson_util;
     use db3_crypto::key_derive;
     use db3_crypto::signature_scheme::SignatureScheme;
+    use db3_proto::db3_database_proto::structured_query::{
+        value::ValueType, FieldFilter, Filter, Limit, Projection, Value,
+    };
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
         index::IndexField,
@@ -911,7 +912,6 @@ mod tests {
     use db3_proto::db3_mutation_proto::CollectionMutation;
     use db3_proto::db3_mutation_proto::DocumentMask;
     use db3_proto::db3_mutation_proto::DocumentMutation;
-    use merkdb::rocksdb::merge_operator::delete_callback;
     use std::boxed::Box;
     use tempdir::TempDir;
 
@@ -1759,8 +1759,8 @@ mod tests {
             r#"ApplyDocumentError("invalid update document mutation, ids and masks size different")"#,
             format!("{:?}", res.err().unwrap())
         );
-        mutation_id += 1;
     }
+
     #[test]
     fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("db_store_test").expect("create temp dir");

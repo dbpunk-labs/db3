@@ -10,7 +10,7 @@ keywords = ["database", "web3", "db3"]
 
 [dependencies]
 
-ethers = { version = "1.0.0", features = ["ws"] }
+ethers = { workspace = true }
 db3-proto={path="../proto", version="0.1.0"}
 db3-error={path="../error", version="0.1.0"}
 db3-crypto={path="../crypto", version="0.1.0"}
@@ -26,8 +26,8 @@ chrono = "0.4.22"
 enum-primitive-derive = "^0.2"
 num-traits = "^0.2"
 rand = "0.8.5"
-[dev-dependencies]
 serde_json = "1.0.88"
+[dev-dependencies]
 db3-base={path="../base", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
 criterion = { version = "0.3.4", default-features = false,features = ["async_futures", "async_tokio"]}

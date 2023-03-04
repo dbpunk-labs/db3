@@ -21,7 +21,7 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_faucet_proto::FaucetRecord;
 use prost::Message;
 use redb::ReadableTable;
-use redb::{ReadTransaction, TableDefinition, WriteTransaction};
+use redb::{TableDefinition, WriteTransaction};
 
 const FAUCET_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("FAUCET_TABLE");
 

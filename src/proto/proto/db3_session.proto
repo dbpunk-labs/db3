@@ -18,36 +18,32 @@
 
 syntax = "proto3";
 import "db3_base.proto";
+import "db3_mutation.proto";
+
 package db3_session_proto;
 
 message QuerySessionInfo {
     // the hex encoded string
     int32 id = 1;
     int64 start_time = 2;
-    int32 query_count = 4;
+    int32 query_count = 3;
+    // the meta for client 
+    db3_base_proto.BroadcastMeta meta = 4;
 }
 
-
-message CloseSessionPayload {
-    QuerySessionInfo session_info = 1;
-    string session_token = 2;
-}
 message OpenSessionPayload {
     string header = 1;
     int64 start_time = 2;
 }
-message QuerySession {
-    // the counter of account
-    uint64 nonce = 1;
-    // the chain id of db3
-    db3_base_proto.ChainId chain_id = 2;
-    // the chain role of db3
-    db3_base_proto.ChainRole chain_role = 3;
-    // node query session info
-    QuerySessionInfo node_query_session_info = 4;
-    // client query session info
-    bytes client_query_session = 5;
-    // client signature
-    bytes client_signature = 6;
-}
 
+// the session for mutation
+message QuerySession {
+    // the meta for node client
+    db3_base_proto.BroadcastMeta meta = 1;
+    // the agreed session info
+    bytes payload = 2;
+    // client signature
+    bytes client_signature = 3;
+    // the type of payload
+    db3_mutation_proto.PayloadType payload_type = 4;
+}

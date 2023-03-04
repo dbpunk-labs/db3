@@ -267,6 +267,7 @@ impl SessionManager {
                 id,
                 start_time,
                 query_count: 0,
+                meta: None,
             },
             status: SessionStatus::Running.into(),
         }

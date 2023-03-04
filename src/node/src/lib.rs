@@ -19,7 +19,6 @@ pub mod abci_impl;
 pub mod auth_storage;
 pub mod command;
 pub mod context;
-mod hash_util;
 mod json_rpc;
 pub mod json_rpc_impl;
 pub mod node_key;

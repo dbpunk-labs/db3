@@ -10,7 +10,7 @@ keywords = ["database", "web3", "db3"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ethers = { version = "1.0.0", features = ["ws"] }
+ethers = {workspace=true, features=["ws"]}
 eyre = "0.6"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0.64"
