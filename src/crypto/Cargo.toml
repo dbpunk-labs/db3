@@ -31,7 +31,7 @@ thiserror = "1.0.34"
 serde_json = { version = "1.0.64", default-features = false }
 serde_with = "2.1.0"
 serde_repr = "0.1"
-signature = "1.6.0"
+signature = "2.0.0"
 eyre = "0.6.8"
 enum_dispatch = "^0.3"
 derive_more = "0.99.17"
