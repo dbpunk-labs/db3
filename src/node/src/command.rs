@@ -60,6 +60,7 @@ use tendermint_rpc::HttpClient;
 use tokio::sync::mpsc::Sender;
 use tonic::codegen::http::Method;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
+use tonic::Status;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
@@ -484,8 +485,11 @@ impl DB3Command {
         let kp = crate::node_key::get_key_pair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         // config it
-        let (sender, receiver) =
-            tokio::sync::mpsc::channel::<(DB3Address, Subscription, Sender<EventMessage>)>(1024);
+        let (sender, receiver) = tokio::sync::mpsc::channel::<(
+            DB3Address,
+            Subscription,
+            Sender<std::result::Result<EventMessage, Status>>,
+        )>(1024);
         let storage_node = StorageNodeImpl::new(context, signer, sender);
         storage_node.keep_subscription(receiver).await.unwrap();
         info!("start db3 storage node on public addr {}", addr);

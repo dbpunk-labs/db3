@@ -27,6 +27,7 @@ use tendermint_rpc::HttpClient;
 type ArcNodeStorage = Arc<Mutex<Pin<Box<NodeStorage>>>>;
 #[derive(Clone)]
 pub struct Context {
+    // seperate the lock
     pub node_store: ArcNodeStorage,
     pub client: HttpClient,
     pub ws_url: String,

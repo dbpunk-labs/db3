@@ -68,14 +68,22 @@ pub struct StorageNodeImpl {
     context: Context,
     signer: Db3MultiSchemeSigner,
     running: Arc<AtomicBool>,
-    sender: Sender<(DB3Address, Subscription, Sender<EventMessage>)>,
+    sender: Sender<(
+        DB3Address,
+        Subscription,
+        Sender<std::result::Result<EventMessage, Status>>,
+    )>,
 }
 
 impl StorageNodeImpl {
     pub fn new(
         context: Context,
         singer: Db3MultiSchemeSigner,
-        sender: Sender<(DB3Address, Subscription, Sender<EventMessage>)>,
+        sender: Sender<(
+            DB3Address,
+            Subscription,
+            Sender<std::result::Result<EventMessage, Status>>,
+        )>,
     ) -> Self {
         Self {
             context,
@@ -90,7 +98,11 @@ impl StorageNodeImpl {
     ///
     pub async fn keep_subscription(
         &self,
-        mut receiver: Receiver<(DB3Address, Subscription, Sender<EventMessage>)>,
+        mut receiver: Receiver<(
+            DB3Address,
+            Subscription,
+            Sender<std::result::Result<EventMessage, Status>>,
+        )>,
     ) -> std::result::Result<(), Status> {
         if self.running.load(Ordering::Relaxed) {
             info!("storage node has been started");
@@ -147,7 +159,10 @@ impl StorageNodeImpl {
                     };
                     let mut subscribers: BTreeMap<
                         DB3Address,
-                        (Sender<EventMessage>, Subscription),
+                        (
+                            Sender<std::result::Result<EventMessage, Status>>,
+                            Subscription,
+                        ),
                     > = BTreeMap::new();
                     let mut to_be_removed: HashSet<DB3Address> = HashSet::new();
                     while local_running.load(Ordering::Relaxed) {
@@ -184,7 +199,7 @@ impl StorageNodeImpl {
                                                     r#type:sub.topics[idx],
                                                     event:Some(Event::BlockEvent(e))
                                                 };
-                                                match sender.try_send(msg) {
+                                                match sender.try_send(Ok(msg)) {
                                                     Ok(_) => { break;}
                                                     Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
                                                         // retry?
@@ -231,7 +246,7 @@ impl StorageNodeImpl {
                                                 event:Some(Event::MutationEvent(e))
                                             };
                                             //TODO  add filter
-                                            match sender.try_send(msg) {
+                                            match sender.try_send(Ok(msg)) {
                                                 Ok(_) => { break;}
                                                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
                                                     // retry?
@@ -702,9 +717,39 @@ impl StorageNode for StorageNodeImpl {
     }
     async fn subscribe(
         &self,
-        _request: Request<SubscribeRequest>,
+        request: Request<SubscribeRequest>,
     ) -> std::result::Result<Response<Self::SubscribeStream>, Status> {
-        Err(Status::internal(format!("")))
+        let r = request.into_inner();
+        let sender = self.sender.clone();
+        let session_token = r.session_token;
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                if let Some(sess) = node_store
+                    .get_session_store()
+                    .get_session_mut(&session_token)
+                {
+                    if !sess.check_session_running() {
+                        return Err(Status::permission_denied(
+                            "Fail to query in this session. Please restart query session",
+                        ));
+                    }
+                } else {
+                    return Err(Status::not_found("not found query session"));
+                }
+
+                if let Some(addr) = node_store.get_session_store().get_address(&session_token) {
+                    let (msg_sender, msg_receiver) =
+                        tokio::sync::mpsc::channel::<std::result::Result<EventMessage, Status>>(10);
+                    sender
+                        .try_send((addr, r.sub.unwrap().clone(), msg_sender))
+                        .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
+                    Ok(Response::new(ReceiverStream::new(msg_receiver)))
+                } else {
+                    Err(Status::not_found("no address with the toke"))
+                }
+            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
+        }
     }
 }
 
