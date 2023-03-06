@@ -52,7 +52,7 @@ clap = { version = "4.0.20", features = ["derive"] }
 subtle-encoding = { version = "0.5", default-features = false, features = ["bech32-preview"] }
 http = "0.2"
 shadow-rs = "0.21.0"
-tower-http = { version = "0.3", features = ["cors"] }
+tower-http = { version = "0.4", features = ["cors"] }
 ctrlc = { version = "3.0", features = ["termination"] }
 ed25519-dalek = "1.0.1"
 dirs = "4.0.0"
