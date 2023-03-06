@@ -20,6 +20,9 @@ import "db3_bill.proto";
 import "db3_account.proto";
 import "db3_session.proto";
 import "db3_database.proto";
+import "db3_event.proto";
+import "db3_mutation.proto";
+
 package db3_node_proto;
 
 message NetworkStatus {
@@ -67,6 +70,7 @@ message GetSessionInfoRequest {
 message OpenSessionRequest {
     bytes payload = 1;
     bytes signature = 2;
+    db3_mutation_proto.PayloadType payload_type = 3;
 }
 
 message OpenSessionResponse {
@@ -77,8 +81,12 @@ message OpenSessionResponse {
 }
 
 message CloseSessionRequest {
+    // the query session info
     bytes payload = 1;
+    // the signature of query session info
     bytes signature = 2;
+    string session_token = 3;
+    db3_mutation_proto.PayloadType payload_type = 4;
 }
 
 message CloseSessionResponse {
@@ -132,6 +140,11 @@ message RunQueryResponse{
 
 message ShowNetworkStatusRequest {}
 
+message SubscribeRequest {
+    string session_token = 1;
+    db3_event_proto.Subscribution sub = 2;
+}
+
 service StorageNode {
     // method for querying bills by height
     rpc QueryBill(QueryBillRequest) returns (QueryBillResponse) {}
@@ -152,4 +165,6 @@ service StorageNode {
     rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
     // method for show the network status
     rpc ShowNetworkStatus(ShowNetworkStatusRequest) returns (NetworkStatus){}
+    // method for subscribution
+    rpc Subscribe(SubscribeRequest) returns (stream db3_event_proto.EventMessage) {}
 }

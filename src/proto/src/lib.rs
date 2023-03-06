@@ -43,3 +43,6 @@ pub mod db3_message_proto {
 pub mod db3_faucet_proto {
     tonic::include_proto!("db3_faucet_proto");
 }
+pub mod db3_event_proto {
+    tonic::include_proto!("db3_event_proto");
+}

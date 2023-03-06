@@ -22,11 +22,24 @@
 
 DB3 Network is an open-source and decentralized firebase firestore alternative for building fully decentralized dApps quickly with  minimal engineering effort.
 
-[DB3 Network TodoMVC demo](https://replit.com/@imotai/tododemo?v=1)
-
-
 <p align="center">
  <img width="600px" src="./docs/images/position_web3.svg" align="center"/>
+
+## Demo
+
+* [DB3 Network CRUD TodoMVC demo](https://replit.com/@imotai/DB3-Network-CRUD-TodoMVC-Demo?v=1)
+* [DB3 Network Metamask Support Demo](https://replit.com/@imotai/db3-playground-with-metamask?v=1)
+
+## Getting Started
+
+### Build
+
+```shell
+git clone https://github.com/dbpunk-labs/db3.git
+cd db3 && bash install_env.sh && cargo build
+# start localnet
+cd tools &&  sh start_localnet.sh
+```
 
 ## Why DB3 Network
 ![why db3](./docs/images/why_db3.svg)

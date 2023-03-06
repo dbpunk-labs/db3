@@ -26,18 +26,14 @@ use db3_crypto::{
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
 use db3_proto::db3_database_proto::structured_query::filter::FilterType;
-use db3_proto::db3_database_proto::structured_query::value::ValueType;
-use db3_proto::db3_database_proto::structured_query::{
-    FieldFilter, Filter, Limit, Projection, Value,
-};
 use db3_proto::db3_database_proto::{Collection, Database, Document, Index, StructuredQuery};
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
 use itertools::Itertools;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
-use merkdb::{BatchEntry, Merk, Op};
+use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -124,8 +120,8 @@ impl DbStore {
             .iter()
             .map(move |x| {
                 idx += 1;
-                collection_count += 1;
-                index_count += x.index.len() as u64;
+                collection_count = collection_count + 1;
+                index_count = index_count + x.index.len() as u64;
                 (
                     x.collection_name.to_string(),
                     Collection {
@@ -164,6 +160,7 @@ impl DbStore {
         mutation_id: u16,
     ) -> Result<(BatchEntry, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
+        info!("create a database with id {}", dbid.to_hex());
         let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
         let (entry, data_in_bytes) = Self::encode_database(dbid, &db)?;
         ops.update_data_size(data_in_bytes as u64);
@@ -310,7 +307,8 @@ impl DbStore {
                                 return Err(DB3Error::DocumentModifiedPermissionError);
                             }
                         } else {
-                            return Err(DB3Error::DocumentNotExist(doc_id_base64.clone()));
+                            warn!("delete doc with id {} not exist", doc_id_base64);
+                            //return Err(DB3Error::DocumentNotExist(doc_id_base64.clone()));
                         }
                     }
                 }
@@ -489,6 +487,7 @@ impl DbStore {
                                 info!("skip update doc when masks fields are empty");
                                 continue;
                             }
+                            info!("document id {}", document_mutation.ids[idx].as_str());
                             let document_id =
                                 DocumentId::try_from_base64(document_mutation.ids[idx].as_str())?;
                             let old_document = if let Some(v) = db
@@ -633,6 +632,7 @@ impl DbStore {
         }
         field_index_map
     }
+
     /// run a query to fetch target documents from given database and collection
     pub fn run_query(
         db: Pin<&Merk>,
@@ -767,6 +767,7 @@ impl DbStore {
             Err(e) => Err(e),
         }
     }
+
     //
     // add document
     //
@@ -791,15 +792,12 @@ impl DbStore {
             Ok(None)
         }
     }
-    //
-    // get documents
-    //
+
     pub fn get_documents(
         db: Pin<&Merk>,
         collection_id: &CollectionId,
         limit: Option<i32>,
     ) -> Result<Vec<Document>> {
-        //TODO use reference
         let start_key = DocumentId::create(collection_id, &DocumentEntryId::zero())
             .unwrap()
             .as_ref()
@@ -808,40 +806,46 @@ impl DbStore {
             .unwrap()
             .as_ref()
             .to_vec();
-        let mut query = Query::new();
-        query.insert_range(std::ops::Range {
-            start: start_key,
-            end: end_key,
-        });
-        let ops = db
-            .execute_query(query)
-            .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
-        let mut values: Vec<_> = Vec::new();
-        let mut idx = 0;
-        for op in ops.iter() {
-            match op {
-                ProofOp::Push(Node::KV(k, v)) => {
-                    let db3_doc = DB3Document::try_from(v.clone())?;
+        let mut it = db.raw_iter();
+        it.seek(start_key);
+        let mut count = 0;
+        let mut docs: Vec<Document> = Vec::new();
+        let end_key_ref: &[u8] = end_key.as_ref();
+        while it.valid() {
+            if limit.is_some() && count >= limit.unwrap() {
+                break;
+            }
+            if let Some(k) = it.key() {
+                if k >= end_key_ref {
+                    break;
+                }
+                if let Some(data) = it.value() {
+                    let tree: Tree = ed::Decode::decode(data).unwrap();
+                    let db3_doc = DB3Document::try_from(tree.value().to_vec())?;
+                    //TODO too much overhead
                     let doc = bson_util::bson_document_into_bytes(db3_doc.get_document()?);
                     let owner = db3_doc.get_owner()?.to_vec();
                     let tx_id = db3_doc.get_tx_id()?.as_ref().to_vec();
-
-                    if limit.is_some() && idx >= limit.unwrap() {
-                        break;
-                    }
-                    idx += 1;
-                    values.push(Document {
+                    docs.push(Document {
                         id: k.to_vec(),
                         doc,
                         owner,
                         tx_id,
-                    })
+                    });
                 }
-                _ => {}
+            } else {
+                //invalid key
+                break;
             }
+            if limit.is_some() && count >= limit.unwrap() {
+                break;
+            }
+            count += 1;
+            it.next();
         }
-        Ok(values)
+        Ok(docs)
     }
+
     pub fn apply_mutation(
         db: Pin<&mut Merk>,
         sender: &DB3Address,
@@ -897,6 +901,9 @@ mod tests {
     use db3_base::bson_util;
     use db3_crypto::key_derive;
     use db3_crypto::signature_scheme::SignatureScheme;
+    use db3_proto::db3_database_proto::structured_query::{
+        value::ValueType, FieldFilter, Filter, Limit, Projection, Value,
+    };
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
         index::IndexField,
@@ -905,7 +912,6 @@ mod tests {
     use db3_proto::db3_mutation_proto::CollectionMutation;
     use db3_proto::db3_mutation_proto::DocumentMask;
     use db3_proto::db3_mutation_proto::DocumentMutation;
-    use merkdb::rocksdb::merge_operator::delete_callback;
     use std::boxed::Box;
     use tempdir::TempDir;
 
@@ -1753,8 +1759,8 @@ mod tests {
             r#"ApplyDocumentError("invalid update document mutation, ids and masks size different")"#,
             format!("{:?}", res.err().unwrap())
         );
-        mutation_id += 1;
     }
+
     #[test]
     fn db_store_smoke_test() {
         let tmp_dir_path = TempDir::new("db_store_test").expect("create temp dir");

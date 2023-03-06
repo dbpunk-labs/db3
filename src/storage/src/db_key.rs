@@ -35,6 +35,7 @@ impl DbKey {
     ///
     /// decode the database key
     ///
+    #[allow(dead_code)]
     pub fn decode(data: &[u8]) -> Result<Self> {
         const MIN_KEY_TOTAL_LEN: usize = DBID_LENGTH + DATABASE.len();
         if data.len() < MIN_KEY_TOTAL_LEN {
@@ -50,11 +51,13 @@ impl DbKey {
         Ok(Self(id))
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn max() -> Self {
         DbKey(DbId::max_id())
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn min() -> Self {
         DbKey(DbId::min_id())

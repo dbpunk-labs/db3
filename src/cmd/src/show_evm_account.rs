@@ -17,9 +17,8 @@
 
 use ethers::{
     contract::abigen,
-    core::types::{Address, TransactionRequest, U256},
+    core::types::{Address, U256},
     providers::{Provider, Ws},
-    signers::{LocalWallet, Signer},
 };
 
 use eyre::Result;

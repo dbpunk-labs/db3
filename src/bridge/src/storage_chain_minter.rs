@@ -24,7 +24,7 @@ use db3_proto::db3_mutation_proto::MintCreditsMutation;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_storage::event_store::EventStore;
 use elliptic_curve::{consts::U32, sec1::ToEncodedPoint};
-use ethers::types::{RecoveryMessage, Signature, H256, U256};
+use ethers::types::{H256, U256};
 use generic_array::GenericArray;
 use hex;
 use redb::Database;
@@ -36,7 +36,7 @@ use tracing::{info, warn};
 use k256::{
     ecdsa::{
         recoverable::{Id as RecoveryId, Signature as RecoverableSignature},
-        Error as K256SignatureError, Signature as K256Signature,
+        Signature as K256Signature,
     },
     PublicKey as K256PublicKey,
 };

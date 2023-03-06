@@ -28,3 +28,4 @@ serde_json = "1.0.88"
 serde = { version = "1.0.144", features = ["derive"] }
 bson = "2.5.0"
 itertools = "0.10.5"
+ed = "0.3.0"

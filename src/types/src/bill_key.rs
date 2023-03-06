@@ -15,13 +15,11 @@
 // limitations under the License.
 //
 
-use db3_crypto::id::{BillId, BILL_ID_LENGTH};
+use db3_crypto::id::BillId;
 use db3_error::Result;
 const BLOCK_BILL: &str = "/bl/";
 
 pub struct BillKey<'a>(pub &'a BillId);
-const BILL_KEY_SIZE: usize = BLOCK_BILL.len() + BILL_ID_LENGTH;
-
 impl<'a> BillKey<'a> {
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut encoded_key = BLOCK_BILL.as_bytes().to_vec();

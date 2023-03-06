@@ -2,46 +2,13 @@
 
 mod node_integration {
     use bytes::BytesMut;
-    use db3_base::get_a_random_nonce;
     use db3_crypto::db3_signer::Db3MultiSchemeSigner;
     use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
-    use db3_proto::db3_mutation_proto::{
-        DatabaseAction, DatabaseMutation, PayloadType, WriteRequest,
-    };
-    use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-    use db3_sdk::mutation_sdk::MutationSDK;
-    use db3_sdk::store_sdk::StoreSDK;
+    use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
+    use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
     use prost::Message;
-    use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
-    use std::{thread, time};
     use subtle_encoding::base64;
-    use tonic::transport::Endpoint;
-
-    fn get_mutation_sdk() -> MutationSDK {
-        let public_grpc_url = "http://127.0.0.1:26659";
-        db3_cmd::keystore::KeyStore::recover_keypair(None).unwrap();
-        // create storage node sdk
-        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
-        let signer = Db3MultiSchemeSigner::new(kp);
-        let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        // broadcast client
-        let sdk = MutationSDK::new(client, signer);
-        sdk
-    }
-
-    fn get_store_sdk() -> StoreSDK {
-        let public_grpc_url = "http://127.0.0.1:26659";
-        // create storage node sdk
-        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
-        let signer = Db3MultiSchemeSigner::new(kp);
-        let rpc_endpoint = Endpoint::new(public_grpc_url).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        StoreSDK::new(client, signer)
-    }
 
     fn current_seconds() -> u64 {
         match SystemTime::now().duration_since(UNIX_EPOCH) {

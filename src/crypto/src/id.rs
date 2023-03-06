@@ -23,7 +23,7 @@ use db3_error::{DB3Error, Result};
 use fastcrypto::hash::{HashFunction, Sha3_256};
 use rust_secp256k1::hashes::{sha256, Hash};
 use rust_secp256k1::ThirtyTwoByteHash;
-use std::{fmt, mem};
+use std::fmt;
 
 // it's ethereum compatiable account id
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
@@ -296,6 +296,7 @@ impl DocumentId {
     pub fn to_base64(&self) -> String {
         base64ct::Base64::encode_string(self.as_ref())
     }
+
     pub fn try_from_base64(input: &str) -> std::result::Result<Self, DB3Error> {
         Self::try_from_bytes(base64ct::Base64::decode_vec(input).unwrap().as_slice())
     }

@@ -15,13 +15,12 @@
 // limitations under the License.
 //
 
-use ethers::providers::Middleware;
 use ethers::{
     contract::abigen,
     core::types::{Address, U256},
     middleware::SignerMiddleware,
     providers::{Provider, Ws},
-    signers::{LocalWallet, Signer},
+    signers::LocalWallet,
 };
 
 use eyre::Result;
@@ -51,16 +50,15 @@ pub async fn lock_balance(
     let provider_arc = Arc::new(provider);
     let token_address = erc20_token_addr.parse::<Address>().unwrap();
     let rollup_address = rollup_addr.parse::<Address>().unwrap();
-    let my_address = wallet.address();
     let signable_client = SignerMiddleware::new(provider_arc.clone(), wallet);
     let client = Arc::new(signable_client);
     let token_contract = DB3TokenContract::new(token_address, client.clone());
     let approve_amount = U256::from(100_000_000_000 as u64); // 10 db3
     let approve_request = token_contract.approve(rollup_address, approve_amount);
-    let result = approve_request.send().await;
+    let _result = approve_request.send().await;
     let rollup_contract = DB3RollupContract::new(rollup_address, client);
     let deposit_amount = U256::from((amount * 1000_000_000.0) as u64);
     let deposit_request = rollup_contract.deposit(deposit_amount);
-    let result = deposit_request.send().await;
+    let _result = deposit_request.send().await;
     Ok(())
 }

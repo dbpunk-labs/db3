@@ -227,6 +227,7 @@ impl AuthStorage {
             owner: addr.to_vec(),
             to: query_addr.to_vec(),
         };
+        //TODO account query service gas fee
         self.network_state
             .total_session_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);

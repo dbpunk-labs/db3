@@ -1,3 +1,21 @@
+//
+// db3_document.rs
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
+
 use bson::spec::BinarySubtype;
 use bson::Document;
 use bson::{Binary, Bson};
@@ -36,6 +54,8 @@ impl DB3Document {
             Err(err) => Err(DB3Error::DocumentDecodeError(format!("{:?}", err))),
         }
     }
+
+    #[cfg(test)]
     pub fn create_from_json_str(
         document_json: &str,
         document_id: &DocumentId,
@@ -47,6 +67,7 @@ impl DB3Document {
             Err(err) => Err(DB3Error::DocumentDecodeError(format!("{:?}", err))),
         }
     }
+
     pub fn into_bytes(&self) -> Vec<u8> {
         bson_util::bson_document_into_bytes(&self.root)
     }
@@ -61,6 +82,7 @@ impl DB3Document {
             .map_err(|e| DB3Error::DocumentDecodeError(format!("{:?}", e)))?;
         Ok(doc)
     }
+
     fn add_document_id(&mut self, doc_id: &DocumentId) {
         self.root.insert(
             "_doc_id",
@@ -71,6 +93,7 @@ impl DB3Document {
         );
     }
 
+    #[cfg(test)]
     pub fn get_document_id(&self) -> std::result::Result<DocumentId, DB3Error> {
         match self.root.get_binary_generic("_doc_id") {
             Ok(doc_id) => DocumentId::try_from_bytes(doc_id.as_slice()),
@@ -146,7 +169,6 @@ impl AsRef<Document> for DB3Document {
         &self.root
     }
 }
-
 impl TryFrom<Vec<u8>> for DB3Document {
     type Error = DB3Error;
     fn try_from(buf: Vec<u8>) -> std::result::Result<Self, DB3Error> {
@@ -160,8 +182,6 @@ impl TryFrom<Vec<u8>> for DB3Document {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bson::spec::ElementType;
-    use byteorder::ReadBytesExt;
     use db3_crypto::id::{AccountId, CollectionId, DocumentEntryId};
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},

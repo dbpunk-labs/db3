@@ -27,6 +27,7 @@ use fastcrypto::secp256k1::{Secp256k1KeyPair, Secp256k1PublicKey, Secp256k1Signa
 use fastcrypto::traits::KeyPair as KeypairTraits;
 use fastcrypto::traits::{Authenticator, ToFromBytes, VerifyingKey};
 use fastcrypto::Verifier;
+use rust_secp256k1::{Message, Secp256k1};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, Bytes};
@@ -168,6 +169,24 @@ pub struct Secp256k1DB3Signature(
     #[serde_as(as = "Readable<Base64, Bytes>")]
     [u8; Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1],
 );
+
+impl Secp256k1DB3Signature {
+    pub fn new_hashed(kp: &Secp256k1KeyPair, msg: &[u8]) -> Result<Vec<u8>> {
+        let secp = Secp256k1::signing_only();
+        let message = Message::from_slice(msg)
+            .map_err(|e| DB3Error::InvalidSignature(format!("bad message for {e}")))?;
+        let sig = secp.sign_ecdsa_recoverable(&message, &kp.secret.privkey);
+        let (recovery_id, sig) = sig.serialize_compact();
+        let mut signature_bytes: Vec<u8> =
+            Vec::with_capacity(Secp256k1PublicKey::LENGTH + Secp256k1Signature::LENGTH + 1);
+        let scheme = SignatureScheme::Secp256k1;
+        signature_bytes.extend_from_slice(&[scheme.flag()]);
+        signature_bytes.extend_from_slice(&sig);
+        signature_bytes.extend_from_slice(&[recovery_id.to_i32() as u8]);
+        signature_bytes.extend_from_slice(kp.public().as_ref());
+        Ok(signature_bytes)
+    }
+}
 
 impl AsRef<[u8]> for Secp256k1DB3Signature {
     fn as_ref(&self) -> &[u8] {

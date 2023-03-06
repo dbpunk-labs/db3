@@ -85,7 +85,6 @@ mod tests {
     use super::*;
     use db3_base::get_a_static_address;
     use db3_proto::db3_bill_proto::BillType;
-    use merkdb::proofs::{Decoder, Node};
     use std::boxed::Box;
     use tempdir::TempDir;
     #[test]

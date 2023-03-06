@@ -22,15 +22,12 @@ use ethers::abi::RawLog;
 use ethers::types::Address;
 use ethers::types::Filter;
 use ethers::{
-    contract::{abigen, Contract, EthEvent},
-    core::types::{
-        transaction::eip2718::TypedTransaction, Log, Signature, Transaction, ValueOrArray,
-    },
+    contract::{abigen, EthEvent},
+    core::types::{transaction::eip2718::TypedTransaction, Log, Signature, Transaction},
     providers::{Middleware, Provider, StreamExt, Ws},
 };
 
 use redb::Database;
-use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
