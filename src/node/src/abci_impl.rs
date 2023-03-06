@@ -37,9 +37,9 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tendermint_abci::Application;
 use tendermint_proto::abci::{
-    RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
-    ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
-    ResponseQuery,
+    Event, EventAttribute, RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo,
+    RequestQuery, ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx,
+    ResponseInfo, ResponseQuery,
 };
 use tracing::{debug, info, span, warn, Level};
 
@@ -163,11 +163,30 @@ impl AbciImpl {
         }
     }
 
-    fn build_delivered_response(&self, ok: bool, msg: &str) -> ResponseDeliverTx {
+    fn build_delivered_response(
+        &self,
+        ok: bool,
+        msg: &str,
+        sender: &AccountId,
+    ) -> ResponseDeliverTx {
         if ok {
+            let event = Event {
+                r#type: "mutation".to_string(),
+                attributes: vec![EventAttribute {
+                    key: "sender".to_string().into_bytes().into(),
+                    value: sender.to_hex().into_bytes().into(),
+                    index: false,
+                }],
+            };
             ResponseDeliverTx {
                 code: 0,
-                ..Default::default()
+                data: Default::default(),
+                log: "".to_string(),
+                info: "".to_string(),
+                gas_wanted: 0,
+                gas_used: 0,
+                events: vec![event],
+                codespace: "".to_string(),
             }
         } else {
             ResponseDeliverTx {
@@ -311,7 +330,7 @@ impl Application for AbciImpl {
                             Ok(dm) => match self.pending_databases.lock() {
                                 Ok(mut s) => {
                                     s.push((account_id.addr, dm, tx_id));
-                                    return self.build_delivered_response(true, "");
+                                    return self.build_delivered_response(true, "", &account_id);
                                 }
                                 _ => {
                                     todo!();
@@ -319,7 +338,11 @@ impl Application for AbciImpl {
                             },
                             Err(e) => {
                                 let msg = format!("{e}");
-                                return self.build_delivered_response(false, msg.as_str());
+                                return self.build_delivered_response(
+                                    false,
+                                    msg.as_str(),
+                                    &account_id,
+                                );
                             }
                         }
                     }
@@ -340,7 +363,7 @@ impl Application for AbciImpl {
                                         tx_id,
                                         qsi,
                                     ));
-                                    return self.build_delivered_response(true, "");
+                                    return self.build_delivered_response(true, "", &account_id);
                                 }
                                 _ => {
                                     todo!();
@@ -348,7 +371,11 @@ impl Application for AbciImpl {
                             },
                             Err(e) => {
                                 let msg = format!("{e}");
-                                return self.build_delivered_response(false, msg.as_str());
+                                return self.build_delivered_response(
+                                    false,
+                                    msg.as_str(),
+                                    &account_id,
+                                );
                             }
                         }
                     }
@@ -357,31 +384,42 @@ impl Application for AbciImpl {
                             Ok(mm) => match self.pending_credits.lock() {
                                 Ok(mut s) => {
                                     s.push((account_id.addr, mm, tx_id));
-                                    return self.build_delivered_response(true, "");
+                                    return self.build_delivered_response(true, "", &account_id);
                                 }
                                 Err(e) => {
                                     let msg = format!("{e}");
-                                    return self.build_delivered_response(false, msg.as_str());
+
+                                    return self.build_delivered_response(
+                                        false,
+                                        msg.as_str(),
+                                        &account_id,
+                                    );
                                 }
                             },
                             Err(e) => {
                                 let msg = format!("{e}");
-                                return self.build_delivered_response(false, msg.as_str());
+                                return self.build_delivered_response(
+                                    false,
+                                    msg.as_str(),
+                                    &account_id,
+                                );
                             }
                         }
                     }
                     _ => {
-                        return self.build_delivered_response(false, "bad mutation payload");
+                        return self.build_delivered_response(false, "", &account_id);
                     }
                 },
                 Err(e) => {
+                    let empty = AccountId::new(AccountAddress::ZERO);
                     let msg = format!("{e}");
-                    return self.build_delivered_response(false, msg.as_str());
+                    return self.build_delivered_response(false, msg.as_str(), &empty);
                 }
             },
             Err(e) => {
+                let empty = AccountId::new(AccountAddress::ZERO);
                 let msg = format!("{e}");
-                return self.build_delivered_response(false, msg.as_str());
+                return self.build_delivered_response(false, msg.as_str(), &empty);
             }
         }
     }

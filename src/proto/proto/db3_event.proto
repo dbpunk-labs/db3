@@ -35,7 +35,7 @@ message BlockEvent {
 
 // the node will dispatch a mutation event when a mutation has been checked
 message MutationEvent {
-    bytes sender = 1;
+    string sender = 1;
     enum MutationEventStatus {
         // the mutation has been deliveried
         Deliveried = 0;
@@ -52,8 +52,10 @@ message MutationEvent {
     }
     MutationEventStatus status = 2;
     // the address that mutation has been send to
-    bytes to = 3;
+    string to = 3;
     uint64 gas = 4;
+    uint64 height= 5;
+    string hash = 6;
 }
 
 message EventMessage {
@@ -77,8 +79,7 @@ message EventFilter {
     }
 }
 
-
-message Subscribution {
+message Subscription {
     repeated EventType topics = 1;
     repeated EventFilter filters = 2;
 }

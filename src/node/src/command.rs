@@ -27,11 +27,13 @@ use clap::Parser;
 use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
 use db3_bridge::storage_chain_minter::StorageChainMinter;
 use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
+use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_faucet::{
     faucet_node_impl::{FaucetNodeConfig, FaucetNodeImpl},
     fund_faucet,
 };
+use db3_proto::db3_event_proto::{EventMessage, Subscription};
 use db3_proto::db3_faucet_proto::faucet_node_server::FaucetNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
@@ -55,6 +57,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
+use tokio::sync::mpsc::Sender;
 use tonic::codegen::http::Method;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 use tower_http::cors::{Any, CorsLayer};
@@ -434,11 +437,13 @@ impl DB3Command {
                 let abci_handler =
                     Self::start_abci_service(abci_port, read_buf_size, node_store.clone());
                 let tm_addr = format!("http://127.0.0.1:{tendermint_port}");
+                let ws_tm_addr = format!("ws://127.0.0.1:{tendermint_port}/websocket");
                 info!("db3 json rpc server will connect to tendermint {tm_addr}");
                 let client = HttpClient::new(tm_addr.as_str()).unwrap();
                 let context = Context {
                     node_store: node_store.clone(),
                     client,
+                    ws_url: ws_tm_addr,
                 };
                 let json_rpc_handler = Self::start_json_rpc_service(
                     &public_host,
@@ -478,7 +483,11 @@ impl DB3Command {
         let addr = format!("{public_host}:{public_grpc_port}");
         let kp = crate::node_key::get_key_pair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
-        let storage_node = StorageNodeImpl::new(context, signer);
+        // config it
+        let (sender, receiver) =
+            tokio::sync::mpsc::channel::<(DB3Address, Subscription, Sender<EventMessage>)>(1024);
+        let storage_node = StorageNodeImpl::new(context, signer, sender);
+        storage_node.keep_subscription(receiver).await.unwrap();
         info!("start db3 storage node on public addr {}", addr);
         if disable_grpc_web {
             Server::builder()
