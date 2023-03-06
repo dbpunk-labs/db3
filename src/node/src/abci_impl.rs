@@ -126,7 +126,6 @@ impl AbciImpl {
                             .ok_or(DB3Error::ApplyMutationError(
                                 "invalid payload type".to_string(),
                             ))?;
-                        info!("account {} apply mutaion check done", account_id.to_hex());
                         Ok((data, data_type, account_id))
                     } else {
                         Err(DB3Error::ApplyMutationError("bad typed data".to_string()))
@@ -143,7 +142,6 @@ impl AbciImpl {
                 DB3Error::ApplyMutationError("invalid payload type".to_string()),
             )?;
             let data = Bytes::from(req.payload);
-            info!("account {} apply mutaion check done", account_id.to_hex());
             Ok((EthersBytes(data), data_type, account_id))
         }
     }

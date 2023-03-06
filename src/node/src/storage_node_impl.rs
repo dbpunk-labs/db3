@@ -174,19 +174,18 @@ impl StorageNodeImpl {
                             }
                             Some(Ok(block)) = block_sub.next() => {
 
-                                    if let EventData::NewBlock {block,..} = block.data {
+                               if let EventData::NewBlock {block,..} = block.data {
                                     if let Some(data) = block {
-                                for (key , (sender, sub)) in subscribers.iter() {
-                                    if sender.is_closed() {
-                                        to_be_removed.insert(key.clone());
-                                        warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
-                                        continue;
-                                    }
-
-                                            for idx in 0..sub.topics.len() {
-                                            if sub.topics[idx] != DB3EventType::Block as i32 {
+                                        for (key , (sender, sub)) in subscribers.iter() {
+                                            if sender.is_closed() {
+                                                to_be_removed.insert(key.clone());
+                                                warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
                                                 continue;
                                             }
+                                            for idx in 0..sub.topics.len() {
+                                                if sub.topics[idx] != DB3EventType::Block as i32 {
+                                                    continue;
+                                                }
                                                 // sender block event
                                                 let e = BlockEvent {
                                                     height: data.header.height.value(),
@@ -218,19 +217,17 @@ impl StorageNodeImpl {
                                 }
                             },
                             Some(Ok(tx)) = tx_sub.next() => {
-
                                 if let EventData::Tx {tx_result} = tx.data {
-                                for (key , (sender, sub)) in subscribers.iter() {
-                                    if sender.is_closed() {
-                                        to_be_removed.insert(key.clone());
-                                        warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
-                                        continue;
-                                    }
-                                    for idx in 0..sub.topics.len() {
-                                        if sub.topics[idx] != DB3EventType::Mutation as i32 {
+                                    for (key , (sender, sub)) in subscribers.iter() {
+                                        if sender.is_closed() {
+                                            to_be_removed.insert(key.clone());
+                                            warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
                                             continue;
                                         }
-
+                                        for idx in 0..sub.topics.len() {
+                                            if sub.topics[idx] != DB3EventType::Mutation as i32 {
+                                                continue;
+                                            }
                                             // sender block event
                                             let e = MutationEvent {
                                                 sender:"".to_string(),
