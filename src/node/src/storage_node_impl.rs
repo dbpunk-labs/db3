@@ -24,8 +24,10 @@ use ethers::core::types::transaction::eip712::{Eip712, TypedData};
 use bytes::BytesMut;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_event_proto::{
-    event_message::Event, mutation_event::MutationEventStatus, BlockEvent, EventMessage,
-    EventType as DB3EventType, MutationEvent, Subscription,
+    event_filter,
+    event_message::Event,
+    mutation_event::{MutationEventStatus, ToAddressType},
+    BlockEvent, EventMessage, EventType as DB3EventType, MutationEvent, Subscription,
 };
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
@@ -217,7 +219,7 @@ impl StorageNodeImpl {
                                 }
                             },
                             Some(Ok(tx)) = tx_sub.next() => {
-                                if let EventData::Tx {tx_result} = tx.data {
+                                if let (EventData::Tx {tx_result}, Some(events)) = (tx.data, tx.events) {
                                     for (key , (sender, sub)) in subscribers.iter() {
                                         if sender.is_closed() {
                                             to_be_removed.insert(key.clone());
@@ -228,16 +230,13 @@ impl StorageNodeImpl {
                                             if sub.topics[idx] != DB3EventType::Mutation as i32 {
                                                 continue;
                                             }
-                                            // sender block event
-                                            let e = MutationEvent {
-                                                sender:"".to_string(),
-                                                status: MutationEventStatus::Deliveried.into(),
-                                                // TODO to be added
-                                                to:"".to_string(),
-                                                gas: 0,
-                                                height: tx_result.height as u64,
-                                                hash:"".to_string(),
-                                            };
+
+                                            if let (Some(account_addrs), Some(event_filter::Filter::Mfilter(m))) = (events.get("mutation.sender"), &sub.filters[idx].filter){
+                                                if !&m.sender.is_empty() && !account_addrs.contains(&m.sender) {
+                                                    continue;
+                                                }
+                                            }
+                                            let e = Self::build_mutation_event(&events, tx_result.height as u64);
                                             let msg = EventMessage {
                                                 r#type:sub.topics[idx],
                                                 event:Some(Event::MutationEvent(e))
@@ -278,6 +277,47 @@ impl StorageNodeImpl {
             });
         }
         Ok(())
+    }
+
+    fn build_mutation_event(events: &BTreeMap<String, Vec<String>>, height: u64) -> MutationEvent {
+        let sender = match events.get("mutation.sender") {
+            Some(addrs) => match addrs.len() {
+                1 => addrs[0].to_string(),
+                _ => "".to_string(),
+            },
+            _ => "".to_string(),
+        };
+        let to = match events.get("mutation.to") {
+            Some(addrs) => match addrs.len() {
+                1 => addrs[0].to_string(),
+                _ => "".to_string(),
+            },
+            _ => "".to_string(),
+        };
+        let collections: Vec<String> = match events.get("mutation.collections") {
+            Some(addrs) => addrs.to_vec(),
+            _ => {
+                vec![]
+            }
+        };
+
+        let hash = match events.get("tx.hash") {
+            Some(addrs) => match addrs.len() {
+                1 => addrs[0].to_string(),
+                _ => "".to_string(),
+            },
+            _ => "".to_string(),
+        };
+        MutationEvent {
+            sender,
+            status: MutationEventStatus::Deliveried.into(),
+            to,
+            gas: 0,
+            height,
+            hash,
+            to_addr_type: ToAddressType::Database.into(),
+            collections,
+        }
     }
 }
 

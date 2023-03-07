@@ -57,7 +57,6 @@ ctrlc = { version = "3.0", features = ["termination"] }
 ed25519-dalek = "1.0.1"
 dirs = "4.0.0"
 redb = "0.13.0"
-futures = "0.3.26"
 [build-dependencies]
 shadow-rs = "0.20.0"
 [dev-dependencies]

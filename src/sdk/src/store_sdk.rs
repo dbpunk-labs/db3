@@ -28,7 +28,12 @@ use db3_proto::db3_node_proto::{
     storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
     GetDocumentRequest, GetSessionInfoRequest, NetworkStatus, OpenSessionRequest,
     OpenSessionResponse, QueryBillKey, QueryBillRequest, RunQueryRequest, RunQueryResponse,
-    SessionIdentifier, ShowDatabaseRequest, ShowNetworkStatusRequest,
+    SessionIdentifier, ShowDatabaseRequest, ShowNetworkStatusRequest, SubscribeRequest,
+};
+
+use db3_proto::db3_event_proto::{
+    event_filter, event_message, BlockEventFilter, EventFilter, EventType, MutationEventFilter,
+    Subscription,
 };
 use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
@@ -36,6 +41,8 @@ use ethers::core::types::{
     transaction::eip712::{EIP712Domain, TypedData, Types},
     Bytes,
 };
+
+use hex;
 use num_traits::cast::FromPrimitive;
 use prost::Message;
 use std::collections::BTreeMap;
@@ -151,6 +158,7 @@ impl StoreSDK {
             ))),
         }
     }
+
     ///
     /// get the information of database with a hex format address
     ///
@@ -214,6 +222,59 @@ impl StoreSDK {
             ))),
         }
     }
+
+    pub async fn open_console(&mut self, all: bool) -> std::result::Result<(), Status> {
+        let m_filter = match all {
+            true => MutationEventFilter {
+                sender: "".to_string(),
+            },
+            false => {
+                let hex_addr = self.signer.get_address().unwrap().to_hex();
+                MutationEventFilter { sender: hex_addr }
+            }
+        };
+        let b_filter = BlockEventFilter {};
+        let sub = Subscription {
+            topics: vec![EventType::Block.into(), EventType::Mutation.into()],
+            filters: vec![
+                EventFilter {
+                    filter: Some(event_filter::Filter::Bfilter(b_filter)),
+                },
+                EventFilter {
+                    filter: Some(event_filter::Filter::Mfilter(m_filter)),
+                },
+            ],
+        };
+        let session_token = self.keep_session().await?;
+        let req = SubscribeRequest {
+            session_token,
+            sub: Some(sub),
+        };
+        let mut client = self.client.as_ref().clone();
+        let mut stream = client.subscribe(req).await?.into_inner();
+        while let Some(event) = stream.message().await? {
+            match event.event {
+                Some(event_message::Event::MutationEvent(me)) => {
+                    println!(
+                        "Mutation\t{}\t{}\t{}\t{}\t{:?}",
+                        me.height, me.sender, me.to, me.hash, me.collections
+                    );
+                }
+                Some(event_message::Event::BlockEvent(be)) => {
+                    println!(
+                        "Block\t{}\t0x{}\t0x{}\t{}",
+                        be.height,
+                        hex::encode(be.block_hash),
+                        hex::encode(be.app_hash),
+                        be.gas
+                    );
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     pub async fn open_session(&mut self) -> std::result::Result<OpenSessionResponse, Status> {
         let payload = OpenSessionPayload {
             header: Uuid::new_v4().to_string(),

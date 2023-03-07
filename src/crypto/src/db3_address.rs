@@ -67,6 +67,10 @@ impl DB3Address {
     pub fn to_inner(self) -> [u8; DB3_ADDRESS_LENGTH] {
         self.0
     }
+    #[inline]
+    pub fn to_hex(&self) -> String {
+        format!("0x{}", hex::encode(self.0.as_ref()))
+    }
 }
 
 impl TryFrom<Vec<u8>> for DB3Address {
