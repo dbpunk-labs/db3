@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
+#![feature(iter_intersperse)]
 pub mod abci_impl;
 pub mod auth_storage;
 pub mod command;

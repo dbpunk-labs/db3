@@ -24,7 +24,7 @@ use db3_crypto::{
 };
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{
-    DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
+    DatabaseAction, DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
 };
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
@@ -161,20 +161,82 @@ impl AbciImpl {
         }
     }
 
-    fn build_delivered_response(
+    ///
+    /// dispatch database event when mutation has been delivered
+    ///
+    fn dispatch_database_event(
+        &self,
+        sender: &AccountId,
+        dm: &DatabaseMutation,
+    ) -> ResponseDeliverTx {
+        let mut attrs = vec![EventAttribute {
+            key: "sender".to_string().into_bytes().into(),
+            value: sender.to_hex().into_bytes().into(),
+            index: false,
+        }];
+        let action = DatabaseAction::from_i32(dm.action);
+        match action {
+            Some(DatabaseAction::CreateDb) => {}
+            Some(DatabaseAction::AddCollection) => {
+                let addr_ref: &[u8] = dm.db_address.as_ref();
+                if let Ok(addr) = AccountAddress::try_from(addr_ref) {
+                    attrs.push(EventAttribute {
+                        key: "to".to_string().into_bytes().into(),
+                        value: addr.to_hex().into_bytes().into(),
+                        index: false,
+                    });
+                }
+            }
+            _ => {
+                dm.document_mutations.iter().for_each(|x| {
+                    attrs.push(EventAttribute {
+                        key: "collections".to_string().into_bytes().into(),
+                        value: x.collection_name.to_string().into_bytes().into(),
+                        index: false,
+                    })
+                });
+                let addr_ref: &[u8] = dm.db_address.as_ref();
+                if let Ok(addr) = AccountAddress::try_from(addr_ref) {
+                    attrs.push(EventAttribute {
+                        key: "to".to_string().into_bytes().into(),
+                        value: addr.to_hex().into_bytes().into(),
+                        index: false,
+                    });
+                }
+            }
+        }
+        let event = Event {
+            r#type: "mutation".to_string(),
+            attributes: attrs,
+        };
+
+        ResponseDeliverTx {
+            code: 0,
+            data: Default::default(),
+            log: "".to_string(),
+            info: "".to_string(),
+            gas_wanted: 0,
+            gas_used: 0,
+            events: vec![event],
+            codespace: "".to_string(),
+        }
+    }
+
+    fn build_delivered_response<'a>(
         &self,
         ok: bool,
         msg: &str,
         sender: &AccountId,
     ) -> ResponseDeliverTx {
         if ok {
+            let attrs = vec![EventAttribute {
+                key: "sender".to_string().into_bytes().into(),
+                value: sender.to_hex().into_bytes().into(),
+                index: false,
+            }];
             let event = Event {
                 r#type: "mutation".to_string(),
-                attributes: vec![EventAttribute {
-                    key: "sender".to_string().into_bytes().into(),
-                    value: sender.to_hex().into_bytes().into(),
-                    index: false,
-                }],
+                attributes: attrs,
             };
             ResponseDeliverTx {
                 code: 0,
@@ -327,8 +389,9 @@ impl Application for AbciImpl {
                         match self.parse_database_mutation(data.as_ref()) {
                             Ok(dm) => match self.pending_databases.lock() {
                                 Ok(mut s) => {
+                                    let response = self.dispatch_database_event(&account_id, &dm);
                                     s.push((account_id.addr, dm, tx_id));
-                                    return self.build_delivered_response(true, "", &account_id);
+                                    return response;
                                 }
                                 _ => {
                                     todo!();
