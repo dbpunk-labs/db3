@@ -24,7 +24,7 @@ use db3_crypto::{
 };
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{
-    DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
+    DatabaseAction, DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
 };
 use db3_proto::db3_session_proto::{QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
@@ -37,9 +37,9 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tendermint_abci::Application;
 use tendermint_proto::abci::{
-    RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo, RequestQuery,
-    ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx, ResponseInfo,
-    ResponseQuery,
+    Event, EventAttribute, RequestBeginBlock, RequestCheckTx, RequestDeliverTx, RequestInfo,
+    RequestQuery, ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx,
+    ResponseInfo, ResponseQuery,
 };
 use tracing::{debug, info, span, warn, Level};
 
@@ -126,7 +126,6 @@ impl AbciImpl {
                             .ok_or(DB3Error::ApplyMutationError(
                                 "invalid payload type".to_string(),
                             ))?;
-                        info!("account {} apply mutaion check done", account_id.to_hex());
                         Ok((data, data_type, account_id))
                     } else {
                         Err(DB3Error::ApplyMutationError("bad typed data".to_string()))
@@ -143,7 +142,6 @@ impl AbciImpl {
                 DB3Error::ApplyMutationError("invalid payload type".to_string()),
             )?;
             let data = Bytes::from(req.payload);
-            info!("account {} apply mutaion check done", account_id.to_hex());
             Ok((EthersBytes(data), data_type, account_id))
         }
     }
@@ -163,11 +161,92 @@ impl AbciImpl {
         }
     }
 
-    fn build_delivered_response(&self, ok: bool, msg: &str) -> ResponseDeliverTx {
+    ///
+    /// dispatch database event when mutation has been delivered
+    ///
+    fn dispatch_database_event(
+        &self,
+        sender: &AccountId,
+        dm: &DatabaseMutation,
+    ) -> ResponseDeliverTx {
+        let mut attrs = vec![EventAttribute {
+            key: "sender".to_string().into_bytes().into(),
+            value: sender.to_hex().into_bytes().into(),
+            index: false,
+        }];
+        let action = DatabaseAction::from_i32(dm.action);
+        match action {
+            Some(DatabaseAction::CreateDb) => {}
+            Some(DatabaseAction::AddCollection) => {
+                let addr_ref: &[u8] = dm.db_address.as_ref();
+                if let Ok(addr) = AccountAddress::try_from(addr_ref) {
+                    attrs.push(EventAttribute {
+                        key: "to".to_string().into_bytes().into(),
+                        value: addr.to_hex().into_bytes().into(),
+                        index: false,
+                    });
+                }
+            }
+            _ => {
+                dm.document_mutations.iter().for_each(|x| {
+                    attrs.push(EventAttribute {
+                        key: "collections".to_string().into_bytes().into(),
+                        value: x.collection_name.to_string().into_bytes().into(),
+                        index: false,
+                    })
+                });
+                let addr_ref: &[u8] = dm.db_address.as_ref();
+                if let Ok(addr) = AccountAddress::try_from(addr_ref) {
+                    attrs.push(EventAttribute {
+                        key: "to".to_string().into_bytes().into(),
+                        value: addr.to_hex().into_bytes().into(),
+                        index: false,
+                    });
+                }
+            }
+        }
+        let event = Event {
+            r#type: "mutation".to_string(),
+            attributes: attrs,
+        };
+
+        ResponseDeliverTx {
+            code: 0,
+            data: Default::default(),
+            log: "".to_string(),
+            info: "".to_string(),
+            gas_wanted: 0,
+            gas_used: 0,
+            events: vec![event],
+            codespace: "".to_string(),
+        }
+    }
+
+    fn build_delivered_response<'a>(
+        &self,
+        ok: bool,
+        msg: &str,
+        sender: &AccountId,
+    ) -> ResponseDeliverTx {
         if ok {
+            let attrs = vec![EventAttribute {
+                key: "sender".to_string().into_bytes().into(),
+                value: sender.to_hex().into_bytes().into(),
+                index: false,
+            }];
+            let event = Event {
+                r#type: "mutation".to_string(),
+                attributes: attrs,
+            };
             ResponseDeliverTx {
                 code: 0,
-                ..Default::default()
+                data: Default::default(),
+                log: "".to_string(),
+                info: "".to_string(),
+                gas_wanted: 0,
+                gas_used: 0,
+                events: vec![event],
+                codespace: "".to_string(),
             }
         } else {
             ResponseDeliverTx {
@@ -310,8 +389,9 @@ impl Application for AbciImpl {
                         match self.parse_database_mutation(data.as_ref()) {
                             Ok(dm) => match self.pending_databases.lock() {
                                 Ok(mut s) => {
+                                    let response = self.dispatch_database_event(&account_id, &dm);
                                     s.push((account_id.addr, dm, tx_id));
-                                    return self.build_delivered_response(true, "");
+                                    return response;
                                 }
                                 _ => {
                                     todo!();
@@ -319,7 +399,11 @@ impl Application for AbciImpl {
                             },
                             Err(e) => {
                                 let msg = format!("{e}");
-                                return self.build_delivered_response(false, msg.as_str());
+                                return self.build_delivered_response(
+                                    false,
+                                    msg.as_str(),
+                                    &account_id,
+                                );
                             }
                         }
                     }
@@ -340,7 +424,7 @@ impl Application for AbciImpl {
                                         tx_id,
                                         qsi,
                                     ));
-                                    return self.build_delivered_response(true, "");
+                                    return self.build_delivered_response(true, "", &account_id);
                                 }
                                 _ => {
                                     todo!();
@@ -348,7 +432,11 @@ impl Application for AbciImpl {
                             },
                             Err(e) => {
                                 let msg = format!("{e}");
-                                return self.build_delivered_response(false, msg.as_str());
+                                return self.build_delivered_response(
+                                    false,
+                                    msg.as_str(),
+                                    &account_id,
+                                );
                             }
                         }
                     }
@@ -357,31 +445,42 @@ impl Application for AbciImpl {
                             Ok(mm) => match self.pending_credits.lock() {
                                 Ok(mut s) => {
                                     s.push((account_id.addr, mm, tx_id));
-                                    return self.build_delivered_response(true, "");
+                                    return self.build_delivered_response(true, "", &account_id);
                                 }
                                 Err(e) => {
                                     let msg = format!("{e}");
-                                    return self.build_delivered_response(false, msg.as_str());
+
+                                    return self.build_delivered_response(
+                                        false,
+                                        msg.as_str(),
+                                        &account_id,
+                                    );
                                 }
                             },
                             Err(e) => {
                                 let msg = format!("{e}");
-                                return self.build_delivered_response(false, msg.as_str());
+                                return self.build_delivered_response(
+                                    false,
+                                    msg.as_str(),
+                                    &account_id,
+                                );
                             }
                         }
                     }
                     _ => {
-                        return self.build_delivered_response(false, "bad mutation payload");
+                        return self.build_delivered_response(false, "", &account_id);
                     }
                 },
                 Err(e) => {
+                    let empty = AccountId::new(AccountAddress::ZERO);
                     let msg = format!("{e}");
-                    return self.build_delivered_response(false, msg.as_str());
+                    return self.build_delivered_response(false, msg.as_str(), &empty);
                 }
             },
             Err(e) => {
+                let empty = AccountId::new(AccountAddress::ZERO);
                 let msg = format!("{e}");
-                return self.build_delivered_response(false, msg.as_str());
+                return self.build_delivered_response(false, msg.as_str(), &empty);
             }
         }
     }

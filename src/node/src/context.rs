@@ -21,17 +21,14 @@ use std::{
     pin::Pin,
     sync::{Arc, Mutex},
 };
+
 use tendermint_rpc::HttpClient;
 
 type ArcNodeStorage = Arc<Mutex<Pin<Box<NodeStorage>>>>;
 #[derive(Clone)]
 pub struct Context {
+    // seperate the lock
     pub node_store: ArcNodeStorage,
     pub client: HttpClient,
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
+    pub ws_url: String,
 }

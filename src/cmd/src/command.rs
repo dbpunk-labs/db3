@@ -198,6 +198,12 @@ pub enum DB3ClientCommand {
         #[clap(long)]
         amount: f32,
     },
+    #[clap(name = "subscribe")]
+    Subcribe {
+        /// subcribe all the events default true
+        #[clap(long, default_value = "true")]
+        all_event: bool,
+    },
 }
 
 impl DB3ClientCommand {
@@ -467,7 +473,15 @@ impl DB3ClientCommand {
                     }
                 }
             }
-
+            DB3ClientCommand::Subcribe { all_event } => {
+                ctx.store_sdk
+                    .as_mut()
+                    .unwrap()
+                    .open_console(all_event)
+                    .await
+                    .unwrap();
+                Err("exit to subscription".to_string())
+            }
             DB3ClientCommand::NewCollection {
                 addr,
                 name,

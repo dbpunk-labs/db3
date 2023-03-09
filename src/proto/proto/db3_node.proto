@@ -142,7 +142,7 @@ message ShowNetworkStatusRequest {}
 
 message SubscribeRequest {
     string session_token = 1;
-    db3_event_proto.Subscribution sub = 2;
+    db3_event_proto.Subscription sub = 2;
 }
 
 service StorageNode {

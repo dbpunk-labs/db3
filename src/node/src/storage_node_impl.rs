@@ -23,7 +23,12 @@ use ethers::core::types::transaction::eip712::{Eip712, TypedData};
 
 use bytes::BytesMut;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
-use db3_proto::db3_event_proto::EventMessage;
+use db3_proto::db3_event_proto::{
+    event_filter,
+    event_message::Event,
+    mutation_event::{MutationEventStatus, ToAddressType},
+    BlockEvent, EventMessage, EventType as DB3EventType, MutationEvent, Subscription,
+};
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
     storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
@@ -40,23 +45,278 @@ use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
 use ethers::types::Bytes;
 use prost::Message;
 use std::boxed::Box;
-use std::sync::atomic::Ordering;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
 use std::time::{SystemTime, UNIX_EPOCH};
-use tendermint_rpc::Client;
+use tendermint_rpc::{
+    event::EventData,
+    query::{EventType, Query},
+    Client, SubscriptionClient, WebSocketClient,
+};
+
+use std::collections::BTreeMap;
+use std::collections::HashSet;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 use tonic::{Request, Response, Status};
-use tracing::info;
+use tracing::{info, warn};
 
 pub struct StorageNodeImpl {
     context: Context,
     signer: Db3MultiSchemeSigner,
+    running: Arc<AtomicBool>,
+    sender: Sender<(
+        DB3Address,
+        Subscription,
+        Sender<std::result::Result<EventMessage, Status>>,
+    )>,
 }
 
 impl StorageNodeImpl {
-    pub fn new(context: Context, singer: Db3MultiSchemeSigner) -> Self {
+    pub fn new(
+        context: Context,
+        singer: Db3MultiSchemeSigner,
+        sender: Sender<(
+            DB3Address,
+            Subscription,
+            Sender<std::result::Result<EventMessage, Status>>,
+        )>,
+    ) -> Self {
         Self {
             context,
             signer: singer,
+            running: Arc::new(AtomicBool::new(false)),
+            sender,
+        }
+    }
+
+    ///
+    /// start a stream channel with tendermint
+    ///
+    pub async fn keep_subscription(
+        &self,
+        mut receiver: Receiver<(
+            DB3Address,
+            Subscription,
+            Sender<std::result::Result<EventMessage, Status>>,
+        )>,
+    ) -> std::result::Result<(), Status> {
+        if self.running.load(Ordering::Relaxed) {
+            info!("storage node has been started");
+            return Ok(());
+        }
+
+        let local_running = self.running.clone();
+        let old_state = local_running.swap(true, Ordering::Acquire);
+        let ws_url = self.context.ws_url.clone();
+        let block_query: Query = "tm.event = 'NewBlock'"
+            .parse()
+            .map_err(|e| Status::internal(format!("fail to parse event query for error {e}")))?;
+
+        let tx_query: Query = Query::from(EventType::Tx);
+
+        // only start the subscription channel if the old state is false
+        if !old_state {
+            tokio::spawn(async move {
+                while local_running.load(Ordering::Relaxed) {
+                    let (client, driver) = match WebSocketClient::new(ws_url.as_str()).await {
+                        Ok((client, driver)) => {
+                            info!("connect to {ws_url} ok");
+
+                            (client, driver)
+                        }
+                        Err(e) => {
+                            warn!(
+                                "fail to start a websocket with url {} and retry in 5 seconds for e {e}",
+                                ws_url
+                            );
+                            sleep(Duration::from_millis(1000 * 5)).await;
+                            continue;
+                        }
+                    };
+
+                    let driver_handle = tokio::spawn(async move { driver.run().await });
+                    let mut block_sub = match client.subscribe(block_query.clone()).await {
+                        Ok(sub) => sub,
+                        Err(e) => {
+                            driver_handle.abort();
+                            sleep(Duration::from_millis(1000 * 5)).await;
+                            warn!("fail to subscribe block event for {e} and retry in 5 seconds");
+                            continue;
+                        }
+                    };
+                    let mut tx_sub = match client.subscribe(tx_query.clone()).await {
+                        Ok(sub) => sub,
+                        Err(e) => {
+                            driver_handle.abort();
+                            sleep(Duration::from_millis(1000 * 5)).await;
+                            warn!("fail to subscribe tx event for {e} and retry in 5 seconds");
+                            continue;
+                        }
+                    };
+                    let mut subscribers: BTreeMap<
+                        DB3Address,
+                        (
+                            Sender<std::result::Result<EventMessage, Status>>,
+                            Subscription,
+                        ),
+                    > = BTreeMap::new();
+                    let mut to_be_removed: HashSet<DB3Address> = HashSet::new();
+                    while local_running.load(Ordering::Relaxed) {
+                        tokio::select! {
+                            Some((addr, sub, sender)) = receiver.recv() => {
+                                info!("add or update the subscriber with addr 0x{}", hex::encode(addr.as_ref()));
+                                //TODO limit the max address count
+                                subscribers.insert(addr, (sender, sub));
+                            }
+                            Some(Ok(block)) = block_sub.next() => {
+
+                               if let EventData::NewBlock {block,..} = block.data {
+                                    if let Some(data) = block {
+                                        for (key , (sender, sub)) in subscribers.iter() {
+                                            if sender.is_closed() {
+                                                to_be_removed.insert(key.clone());
+                                                warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
+                                                continue;
+                                            }
+                                            for idx in 0..sub.topics.len() {
+                                                if sub.topics[idx] != DB3EventType::Block as i32 {
+                                                    continue;
+                                                }
+                                                // sender block event
+                                                let e = BlockEvent {
+                                                    height: data.header.height.value(),
+                                                    block_hash: data.header.data_hash.unwrap_or_default().as_ref().to_vec(),
+                                                    app_hash:data.header.app_hash.as_ref().to_vec(),
+                                                    chain_id:data.header.chain_id.as_str().to_string(),
+                                                    gas: 0
+                                                };
+                                                let msg = EventMessage {
+                                                    r#type:sub.topics[idx],
+                                                    event:Some(Event::BlockEvent(e))
+                                                };
+                                                match sender.try_send(Ok(msg)) {
+                                                    Ok(_) => { break;}
+                                                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                                        // retry?
+                                                        // TODO
+                                                        warn!("the channel is full for addr 0x{}", hex::encode(key.as_ref()));
+                                                    }
+                                                    Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                                                        // remove the address
+                                                        to_be_removed.insert(key.clone());
+                                                        warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            Some(Ok(tx)) = tx_sub.next() => {
+                                if let (EventData::Tx {tx_result}, Some(events)) = (tx.data, tx.events) {
+                                    for (key , (sender, sub)) in subscribers.iter() {
+                                        if sender.is_closed() {
+                                            to_be_removed.insert(key.clone());
+                                            warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
+                                            continue;
+                                        }
+                                        for idx in 0..sub.topics.len() {
+                                            if sub.topics[idx] != DB3EventType::Mutation as i32 {
+                                                continue;
+                                            }
+
+                                            if let (Some(account_addrs), Some(event_filter::Filter::Mfilter(m))) = (events.get("mutation.sender"), &sub.filters[idx].filter){
+                                                if !&m.sender.is_empty() && !account_addrs.contains(&m.sender) {
+                                                    continue;
+                                                }
+                                            }
+                                            let e = Self::build_mutation_event(&events, tx_result.height as u64);
+                                            let msg = EventMessage {
+                                                r#type:sub.topics[idx],
+                                                event:Some(Event::MutationEvent(e))
+                                            };
+                                            //TODO  add filter
+                                            match sender.try_send(Ok(msg)) {
+                                                Ok(_) => { break;}
+                                                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                                    // retry?
+                                                    // TODO
+                                                    warn!("the channel is full for addr 0x{}", hex::encode(key.as_ref()));
+                                                }
+                                                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                                                    // remove the address
+                                                    to_be_removed.insert(key.clone());
+                                                    warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            else => {
+                                warn!("the remote channel has been closed");
+                               driver_handle.abort();
+                               // reconnect in 5 seconds
+                               sleep(Duration::from_millis(1000 * 5)).await;
+                               break;
+                            }
+                        }
+                        for k in to_be_removed.iter() {
+                            subscribers.remove(k);
+                        }
+                        to_be_removed.clear();
+                    }
+                }
+                info!("stop the subscription channel");
+            });
+        }
+        Ok(())
+    }
+
+    fn build_mutation_event(events: &BTreeMap<String, Vec<String>>, height: u64) -> MutationEvent {
+        let sender = match events.get("mutation.sender") {
+            Some(addrs) => match addrs.len() {
+                1 => addrs[0].to_string(),
+                _ => "".to_string(),
+            },
+            _ => "".to_string(),
+        };
+        let to = match events.get("mutation.to") {
+            Some(addrs) => match addrs.len() {
+                1 => addrs[0].to_string(),
+                _ => "".to_string(),
+            },
+            _ => "".to_string(),
+        };
+        let collections: Vec<String> = match events.get("mutation.collections") {
+            Some(addrs) => addrs.to_vec(),
+            _ => {
+                vec![]
+            }
+        };
+
+        let hash = match events.get("tx.hash") {
+            Some(addrs) => match addrs.len() {
+                1 => addrs[0].to_string(),
+                _ => "".to_string(),
+            },
+            _ => "".to_string(),
+        };
+        MutationEvent {
+            sender,
+            status: MutationEventStatus::Deliveried.into(),
+            to,
+            gas: 0,
+            height,
+            hash,
+            to_addr_type: ToAddressType::Database.into(),
+            collections,
         }
     }
 }
@@ -494,9 +754,39 @@ impl StorageNode for StorageNodeImpl {
     }
     async fn subscribe(
         &self,
-        _request: Request<SubscribeRequest>,
+        request: Request<SubscribeRequest>,
     ) -> std::result::Result<Response<Self::SubscribeStream>, Status> {
-        Err(Status::internal(format!("")))
+        let r = request.into_inner();
+        let sender = self.sender.clone();
+        let session_token = r.session_token;
+        match self.context.node_store.lock() {
+            Ok(mut node_store) => {
+                if let Some(sess) = node_store
+                    .get_session_store()
+                    .get_session_mut(&session_token)
+                {
+                    if !sess.check_session_running() {
+                        return Err(Status::permission_denied(
+                            "Fail to query in this session. Please restart query session",
+                        ));
+                    }
+                } else {
+                    return Err(Status::not_found("not found query session"));
+                }
+
+                if let Some(addr) = node_store.get_session_store().get_address(&session_token) {
+                    let (msg_sender, msg_receiver) =
+                        tokio::sync::mpsc::channel::<std::result::Result<EventMessage, Status>>(10);
+                    sender
+                        .try_send((addr, r.sub.unwrap().clone(), msg_sender))
+                        .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
+                    Ok(Response::new(ReceiverStream::new(msg_receiver)))
+                } else {
+                    Err(Status::not_found("no address with the toke"))
+                }
+            }
+            Err(e) => Err(Status::internal(format!("{}", e))),
+        }
     }
 }
 
