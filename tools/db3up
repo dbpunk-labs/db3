@@ -3,7 +3,8 @@
 mkdir -p ~/.db3/bin
 mkdir -p ~/.db3/data
 mkdir -p ~/.db3/logs
-VERSION=v0.2.7
+VERSION=v0.2.13
+
 if [ ! -f ~/.db3/bin/db3 ]
 then
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -12,6 +13,7 @@ then
         tar -zxf /tmp/db3-${VERSION}-linux-x86_64.tar.gz
         cp db3-${VERSION}-linux-x86_64/bin/* ~/.db3/bin
     elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "download db3 package from github"
         wget https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3-${VERSION}-macos-x86_64.tar.gz -O /tmp/db3-${VERSION}-macos-x86_64.tar.gz
         tar -zxf /tmp/db3-${VERSION}-macos-x86_64.tar.gz
         cp db3-${VERSION}-macos-x86_64/bin/* ~/.db3/bin
@@ -29,3 +31,16 @@ sleep 2
 ~/.db3/bin/tendermint start >~/.db3/logs/tm.log 2>&1 &
 sleep 2
 echo "start db3 network ok .."
+echo "use ~/.db3/bin/db3 console to connect to the localnet"
+echo "use db3.js with endpoint http://127,0.0.1:26659"
+echo "ctrl-c to kill the localnet"
+trap_ctrlc() {
+    killall db3
+    echo "kill db3 network"
+}
+trap trap_ctrlc INT
+wait
+
+
+
+
