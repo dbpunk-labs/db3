@@ -613,9 +613,11 @@ mod tests {
             addr: addr.clone(),
             name: collection_books.to_string(),
             index_list: vec![
-                r#"{"id":1,"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}"#.to_string(),
-                r#"{"id":2,"name":"idx2","fields":[{"field_path":"age","value_mode":{"Order":1}}]}"#.to_string(),
-            ]
+                r#"{"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}"#
+                    .to_string(),
+                r#"{"name":"idx2","fields":[{"field_path":"age","value_mode":{"Order":1}}]}"#
+                    .to_string(),
+            ],
         };
 
         if let Ok(_) = cmd.execute(&mut ctx).await {
@@ -629,7 +631,10 @@ mod tests {
         let cmd = DB3ClientCommand::NewCollection {
             addr: addr.clone(),
             name: collection_student.to_string(),
-            index_list: vec![r#"{"id":1,"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}"#.to_string()]
+            index_list: vec![
+                r#"{"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}]}"#
+                    .to_string(),
+            ],
         };
 
         if let Ok(_) = cmd.execute(&mut ctx).await {
