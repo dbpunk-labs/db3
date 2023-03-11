@@ -9,11 +9,7 @@ use db3_proto::db3_database_proto::structured_query::value::ValueType;
 use db3_proto::db3_database_proto::structured_query::FieldFilter;
 use db3_proto::db3_database_proto::structured_query::Filter;
 use db3_proto::db3_database_proto::structured_query::Value;
-use db3_proto::db3_database_proto::{
-    index::index_field::{Order, ValueMode},
-    index::IndexField,
-    Index,
-};
+use db3_proto::db3_database_proto::{index::IndexField, Index};
 use serde_json::Value as JsonValue;
 /// convert json string to Bson::Document
 pub fn json_str_to_bson_document(json_str: &str) -> std::result::Result<Document, DB3Error> {
@@ -230,6 +226,7 @@ mod tests {
     };
     use bson::Bson;
     use chrono::Utc;
+    use db3_proto::db3_database_proto::index::index_field::{Order, ValueMode};
     #[test]
     fn json_str_to_bson_document_ut() {
         let data = r#"
