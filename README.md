@@ -53,7 +53,7 @@ use ~/.db3/bin/db3 console to connect to the localnet
 use db3.js with endpoint http://127,0.0.1:26659
 ctrl-c to kill the localnet
 ```
-now you can use db3 cli and db3.js to connect the localnet
+now you can use db3 cli and db3.js to connect to the localnet
 
 ### Start the localnet from building the source code
 
