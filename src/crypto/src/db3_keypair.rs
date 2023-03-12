@@ -175,8 +175,6 @@ mod tests {
     use crate::db3_signature::DB3Signature;
     use crate::key_derive;
     use bip39::{Language, Mnemonic, Seed};
-    use fastcrypto::hash::{HashFunction, Sha3_256};
-    use hex;
     #[test]
     fn keypair_smoke_test_secp256k1() {
         let mnemonic = Mnemonic::from_phrase(

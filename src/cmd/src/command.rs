@@ -488,10 +488,14 @@ impl DB3ClientCommand {
                 index_list,
             } => {
                 //TODO validate the index
-                let index_vec: Vec<Index> = index_list
-                    .iter()
-                    .map(|i| serde_json::from_str::<Index>(i.as_str()).unwrap())
-                    .collect();
+                // .map(|i| serde_json::from_str::<Index>(i.as_str()).unwrap())
+
+                let mut index_vec: Vec<Index> = vec![];
+                for idx in 0..index_list.len() {
+                    index_vec.push(
+                        bson_util::json_str_to_index(index_list[idx].as_str(), idx as u32).unwrap(),
+                    );
+                }
                 let collection = CollectionMutation {
                     index: index_vec.to_owned(),
                     collection_name: name.to_string(),
