@@ -1,46 +1,111 @@
 #! /bin/bash
 
-mkdir -p ~/.db3/bin
-mkdir -p ~/.db3/data
-mkdir -p ~/.db3/logs
-VERSION=v0.2.13
 
-if [ ! -f ~/.db3/bin/db3 ]
-then
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "download db3 package from github"
-        wget https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3-${VERSION}-linux-x86_64.tar.gz -O /tmp/db3-${VERSION}-linux-x86_64.tar.gz
-        tar -zxf /tmp/db3-${VERSION}-linux-x86_64.tar.gz
-        cp db3-${VERSION}-linux-x86_64/bin/* ~/.db3/bin
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "download db3 package from github"
-        wget https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3-${VERSION}-macos-x86_64.tar.gz -O /tmp/db3-${VERSION}-macos-x86_64.tar.gz
-        tar -zxf /tmp/db3-${VERSION}-macos-x86_64.tar.gz
-        cp db3-${VERSION}-macos-x86_64/bin/* ~/.db3/bin
-    else
-        echo "$OSTYPE is not supported, please give us a issue https://github.com/dbpunk-labs/db3/issues/new/choose"
-        exit 1
-    fi
-    echo "init localnet configure"
-    ~/.db3/bin/tendermint init
-fi
-killall db3
-echo "start db3 network in single node mode..."
-~/.db3/bin/db3 start -d ~/.db3/data >~/.db3/logs/db3.log 2>&1 &
-sleep 2
-~/.db3/bin/tendermint start >~/.db3/logs/tm.log 2>&1 &
-sleep 2
-echo "start db3 network ok .."
-echo "use ~/.db3/bin/db3 console to connect to the localnet"
-echo "use db3.js with endpoint http://127,0.0.1:26659"
-echo "ctrl-c to kill the localnet"
-trap_ctrlc() {
-    killall db3
-    echo "kill db3 network"
+# the function for show help information
+function show_help() {
+  cat <<help_message
+USAGE:
+  db3up [SUBCOMMAND]
+FLAGS:
+  -h  Prints help information
+SUBCOMMANDS:
+  install     install db3
+  localnet    start a localnet for testing
+help_message
+  return 0
 }
-trap trap_ctrlc INT
-wait
 
+function install_db3() {
+    mkdir -p ~/.db3/bin
+    mkdir -p ~/.db3/data
+    mkdir -p ~/.db3/logs
+    VERSION=`curl -s https://api.github.com/repos/dbpunk-labs/db3/releases/latest | python3  -c 'import sys, json; print(json.load(sys.stdin)["name"])'`
+    echo "install db3 with version ${VERSION} at path ~/.db3"
+    if [ ! -f ~/.db3/bin/db3 ]
+    then
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            echo "download db3 package from github"
+            curl -L --max-redirs 10 https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3-${VERSION}-linux-x86_64.tar.gz -o /tmp/db3-${VERSION}-linux-x86_64.tar.gz
+            tar -zxf /tmp/db3-${VERSION}-linux-x86_64.tar.gz
+            cp db3-${VERSION}-linux-x86_64/bin/* ~/.db3/bin
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            echo "download db3 package from github"
+            curl -L --max-redirs 10 https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3-${VERSION}-macos-x86_64.tar.gz -o /tmp/db3-${VERSION}-macos-x86_64.tar.gz
+            tar -zxf /tmp/db3-${VERSION}-macos-x86_64.tar.gz
+            cp db3-${VERSION}-macos-x86_64/bin/* ~/.db3/bin
+        else
+            echo "$OSTYPE is not supported, please give us a issue https://github.com/dbpunk-labs/db3/issues/new/choose"
+            exit 1
+        fi
+        export PATH=~/.db3/bin:$PATH
+        tendermint init >/dev/null 2>&1  && tendermint unsafe_reset_all >/dev/null 2>&1
+    fi
+    echo "nice jobs, you have installed db3 network! and you can run db3up localnet to start it"
+}
 
+function start_localnet() {
+    export PATH=~/.db3/bin:$PATH
+    killall db3 > /dev/null 2>&1 
+    echo "start db3 network in single node mode..."
+    db3 start -d ~/.db3/data >~/.db3/logs/db3.log 2>&1 &
+    sleep 2
+    tendermint start >~/.db3/logs/tm.log 2>&1 &
+    sleep 2
+    echo "start db3 network ok .."
+    echo "use db3 console to connect to the http://127.0.0.1:26659"
+    echo "ctrl-c to kill the localnet"
+    trap_ctrlc() {
+        killall db3
+        echo "kill db3 network"
+    }
+    trap trap_ctrlc INT
+    wait
+}
 
+function get_opts() {
+  #  Parse options to the main command.
+  while getopts ":h" opt; do
+    case "${opt}" in
+      h)
+        #  Display help.
+        show_help
+        ;;
+      \?)
+        echo "bad options"
+        exit 1
+        ;;
+    esac
+  done
+  shift $((OPTIND -1))
+  declare -grx CODE_SRC_DIR
+
+  #  Remove the main command from the argument list.
+  local -r _subcommand="${1:-}"
+  if [[ -z ${_subcommand} ]]; then
+    return 0
+  fi
+
+  shift
+  case "${_subcommand}" in
+    install)
+      install_db3
+    ;;
+    localnet)
+      start_localnet
+      ;;
+    *)
+      #  Unrecognized option, get help.
+      echo "Invalid subcommand: ${_subcommand}!"
+      get_help
+      ;;
+  esac
+  return 0
+}
+
+function main() {
+  get_opts "${@}"
+  return 0
+}
+
+main "${@}"
 
