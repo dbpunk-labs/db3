@@ -90,6 +90,7 @@ jobs:
                   files: |
                       target/${{ matrix.job.target }}/release/db3*.tar.gz
                       target/${{ matrix.job.target }}/release/db3*.sha256
+                      tools/db3up
               env:
                   GITHUB_TOKEN: ${{ secrets.CR_PAT }}
 
