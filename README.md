@@ -37,114 +37,38 @@ DB3 Network is an open-source and decentralized firebase firestore alternative f
 
 ## Getting Started
 
-### Start the localnet from a precompiled package
 
 ```shell
-git clone https://github.com/dbpunk-labs/db3.git
-cd db3 && bash ./tools/db3up
+curl --proto '=https' --tlsv1.2 -sSf https://up.db3.network/db3up_init.sh | sh
+db3up localnet
 ```
+Note:
+* curl and python3 are required in your enviroment
+* You should run the `source ~/.zshrc` if you use zsh or `source ~/.bashrc` if you use bash
 
-the output
+The db3 localnet has been started if you see the following output
 
 ```
 start db3 network in single node mode...
 start db3 network ok ..
-use ~/.db3/bin/db3 console to connect to the localnet
-use db3.js with endpoint http://127,0.0.1:26659
+use db3 console to connect to the http://127.0.0.1:26659
 ctrl-c to kill the localnet
 ```
-now you can use db3 cli and db3.js to connect to the localnet
 
-### Start the localnet from building the source code
+Open another terminal and run the following commands
 
-```shell
-git clone https://github.com/dbpunk-labs/db3.git
-cd db3 && bash install_env.sh
-cd bridge && yarn && npx hardhat compile
-cd .. && cargo build
-cd tools && bash ./start_localnet.sh
 ```
-
-### Use Console
-
- * [x] Start db3 console
-
-```shell
-./target/debug/db3 console
+# connect to db3
+db3 console
+db3>-$ init
+ address                                    | scheme
+--------------------------------------------+-----------
+ 0xcc28673faf07ec708d30ca0275f0509279db9242 | secp256k1
 db3>-$ new-db
-database address                           | transaction id
+ database address                           | mutation id
 --------------------------------------------+----------------------------------------------
-0xa9f5c8170aad7a0f924d89c6edacae6db24ef57d | 0ALy/hH7CQe9lv294K6dOxGP14xWHsbRs+/pXBZa8oU=
+ 0x658be8968b414830d57e44f9b70ad65d4a947764 | Gm9FOIymAFjmy9NtGWSMZRiAdtV81CGMMNGgIJMk0nY=
 ```
-
- * [x] Show database
-
-```shell
-db3>-$ show-db --addr 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33
- database address                           | sender address                             | related transactions                        | collections
---------------------------------------------+--------------------------------------------+----------------------------------------------+-------------
- 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33 | 0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | EMYw64xlI2q4v1MShoKw3T60asNbWJ9//ca75M3JO3Q= |
-```
-
- * [x] Add a collection to database
-
-```shell
-db3>$ new-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251 --name books --index '{"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}'
-send add collection done with tx
-3V7r7VRg+9zUXeGNmqRR0YdVXWtBSl4sk+Z50h9BrOc=
-
-```
-
- * [x] Show collections in database
-
-```shell
-db3>-$ show-collection --addr 0xcfb524677673af15edebbec018b16d42d87b1251
- name  | index
--------+----------------------------------------------------------------------------
- books | {"name":"idx1","fields":[{"field_path":"test1","value_mode":{"Order":1}}]}
-```
- * [x] Create a document
-
-```
-db3>-$ new-doc --addr 0x997f631fcafeed5ee319c83683ae16e64783602b --collection-name books --documents '{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}'
-send add document done with tx
-+O9cK2cHLexZQvIITk4OTm8SxBhq7Yz7g+xZYiionWo=
-```
-
- * [x] list documents
- 
- ```
-db3>-$ show-doc --addr 0x22fb51848e26b34e242dd16a1224e8f23ee9b42e  --collection-name books
- id_base64                                    | owner                                      | document
-----------------------------------------------+--------------------------------------------+---------------------------------------------------------------------------------------------------------------------------
- AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAAAfAAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
- AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAABLAAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(44), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
- AQAAAAAAAAAyAAAAAQAAAAEAAAAAAAABPgAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("John Doe"), "age": Int64(45), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
- ```
-
-* [x] get a document
-
- ```
- db3>-$ get-doc --id AQAAAAAAAAAVAAAAAQAAAAEAAAAAAAAAOQAAAAEAAAAA
- id_base64                                    | owner                                      | document
-----------------------------------------------+--------------------------------------------+-----------------------------------------------------------------------------------------------------------------------
- AQAAAAAAAAAVAAAAAQAAAAEAAAAAAAAAOQAAAAEAAAAA | 0x84b0bd55e7ad979b7cb92a56f561190de8f68403 | Document({"name": String("Mike"), "age": Int64(43), "phones": Array([String("+44 1234567"), String("+44 2345678")])})
- ```
- * [x] show network state
-
-```
-db3>-$ show-state
- name       | state
-------------+---------
- database   | 1
- collection | 0
- documemt   | 0
- account    | 1
- mutation   | 1
- session    | 0
- storage    | 102.00
-```
- * [ ] query documents by index
 
 ### Build a dapp with db3.js
 

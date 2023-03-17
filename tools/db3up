@@ -77,8 +77,6 @@ function get_opts() {
     esac
   done
   shift $((OPTIND -1))
-  declare -grx CODE_SRC_DIR
-
   #  Remove the main command from the argument list.
   local -r _subcommand="${1:-}"
   if [[ -z ${_subcommand} ]]; then
