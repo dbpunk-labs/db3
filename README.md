@@ -37,6 +37,7 @@ DB3 Network is an open-source and decentralized firebase firestore alternative f
 
 ## Getting Started
 
+install db3up tool
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://up.db3.network/db3up_init.sh | sh
