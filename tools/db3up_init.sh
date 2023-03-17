@@ -4,7 +4,7 @@
 
 mkdir -p ~/.db3/bin
 VERSION=`curl -s https://api.github.com/repos/dbpunk-labs/db3/releases/latest | python3  -c 'import sys, json; print(json.load(sys.stdin)["name"])'`
-curl https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3up -o ~/.db3/bin/db3up
+curl -L --max-redirs 10 https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/db3up -o ~/.db3/bin/db3up
 chmod +x ~/.db3/bin/db3up
 if [ -f ~/.zshrc ]; then
     read -p "Add ~/.db3/bin to your PATH(y/n)? " yn
