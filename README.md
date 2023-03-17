@@ -40,20 +40,21 @@ DB3 Network is an open-source and decentralized firebase firestore alternative f
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://up.db3.network/db3up_init.sh | sh
-db3up localnet
 ```
+
 Note:
 * curl and python3 are required in your enviroment
-* You should run the `source ~/.zshrc` if you use zsh or `source ~/.bashrc` if you use bash
 
-The db3 localnet has been started if you see the following output
-
+start the localnet
 ```
+db3up localnet
 start db3 network in single node mode...
 start db3 network ok ..
 use db3 console to connect to the http://127.0.0.1:26659
 ctrl-c to kill the localnet
 ```
+Note if you encounter the error 'db3up not found' you use the following solution to resolve it
+* You should run the `source ~/.zshrc` if you use zsh or `source ~/.bashrc` if you use bash
 
 Open another terminal and run the following commands
 
