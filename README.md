@@ -126,8 +126,10 @@ const result = await addDoc<Todo>(collectionRef, {
             owner: wallet.getAddress(),
  } as Todo)
 ```
+ 
+the tour on replit.com about how to use db3.js
+* [create a database](https://replit.com/@imotai/ConnectToDB3?v=1)
 
-for more please go to [db3.js](https://github.com/dbpunk-labs/db3.js)
 
 ## Why DB3 Network
 ![why db3](./docs/images/why_db3.svg)
