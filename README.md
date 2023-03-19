@@ -79,11 +79,16 @@ db3>-$ new-db
 
 ## Use db3.js to connect db3 network
 
+
 ```typescript
-// create a wallet
+
+// create a db3 browser wallet 
 const mnemonic =
         'result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss'
 const wallet = DB3BrowserWallet.createNew(mnemonic, 'DB3_SECP256K1')
+
+// you can use metamask to connect db3 network with the following code
+// const wallet = new MetamaskWallet(window)
 
 // create a database
 const [dbId, txId] = await client.createDatabase()
