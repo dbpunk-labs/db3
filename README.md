@@ -77,35 +77,32 @@ db3>-$ new-db
  0x658be8968b414830d57e44f9b70ad65d4a947764 | Gm9FOIymAFjmy9NtGWSMZRiAdtV81CGMMNGgIJMk0nY=
 ```
 
-### Build a dapp with db3.js
+## Use db3.js to connect db3 network
 
-#### Build db3 client
-
-```typescript
-// the key seed
-const mnemonic ='...'
-// create a wallet
-const wallet = DB3BrowserWallet.createNew(mnemonic, 'DB3_SECP259K1')
-// build db3 client
-const client = new DB3Client('http://127.0.0.1:26659', wallet)
-```
-#### Create a database
 
 ```typescript
+
+// create a db3 browser wallet 
+const mnemonic =
+        'result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss'
+const wallet = DB3BrowserWallet.createNew(mnemonic, 'DB3_SECP256K1')
+
+// you can use metamask to connect db3 network with the following code
+// const wallet = new MetamaskWallet(window)
+
+// create a database
 const [dbId, txId] = await client.createDatabase()
+
+// connect a database with address
 const db = initializeDB3('http://127.0.0.1:26659', dbId, wallet)
-```
 
-#### Create a collection
-
-```typescript
-// add an index to collection
 const indexList: Index[] = [
             {
                 name: 'idx1',
+                id: 1,
                 fields: [
                     {
-                        fieldPath: 'name',
+                        fieldPath: 'owner',
                         valueMode: {
                             oneofKind: 'order',
                             order: Index_IndexField_Order.ASCENDING,
@@ -113,19 +110,24 @@ const indexList: Index[] = [
                     },
                 ],
             },
-]
-// create a collecion
-const collectionRef = await collection(db, 'cities', indexList)
-// add a doc to collection
-const result = await addDoc(collectionRef, {
-    name: 'beijing',
-    address: 'north',
-})
-// get all docs from collection                                                                                                                                                                  
-const docs = await getDocs(collectionRef)
-```
-for more please go to [db3.js](https://github.com/dbpunk-labs/db3.js)
+        ]
+// create a collection with index and the following interface `Todo`
+//
+//interface Todo {
+//    text: string
+//    owner: string
+//}
+//
+const collectionRef = await collection<Todo>(db, 'todos', indexList)
 
+// add a todo
+const result = await addDoc<Todo>(collectionRef, {
+            text: 'beijing',
+            owner: wallet.getAddress(),
+ } as Todo)
+```
+
+for more please go to [db3.js](https://github.com/dbpunk-labs/db3.js)
 
 ## Why DB3 Network
 ![why db3](./docs/images/why_db3.svg)
