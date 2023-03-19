@@ -77,7 +77,7 @@ db3>-$ new-db
  0x658be8968b414830d57e44f9b70ad65d4a947764 | Gm9FOIymAFjmy9NtGWSMZRiAdtV81CGMMNGgIJMk0nY=
 ```
 
-## Use db3.js to connect db3 network
+## Connect to db3 network with db3.js
 
 
 ```typescript
