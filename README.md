@@ -94,7 +94,7 @@ const wallet = DB3BrowserWallet.createNew(mnemonic, 'DB3_SECP256K1')
 const [dbId, txId] = await client.createDatabase()
 
 // connect a database with address
-const db = initializeDB3('http://127.0.0.1:26659', dbId, wallet)
+const {db} = initializeDB3('http://127.0.0.1:26659', dbId, wallet)
 
 const indexList: Index[] = [
             {
@@ -129,6 +129,7 @@ const result = await addDoc<Todo>(collectionRef, {
  
 the tour on replit.com about how to use db3.js
 * [create a database](https://replit.com/@imotai/ConnectToDB3?v=1)
+* [create a collection](https://replit.com/@imotai/CreateACollection?v=1)
 
 
 ## Why DB3 Network
