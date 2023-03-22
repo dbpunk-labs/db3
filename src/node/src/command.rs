@@ -112,6 +112,10 @@ pub enum DB3Command {
         /// disable grpc-web
         #[clap(long, default_value = "false")]
         disable_grpc_web: bool,
+        /// disable query session
+        /// the node will be free if you disable the query session
+        #[clap(long, default_value = "false")]
+        disable_query_session: bool,
     },
 
     /// Start db3 interactive console
@@ -411,6 +415,7 @@ impl DB3Command {
                 db_path,
                 db_tree_level_in_memory,
                 disable_grpc_web,
+                disable_query_session,
             } => {
                 let log_level = if quiet {
                     LevelFilter::OFF
@@ -445,6 +450,7 @@ impl DB3Command {
                     node_store: node_store.clone(),
                     client,
                     ws_url: ws_tm_addr,
+                    disable_query_session,
                 };
                 let json_rpc_handler = Self::start_json_rpc_service(
                     &public_host,

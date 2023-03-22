@@ -33,6 +33,7 @@ message NetworkStatus {
     uint64 total_mutation_count = 5;
     uint64 total_session_count = 6;
     uint64 total_storage_in_bytes = 7;
+    bool query_session_enabled = 8;
 }
 
 message QueryBillKey {

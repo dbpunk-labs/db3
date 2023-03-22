@@ -46,6 +46,7 @@ use hex;
 use num_traits::cast::FromPrimitive;
 use prost::Message;
 use std::collections::BTreeMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tonic::Status;
 use uuid::Uuid;
@@ -56,6 +57,7 @@ pub struct StoreSDK {
     session_pool: SessionPool,
     types: Types,
     use_typed_format: bool,
+    query_session_enabled: Arc<AtomicBool>,
 }
 
 impl StoreSDK {
@@ -73,17 +75,35 @@ impl StoreSDK {
           ]
         });
         let types: Types = serde_json::from_value(json).unwrap();
-
         Self {
             client,
             signer,
             session_pool: SessionPool::new(),
             types,
             use_typed_format,
+            query_session_enabled: Arc::new(AtomicBool::new(true)),
         }
     }
 
-    async fn keep_session(&mut self) -> std::result::Result<String, Status> {
+    pub async fn check_node(&self) -> std::result::Result<(), Status> {
+        let state = self.get_state().await?;
+        self.query_session_enabled.store(
+            state.query_session_enabled,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        Ok(())
+    }
+
+    async fn keep_session(&mut self, force: bool) -> std::result::Result<String, Status> {
+        //TODO remove force parameter
+        if !self
+            .query_session_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+            && !force
+        {
+            return Ok("".to_string());
+        }
+
         if let Some(token) = self.session_pool.get_last_token() {
             match self.session_pool.get_session_mut(token.as_ref()) {
                 Some(session) => {
@@ -134,28 +154,43 @@ impl StoreSDK {
         &mut self,
         id: &str,
     ) -> std::result::Result<Option<Document>, Status> {
-        let token = self.keep_session().await?;
-        match self.session_pool.get_session_mut(token.as_ref()) {
-            Some(session) => {
-                if session.check_session_running() {
-                    let r = GetDocumentRequest {
-                        session_token: token.to_string(),
-                        id: id.to_string(),
-                    };
-                    let request = tonic::Request::new(r);
-                    let mut client = self.client.as_ref().clone();
-                    let response = client.get_document(request).await?.into_inner();
-                    session.increase_query(1);
-                    Ok(response.document)
-                } else {
-                    Err(Status::permission_denied(
-                        "Fail to query in this session. Please restart query session",
-                    ))
+        if self
+            .query_session_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            let token = self.keep_session(false).await?;
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.check_session_running() {
+                        let r = GetDocumentRequest {
+                            session_token: token.to_string(),
+                            id: id.to_string(),
+                        };
+                        let request = tonic::Request::new(r);
+                        let mut client = self.client.as_ref().clone();
+                        let response = client.get_document(request).await?.into_inner();
+                        session.increase_query(1);
+                        Ok(response.document)
+                    } else {
+                        Err(Status::permission_denied(
+                            "Fail to query in this session. Please restart query session",
+                        ))
+                    }
                 }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
             }
-            None => Err(Status::not_found(format!(
-                "Fail to query, session with token {token} not found"
-            ))),
+        } else {
+            let r = GetDocumentRequest {
+                session_token: "".to_string(),
+                id: id.to_string(),
+            };
+
+            let request = tonic::Request::new(r);
+            let mut client = self.client.as_ref().clone();
+            let response = client.get_document(request).await?.into_inner();
+            Ok(response.document)
         }
     }
 
@@ -166,28 +201,42 @@ impl StoreSDK {
         &mut self,
         addr: &str,
     ) -> std::result::Result<Option<Database>, Status> {
-        let token = self.keep_session().await?;
-        match self.session_pool.get_session_mut(token.as_ref()) {
-            Some(session) => {
-                if session.check_session_running() {
-                    let r = ShowDatabaseRequest {
-                        session_token: token.to_string(),
-                        address: addr.to_string(),
-                    };
-                    let request = tonic::Request::new(r);
-                    let mut client = self.client.as_ref().clone();
-                    let response = client.show_database(request).await?.into_inner();
-                    session.increase_query(1);
-                    Ok(response.db)
-                } else {
-                    Err(Status::permission_denied(
-                        "Fail to query in this session. Please restart query session",
-                    ))
+        if self
+            .query_session_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            let token = self.keep_session(false).await?;
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.check_session_running() {
+                        let r = ShowDatabaseRequest {
+                            session_token: token.to_string(),
+                            address: addr.to_string(),
+                        };
+                        let request = tonic::Request::new(r);
+                        let mut client = self.client.as_ref().clone();
+                        let response = client.show_database(request).await?.into_inner();
+                        session.increase_query(1);
+                        Ok(response.db)
+                    } else {
+                        Err(Status::permission_denied(
+                            "Fail to query in this session. Please restart query session",
+                        ))
+                    }
                 }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
             }
-            None => Err(Status::not_found(format!(
-                "Fail to query, session with token {token} not found"
-            ))),
+        } else {
+            let r = ShowDatabaseRequest {
+                session_token: "".to_string(),
+                address: addr.to_string(),
+            };
+            let request = tonic::Request::new(r);
+            let mut client = self.client.as_ref().clone();
+            let response = client.show_database(request).await?.into_inner();
+            Ok(response.db)
         }
     }
 
@@ -197,29 +246,44 @@ impl StoreSDK {
         addr: &str,
         query: StructuredQuery,
     ) -> std::result::Result<RunQueryResponse, Status> {
-        let token = self.keep_session().await?;
-        match self.session_pool.get_session_mut(token.as_ref()) {
-            Some(session) => {
-                if session.check_session_running() {
-                    let r = RunQueryRequest {
-                        session_token: token.to_string(),
-                        address: addr.to_string(),
-                        query: Some(query),
-                    };
-                    let request = tonic::Request::new(r);
-                    let mut client = self.client.as_ref().clone();
-                    let response = client.run_query(request).await?.into_inner();
-                    session.increase_query(1);
-                    Ok(response)
-                } else {
-                    Err(Status::permission_denied(
-                        "Fail to query in this session. Please restart query session",
-                    ))
+        if self
+            .query_session_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            let token = self.keep_session(false).await?;
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.check_session_running() {
+                        let r = RunQueryRequest {
+                            session_token: token.to_string(),
+                            address: addr.to_string(),
+                            query: Some(query),
+                        };
+                        let request = tonic::Request::new(r);
+                        let mut client = self.client.as_ref().clone();
+                        let response = client.run_query(request).await?.into_inner();
+                        session.increase_query(1);
+                        Ok(response)
+                    } else {
+                        Err(Status::permission_denied(
+                            "Fail to query in this session. Please restart query session",
+                        ))
+                    }
                 }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
             }
-            None => Err(Status::not_found(format!(
-                "Fail to query, session with token {token} not found"
-            ))),
+        } else {
+            let r = RunQueryRequest {
+                session_token: "".to_string(),
+                address: addr.to_string(),
+                query: Some(query),
+            };
+            let request = tonic::Request::new(r);
+            let mut client = self.client.as_ref().clone();
+            let response = client.run_query(request).await?.into_inner();
+            Ok(response)
         }
     }
 
@@ -245,7 +309,7 @@ impl StoreSDK {
                 },
             ],
         };
-        let session_token = self.keep_session().await?;
+        let session_token = self.keep_session(true).await?;
         let req = SubscribeRequest {
             session_token,
             sub: Some(sub),
@@ -436,6 +500,9 @@ impl StoreSDK {
         token: &str,
         use_typed_format: bool,
     ) -> std::result::Result<QuerySessionInfo, Status> {
+        if token.len() == 0 {
+            return Err(Status::internal(format!("Session {} not exist", token)));
+        }
         match self.session_pool.get_session(token) {
             Some(sess) => {
                 let query_session_info = sess.get_session_info();
@@ -493,29 +560,44 @@ impl StoreSDK {
     }
 
     pub async fn get_block_bills(&mut self, height: u64) -> std::result::Result<Vec<Bill>, Status> {
-        let token = self.keep_session().await?;
-        match self.session_pool.get_session_mut(token.as_str()) {
-            Some(session) => {
-                if session.check_session_running() {
-                    let mut client = self.client.as_ref().clone();
-                    let query_bill_key = Some(QueryBillKey {
-                        height,
-                        session_token: token.clone(),
-                    });
-                    let q_req = QueryBillRequest { query_bill_key };
-                    let request = tonic::Request::new(q_req);
-                    let response = client.query_bill(request).await?.into_inner();
-                    session.increase_query(1);
-                    Ok(response.bills)
-                } else {
-                    Err(Status::permission_denied(
-                        "Fail to query bill in this session. Please restart query session",
-                    ))
+        if self
+            .query_session_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            let token = self.keep_session(false).await?;
+            match self.session_pool.get_session_mut(token.as_str()) {
+                Some(session) => {
+                    if session.check_session_running() {
+                        let mut client = self.client.as_ref().clone();
+                        let query_bill_key = Some(QueryBillKey {
+                            height,
+                            session_token: token.clone(),
+                        });
+                        let q_req = QueryBillRequest { query_bill_key };
+                        let request = tonic::Request::new(q_req);
+                        let response = client.query_bill(request).await?.into_inner();
+                        session.increase_query(1);
+                        Ok(response.bills)
+                    } else {
+                        Err(Status::permission_denied(
+                            "Fail to query bill in this session. Please restart query session",
+                        ))
+                    }
                 }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
             }
-            None => Err(Status::not_found(format!(
-                "Fail to query, session with token {token} not found"
-            ))),
+        } else {
+            let mut client = self.client.as_ref().clone();
+            let query_bill_key = Some(QueryBillKey {
+                height,
+                session_token: "".to_string(),
+            });
+            let q_req = QueryBillRequest { query_bill_key };
+            let request = tonic::Request::new(q_req);
+            let response = client.query_bill(request).await?.into_inner();
+            Ok(response.bills)
         }
     }
 

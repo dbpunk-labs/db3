@@ -31,4 +31,5 @@ pub struct Context {
     pub node_store: ArcNodeStorage,
     pub client: HttpClient,
     pub ws_url: String,
+    pub disable_query_session: bool,
 }
