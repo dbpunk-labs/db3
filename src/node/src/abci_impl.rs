@@ -559,7 +559,10 @@ impl Application for AbciImpl {
                         Ok(_) => {}
                         Err(e) => {
                             warn!("fail to apply database for {e}");
-                            todo!()
+                            return ResponseCommit {
+                                data: Bytes::from(format!("{:?}", e)),
+                                retain_height: 0,
+                            };
                         }
                     }
                 }

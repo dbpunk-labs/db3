@@ -251,7 +251,10 @@ impl DbStore {
             }
             None => {
                 warn!("database not found with addr {}", db_id.to_hex());
-                todo!();
+                return Err(DB3Error::ApplyDatabaseError(format!(
+                    "database not found with addr {}",
+                    db_id.to_hex()
+                )));
             }
         }
     }
