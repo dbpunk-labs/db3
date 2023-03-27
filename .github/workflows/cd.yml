@@ -91,6 +91,7 @@ jobs:
                       target/${{ matrix.job.target }}/release/db3*.tar.gz
                       target/${{ matrix.job.target }}/release/db3*.sha256
                       tools/db3up
+                      config/devnet/genesis.json
               env:
                   GITHUB_TOKEN: ${{ secrets.CR_PAT }}
 

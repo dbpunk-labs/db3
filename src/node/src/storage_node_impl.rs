@@ -335,29 +335,32 @@ impl StorageNode for StorageNodeImpl {
                 let address_ref: &str = show_database_req.address.as_ref();
                 let db_id = DbId::try_from(address_ref)
                     .map_err(|e| Status::internal(format!("invalid database address {e}")))?;
-                // validate the session id
-                match node_store
-                    .get_session_store()
-                    .get_session_mut(&show_database_req.session_token)
-                {
-                    Some(session) => {
-                        if !session.check_session_running() {
-                            return Err(Status::permission_denied(
-                                "Fail to query in this session. Please restart query session",
-                            ));
+
+                if !self.context.disable_query_session {
+                    // validate the session id
+                    match node_store
+                        .get_session_store()
+                        .get_session_mut(&show_database_req.session_token)
+                    {
+                        Some(session) => {
+                            if !session.check_session_running() {
+                                return Err(Status::permission_denied(
+                                    "Fail to query in this session. Please restart query session",
+                                ));
+                            }
                         }
+                        None => return Err(Status::internal("Fail to create session")),
                     }
-                    None => return Err(Status::internal("Fail to create session")),
+                    node_store
+                        .get_session_store()
+                        .get_session_mut(&show_database_req.session_token)
+                        .unwrap()
+                        .increase_query(1);
                 }
                 let db = node_store
                     .get_auth_store()
                     .get_database(&db_id)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                node_store
-                    .get_session_store()
-                    .get_session_mut(&show_database_req.session_token)
-                    .unwrap()
-                    .increase_query(1);
                 Ok(Response::new(ShowDatabaseResponse { db }))
             }
             Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
@@ -375,18 +378,21 @@ impl StorageNode for StorageNodeImpl {
             Ok(mut node_store) => {
                 // get database id
                 // validate the session id
-                match node_store
-                    .get_session_store()
-                    .get_session_mut(&get_document_request.session_token)
-                {
-                    Some(session) => {
-                        if !session.check_session_running() {
-                            return Err(Status::permission_denied(
-                                "Fail to query in this session. Please restart query session",
-                            ));
+                if !self.context.disable_query_session {
+                    match node_store
+                        .get_session_store()
+                        .get_session_mut(&get_document_request.session_token)
+                    {
+                        Some(session) => {
+                            if !session.check_session_running() {
+                                return Err(Status::permission_denied(
+                                    "Fail to query in this session. Please restart query session",
+                                ));
+                            }
                         }
+                        None => return Err(Status::internal("Fail to create session")),
                     }
-                    None => return Err(Status::internal("Fail to create session")),
+                    //TODO account the query
                 }
                 match node_store.get_auth_store().get_document(&id) {
                     Ok(document) => Ok(Response::new(GetDocumentResponse { document })),
@@ -408,19 +414,26 @@ impl StorageNode for StorageNodeImpl {
                 let address_ref: &str = run_query_req.address.as_ref();
                 let db_id = DbId::try_from(address_ref)
                     .map_err(|e| Status::internal(format!("invalid database address {e}")))?;
-                // validate the session id
-                match node_store
-                    .get_session_store()
-                    .get_session_mut(&run_query_req.session_token)
-                {
-                    Some(session) => {
-                        if !session.check_session_running() {
-                            return Err(Status::permission_denied(
-                                "Fail to query in this session. Please restart query session",
-                            ));
+                if !self.context.disable_query_session {
+                    // validate the session id
+                    match node_store
+                        .get_session_store()
+                        .get_session_mut(&run_query_req.session_token)
+                    {
+                        Some(session) => {
+                            if !session.check_session_running() {
+                                return Err(Status::permission_denied(
+                                    "Fail to query in this session. Please restart query session",
+                                ));
+                            }
                         }
+                        None => return Err(Status::internal("Fail to create session")),
                     }
-                    None => return Err(Status::internal("Fail to create session")),
+                    node_store
+                        .get_session_store()
+                        .get_session_mut(&run_query_req.session_token)
+                        .unwrap()
+                        .increase_query(1);
                 }
 
                 match &run_query_req.query {
@@ -429,11 +442,6 @@ impl StorageNode for StorageNodeImpl {
                             .get_auth_store()
                             .run_query(&db_id, &query)
                             .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                        node_store
-                            .get_session_store()
-                            .get_session_mut(&run_query_req.session_token)
-                            .unwrap()
-                            .increase_query(1);
                         Ok(Response::new(RunQueryResponse { documents }))
                     }
                     None => return Err(Status::internal("Fail to run with none query")),
@@ -635,30 +643,32 @@ impl StorageNode for StorageNodeImpl {
         let query_bill_key = request.into_inner().query_bill_key.unwrap();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
-                match node_store
-                    .get_session_store()
-                    .get_session_mut(&query_bill_key.session_token)
-                {
-                    Some(session) => {
-                        if !session.check_session_running() {
-                            return Err(Status::permission_denied(
-                                "Fail to query in this session. Please restart query session",
-                            ));
+                if !self.context.disable_query_session {
+                    match node_store
+                        .get_session_store()
+                        .get_session_mut(&query_bill_key.session_token)
+                    {
+                        Some(session) => {
+                            if !session.check_session_running() {
+                                return Err(Status::permission_denied(
+                                    "Fail to query in this session. Please restart query session",
+                                ));
+                            }
+                        }
+                        None => {
+                            return Err(Status::internal("Fail to create session"));
                         }
                     }
-                    None => {
-                        return Err(Status::internal("Fail to create session"));
-                    }
+                    node_store
+                        .get_session_store()
+                        .get_session_mut(&query_bill_key.session_token)
+                        .unwrap()
+                        .increase_query(1);
                 }
                 let bills = node_store
                     .get_auth_store()
                     .get_bills(query_bill_key.height)
                     .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                node_store
-                    .get_session_store()
-                    .get_session_mut(&query_bill_key.session_token)
-                    .unwrap()
-                    .increase_query(1);
                 Ok(Response::new(QueryBillResponse { bills }))
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
@@ -730,6 +740,7 @@ impl StorageNode for StorageNodeImpl {
             hash: response.hash.as_ref().to_vec(),
         }))
     }
+
     async fn show_network_status(
         &self,
         _request: Request<ShowNetworkStatusRequest>,
@@ -745,13 +756,14 @@ impl StorageNode for StorageNodeImpl {
                     total_mutation_count: state.total_mutation_count.load(Ordering::Relaxed),
                     total_session_count: state.total_session_count.load(Ordering::Relaxed),
                     total_storage_in_bytes: state.total_storage_bytes.load(Ordering::Relaxed),
+                    query_session_enabled: !self.context.disable_query_session,
                 };
-
                 Ok(Response::new(status))
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
         }
     }
+
     async fn subscribe(
         &self,
         request: Request<SubscribeRequest>,
