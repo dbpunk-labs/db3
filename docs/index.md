@@ -2,40 +2,68 @@
 
 DB3 Network is an open-source and decentralized firebase firestore alternative to build fully decentralized dApps quickly with minimal engineering effort
 
-
 <p align="center">
  <img width="600px" src="./images/position_web3.svg" align="center"/>
 </p>
 
-
-## Get Started
+## Getting Started
 
 ### Install
 
-```
-wget https://github.com/dbpunk-labs/db3/raw/main/tools/start_localnet.sh
-bash install_db3.sh
+```shell
+curl --proto '=https' --tlsv1.2 -sSf https://up.db3.network/db3up_init.sh | sh
 ```
 
-### Create a key
+=== "Start the localnet"
+
+    ```shell
+    db3up localnet
+    ```
+
+    open another terminal
+
+    ```shell
+    db3 console --url http://127.0.0.1:26659
+    ```
+
+=== "Join the devnet"
+
+    ```shell
+    db3up join_devnet
+    ```
+
+    open another terminal
+
+    ```shell
+    db3 console --url http://127.0.0.1:26659
+    ```
+
+    joining the devnet will take a lot of time to sync data
+
+=== "Connect to the devnet directly"
+
+    ```shell
+    db3 console --url https://grpc.devnet.db3.network
+    ```
+
+
+!!! failure "command not found"
+    please add the `~/.db3/bin` to the `PATH`
+
+### Create a local keypair
 
 ```
 db3 client init
-Init key successfully!
 db3 client show-key
  address                                    | scheme
 --------------------------------------------+-----------
  0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | secp256k1
 ```
-
-this command will create a key used for signing a message
+this command will create a key used for signing mutations
 
 ### Create a Database
 
-start the console connecting to the `https://grpc.devnet.db3.network` and create a database
-
 ```
-db3 console --url https://grpc.devnet.db3.network
 db3>-$ new-db
  database address                           | transaction id
 --------------------------------------------+----------------------------------------------
@@ -66,3 +94,23 @@ db3>-$ new-doc --addr 0x997f631fcafeed5ee319c83683ae16e64783602b --collection-na
 send add document done with tx
 +O9cK2cHLexZQvIITk4OTm8SxBhq7Yz7g+xZYiionWo=
 ```
+
+## Using db3.js
+
+### Install
+
+=== "Install with Yarn"
+
+    ```shell
+    yarn add db3.js
+    ```
+
+=== "Install with Npm"
+
+    ```shell
+    npm install db3.js
+    ```
+
+### Hello db3.js
+
+
