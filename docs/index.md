@@ -53,8 +53,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://up.db3.network/db3up_init.sh | sh
 ### Create a local keypair
 
 ```
-db3 client init
-db3 client show-key
+db3>-$ init
  address                                    | scheme
 --------------------------------------------+-----------
  0x96bdb8e20fbd831fcb37dde9f81930a82ab5436b | secp256k1
@@ -113,4 +112,57 @@ send add document done with tx
 
 ### Hello db3.js
 
+```typescript
+
+// create a db3 browser wallet 
+const mnemonic =
+        'result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss'
+const wallet = DB3BrowserWallet.createNew(mnemonic, 'DB3_SECP256K1')
+
+// you can use metamask to connect db3 network with the following code
+// const wallet = new MetamaskWallet(window)
+
+// create a database
+const [dbId, txId] = await client.createDatabase()
+
+// connect a database with address
+const {db} = initializeDB3('http://127.0.0.1:26659', dbId, wallet)
+
+const indexList: Index[] = [
+            {
+                name: 'idx1',
+                id: 1,
+                fields: [
+                    {
+                        fieldPath: 'owner',
+                        valueMode: {
+                            oneofKind: 'order',
+                            order: Index_IndexField_Order.ASCENDING,
+                        },
+                    },
+                ],
+            },
+        ]
+// create a collection with index and the following interface `Todo`
+//
+//interface Todo {
+//    text: string
+//    owner: string
+//}
+//
+const collectionRef = await collection<Todo>(db, 'todos', indexList)
+
+// add a todo
+const result = await addDoc<Todo>(collectionRef, {
+            text: 'beijing',
+            owner: wallet.getAddress(),
+ } as Todo)
+```
+
+### Demos
+
+* [hello world with metamask](https://db3-playground-with-metamask.imotai.repl.co/)
+* [todomvc](https://db3-network-crud-todomvc-demo.imotai.repl.co/)
+* [create a database](https://replit.com/@imotai/ConnectToDB3?v=1)
+* [create a collection](https://replit.com/@imotai/CreateACollection?v=1)
 
