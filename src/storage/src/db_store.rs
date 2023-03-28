@@ -906,6 +906,47 @@ impl DbStore {
         }
     }
 
+    pub fn get_my_database(db: Pin<&Merk>, sender: &DB3Address) -> Result<Vec<Database>> {
+        let start_key = DbOwnerKey::min(sender)?;
+        let end_key = DbOwnerKey::max(sender)?;
+        let mut it = db.raw_iter();
+        it.seek(start_key);
+        let mut count = 0;
+        let mut dbs: Vec<Database> = Vec::new();
+        let end_key_ref: &[u8] = end_key.as_ref();
+        //TODO limit the max database
+        let limit: u32 = 100;
+        while it.valid() {
+            if count >= limit {
+                break;
+            }
+            if let Some(k) = it.key() {
+                if k >= end_key_ref {
+                    break;
+                }
+                if let Some(data) = it.value() {
+                    let tree: Tree = ed::Decode::decode(data).unwrap();
+                    let dbid = DbId::try_from(tree.value())?;
+                    match Self::get_database(db.as_ref(), &dbid) {
+                        Ok(Some(database)) => {
+                            dbs.push(database);
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                //invalid key
+                break;
+            }
+            if count >= limit {
+                break;
+            }
+            count += 1;
+            it.next();
+        }
+        Ok(dbs)
+    }
+
     pub fn get_database(db: Pin<&Merk>, id: &DbId) -> Result<Option<Database>> {
         //TODO use reference
         let key = DbKey(id.clone());

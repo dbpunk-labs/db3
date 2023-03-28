@@ -212,12 +212,17 @@ impl StoreSDK {
                         let r = ShowDatabaseRequest {
                             session_token: token.to_string(),
                             address: addr.to_string(),
+                            owner_address: "".to_string(),
                         };
                         let request = tonic::Request::new(r);
                         let mut client = self.client.as_ref().clone();
                         let response = client.show_database(request).await?.into_inner();
                         session.increase_query(1);
-                        Ok(response.db)
+                        if response.dbs.len() > 0 {
+                            Ok(Some(response.dbs[0].clone()))
+                        } else {
+                            Ok(None)
+                        }
                     } else {
                         Err(Status::permission_denied(
                             "Fail to query in this session. Please restart query session",
@@ -232,11 +237,61 @@ impl StoreSDK {
             let r = ShowDatabaseRequest {
                 session_token: "".to_string(),
                 address: addr.to_string(),
+                owner_address: "".to_string(),
             };
             let request = tonic::Request::new(r);
             let mut client = self.client.as_ref().clone();
             let response = client.show_database(request).await?.into_inner();
-            Ok(response.db)
+            if response.dbs.len() > 0 {
+                Ok(Some(response.dbs[0].clone()))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
+    pub async fn get_my_database(
+        &mut self,
+        addr: &str,
+    ) -> std::result::Result<Vec<Database>, Status> {
+        if self
+            .query_session_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            let token = self.keep_session(false).await?;
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.check_session_running() {
+                        let r = ShowDatabaseRequest {
+                            session_token: token.to_string(),
+                            address: "".to_string(),
+                            owner_address: addr.to_string(),
+                        };
+                        let request = tonic::Request::new(r);
+                        let mut client = self.client.as_ref().clone();
+                        let response = client.show_database(request).await?.into_inner();
+                        session.increase_query(1);
+                        Ok(response.dbs)
+                    } else {
+                        Err(Status::permission_denied(
+                            "Fail to query in this session. Please restart query session",
+                        ))
+                    }
+                }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
+            }
+        } else {
+            let r = ShowDatabaseRequest {
+                session_token: "".to_string(),
+                address: "".to_string(),
+                owner_address: addr.to_string(),
+            };
+            let request = tonic::Request::new(r);
+            let mut client = self.client.as_ref().clone();
+            let response = client.show_database(request).await?.into_inner();
+            Ok(response.dbs)
         }
     }
 

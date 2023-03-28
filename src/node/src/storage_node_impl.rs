@@ -331,11 +331,6 @@ impl StorageNode for StorageNodeImpl {
         let show_database_req = request.into_inner();
         match self.context.node_store.lock() {
             Ok(mut node_store) => {
-                // get database id
-                let address_ref: &str = show_database_req.address.as_ref();
-                let db_id = DbId::try_from(address_ref)
-                    .map_err(|e| Status::internal(format!("invalid database address {e}")))?;
-
                 if !self.context.disable_query_session {
                     // validate the session id
                     match node_store
@@ -357,11 +352,30 @@ impl StorageNode for StorageNodeImpl {
                         .unwrap()
                         .increase_query(1);
                 }
-                let db = node_store
-                    .get_auth_store()
-                    .get_database(&db_id)
-                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                Ok(Response::new(ShowDatabaseResponse { db }))
+                if show_database_req.address.len() > 0 {
+                    // get database id
+                    let address_ref: &str = show_database_req.address.as_ref();
+                    let db_id = DbId::try_from(address_ref)
+                        .map_err(|e| Status::internal(format!("invalid database address {e}")))?;
+                    if let Some(db) = node_store
+                        .get_auth_store()
+                        .get_database(&db_id)
+                        .map_err(|e| Status::internal(format!("{:?}", e)))?
+                    {
+                        Ok(Response::new(ShowDatabaseResponse { dbs: vec![db] }))
+                    } else {
+                        Ok(Response::new(ShowDatabaseResponse { dbs: vec![] }))
+                    }
+                } else {
+                    let address_ref: &str = show_database_req.owner_address.as_str();
+                    let owner = DB3Address::try_from(address_ref)
+                        .map_err(|e| Status::internal(format!("invalid database address {e}")))?;
+                    let dbs = node_store
+                        .get_auth_store()
+                        .get_my_database(&owner)
+                        .map_err(|e| Status::internal(format!("{:?}", e)))?;
+                    Ok(Response::new(ShowDatabaseResponse { dbs }))
+                }
             }
             Err(e) => Err(Status::internal(format!("Fail to get lock {}", e))),
         }

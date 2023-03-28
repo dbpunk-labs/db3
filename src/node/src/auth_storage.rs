@@ -145,6 +145,10 @@ impl AuthStorage {
         DbStore::get_database(self.db.as_ref(), id)
     }
 
+    pub fn get_my_database(&self, owner: &DB3Address) -> Result<Vec<Database>> {
+        DbStore::get_my_database(self.db.as_ref(), owner)
+    }
+
     pub fn get_documents(&self, id: &CollectionId) -> Result<Vec<Document>> {
         // TODO(chanjing): support get documents with limit
         DbStore::get_documents(self.db.as_ref(), id, None)
