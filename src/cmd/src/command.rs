@@ -516,6 +516,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     action: DatabaseAction::AddCollection.into(),
                     document_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk
@@ -622,6 +623,7 @@ impl DB3ClientCommand {
                     db_address: vec![],
                     action: DatabaseAction::CreateDb.into(),
                     document_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk
@@ -672,6 +674,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     document_mutations: vec![document_mut],
                     collection_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk
@@ -731,6 +734,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     document_mutations: vec![document_mut],
                     collection_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk
@@ -779,6 +783,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     document_mutations: vec![document_mut],
                     collection_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk

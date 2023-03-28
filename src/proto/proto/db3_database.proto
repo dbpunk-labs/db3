@@ -29,6 +29,7 @@ message Database {
     // the history of database modification
     repeated bytes tx = 3;
     map<string, Collection> collections = 4;
+    string desc =5;
 }
 
 message Collection {
@@ -43,6 +44,7 @@ message Document {
   bytes owner = 3;
   bytes tx_id = 4;
 }
+
 message Index {
 
   // A field in an index.

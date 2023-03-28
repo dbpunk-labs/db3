@@ -97,6 +97,7 @@ pub fn create_a_database_mutation() -> DatabaseMutation {
         db_address: vec![],
         action: DatabaseAction::CreateDb.into(),
         document_mutations: vec![],
+        db_desc: "".to_string(),
     };
     dm
 }
@@ -125,6 +126,7 @@ pub fn create_a_collection_mutataion(name: &str, addr: &DB3Address) -> DatabaseM
         db_address: addr.as_ref().to_vec(),
         action: DatabaseAction::AddCollection.into(),
         document_mutations: vec![],
+        db_desc: "".to_string(),
     };
     dm
 }
@@ -155,6 +157,7 @@ pub fn add_documents(name: &str, addr: &DB3Address, doc_vec: &Vec<&str>) -> Data
         db_address: addr.as_ref().to_vec(),
         action: DatabaseAction::AddDocument.into(),
         document_mutations: vec![document_mut],
+        db_desc: "".to_string(),
     };
     dm
 }

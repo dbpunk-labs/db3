@@ -14,8 +14,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
 use super::db_key::DbKey;
+use super::db_owner_key::DbOwnerKey;
 use crate::db3_document::DB3Document;
 use bytes::BytesMut;
 use db3_base::bson_util;
@@ -93,6 +93,7 @@ impl DbStore {
                 sender: old_db.sender.to_vec(),
                 tx: tx_list,
                 collections: new_collections,
+                desc: old_db.desc.to_string(),
             },
             DbStoreOp::DbOp {
                 create_db_ops: 0,
@@ -110,6 +111,7 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u16,
+        desc: &str,
     ) -> (Database, DbStoreOp) {
         //TODO check the duplicated collection id
         let mut idx: u16 = 0;
@@ -141,6 +143,7 @@ impl DbStore {
                 sender: sender.as_ref().to_vec(),
                 tx: vec![txid.as_ref().to_vec()],
                 collections,
+                desc: desc.to_string(),
             },
             DbStoreOp::DbOp {
                 create_db_ops: 1,
@@ -158,16 +161,31 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u16,
-    ) -> Result<(BatchEntry, DbStoreOp)> {
+        desc: &str,
+    ) -> Result<(Vec<BatchEntry>, DbStoreOp)> {
         let dbid = DbId::try_from((sender, nonce))?;
-        info!("create a database with id {}", dbid.to_hex());
-        let (db, mut ops) = Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id);
-        let (entry, data_in_bytes) = Self::encode_database(dbid, &db)?;
+        info!(
+            "create a database with id {} and sender {}",
+            dbid.to_hex(),
+            sender.to_hex()
+        );
+        let (db, mut ops) =
+            Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id, desc);
+        let (batches, data_in_bytes) =
+            Self::encode_database(dbid, &db, sender, block_id, mutation_id)?;
         ops.update_data_size(data_in_bytes as u64);
-        Ok((entry, ops))
+        Ok((batches, ops))
     }
 
-    fn encode_database(dbid: DbId, database: &Database) -> Result<(BatchEntry, usize)> {
+    fn encode_database(
+        dbid: DbId,
+        database: &Database,
+        sender: &DB3Address,
+        height: u64,
+        mutation_id: u16,
+    ) -> Result<(Vec<BatchEntry>, usize)> {
+        let db_owner = DbOwnerKey(sender, height, mutation_id);
+        let db_owner_encoded_key = db_owner.encode()?;
         let key = DbKey(dbid);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024 * 2);
@@ -175,11 +193,13 @@ impl DbStore {
             .encode(&mut buf)
             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         let buf = buf.freeze();
-        let total_in_bytes = encoded_key.len() + buf.as_ref().len();
-        Ok((
+        let total_in_bytes =
+            encoded_key.len() + buf.as_ref().len() + db_owner_encoded_key.len() + DbId::length();
+        let batches = vec![
             (encoded_key, Op::Put(buf.as_ref().to_vec())),
-            total_in_bytes,
-        ))
+            (db_owner_encoded_key, Op::Put(dbid.as_ref().to_vec())),
+        ];
+        Ok((batches, total_in_bytes))
     }
 
     //
@@ -193,13 +213,13 @@ impl DbStore {
         mutation: &DatabaseMutation,
         block_id: u64,
         mutation_id: u16,
+        desc: &str,
     ) -> Result<DbStoreOp> {
-        let mut entries: Vec<BatchEntry> = Vec::new();
-        let (batch_entry, ops) = Self::convert(sender, nonce, tx, mutation, block_id, mutation_id)?;
-        entries.push(batch_entry);
+        let (batches, ops) =
+            Self::convert(sender, nonce, tx, mutation, block_id, mutation_id, desc)?;
         unsafe {
             Pin::get_unchecked_mut(db)
-                .apply(&entries, &[])
+                .apply(&batches, &[])
                 .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         }
         Ok(ops)
@@ -234,16 +254,15 @@ impl DbStore {
                         data_in_bytes: 0,
                     })
                 } else {
-                    let mut entries: Vec<BatchEntry> = Vec::new();
                     let (new_db, mut ops) =
                         Self::update_database(&d, mutation, tx, block_id, mutation_id)?;
                     //TODO how to get the byte size that was updated
-                    let (entry, data_in_bytes) = Self::encode_database(db_id, &new_db)?;
+                    let (batches, data_in_bytes) =
+                        Self::encode_database(db_id, &new_db, sender, block_id, mutation_id)?;
                     ops.update_data_size(data_in_bytes as u64);
-                    entries.push(entry);
                     unsafe {
                         Pin::get_unchecked_mut(db)
-                            .apply(&entries, &[])
+                            .apply(&batches, &[])
                             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
                     }
                     Ok(ops)
@@ -860,9 +879,16 @@ impl DbStore {
     ) -> Result<DbStoreOp> {
         let action = DatabaseAction::from_i32(mutation.action);
         match action {
-            Some(DatabaseAction::CreateDb) => {
-                Self::create_database(db, sender, nonce, tx, mutation, block_id, mutation_id)
-            }
+            Some(DatabaseAction::CreateDb) => Self::create_database(
+                db,
+                sender,
+                nonce,
+                tx,
+                mutation,
+                block_id,
+                mutation_id,
+                mutation.db_desc.as_str(),
+            ),
             Some(DatabaseAction::AddCollection) => {
                 Self::add_collection(db, sender, tx, mutation, block_id, mutation_id)
             }
@@ -942,6 +968,7 @@ mod tests {
             document_mutations,
             db_address: addr.to_vec(),
             action: DatabaseAction::DeleteDocument.into(),
+            db_desc: "".to_string(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
@@ -969,6 +996,7 @@ mod tests {
             document_mutations,
             db_address: addr.to_vec(),
             action: DatabaseAction::AddDocument.into(),
+            db_desc: "".to_string(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
@@ -1002,6 +1030,7 @@ mod tests {
             document_mutations,
             db_address: addr.to_vec(),
             action: DatabaseAction::UpdateDocument.into(),
+            db_desc: "".to_string(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
@@ -1042,6 +1071,7 @@ mod tests {
             document_mutations: vec![],
             db_address: addr.to_vec(),
             action: DatabaseAction::CreateDb.into(),
+            db_desc: "".to_string(),
         };
         let json_data = serde_json::to_string(&dm).unwrap();
         println!("{json_data}");
@@ -1100,8 +1130,9 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
+        let desc = "";
         let (database, _) =
-            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100, desc);
         assert!(database.collections.contains_key("collection1"))
     }
 
@@ -1110,8 +1141,9 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
+        let desc = "";
         let (old_database, _) =
-            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100, desc);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection2");
         let (new_database, _) =
@@ -1126,8 +1158,9 @@ mod tests {
         let addr = gen_address();
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         let db_mutation = build_database_mutation(&addr, "collection1");
+        let desc = "";
         let (old_database, _) =
-            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100);
+            DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100, desc);
         assert!(old_database.collections.contains_key("collection1"));
         let db_mutation_2 = build_database_mutation(&addr, "collection1");
         let res = DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101);
