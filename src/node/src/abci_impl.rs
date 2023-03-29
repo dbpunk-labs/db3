@@ -41,7 +41,7 @@ use tendermint_proto::abci::{
     RequestQuery, ResponseBeginBlock, ResponseCheckTx, ResponseCommit, ResponseDeliverTx,
     ResponseInfo, ResponseQuery,
 };
-use tracing::{debug, info, span, warn, Level};
+use tracing::{info, span, warn, Level};
 
 macro_rules! parse_mutation {
     ($func:ident, $type:ident) => {
@@ -579,7 +579,6 @@ impl Application for AbciImpl {
                     }
                 } else {
                     let hash = s.root_hash();
-                    debug!("commit hash {}", hex::encode_upper(hash));
                     ResponseCommit {
                         data: Bytes::copy_from_slice(&hash),
                         retain_height: 0,

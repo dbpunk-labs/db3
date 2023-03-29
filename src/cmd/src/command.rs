@@ -277,13 +277,14 @@ impl DB3ClientCommand {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row![
+            "#",
             "database address",
             "description",
             "sender address",
             "related mutations",
             "collections"
         ]);
-        for database in dbs {
+        for (idx, database) in dbs.iter().enumerate() {
             let tx_list: String = database
                 .tx
                 .iter()
@@ -299,6 +300,7 @@ impl DB3ClientCommand {
             let address_ref: &[u8] = database.address.as_ref();
             let sender_ref: &[u8] = database.sender.as_ref();
             table.add_row(row![
+                idx + 1,
                 DbId::try_from(address_ref).unwrap().to_hex(),
                 database.desc.to_string(),
                 AccountId::try_from(sender_ref).unwrap().to_hex(),
