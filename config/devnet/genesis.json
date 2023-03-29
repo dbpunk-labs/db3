@@ -1,6 +1,6 @@
 {
   "genesis_time": "2023-03-27T07:58:28.239883545Z",
-  "chain_id": "chain-uD7esI",
+  "chain_id": "db3-devnet",
   "initial_height": "0",
   "consensus_params": {
     "block": {
@@ -27,7 +27,7 @@
         "type": "tendermint/PubKeyEd25519",
         "value": "vauCM4+0qSjhZFXbe1tbyTMQrZbXAh0+L4hkxx1XmU0="
       },
-      "power": "1",
+      "power": "100000",
       "name": "node0"
     },
     {
@@ -36,7 +36,7 @@
         "type": "tendermint/PubKeyEd25519",
         "value": "BhknlV+raEgi3YUq8MxiOy8ozy3muhZb/5+z6oUkovk="
       },
-      "power": "1",
+      "power": "100000",
       "name": "node1"
     },
     {
@@ -45,7 +45,7 @@
         "type": "tendermint/PubKeyEd25519",
         "value": "oNrJSeqDPSUD7ry1xX2aoBw3O53gblBjRoiSfSMGW+0="
       },
-      "power": "1",
+      "power": "100000",
       "name": "node2"
     }
   ],
