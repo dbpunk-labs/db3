@@ -33,7 +33,7 @@ use itertools::Itertools;
 use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -51,15 +51,16 @@ impl DbStore {
         block_id: u64,
         mutation_id: u16,
     ) -> Result<(Database, DbStoreOp)> {
-        let mut new_collections: HashMap<String, Collection> = HashMap::new();
+        let mut new_db = old_db.clone();
+        let mut name_set: HashSet<&str> = HashSet::new();
+        for collection in old_db.collections.iter() {
+            name_set.insert(collection.name.as_str());
+        }
         let mut idx: u16 = 0;
         let mut collection_ops: u64 = 0;
         let mut index_ops: u64 = 0;
         for new_collection in mutation.collection_mutations.iter() {
-            if old_db
-                .collections
-                .contains_key(&new_collection.collection_name)
-            {
+            if name_set.contains(new_collection.collection_name.as_str()) {
                 return Err(DB3Error::ApplyDatabaseError(format!(
                     "duplicated collection names {}",
                     new_collection.collection_name
@@ -68,33 +69,23 @@ impl DbStore {
                 idx += 1;
                 collection_ops += 1;
                 index_ops += new_collection.index.len() as u64;
-                new_collections.insert(
-                    new_collection.collection_name.to_string(),
-                    Collection {
-                        id: CollectionId::create(block_id, mutation_id, idx)
-                            .unwrap()
-                            .as_ref()
-                            .to_vec(),
-                        name: new_collection.collection_name.to_string(),
-                        index_list: new_collection.index.to_vec(),
-                    },
-                );
+                new_db.collections.push(Collection {
+                    id: CollectionId::create(block_id, mutation_id, idx)
+                        .map_err(|e| {
+                            DB3Error::ApplyDatabaseError(format!(
+                                "fail to generate collection id {block_id}, {mutation_id}, {idx} with err {e}"
+                            ))
+                        })?
+                        .as_ref()
+                        .to_vec(),
+                    name: new_collection.collection_name.to_string(),
+                    index_list: new_collection.index.to_vec(),
+                });
             }
         }
-
-        for (k, v) in old_db.collections.iter() {
-            new_collections.insert(k.to_string(), v.clone());
-        }
-        let mut tx_list = old_db.tx.to_vec();
-        tx_list.push(tx_id.as_ref().to_vec());
+        new_db.tx.push(tx_id.as_ref().to_vec());
         Ok((
-            Database {
-                address: old_db.address.to_vec(),
-                sender: old_db.sender.to_vec(),
-                tx: tx_list,
-                collections: new_collections,
-                desc: old_db.desc.to_string(),
-            },
+            new_db,
             DbStoreOp::DbOp {
                 create_db_ops: 0,
                 create_collection_ops: collection_ops,
@@ -117,24 +108,30 @@ impl DbStore {
         let mut idx: u16 = 0;
         let mut collection_count: u64 = 0;
         let mut index_count: u64 = 0;
-        let collections: HashMap<String, Collection> = mutation
+        let mut name_set: HashSet<&str> = HashSet::new();
+        let collections: Vec<Collection> = mutation
             .collection_mutations
             .iter()
+            .filter(|x| {
+                if name_set.contains(x.collection_name.as_str()) {
+                    return false;
+                } else {
+                    name_set.insert(x.collection_name.as_str());
+                    return true;
+                }
+            })
             .map(move |x| {
                 idx += 1;
                 collection_count = collection_count + 1;
                 index_count = index_count + x.index.len() as u64;
-                (
-                    x.collection_name.to_string(),
-                    Collection {
-                        id: CollectionId::create(block_id, mutation_id, idx)
-                            .unwrap()
-                            .as_ref()
-                            .to_vec(),
-                        name: x.collection_name.to_string(),
-                        index_list: x.index.to_vec(),
-                    },
-                )
+                Collection {
+                    id: CollectionId::create(block_id, mutation_id, idx)
+                        .unwrap()
+                        .as_ref()
+                        .to_vec(),
+                    name: x.collection_name.to_string(),
+                    index_list: x.index.to_vec(),
+                }
             })
             .collect();
         (
@@ -294,44 +291,51 @@ impl DbStore {
         match database {
             Some(d) => {
                 for document_mutation in &mutation.document_mutations {
-                    let collection = d
+                    if let Some(collection) = d
                         .collections
-                        .get(document_mutation.collection_name.as_str())
-                        .unwrap();
-                    let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())?;
-                    for doc_id_base64 in document_mutation.ids.iter() {
-                        let document_id = DocumentId::try_from_base64(&doc_id_base64)?;
-                        if let Some(v) = db
-                            .get(document_id.as_ref())
-                            .map_err(|e| DB3Error::QueryDocumentError(format!("{:?}", e)))?
-                        {
-                            let db3_doc = DB3Document::try_from(v.clone())?;
-                            let owner = &db3_doc.get_owner()?;
-                            if sender == owner {
-                                info!("delete doc id {}", document_id);
-                                entries.push((document_id.as_ref().to_vec(), Op::Delete));
-                                for index in collection.index_list.iter() {
-                                    let key = db3_doc.get_keys(index)?;
-                                    match key {
-                                        Some(k) => {
-                                            let index_id = IndexId::create(
-                                                &collection_id,
-                                                index.id,
-                                                k.as_ref(),
-                                                &document_id,
-                                            )?;
-                                            entries.push((index_id.as_ref().to_vec(), Op::Delete));
+                        .iter()
+                        .find(|x| x.name.as_str() == document_mutation.collection_name.as_str())
+                    {
+                        let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())?;
+                        for doc_id_base64 in document_mutation.ids.iter() {
+                            let document_id = DocumentId::try_from_base64(&doc_id_base64)?;
+                            if let Some(v) = db
+                                .get(document_id.as_ref())
+                                .map_err(|e| DB3Error::QueryDocumentError(format!("{:?}", e)))?
+                            {
+                                let db3_doc = DB3Document::try_from(v.clone())?;
+                                let owner = &db3_doc.get_owner()?;
+                                if sender == owner {
+                                    info!("delete doc id {}", document_id);
+                                    entries.push((document_id.as_ref().to_vec(), Op::Delete));
+                                    for index in collection.index_list.iter() {
+                                        let key = db3_doc.get_keys(index)?;
+                                        match key {
+                                            Some(k) => {
+                                                let index_id = IndexId::create(
+                                                    &collection_id,
+                                                    index.id,
+                                                    k.as_ref(),
+                                                    &document_id,
+                                                )?;
+                                                entries
+                                                    .push((index_id.as_ref().to_vec(), Op::Delete));
+                                            }
+                                            None => {}
                                         }
-                                        None => {}
                                     }
+                                } else {
+                                    return Err(DB3Error::DocumentModifiedPermissionError);
                                 }
                             } else {
-                                return Err(DB3Error::DocumentModifiedPermissionError);
+                                warn!("delete doc with id {} not exist", doc_id_base64);
+                                return Err(DB3Error::DocumentNotExist(doc_id_base64.clone()));
                             }
-                        } else {
-                            warn!("delete doc with id {} not exist", doc_id_base64);
-                            //return Err(DB3Error::DocumentNotExist(doc_id_base64.clone()));
                         }
+                    } else {
+                        return Err(DB3Error::CollectionNotFound(
+                            document_mutation.collection_name.to_string(),
+                        ));
                     }
                 }
             }
@@ -379,9 +383,11 @@ impl DbStore {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
                 let mut document_ids: Vec<DocumentId> = Vec::new();
-                let cid_index_map: &HashMap<String, _> = &d.collections;
+                let cid_index_map: HashMap<&str, &Collection> =
+                    d.collections.iter().map(|x| (x.name.as_str(), x)).collect();
                 for document_mutation in &mutation.document_mutations {
-                    if let Some(collection) = cid_index_map.get(&document_mutation.collection_name)
+                    if let Some(collection) =
+                        cid_index_map.get(document_mutation.collection_name.as_str())
                     {
                         let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())
                             .map_err(|e| DB3Error::InvalidCollectionIdBytes(format!("{:?}", e)))?;
@@ -393,7 +399,6 @@ impl DbStore {
                                 entries.len() as u16,
                             )
                             .map_err(|e| DB3Error::ApplyDocumentError(format!("{:?}", e)))?;
-
                             // generate document id
                             let document_id =
                                 DocumentId::create(&collection_id, &document_entry_id).map_err(
@@ -484,7 +489,8 @@ impl DbStore {
         match database {
             Some(d) => {
                 let mut entries: Vec<BatchEntry> = Vec::new();
-                let cid_index_map: &HashMap<String, _> = &d.collections;
+                let cid_index_map: HashMap<&str, &Collection> =
+                    d.collections.iter().map(|x| (x.name.as_str(), x)).collect();
                 for document_mutation in &mutation.document_mutations {
                     if document_mutation.ids.len() != document_mutation.documents.len() {
                         return Err(DB3Error::ApplyDocumentError(
@@ -498,7 +504,8 @@ impl DbStore {
                                 .to_string(),
                         ));
                     }
-                    if let Some(collection) = cid_index_map.get(&document_mutation.collection_name)
+                    if let Some(collection) =
+                        cid_index_map.get(document_mutation.collection_name.as_str())
                     {
                         let collection_id = CollectionId::try_from_bytes(collection.id.as_slice())
                             .map_err(|e| DB3Error::InvalidCollectionIdBytes(format!("{:?}", e)))?;
@@ -642,7 +649,6 @@ impl DbStore {
 
     fn collect_field_index_map(collection: &Collection) -> HashMap<String, Vec<&Index>> {
         let mut field_index_map: HashMap<String, Vec<_>> = HashMap::new();
-
         for index in collection.index_list.iter() {
             for field in index.fields.iter() {
                 if let Some(list) = field_index_map.get_mut(&field.field_path) {
@@ -664,7 +670,11 @@ impl DbStore {
         debug!("run_query : {:?}", query);
         match Self::get_database(db, db_id) {
             Ok(Some(database)) => {
-                if let Some(collection) = database.collections.get(&query.collection_name) {
+                if let Some(collection) = database
+                    .collections
+                    .iter()
+                    .find(|x| x.name.as_str() == query.collection_name.as_str())
+                {
                     let limit = match &query.limit {
                         Some(v) => Some(v.limit),
                         None => None,
@@ -1174,7 +1184,11 @@ mod tests {
         let desc = "";
         let (database, _) =
             DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100, desc);
-        assert!(database.collections.contains_key("collection1"))
+        assert!(database
+            .collections
+            .iter()
+            .find(|x| x.name.as_str() == "collection1")
+            .is_some());
     }
 
     #[test]
@@ -1185,13 +1199,26 @@ mod tests {
         let desc = "";
         let (old_database, _) =
             DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100, desc);
-        assert!(old_database.collections.contains_key("collection1"));
+        assert!(old_database
+            .collections
+            .iter()
+            .find(|x| x.name.as_str() == "collection1")
+            .is_some());
         let db_mutation_2 = build_database_mutation(&addr, "collection2");
         let (new_database, _) =
             DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101)
                 .unwrap();
-        assert!(new_database.collections.contains_key("collection1"));
-        assert!(new_database.collections.contains_key("collection2"));
+
+        assert!(new_database
+            .collections
+            .iter()
+            .find(|x| x.name.as_str() == "collection1")
+            .is_some());
+        assert!(new_database
+            .collections
+            .iter()
+            .find(|x| x.name.as_str() == "collection2")
+            .is_some());
     }
 
     #[test]
@@ -1202,7 +1229,11 @@ mod tests {
         let desc = "";
         let (old_database, _) =
             DbStore::new_database(&db_id, &addr, &TxId::zero(), &db_mutation, 1000, 100, desc);
-        assert!(old_database.collections.contains_key("collection1"));
+        assert!(old_database
+            .collections
+            .iter()
+            .find(|x| x.name.as_str() == "collection1")
+            .is_some());
         let db_mutation_2 = build_database_mutation(&addr, "collection1");
         let res = DbStore::update_database(&old_database, &db_mutation_2, &TxId::zero(), 1000, 101);
         assert!(res.is_err());
@@ -1856,8 +1887,16 @@ mod tests {
         let db_id = DbId::try_from((&addr, 1)).unwrap();
         if let Ok(Some(res)) = DbStore::get_database(db.as_ref(), &db_id) {
             assert_eq!(1, res.collections.len());
-            assert!(res.collections.contains_key(&collection_name));
-            let collection = &res.collections.get(&collection_name).unwrap();
+            assert!(res
+                .collections
+                .iter()
+                .find(|x| x.name.as_str() == collection_name.as_str())
+                .is_some());
+            let collection = res
+                .collections
+                .iter()
+                .find(|x| x.name.as_str() == collection_name.as_str())
+                .unwrap();
             let collection_id = CollectionId::try_from_bytes(collection.id.as_slice()).unwrap();
             let db_mutation = build_add_document_mutation(
                 db_id.address(),

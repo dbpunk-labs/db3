@@ -261,7 +261,7 @@ impl DB3ClientCommand {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row!["name", "index",]);
-        for (_, collection) in &database.collections {
+        for collection in &database.collections {
             let index_str: String = collection
                 .index_list
                 .iter()
@@ -293,7 +293,7 @@ impl DB3ClientCommand {
             let collections: String = database
                 .collections
                 .iter()
-                .map(|(name, _)| name.to_string())
+                .map(|x| x.name.to_string())
                 .intersperse("\n ".to_string())
                 .collect();
             let address_ref: &[u8] = database.address.as_ref();

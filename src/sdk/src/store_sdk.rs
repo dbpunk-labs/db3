@@ -250,6 +250,9 @@ impl StoreSDK {
         }
     }
 
+    ///
+    /// get the information of database with a hex format address
+    ///
     pub async fn get_my_database(
         &mut self,
         addr: &str,
@@ -931,4 +934,8 @@ mod tests {
         let result = sdk.get_state().await;
         assert!(result.is_ok());
     }
+
+    /// write a test case for method get_my_database
+    #[tokio::test]
+    async fn test_get_my_database() {}
 }
