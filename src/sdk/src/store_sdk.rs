@@ -759,7 +759,7 @@ mod tests {
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
         counter: i64,
     ) {
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let (addr1, signer) = sdk_test::gen_secp256k1_signer(counter);
         let msdk = MutationSDK::new(client.clone(), signer, use_typed_format);
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
@@ -775,6 +775,8 @@ mod tests {
         std::thread::sleep(two_seconds);
         let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
         let mut sdk = StoreSDK::new(client.clone(), signer, use_typed_format);
+        let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
+        assert_eq!(1, my_dbs.len());
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
         if let Ok(Some(db)) = database {
             assert_eq!(&db.address, db_id.address().as_ref());
