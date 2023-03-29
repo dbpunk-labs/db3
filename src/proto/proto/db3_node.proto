@@ -110,12 +110,14 @@ message BroadcastResponse {
 
 message ShowDatabaseRequest {
     string session_token = 1;
-    // a hex string
+    // the database address in hex format
     string address = 2;
+    // the owner address in hex format
+    string owner_address = 3;
 }
 
 message ShowDatabaseResponse {
-    db3_database_proto.Database db = 1;
+    repeated db3_database_proto.Database dbs = 1;
 }
 
 message RunQueryRequest {
@@ -131,9 +133,11 @@ message GetDocumentRequest {
     // a hex string
     string id = 2;
 }
+
 message GetDocumentResponse {
     db3_database_proto.Document document = 1;
 }
+
 message RunQueryResponse{
     repeated db3_database_proto.Document documents = 2;
     // TODO: support next_page_token for page loading

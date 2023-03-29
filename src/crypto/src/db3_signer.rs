@@ -84,6 +84,7 @@ mod tests {
             db_address: vec![],
             action: DatabaseAction::CreateDb.into(),
             document_mutations: vec![],
+            db_desc: "".to_string(),
         };
 
         let mut buf = BytesMut::with_capacity(1024 * 8);
@@ -121,6 +122,7 @@ mod tests {
             db_address: vec![],
             action: DatabaseAction::CreateDb.into(),
             document_mutations: vec![],
+            db_desc: "".to_string(),
         };
 
         let mut payload = BytesMut::with_capacity(1024 * 8);

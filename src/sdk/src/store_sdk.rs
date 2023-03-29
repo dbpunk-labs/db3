@@ -212,12 +212,17 @@ impl StoreSDK {
                         let r = ShowDatabaseRequest {
                             session_token: token.to_string(),
                             address: addr.to_string(),
+                            owner_address: "".to_string(),
                         };
                         let request = tonic::Request::new(r);
                         let mut client = self.client.as_ref().clone();
                         let response = client.show_database(request).await?.into_inner();
                         session.increase_query(1);
-                        Ok(response.db)
+                        if response.dbs.len() > 0 {
+                            Ok(Some(response.dbs[0].clone()))
+                        } else {
+                            Ok(None)
+                        }
                     } else {
                         Err(Status::permission_denied(
                             "Fail to query in this session. Please restart query session",
@@ -232,11 +237,64 @@ impl StoreSDK {
             let r = ShowDatabaseRequest {
                 session_token: "".to_string(),
                 address: addr.to_string(),
+                owner_address: "".to_string(),
             };
             let request = tonic::Request::new(r);
             let mut client = self.client.as_ref().clone();
             let response = client.show_database(request).await?.into_inner();
-            Ok(response.db)
+            if response.dbs.len() > 0 {
+                Ok(Some(response.dbs[0].clone()))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
+    ///
+    /// get the information of database with a hex format address
+    ///
+    pub async fn get_my_database(
+        &mut self,
+        addr: &str,
+    ) -> std::result::Result<Vec<Database>, Status> {
+        if self
+            .query_session_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            let token = self.keep_session(false).await?;
+            match self.session_pool.get_session_mut(token.as_ref()) {
+                Some(session) => {
+                    if session.check_session_running() {
+                        let r = ShowDatabaseRequest {
+                            session_token: token.to_string(),
+                            address: "".to_string(),
+                            owner_address: addr.to_string(),
+                        };
+                        let request = tonic::Request::new(r);
+                        let mut client = self.client.as_ref().clone();
+                        let response = client.show_database(request).await?.into_inner();
+                        session.increase_query(1);
+                        Ok(response.dbs)
+                    } else {
+                        Err(Status::permission_denied(
+                            "Fail to query in this session. Please restart query session",
+                        ))
+                    }
+                }
+                None => Err(Status::not_found(format!(
+                    "Fail to query, session with token {token} not found"
+                ))),
+            }
+        } else {
+            let r = ShowDatabaseRequest {
+                session_token: "".to_string(),
+                address: "".to_string(),
+                owner_address: addr.to_string(),
+            };
+            let request = tonic::Request::new(r);
+            let mut client = self.client.as_ref().clone();
+            let response = client.show_database(request).await?.into_inner();
+            Ok(response.dbs)
         }
     }
 
@@ -701,7 +759,7 @@ mod tests {
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
         counter: i64,
     ) {
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let (addr1, signer) = sdk_test::gen_secp256k1_signer(counter);
         let msdk = MutationSDK::new(client.clone(), signer, use_typed_format);
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
@@ -717,6 +775,8 @@ mod tests {
         std::thread::sleep(two_seconds);
         let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
         let mut sdk = StoreSDK::new(client.clone(), signer, use_typed_format);
+        let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
+        assert_eq!(true, my_dbs.len() > 0);
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
         if let Ok(Some(db)) = database {
             assert_eq!(&db.address, db_id.address().as_ref());
@@ -876,4 +936,8 @@ mod tests {
         let result = sdk.get_state().await;
         assert!(result.is_ok());
     }
+
+    /// write a test case for method get_my_database
+    #[tokio::test]
+    async fn test_get_my_database() {}
 }

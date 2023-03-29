@@ -36,6 +36,9 @@ message DatabaseMutation {
     bytes db_address = 3;
     repeated CollectionMutation collection_mutations = 4;
     repeated DocumentMutation document_mutations = 5;
+    // the description of database
+    // max bytes = 140
+    string db_desc = 6;
 }
 
 message CollectionMutation {

@@ -57,7 +57,17 @@ pub enum DB3ClientCommand {
     ShowKey {},
     /// Create a database
     #[clap(name = "new-db")]
-    NewDB {},
+    NewDB {
+        /// add description for the new database
+        #[clap(long, default_value = "")]
+        desc: String,
+    },
+    #[clap(name = "my-db")]
+    MyDB {
+        /// the address of owner
+        #[clap(long, default_value = "")]
+        addr: String,
+    },
     /// Show the database with an address
     #[clap(name = "show-db")]
     ShowDB {
@@ -251,7 +261,7 @@ impl DB3ClientCommand {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row!["name", "index",]);
-        for (_, collection) in &database.collections {
+        for collection in &database.collections {
             let index_str: String = collection
                 .index_list
                 .iter()
@@ -263,35 +273,39 @@ impl DB3ClientCommand {
         Ok(table)
     }
 
-    fn show_database(database: &Database) -> std::result::Result<Table, String> {
+    fn show_database(dbs: &[Database]) -> std::result::Result<Table, String> {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
         table.set_titles(row![
             "database address",
+            "description",
             "sender address",
             "related mutations",
             "collections"
         ]);
-        let tx_list: String = database
-            .tx
-            .iter()
-            .map(|tx| TxId::try_from_bytes(tx).unwrap().to_base64())
-            .intersperse("\n ".to_string())
-            .collect();
-        let collections: String = database
-            .collections
-            .iter()
-            .map(|(name, _)| name.to_string())
-            .intersperse("\n ".to_string())
-            .collect();
-        let address_ref: &[u8] = database.address.as_ref();
-        let sender_ref: &[u8] = database.sender.as_ref();
-        table.add_row(row![
-            DbId::try_from(address_ref).unwrap().to_hex(),
-            AccountId::try_from(sender_ref).unwrap().to_hex(),
-            tx_list,
-            collections
-        ]);
+        for database in dbs {
+            let tx_list: String = database
+                .tx
+                .iter()
+                .map(|tx| TxId::try_from_bytes(tx).unwrap().to_base64())
+                .intersperse("\n ".to_string())
+                .collect();
+            let collections: String = database
+                .collections
+                .iter()
+                .map(|x| x.name.to_string())
+                .intersperse("\n ".to_string())
+                .collect();
+            let address_ref: &[u8] = database.address.as_ref();
+            let sender_ref: &[u8] = database.sender.as_ref();
+            table.add_row(row![
+                DbId::try_from(address_ref).unwrap().to_hex(),
+                database.desc.to_string(),
+                AccountId::try_from(sender_ref).unwrap().to_hex(),
+                tx_list,
+                collections
+            ]);
+        }
         Ok(table)
     }
 
@@ -516,6 +530,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     action: DatabaseAction::AddCollection.into(),
                     document_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk
@@ -601,13 +616,45 @@ impl DB3ClientCommand {
                     .get_database(addr.as_ref())
                     .await
                 {
-                    Ok(Some(database)) => Self::show_database(&database),
+                    Ok(Some(database)) => {
+                        let dbs = vec![database];
+                        Self::show_database(dbs.as_ref())
+                    }
                     Ok(None) => Err(format!("no database with target address")),
                     Err(e) => Err(format!("fail to show database with error {e}")),
                 }
             }
 
-            DB3ClientCommand::NewDB {} => {
+            DB3ClientCommand::MyDB { addr } => {
+                if addr.is_empty() {
+                    match KeyStore::recover_keypair(None) {
+                        Ok(ks) => {
+                            let owner = ks.get_address().unwrap();
+                            match ctx
+                                .store_sdk
+                                .as_mut()
+                                .unwrap()
+                                .get_my_database(owner.to_hex().as_str())
+                                .await
+                            {
+                                Ok(databases) => Self::show_database(databases.as_ref()),
+                                Err(_) => Err("fail to get account".to_string()),
+                            }
+                        }
+                        Err(_) => Err(
+                            "no key was found, you can use init command to create a new one"
+                                .to_string(),
+                        ),
+                    }
+                } else {
+                    match ctx.store_sdk.as_mut().unwrap().get_my_database(&addr).await {
+                        Ok(databases) => Self::show_database(databases.as_ref()),
+                        Err(_) => Err("fail to get account".to_string()),
+                    }
+                }
+            }
+
+            DB3ClientCommand::NewDB { desc } => {
                 let meta = BroadcastMeta {
                     //TODO get from network
                     nonce: Self::current_seconds(),
@@ -622,6 +669,7 @@ impl DB3ClientCommand {
                     db_address: vec![],
                     action: DatabaseAction::CreateDb.into(),
                     document_mutations: vec![],
+                    db_desc: desc,
                 };
                 match ctx
                     .mutation_sdk
@@ -672,6 +720,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     document_mutations: vec![document_mut],
                     collection_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk
@@ -731,6 +780,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     document_mutations: vec![document_mut],
                     collection_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk
@@ -779,6 +829,7 @@ impl DB3ClientCommand {
                     db_address: db_id.as_ref().to_vec(),
                     document_mutations: vec![document_mut],
                     collection_mutations: vec![],
+                    db_desc: "".to_string(),
                 };
                 match ctx
                     .mutation_sdk

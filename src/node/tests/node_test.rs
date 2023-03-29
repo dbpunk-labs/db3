@@ -32,6 +32,7 @@ mod node_integration {
             db_address: vec![],
             action: DatabaseAction::CreateDb.into(),
             document_mutations: vec![],
+            db_desc: "".to_string(),
         };
         dm
     }

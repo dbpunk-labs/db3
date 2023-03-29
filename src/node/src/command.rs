@@ -607,7 +607,9 @@ mod tests {
         }
 
         let mut addr = String::new();
-        let cmd = DB3ClientCommand::NewDB {};
+        let cmd = DB3ClientCommand::NewDB {
+            desc: "".to_string(),
+        };
         if let Ok(table) = cmd.execute(&mut ctx).await {
             assert_eq!(1, table.len());
             addr = table.get_row(0).unwrap().get_cell(0).unwrap().get_content();

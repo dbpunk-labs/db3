@@ -64,5 +64,3 @@ if [[ $RUN_L1_CHAIN == 'OK' ]]; then
     echo "start local development done!"
 fi
 while true; do sleep 1 ; done
-
-
