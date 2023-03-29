@@ -169,7 +169,7 @@ impl DbStore {
         let (db, mut ops) =
             Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id, desc);
         let (batches, data_in_bytes) =
-            Self::encode_database(dbid, &db, sender, block_id, mutation_id)?;
+            Self::encode_database(dbid, &db, sender, block_id, mutation_id, true)?;
         ops.update_data_size(data_in_bytes as u64);
         Ok((batches, ops))
     }
@@ -180,9 +180,8 @@ impl DbStore {
         sender: &DB3Address,
         height: u64,
         mutation_id: u16,
+        add_owner: bool,
     ) -> Result<(Vec<BatchEntry>, usize)> {
-        let db_owner = DbOwnerKey(sender, height, mutation_id);
-        let db_owner_encoded_key = db_owner.encode()?;
         let key = DbKey(dbid);
         let encoded_key = key.encode()?;
         let mut buf = BytesMut::with_capacity(1024 * 2);
@@ -190,13 +189,23 @@ impl DbStore {
             .encode(&mut buf)
             .map_err(|e| DB3Error::ApplyDatabaseError(format!("{e}")))?;
         let buf = buf.freeze();
-        let total_in_bytes =
-            encoded_key.len() + buf.as_ref().len() + db_owner_encoded_key.len() + DbId::length();
-        let batches = vec![
-            (encoded_key, Op::Put(buf.as_ref().to_vec())),
-            (db_owner_encoded_key, Op::Put(dbid.as_ref().to_vec())),
-        ];
-        Ok((batches, total_in_bytes))
+        if add_owner {
+            let db_owner = DbOwnerKey(sender, height, mutation_id);
+            let db_owner_encoded_key = db_owner.encode()?;
+            let total_in_bytes = encoded_key.len()
+                + buf.as_ref().len()
+                + db_owner_encoded_key.len()
+                + DbId::length();
+            let batches = vec![
+                (encoded_key, Op::Put(buf.as_ref().to_vec())),
+                (db_owner_encoded_key, Op::Put(dbid.as_ref().to_vec())),
+            ];
+            Ok((batches, total_in_bytes))
+        } else {
+            let total_in_bytes = encoded_key.len() + buf.as_ref().len();
+            let batches = vec![(encoded_key, Op::Put(buf.as_ref().to_vec()))];
+            Ok((batches, total_in_bytes))
+        }
     }
 
     //
@@ -254,8 +263,14 @@ impl DbStore {
                     let (new_db, mut ops) =
                         Self::update_database(&d, mutation, tx, block_id, mutation_id)?;
                     //TODO how to get the byte size that was updated
-                    let (batches, data_in_bytes) =
-                        Self::encode_database(db_id, &new_db, sender, block_id, mutation_id)?;
+                    let (batches, data_in_bytes) = Self::encode_database(
+                        db_id,
+                        &new_db,
+                        sender,
+                        block_id,
+                        mutation_id,
+                        false,
+                    )?;
                     ops.update_data_size(data_in_bytes as u64);
                     unsafe {
                         Pin::get_unchecked_mut(db)

@@ -417,6 +417,11 @@ impl AuthStorage {
         self.current_block_state.abci_hash = hash.clone();
         self.last_block_state = self.current_block_state.clone();
         self.current_block_state.reset();
+        info!(
+            "commit hash {} block {}",
+            hex::encode_upper(hash),
+            self.last_block_state.block_height
+        );
         Ok(hash)
     }
 
