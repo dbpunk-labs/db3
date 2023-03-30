@@ -344,7 +344,12 @@ impl StorageNode for StorageNodeImpl {
                                 ));
                             }
                         }
-                        None => return Err(Status::internal("Fail to create session")),
+                        None => {
+                            return Err(Status::internal(format!(
+                                "Fail to get session with token {}",
+                                show_database_req.session_token
+                            )))
+                        }
                     }
                     node_store
                         .get_session_store()
@@ -509,6 +514,7 @@ impl StorageNode for StorageNodeImpl {
                 let sess_store = node_store.get_session_store();
                 match sess_store.add_new_session(&header, session.start_time, account_id.addr) {
                     Ok((session_token, query_session_info)) => {
+                        info!("open session account {} done", account_id.to_hex());
                         // Takes a reference and returns Option<&V>
                         Ok(Response::new(OpenSessionResponse {
                             query_session_info: Some(query_session_info),
@@ -517,7 +523,13 @@ impl StorageNode for StorageNodeImpl {
                             max_query_limit: DEFAULT_SESSION_QUERY_LIMIT,
                         }))
                     }
-                    Err(e) => Err(Status::internal(format!("{}", e))),
+                    Err(e) => {
+                        warn!(
+                            "fail to open session with account {} for {e}",
+                            account_id.to_hex()
+                        );
+                        Err(Status::internal(format!("{}", e)))
+                    }
                 }
             }
             Err(e) => Err(Status::internal(format!("{}", e))),
