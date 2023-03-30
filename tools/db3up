@@ -60,7 +60,7 @@ function join_devnet() {
     test -f ~/.db3/devnet/node/config/genesis.json || echo "genesis.json was not found"
     killall db3 > /dev/null 2>&1
     export PATH=~/.db3/bin:$PATH
-    db3 start -d ~/.db3/devnet/data >~/.db3/devnet/logs/db3.log 2>&1 &
+    db3 start --disable-query-session true -d ~/.db3/devnet/data >~/.db3/devnet/logs/db3.log 2>&1 &
     sleep 2
     tendermint start --home ~/.db3/devnet/node --p2p.persistent_peers "4cc9ce402e5ca4459d99c6040fa5042178a8a220@18.162.230.6:26656,28819b72f4f059a19b8f16f654aa49a3524eb0cd@16.163.108.68:26656,1a629ebba7b115a53a2c99b815ad56a9a9fdfe20@18.162.114.26:26656" >~/.db3/devnet/logs/tm.log 2>&1 &
     sleep 2
