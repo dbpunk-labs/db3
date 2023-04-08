@@ -1,16 +1,100 @@
-site_name: DB3 Network
-
-repo_name: dbpunk-labs/db3
+site_name: DB3 Network Docs
+site_url: https://db3.network
+site_description: Specs, docs, guides, and APIs for the DB3 Network.
 repo_url: https://github.com/dbpunk-labs/db3.git
+repo_name: dbpunk-labs/db3
+edit_uri: https://github.com/dbpunk-labs/db3/docs/
+# strict: true
+
+# Copyright
+copyright: "DB3 Network is open sourced under MIT and Apache 2"
+
 theme:
   name: material
-  features:
-    - content.tabs.link
 
+  # custom_dir: overrides
+  # 404 page
+  static_templates:
+    - 404.html
+  palette:
+    scheme: default
+  logo: images/db3_logo.svg
+  # icon:
+  #   repo: fontawesome/brands/github-alt
+  # favicon: images/favicon-ceramic.png
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.indexes
+    - content.code.annotate
+    - navigation.path
+    - navigation.sections
+
+nav:
+  - Home:
+      - Introduction: index.md
+      - Welcome to DB3: index.md
+      - Why DB3: learn/basic/why_db3.md
+      - Features: learn/basic/features.md
+      # - How DB3 works: learn/basic/how_it_works.md
+      - Quick Start: build/quick_start.md
+    # - Network:
+    #   - Overview: learn/network/overview.md
+    #   - Node: learn/network/node/node.md
+    #   - Networking:
+    #     - Consensus: learn/network/networking/consensus.md
+    #     - Security: learn/network/networking/security.md
+    #     - Event Notice: learn/network/networking/event.md
+
+    #   - Account:
+    #     - Account: learn/network/account/account.md
+    #     - Account credit: learn/network/account/account_credit.md
+    #     - Signiture: learn/network/account/signiture.md
+
+    #   - Data Model:
+    #     - Database: learn/network/data_model/database.md
+    #     - Collection: learn/network/data_model/collection.md
+    #     - Record: learn/network/data_model/record.md
+    #     - Indexer: learn/network/data_model/indexer.md
+    #   - Fee:
+    #     - Fee: learn/network/fees/fee.md
+    #     - Gas: learn/network/fees/gas.md
+
+    # - Advanced:
+    #   - Tech Intro: learn/advanced/overview.md
+  - Build:
+      # - Overview: build/overview.md
+
+      - Quick Start: build/quick_start.md
+      - DMS: build/data_manager.md
+      - Nodes:
+          - Community Nodes: build/node/community_node.md
+          - Self Running Node: build/node/run_locally.md
+      - Demos: build/demos/js_demo.md
+      # - DB3 Client:
+      #     # - Json rpc: build/json_rpc.md
+      #     - Terminal Client: build/client/terminal_client.md
+      #     - Javascript Client: build/client/js_client.md
+      # - Demo:
+      #     - Easy html: build/demos/html_demo.md
+      #     - Nextjs Demo: build/demos/nextjs_demo.md
+
+  - White Paper: white_paper.md
+  - Forum: "https://community.db3.network/"
+
+extra:
+  # Social icons in footer
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dbpunk-labs/db3.git
+      name: DB3 Network on Github
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/Db3Network
+      name: Db3 Network on Twitter
+    - icon: fontawesome/brands/discord
+      link: https://discord.com/invite/sgY2bbFCzr
+      name: Db3 Network on Discord
 markdown_extensions:
-  - admonition
-  - pymdownx.details
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
-
