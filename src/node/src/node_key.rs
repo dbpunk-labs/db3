@@ -22,9 +22,9 @@ pub fn get_key_pair(file_path: Option<String>) -> Result<DB3KeyPair> {
     };
 
     match PrivValidatorKey::load_json_file(&key_path) {
-        Ok(key) => match key.priv_key.ed25519_keypair() {
+        Ok(key) => match key.priv_key.ed25519_signing_key() {
             Some(kp) => {
-                let private_key = Ed25519PrivateKey::from_bytes(kp.secret.as_ref())
+                let private_key = Ed25519PrivateKey::from_bytes(kp.as_bytes())
                     .map_err(|e| DB3Error::LoadKeyPairError(format!("{e}")))?;
                 let pair = Ed25519KeyPair::from(private_key);
                 Ok(DB3KeyPair::Ed25519(pair))

@@ -65,9 +65,13 @@ jobs:
           protoc --version
           cargo build
           cd tools
-          wget https://github.com/tendermint/tendermint/releases/download/v0.34.22/tendermint_0.34.22_linux_amd64.tar.gz
-          tar -zxf tendermint_0.34.22_linux_amd64.tar.gz
+          wget https://github.com/tendermint/tendermint/releases/download/v0.37.0-rc2/tendermint_0.37.0-rc2_linux_amd64.tar.gz
+          tar -zxf tendermint_0.37.0-rc2_linux_amd64.tar.gz
           sh start_localnet.sh >tm.log 2>&1 &
+          sleep 3
+          ../target/debug/db3 client new-db
+          sleep 1
+          ../target/debug/db3 client show-state
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
