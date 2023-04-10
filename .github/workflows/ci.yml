@@ -66,6 +66,10 @@ jobs:
           cargo build
           cd tools
           sh start_localnet.sh >tm.log 2>&1 &
+          sleep 3
+          ../target/debug/db3 client new-db
+          sleep 1
+          ../target/debug/db3 client show-state
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
