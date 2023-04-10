@@ -27,4 +27,4 @@ hex = "0.4.3"
 tracing = "0.1"
 generic-array = { version = "0.14.6", default-features = false }
 k256 = { version = "0.11", default-features = false, features = ["keccak256", "ecdsa", "std"] }
-elliptic-curve = { version = "0.12.3", default-features = false }
+elliptic-curve = { version = "0.13.4", default-features = false }
