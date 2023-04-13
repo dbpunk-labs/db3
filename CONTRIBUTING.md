@@ -17,8 +17,13 @@ keywords.
 ### Build
 
 ```shell
+### First step:
 git clone https://github.com/dbpunk-labs/db3.git
-cd bridge && yarn install && npx hardhat test
+
+### Second step:  
+cd db3/bridge && yarn install && npx hardhat test
+
+### Third step:
 cd db3 & bash install_env.sh && cargo build
 ```
 
