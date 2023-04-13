@@ -18,8 +18,11 @@ keywords.
 
 ```shell
 git clone https://github.com/dbpunk-labs/db3.git
+cd bridge && yarn install && npx hardhat test
 cd db3 & bash install_env.sh && cargo build
 ```
+
+
 
 ### Start local testnet
 
