@@ -170,8 +170,8 @@ impl AbciImpl {
         dm: &DatabaseMutation,
     ) -> ResponseDeliverTx {
         let mut attrs = vec![EventAttribute {
-            key: "sender".to_string().into_bytes().into(),
-            value: sender.to_hex().into_bytes().into(),
+            key: "sender".to_string(),
+            value: sender.to_hex(),
             index: false,
         }];
         let action = DatabaseAction::from_i32(dm.action);
@@ -181,8 +181,8 @@ impl AbciImpl {
                 let addr_ref: &[u8] = dm.db_address.as_ref();
                 if let Ok(addr) = AccountAddress::try_from(addr_ref) {
                     attrs.push(EventAttribute {
-                        key: "to".to_string().into_bytes().into(),
-                        value: addr.to_hex().into_bytes().into(),
+                        key: "to".to_string(),
+                        value: addr.to_hex(),
                         index: false,
                     });
                 }
@@ -190,16 +190,16 @@ impl AbciImpl {
             _ => {
                 dm.document_mutations.iter().for_each(|x| {
                     attrs.push(EventAttribute {
-                        key: "collections".to_string().into_bytes().into(),
-                        value: x.collection_name.to_string().into_bytes().into(),
+                        key: "collections".to_string(),
+                        value: x.collection_name.to_string(),
                         index: false,
                     })
                 });
                 let addr_ref: &[u8] = dm.db_address.as_ref();
                 if let Ok(addr) = AccountAddress::try_from(addr_ref) {
                     attrs.push(EventAttribute {
-                        key: "to".to_string().into_bytes().into(),
-                        value: addr.to_hex().into_bytes().into(),
+                        key: "to".to_string(),
+                        value: addr.to_hex(),
                         index: false,
                     });
                 }
@@ -230,8 +230,8 @@ impl AbciImpl {
     ) -> ResponseDeliverTx {
         if ok {
             let attrs = vec![EventAttribute {
-                key: "sender".to_string().into_bytes().into(),
-                value: sender.to_hex().into_bytes().into(),
+                key: "sender".to_string(),
+                value: sender.to_hex(),
                 index: false,
             }];
             let event = Event {

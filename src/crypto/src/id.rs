@@ -298,7 +298,9 @@ impl DocumentId {
     }
 
     pub fn try_from_base64(input: &str) -> std::result::Result<Self, DB3Error> {
-        Self::try_from_bytes(base64ct::Base64::decode_vec(input).unwrap().as_slice())
+        let b64_vec =
+            base64ct::Base64::decode_vec(input).map_err(|_| DB3Error::InvalidDocumentIdBytes)?;
+        Self::try_from_bytes(b64_vec.as_slice())
     }
 }
 
