@@ -30,10 +30,11 @@ use db3_proto::db3_database_proto::{Collection, Database, Document, Index, Struc
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
 use itertools::Itertools;
-use merkdb::proofs::{query::Query, Node, Op as ProofOp};
+use merkdb::proofs::{Node, Op as ProofOp};
 use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::{HashMap, HashSet};
+use std::ops::Bound;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -745,10 +746,8 @@ impl DbStore {
                                             keys.as_slice(),
                                             &DocumentId::one(),
                                         )?;
-                                        std::ops::Range {
-                                            start: start_key.as_ref().to_vec(),
-                                            end: end_key.as_ref().to_vec(),
-                                        }
+                                        (Bound::Included(start_key),
+                                         Bound::Included(end_key))
                                     }
                                     _ => {
                                         return Err(DB3Error::InvalidFilterType(format!(
@@ -757,39 +756,7 @@ impl DbStore {
                                         )));
                                     }
                                 };
-
-                                let mut query = Query::new();
-                                query.insert_range(range);
-                                let ops = db
-                                    .execute_query(query)
-                                    .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
-
-                                let mut values: Vec<_> = Vec::new();
-                                let mut idx = 0;
-                                for op in ops.iter() {
-                                    match op {
-                                        ProofOp::Push(Node::KV(k, _)) => {
-                                            let index_id = IndexId::new(k.clone());
-                                            let document_id = index_id.get_document_id()?;
-                                            if let Ok(Some(document)) =
-                                                Self::get_document(db, &document_id)
-                                            {
-                                                if limit.is_some() && idx >= limit.unwrap() {
-                                                    break;
-                                                }
-                                                idx += 1;
-                                                values.push(document)
-                                            } else {
-                                                warn!(
-                                                    "document not exist with target id {}",
-                                                    document_id
-                                                );
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                Ok(values)
+                                Self::execute_query(db, &range, limit)
                             }
                             None => {
                                 return Err(DB3Error::InvalidFilterType(
@@ -815,6 +782,67 @@ impl DbStore {
         }
     }
 
+    /// execute a query to fetch target documents from given database and index range
+    fn execute_query(db: Pin<&Merk>, range: &(Bound<IndexId>, Bound<IndexId>),
+                     limit: Option<i32>) -> Result<Vec<Document>> {
+        // let ops = db
+        //     .execute_query(query)
+        //     .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
+        let mut values: Vec<_> = Vec::new();
+        let mut count = 0;
+
+        let mut it = db.raw_iter();
+        match &range.0 {
+            Bound::Included(start) => it.seek(start.as_ref()),
+            Bound::Excluded(start) => {
+                it.seek(start.as_ref());
+                if it.valid() {
+                    it.next();
+                }
+            },
+            Bound::Unbounded => it.seek_to_first(),
+        };
+
+        if !it.valid() {
+            return Ok(values);
+        }
+
+        let mut it_end = db.raw_iter();
+        it_end.seek_to_last();
+        let it_end_key = it_end.key().unwrap();
+
+        let (end_key_ref, end_key_include) = match &range.1 {
+            Bound::Unbounded => (it_end_key, true),
+            Bound::Included(end) => (end.as_ref().as_slice(), true),
+            Bound::Excluded(end) => (end.as_ref().as_slice(), false),
+        };
+
+        while it.valid() {
+            if limit.is_some() && count >= limit.unwrap() {
+                break;
+            }
+            if let Some(k) = it.key() {
+                if k > end_key_ref {
+                    break;
+                }
+                if end_key_include && k == end_key_ref {
+                    break;
+                }
+                let index_id = IndexId::new(k.to_vec());
+                let document_id = index_id.get_document_id()?;
+                if let Ok(Some(document)) =
+                    Self::get_document(db, &document_id)
+                {
+                    count += 1;
+                    values.push(document)
+                } else {
+                    warn!("document not exist with target id {}",document_id);
+                }
+            }
+            it.next();
+        }
+        Ok(values)
+    }
     //
     // add document
     //
