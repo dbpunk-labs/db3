@@ -793,7 +793,9 @@ impl DbStore {
         match &range.0 {
             Bound::Included(start) => it.seek(start.as_ref()),
             Bound::Excluded(start) => {
-                it.seek(start.as_ref());
+                // 1. Seeks to the start key, or the first key that lexicographically precedes it.
+                // 2. Advance iterator to the next key to exclude the start key
+                it.seek_for_prev(start.as_ref());
                 if it.valid() {
                     it.next();
                 }
