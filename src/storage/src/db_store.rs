@@ -30,7 +30,6 @@ use db3_proto::db3_database_proto::{Collection, Database, Document, Index, Struc
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
 use itertools::Itertools;
-use merkdb::proofs::{Node, Op as ProofOp};
 use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::{HashMap, HashSet};
@@ -746,8 +745,7 @@ impl DbStore {
                                             keys.as_slice(),
                                             &DocumentId::one(),
                                         )?;
-                                        (Bound::Included(start_key),
-                                         Bound::Included(end_key))
+                                        (Bound::Included(start_key), Bound::Included(end_key))
                                     }
                                     _ => {
                                         return Err(DB3Error::InvalidFilterType(format!(
@@ -783,11 +781,11 @@ impl DbStore {
     }
 
     /// execute a query to fetch target documents from given database and index range
-    fn execute_query(db: Pin<&Merk>, range: &(Bound<IndexId>, Bound<IndexId>),
-                     limit: Option<i32>) -> Result<Vec<Document>> {
-        // let ops = db
-        //     .execute_query(query)
-        //     .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
+    fn execute_query(
+        db: Pin<&Merk>,
+        range: &(Bound<IndexId>, Bound<IndexId>),
+        limit: Option<i32>,
+    ) -> Result<Vec<Document>> {
         let mut values: Vec<_> = Vec::new();
         let mut count = 0;
 
@@ -799,7 +797,7 @@ impl DbStore {
                 if it.valid() {
                     it.next();
                 }
-            },
+            }
             Bound::Unbounded => it.seek_to_first(),
         };
 
@@ -830,13 +828,11 @@ impl DbStore {
                 }
                 let index_id = IndexId::new(k.to_vec());
                 let document_id = index_id.get_document_id()?;
-                if let Ok(Some(document)) =
-                    Self::get_document(db, &document_id)
-                {
+                if let Ok(Some(document)) = Self::get_document(db, &document_id) {
                     count += 1;
                     values.push(document)
                 } else {
-                    warn!("document not exist with target id {}",document_id);
+                    warn!("document not exist with target id {}", document_id);
                 }
             }
             it.next();
