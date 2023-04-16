@@ -1456,134 +1456,50 @@ mod tests {
         let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
         assert_eq!(2, docs.len());
 
-        // run query: select * from collection where name = "Bill"
-        let query = StructuredQuery {
-            collection_name: collection_name.to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::Equal.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("Bill".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
-        assert_eq!(2, docs.len());
-        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
-        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
-
-        // test query with <, <=, >, >= condition
-        // run query: select * from collection where name < "John Doe"
-        let query = StructuredQuery {
-            collection_name: collection_name.to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::LessThan.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("John Doe".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
-        assert_eq!(2, docs.len());
-        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
-        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
-
-        // run query: select * from collection where name <= "John Doe"
-        let query = StructuredQuery {
-            collection_name: collection_name.to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::LessThanOrEqual.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("John Doe".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
-        assert_eq!(3, docs.len());
-        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
-        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
-        let document = bson_util::bytes_to_bson_document(docs[2].doc.clone()).unwrap();
-        assert_eq!("John Doe", document.get_str("name").unwrap());
-
-        // run query: select * from collection where name > "John Doe"
-        let query = StructuredQuery {
-            collection_name: collection_name.to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::GreaterThan.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("John Doe".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
-        assert_eq!(1, docs.len());
-        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
-        assert_eq!("Mike", document.get_str("name").unwrap());
-
-        // run query: select * from collection where name >= "John Doe"
-        let query = StructuredQuery {
-            collection_name: collection_name.to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::GreaterThanOrEqual.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("John Doe".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
-        assert_eq!(2, docs.len());
-        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
-        assert_eq!("John Doe", document.get_str("name").unwrap());
-        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
-        assert_eq!("Mike", document.get_str("name").unwrap());
-
-        // run query: select * from collection where name > "Mike"
-        let query = StructuredQuery {
-            collection_name: collection_name.to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::GreaterThan.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("Mike".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
-        assert_eq!(0, docs.len());
+        // test query with ==, <, <=, >, >= condition
+        for (field, value_str, op, exp) in [
+            ("name", "Bill", Operator::Equal, vec!["Bill", "Bill"]),
+            ("name", "John Doe", Operator::LessThan, vec!["Bill", "Bill"]),
+            (
+                "name",
+                "John Doe",
+                Operator::LessThanOrEqual,
+                vec!["Bill", "Bill", "John Doe"],
+            ),
+            (
+                "name",
+                "John Doe",
+                Operator::GreaterThanOrEqual,
+                vec!["John Doe", "Mike"],
+            ),
+            ("name", "John Doe", Operator::GreaterThan, vec!["Mike"]),
+        ] {
+            let query = StructuredQuery {
+                collection_name: collection_name.to_string(),
+                select: Some(Projection { fields: vec![] }),
+                r#where: Some(Filter {
+                    filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                        field: field.to_string(),
+                        op: op.into(),
+                        value: Some(Value {
+                            value_type: Some(ValueType::StringValue(value_str.to_string())),
+                        }),
+                    })),
+                }),
+                limit: None,
+            };
+            let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+            assert_eq!(exp.len(), docs.len(), "run query fail for {:?}", query);
+            for i in 0..exp.len() {
+                let document = bson_util::bytes_to_bson_document(docs[i].doc.clone()).unwrap();
+                assert_eq!(
+                    exp[i],
+                    document.get_str(field).unwrap(),
+                    "run query fail for {:?}",
+                    query
+                );
+            }
+        }
 
         // run query: select * from collection where name = "Bill" limit 1
         let query = StructuredQuery {

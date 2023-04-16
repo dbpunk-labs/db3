@@ -687,7 +687,7 @@ mod tests {
         assert!(cmd.execute(&mut ctx).await.is_ok());
         std::thread::sleep(time::Duration::from_millis(2000));
 
-        // run show document limit 2
+        // run show document no limit
         // r#"{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#
         // r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
         // r#"{"name": "Bill","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#.to_string(),
@@ -704,7 +704,7 @@ mod tests {
         let doc_id3 = table.get_row(2).unwrap().get_cell(0).unwrap().get_content();
         let doc_id4 = table.get_row(3).unwrap().get_cell(0).unwrap().get_content();
 
-        // run show document limit 2
+        // run show document limit 3
         let cmd = DB3ClientCommand::ShowDocument {
             addr: addr.clone(),
             collection_name: collection_books.to_string(),
@@ -714,32 +714,59 @@ mod tests {
         assert_eq!(3, cmd.execute(&mut ctx).await.unwrap().len());
 
         // run show document --filter = '{"field": "name", "value": "Bill", "op": "=="}'
-        let cmd = DB3ClientCommand::ShowDocument {
-            addr: addr.clone(),
-            collection_name: collection_books.to_string(),
-            filter: r#"{"field": "name", "value": "Bill", "op": "=="}"#.to_string(),
-            limit: -1,
-        };
-        if let Ok(table) = cmd.execute(&mut ctx).await {
-            assert_eq!(2, table.len());
-            assert!(table
-                .get_row(0)
-                .unwrap()
-                .get_cell(2)
-                .unwrap()
-                .get_content()
-                .contains(r#""name": String("Bill")"#));
-            assert!(table
-                .get_row(1)
-                .unwrap()
-                .get_cell(2)
-                .unwrap()
-                .get_content()
-                .contains(r#""name": String("Bill")"#));
-        } else {
-            assert!(false)
-        }
 
+        for (filter, exp) in [
+            (
+                r#"{"field": "name", "value": "Bill", "op": "=="}"#,
+                vec![r#""name": String("Bill")"#, r#""name": String("Bill")"#],
+            ),
+            (
+                r#"{"field": "name", "value": "John Doe", "op": "<"}"#,
+                vec![r#""name": String("Bill")"#, r#""name": String("Bill")"#],
+            ),
+            (
+                r#"{"field": "name", "value": "John Doe", "op": "<="}"#,
+                vec![
+                    r#""name": String("Bill")"#,
+                    r#""name": String("Bill")"#,
+                    r#""name": String("John Doe")"#,
+                ],
+            ),
+            (
+                r#"{"field": "name", "value": "John Doe", "op": ">="}"#,
+                vec![r#""name": String("John Doe")"#, r#""name": String("Mike")"#],
+            ),
+            (
+                r#"{"field": "name", "value": "John Doe", "op": ">"}"#,
+                vec![r#""name": String("Mike")"#],
+            ),
+        ] {
+            let cmd = DB3ClientCommand::ShowDocument {
+                addr: addr.clone(),
+                collection_name: collection_books.to_string(),
+                filter: filter.to_string(),
+                limit: -1,
+            };
+            if let Ok(table) = cmd.execute(&mut ctx).await {
+                assert_eq!(exp.len(), table.len());
+                for i in 0..exp.len() {
+                    assert!(
+                        table
+                            .get_row(i)
+                            .unwrap()
+                            .get_cell(2)
+                            .unwrap()
+                            .get_content()
+                            .contains(exp[i]),
+                        "expect contains {} but {}",
+                        exp[i],
+                        table.get_row(i).unwrap().get_cell(2).unwrap().get_content()
+                    );
+                }
+            } else {
+                assert!(false)
+            }
+        }
         // run show document --filter = '{"field": "age", "value": 44, "op": "=="}'
         let cmd = DB3ClientCommand::ShowDocument {
             addr: addr.clone(),
