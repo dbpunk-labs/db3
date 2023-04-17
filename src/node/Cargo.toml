@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 bytes = { version = "1.0", default-features = false }
-tendermint-abci = "0.30.0"
+tendermint-abci = "0.31.1"
 tendermint-proto = "0.30.0"
 tendermint-rpc = {version = "0.30.0",  features=["http-client", "websocket-client"]}
 tendermint-config = "0.30.0"
