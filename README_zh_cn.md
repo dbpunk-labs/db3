@@ -85,7 +85,7 @@ database address                           | transaction id
 0xa9f5c8170aad7a0f924d89c6edacae6db24ef57d | 0ALy/hH7CQe9lv294K6dOxGP14xWHsbRs+/pXBZa8oU=
 ```
 
- * [x] 现实数据库信息
+ * [x] 显示数据库信息
 
 ```shell
 db3>-$ show-db --addr 0x7e16cb6524e2fc21ae9bf2d7ee18b05767b9dc33

@@ -16,9 +16,19 @@ keywords.
 
 ### Build
 
+1. clone the source and init the building environment
 ```shell
 git clone https://github.com/dbpunk-labs/db3.git
-cd db3 & bash install_env.sh && cargo build
+cd db3 & bash install_env.sh
+```
+
+2. compile the bridge contract
+```shell
+cd  bridge && yarn && npx hardhat test
+```
+3. build the db3 binary
+```shell
+cargo build
 ```
 
 ### Start local testnet
