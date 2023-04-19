@@ -177,7 +177,11 @@ pub fn filter_from_json_value(json_str: &str) -> std::result::Result<Option<Filt
         })?;
         let op = match op_str {
             "==" => Operator::Equal,
-            ">" | "<" | ">=" | "<=" | "!=" => {
+            ">" => Operator::GreaterThan,
+            "<" => Operator::LessThan,
+            ">=" => Operator::GreaterThanOrEqual,
+            "<=" => Operator::LessThanOrEqual,
+            "!=" => {
                 return Err(DB3Error::InvalidFilterOp(format!(
                     "OP {} un-support currently",
                     op_str
@@ -403,6 +407,35 @@ mod tests {
             .unwrap();
         assert_eq!(
             r#"{"filter_type":{"FieldFilter":{"field":"flag","op":5,"value":{"value_type":{"BooleanValue":true}}}}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
+
+        let filter = filter_from_json_value(r#"{"field": "flag", "value": true, "op": ">="}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"{"filter_type":{"FieldFilter":{"field":"flag","op":4,"value":{"value_type":{"BooleanValue":true}}}}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
+        let filter = filter_from_json_value(r#"{"field": "flag", "value": true, "op": ">"}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"{"filter_type":{"FieldFilter":{"field":"flag","op":3,"value":{"value_type":{"BooleanValue":true}}}}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
+        let filter = filter_from_json_value(r#"{"field": "flag", "value": true, "op": "<="}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"{"filter_type":{"FieldFilter":{"field":"flag","op":2,"value":{"value_type":{"BooleanValue":true}}}}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
+        let filter = filter_from_json_value(r#"{"field": "flag", "value": true, "op": "<"}"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            r#"{"filter_type":{"FieldFilter":{"field":"flag","op":1,"value":{"value_type":{"BooleanValue":true}}}}}"#,
             serde_json::to_string(&filter).unwrap()
         );
 
