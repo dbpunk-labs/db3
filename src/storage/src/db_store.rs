@@ -30,10 +30,10 @@ use db3_proto::db3_database_proto::{Collection, Database, Document, Index, Struc
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation};
 use db3_types::cost::DbStoreOp;
 use itertools::Itertools;
-use merkdb::proofs::{query::Query, Node, Op as ProofOp};
 use merkdb::{tree::Tree, BatchEntry, Merk, Op};
 use prost::Message;
 use std::collections::{HashMap, HashSet};
+use std::ops::Bound;
 use std::pin::Pin;
 use tracing::{debug, info, span, warn, Level};
 
@@ -720,7 +720,7 @@ impl DbStore {
                                     }
                                 };
 
-                                let keys = match &field_filter.value {
+                                let key = match &field_filter.value {
                                     Some(value) => bson_util::bson_into_comparison_bytes(
                                         &bson_util::bson_value_from_proto_value(value)?,
                                     )?,
@@ -730,66 +730,13 @@ impl DbStore {
                                         ));
                                     }
                                 };
-                                let range = match Operator::from_i32(field_filter.op) {
-                                    Some(Operator::Equal) => {
-                                        let start_key = IndexId::create(
-                                            &collection_id,
-                                            index.id,
-                                            keys.as_slice(),
-                                            &DocumentId::zero(),
-                                        )?;
-
-                                        let end_key = IndexId::create(
-                                            &collection_id,
-                                            index.id,
-                                            keys.as_slice(),
-                                            &DocumentId::one(),
-                                        )?;
-                                        std::ops::Range {
-                                            start: start_key.as_ref().to_vec(),
-                                            end: end_key.as_ref().to_vec(),
-                                        }
-                                    }
-                                    _ => {
-                                        return Err(DB3Error::InvalidFilterType(format!(
-                                            "Filed Filter Op {:?} un-support",
-                                            &field_filter.op
-                                        )));
-                                    }
-                                };
-
-                                let mut query = Query::new();
-                                query.insert_range(range);
-                                let ops = db
-                                    .execute_query(query)
-                                    .map_err(|e| DB3Error::QueryKvError(format!("{}", e)))?;
-
-                                let mut values: Vec<_> = Vec::new();
-                                let mut idx = 0;
-                                for op in ops.iter() {
-                                    match op {
-                                        ProofOp::Push(Node::KV(k, _)) => {
-                                            let index_id = IndexId::new(k.clone());
-                                            let document_id = index_id.get_document_id()?;
-                                            if let Ok(Some(document)) =
-                                                Self::get_document(db, &document_id)
-                                            {
-                                                if limit.is_some() && idx >= limit.unwrap() {
-                                                    break;
-                                                }
-                                                idx += 1;
-                                                values.push(document)
-                                            } else {
-                                                warn!(
-                                                    "document not exist with target id {}",
-                                                    document_id
-                                                );
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                Ok(values)
+                                let range = Self::generate_range_with_single_field_filter(
+                                    &collection_id,
+                                    index,
+                                    &key,
+                                    Operator::from_i32(field_filter.op),
+                                )?;
+                                Self::execute_query(db, &range, limit)
                             }
                             None => {
                                 return Err(DB3Error::InvalidFilterType(
@@ -815,6 +762,146 @@ impl DbStore {
         }
     }
 
+    /// generate range for single field filter
+    /// e.g : field = "name", value = "jack", op = "equal"
+    /// range = [name:jack:00000, name:jack:11111]
+    /// e.g : field = "name", value = "jack", op = "less_than"
+    /// range = (unbounded, name:jack:00000)
+    /// etc.
+    fn generate_range_with_single_field_filter(
+        collection_id: &CollectionId,
+        index: &Index,
+        key: &Vec<u8>,
+        op: Option<Operator>,
+    ) -> Result<(Bound<IndexId>, Bound<IndexId>)> {
+        match op {
+            Some(Operator::Equal) => {
+                let start_key = IndexId::create(
+                    &collection_id,
+                    index.id,
+                    key.as_slice(),
+                    &DocumentId::zero(),
+                )?;
+
+                let end_key =
+                    IndexId::create(&collection_id, index.id, key.as_slice(), &DocumentId::one())?;
+                Ok((Bound::Included(start_key), Bound::Included(end_key)))
+            }
+            Some(Operator::LessThan) => {
+                let start_key =
+                    IndexId::create(&collection_id, index.id, "".as_bytes(), &DocumentId::zero())?;
+                let end_key = IndexId::create(
+                    &collection_id,
+                    index.id,
+                    key.as_slice(),
+                    &DocumentId::zero(),
+                )?;
+                Ok((Bound::Included(start_key), Bound::Excluded(end_key)))
+            }
+            Some(Operator::LessThanOrEqual) => {
+                let start_key =
+                    IndexId::create(&collection_id, index.id, "".as_bytes(), &DocumentId::zero())?;
+                let end_key =
+                    IndexId::create(&collection_id, index.id, key.as_slice(), &DocumentId::one())?;
+                Ok((Bound::Included(start_key), Bound::Included(end_key)))
+            }
+            Some(Operator::GreaterThan) => {
+                let start_key =
+                    IndexId::create(&collection_id, index.id, key.as_slice(), &DocumentId::one())?;
+                let end_key = IndexId::create(
+                    &collection_id,
+                    index.id + 1,
+                    "".as_bytes(),
+                    &DocumentId::zero(),
+                )?;
+                Ok((Bound::Excluded(start_key), Bound::Excluded(end_key)))
+            }
+            Some(Operator::GreaterThanOrEqual) => {
+                let start_key = IndexId::create(
+                    &collection_id,
+                    index.id,
+                    key.as_slice(),
+                    &DocumentId::zero(),
+                )?;
+                let end_key = IndexId::create(
+                    &collection_id,
+                    index.id + 1,
+                    "".as_bytes(),
+                    &DocumentId::zero(),
+                )?;
+                Ok((Bound::Included(start_key), Bound::Excluded(end_key)))
+            }
+            _ => {
+                // TODO: support more not equal operator
+                return Err(DB3Error::InvalidFilterType(format!(
+                    "Filed Filter Op {:?} un-support",
+                    op
+                )));
+            }
+        }
+    }
+
+    /// execute a query to fetch target documents from given database and index range
+    fn execute_query(
+        db: Pin<&Merk>,
+        range: &(Bound<IndexId>, Bound<IndexId>),
+        limit: Option<i32>,
+    ) -> Result<Vec<Document>> {
+        let mut values: Vec<_> = Vec::new();
+        let mut count = 0;
+
+        let mut it = db.raw_iter();
+        match &range.0 {
+            Bound::Included(start) => it.seek(start.as_ref()),
+            Bound::Excluded(start) => {
+                // 1. Seeks to the start key, or the first key that lexicographically precedes it.
+                // 2. Advance iterator to the next key to exclude the start key
+                it.seek_for_prev(start.as_ref());
+                if it.valid() {
+                    it.next();
+                }
+            }
+            Bound::Unbounded => it.seek_to_first(),
+        };
+
+        if !it.valid() {
+            return Ok(values);
+        }
+
+        let mut it_end = db.raw_iter();
+        it_end.seek_to_last();
+        let it_end_key = it_end.key().unwrap();
+
+        let (end_key_ref, end_key_exclude) = match &range.1 {
+            Bound::Unbounded => (it_end_key, false),
+            Bound::Included(end) => (end.as_ref().as_slice(), false),
+            Bound::Excluded(end) => (end.as_ref().as_slice(), true),
+        };
+
+        while it.valid() {
+            if limit.is_some() && count >= limit.unwrap() {
+                break;
+            }
+            if let Some(k) = it.key() {
+                if k > end_key_ref {
+                    break;
+                }
+                if k == end_key_ref && end_key_exclude {
+                    break;
+                }
+                let index_id = IndexId::new(k.to_vec());
+                let document_id = index_id.get_document_id()?;
+                if let Ok(Some(document)) = Self::get_document(db, &document_id) {
+                    count += 1;
+                    values.push(document)
+                } else {
+                    warn!("document not exist with target id {}", document_id);
+                }
+            }
+            it.next();
+        }
+        Ok(values)
+    }
     //
     // add document
     //
@@ -993,6 +1080,7 @@ impl DbStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bson::Bson;
     use db3_base::bson_util;
     use db3_crypto::key_derive;
     use db3_crypto::signature_scheme::SignatureScheme;
@@ -1008,6 +1096,7 @@ mod tests {
     use db3_proto::db3_mutation_proto::DocumentMask;
     use db3_proto::db3_mutation_proto::DocumentMutation;
     use std::boxed::Box;
+    use std::ops::Bound::{Excluded, Included};
     use tempdir::TempDir;
 
     fn gen_address() -> DB3Address {
@@ -1367,27 +1456,50 @@ mod tests {
         let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
         assert_eq!(2, docs.len());
 
-        // run query: select * from collection where name = "Bill"
-        let query = StructuredQuery {
-            collection_name: collection_name.to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::Equal.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("Bill".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
-        assert_eq!(2, docs.len());
-        let document = bson_util::bytes_to_bson_document(docs[0].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
-        let document = bson_util::bytes_to_bson_document(docs[1].doc.clone()).unwrap();
-        assert_eq!("Bill", document.get_str("name").unwrap());
+        // test query with ==, <, <=, >, >= condition
+        for (field, value_str, op, exp) in [
+            ("name", "Bill", Operator::Equal, vec!["Bill", "Bill"]),
+            ("name", "John Doe", Operator::LessThan, vec!["Bill", "Bill"]),
+            (
+                "name",
+                "John Doe",
+                Operator::LessThanOrEqual,
+                vec!["Bill", "Bill", "John Doe"],
+            ),
+            (
+                "name",
+                "John Doe",
+                Operator::GreaterThanOrEqual,
+                vec!["John Doe", "Mike"],
+            ),
+            ("name", "John Doe", Operator::GreaterThan, vec!["Mike"]),
+        ] {
+            let query = StructuredQuery {
+                collection_name: collection_name.to_string(),
+                select: Some(Projection { fields: vec![] }),
+                r#where: Some(Filter {
+                    filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                        field: field.to_string(),
+                        op: op.into(),
+                        value: Some(Value {
+                            value_type: Some(ValueType::StringValue(value_str.to_string())),
+                        }),
+                    })),
+                }),
+                limit: None,
+            };
+            let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+            assert_eq!(exp.len(), docs.len(), "run query fail for {:?}", query);
+            for i in 0..exp.len() {
+                let document = bson_util::bytes_to_bson_document(docs[i].doc.clone()).unwrap();
+                assert_eq!(
+                    exp[i],
+                    document.get_str(field).unwrap(),
+                    "run query fail for {:?}",
+                    query
+                );
+            }
+        }
 
         // run query: select * from collection where name = "Bill" limit 1
         let query = StructuredQuery {
@@ -1841,7 +1953,6 @@ mod tests {
             block_id,
             mutation_id,
         );
-        println!("{:?}", res);
         assert!(res.is_err(), "{:?}", res);
         assert_eq!(
             r#"DocumentNotExist("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==")"#,
@@ -1876,7 +1987,6 @@ mod tests {
             block_id,
             mutation_id,
         );
-        println!("{:?}", res);
         assert!(res.is_err(), "{:?}", res);
         assert_eq!(
             r#"ApplyDocumentError("invalid update document mutation, ids and masks size different")"#,
@@ -2034,6 +2144,156 @@ mod tests {
                 .is_some());
         } else {
             assert!(false);
+        }
+    }
+
+    #[test]
+    fn generate_range_with_single_field_filter_test() {
+        let collection_id = CollectionId::create(1000, 100, 10).unwrap();
+
+        let index_field_name = IndexField {
+            field_path: "name".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index_name = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![index_field_name],
+        };
+        let key = bson_util::bson_into_comparison_bytes(&Bson::String("Bill".to_string())).unwrap();
+
+        let res = DbStore::generate_range_with_single_field_filter(
+            &collection_id,
+            &index_name,
+            &key,
+            Some(Operator::Equal),
+        );
+        assert!(res.is_ok(), "{:?}", res);
+        let (start, end) = res.unwrap();
+        // range [collection-index-key-00000000, collection-index-key-11111111]
+        match start {
+            Included(start) => {
+                assert_eq!(start.get_document_id().unwrap(), DocumentId::zero());
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+        match end {
+            Included(start) => {
+                assert_eq!(start.get_document_id().unwrap(), DocumentId::one());
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+
+        let res = DbStore::generate_range_with_single_field_filter(
+            &collection_id,
+            &index_name,
+            &key,
+            Some(Operator::GreaterThan),
+        );
+        assert!(res.is_ok(), "{:?}", res);
+        let (start, end) = res.unwrap();
+        // range (collection-index-key-11111111, collection-next_index-0-00000000)
+        match start {
+            Excluded(start) => {
+                assert_eq!(start.get_document_id().unwrap(), DocumentId::one());
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+        match end {
+            Excluded(end) => {
+                assert_eq!(end.get_document_id().unwrap(), DocumentId::zero());
+                assert_eq!(end.get_index_field_id(), index_name.id + 1);
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+
+        let res = DbStore::generate_range_with_single_field_filter(
+            &collection_id,
+            &index_name,
+            &key,
+            Some(Operator::GreaterThanOrEqual),
+        );
+        assert!(res.is_ok(), "{:?}", res);
+        let (start, end) = res.unwrap();
+        // range [collection-index-key-00000000, collection-next_index-0-00000000)
+        match start {
+            Included(start) => {
+                assert_eq!(start.get_document_id().unwrap(), DocumentId::zero());
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+        match end {
+            Excluded(end) => {
+                assert_eq!(end.get_document_id().unwrap(), DocumentId::zero());
+                assert_eq!(end.get_index_field_id(), index_name.id + 1);
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+
+        let res = DbStore::generate_range_with_single_field_filter(
+            &collection_id,
+            &index_name,
+            &key,
+            Some(Operator::LessThan),
+        );
+        assert!(res.is_ok(), "{:?}", res);
+        let (start, end) = res.unwrap();
+        // range [collection-index-0-00000000, collection-index-key-00000000)
+        match end {
+            Excluded(end) => {
+                assert_eq!(end.get_document_id().unwrap(), DocumentId::zero());
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+
+        match start {
+            Included(start) => {
+                assert_eq!(start.get_document_id().unwrap(), DocumentId::zero());
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+
+        let res = DbStore::generate_range_with_single_field_filter(
+            &collection_id,
+            &index_name,
+            &key,
+            Some(Operator::LessThanOrEqual),
+        );
+        assert!(res.is_ok(), "{:?}", res);
+        let (start, end) = res.unwrap();
+        // range [collection-index-0-00000000, collection-index-key-11111111]
+        match end {
+            Included(end) => {
+                assert_eq!(end.get_document_id().unwrap(), DocumentId::one());
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+        match start {
+            Included(start) => {
+                assert_eq!(start.get_document_id().unwrap(), DocumentId::zero());
+            }
+            _ => {
+                assert!(false);
+            }
         }
     }
 }
