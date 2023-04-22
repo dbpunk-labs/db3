@@ -20,7 +20,7 @@ ethereum-types = { version = "0.14.0", default-features = false }
 prost = "0.11"
 prost-types = "0.11"
 prettytable-rs = "^0.10"
-ed25519-dalek = "1.0.1"
+ed25519-dalek = "2.0.0-rc.2"
 rand = "0.7"
 rand_core = "0.6"
 dirs = "5.0.0"

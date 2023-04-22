@@ -9,7 +9,6 @@ repository = "https://github.com/db3-teams/db3"
 keywords = ["database", "web3", "db3"]
 
 [dependencies]
-
 ethers = { workspace = true }
 db3-proto={path="../proto", version="0.1.0"}
 db3-error={path="../error", version="0.1.0"}

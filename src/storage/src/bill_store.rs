@@ -83,14 +83,13 @@ impl BillStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_base::get_a_static_address;
     use db3_proto::db3_bill_proto::BillType;
     use std::boxed::Box;
     use tempdir::TempDir;
     #[test]
     fn it_apply_bill_test() {
         let tmp_dir_path = TempDir::new("assign_partition").expect("create temp dir");
-        let addr = get_a_static_address();
+        let addr = vec![0; 20];
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
         let target_id: &str = "id";
@@ -100,7 +99,7 @@ mod tests {
             bill_type: BillType::BillForMutation.into(),
             time: 111,
             tx_id: target_id.as_bytes().to_vec(),
-            owner: addr.as_bytes().to_vec(),
+            owner: addr.to_vec(),
             to: vec![],
         };
 
@@ -115,7 +114,7 @@ mod tests {
             bill_type: BillType::BillForMutation.into(),
             time: 111,
             tx_id: target_id.as_bytes().to_vec(),
-            owner: addr.as_bytes().to_vec(),
+            owner: addr.to_vec(),
             to: vec![],
         };
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
