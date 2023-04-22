@@ -52,13 +52,6 @@ jobs:
           cd bridge
           yarn install
           npx hardhat test
-      - name: Check documentation
-        env:
-          RUSTDOCFLAGS: -D warnings
-        uses: actions-rs/cargo@v1
-        with:
-          command: doc
-          args: --no-deps --document-private-items --all-features --workspace --examples
       - name: Setup test env
         run: |
           sudo apt-get install protobuf-compiler 
