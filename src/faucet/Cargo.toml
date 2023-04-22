@@ -16,7 +16,7 @@ eyre = "0.6"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0.64"
 tokio = { version = "1.18", features = ["macros"] }
-redb = "0.14.0"
+redb = "0.15.0"
 db3-proto={ path ="../proto" }
 db3-error={ path = "../error" }
 db3-storage={ path = "../storage" }
