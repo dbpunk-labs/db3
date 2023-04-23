@@ -36,7 +36,6 @@ abigen!(
     DB3RollupContract,
     "bridge/artifacts/contracts/DB3Rollup.sol/DB3Rollup.json"
 );
-
 #[derive(Debug)]
 pub struct EvmChainConfig {
     pub chain_id: u32,
