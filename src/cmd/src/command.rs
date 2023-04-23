@@ -512,6 +512,12 @@ impl DB3ClientCommand {
                         bson_util::json_str_to_index(index_list[idx].as_str(), idx as u32).unwrap(),
                     );
                 }
+                // we currently only support index filter single field
+                for index in index_vec.iter() {
+                    if index.fields.len() != 1 {
+                        return Err("fail to create collection with multi-key index".to_string());
+                    }
+                }
                 let collection = CollectionMutation {
                     index: index_vec.to_owned(),
                     collection_name: name.to_string(),

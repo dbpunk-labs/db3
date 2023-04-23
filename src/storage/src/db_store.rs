@@ -168,6 +168,16 @@ impl DbStore {
         );
         let (db, mut ops) =
             Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id, desc);
+        for c in &db.collections {
+            for index in &c.index_list {
+                if index.fields.len() > 1 {
+                    return Err(DB3Error::ApplyDatabaseError(format!(
+                        "currently not support multi-key index, index fields should be less than 1, but got {}",
+                        index.fields.len()
+                    )));
+                }
+            }
+        }
         let (batches, data_in_bytes) =
             Self::encode_database(dbid, &db, sender, block_id, mutation_id, true)?;
         ops.update_data_size(data_in_bytes as u64);
@@ -1232,6 +1242,43 @@ mod tests {
         println!("{json_data}");
         dm
     }
+    fn build_database_mutation_with_multi_key_index(
+        addr: &DB3Address,
+        collection_name: &str,
+    ) -> DatabaseMutation {
+        let index_field_name = IndexField {
+            field_path: "name".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index_field_age = IndexField {
+            field_path: "age".to_string(),
+            value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
+        };
+
+        let index_name_age = Index {
+            id: 0,
+            name: "idx1".to_string(),
+            fields: vec![index_field_name, index_field_age],
+        };
+
+        let index_mutation = CollectionMutation {
+            index: vec![index_name_age],
+            collection_name: collection_name.to_string(),
+        };
+
+        let dm = DatabaseMutation {
+            meta: None,
+            collection_mutations: vec![index_mutation],
+            document_mutations: vec![],
+            db_address: addr.to_vec(),
+            action: DatabaseAction::CreateDb.into(),
+            db_desc: "".to_string(),
+        };
+        let json_data = serde_json::to_string(&dm).unwrap();
+        println!("{json_data}");
+        dm
+    }
 
     #[test]
     fn collect_field_index_map_ut() {
@@ -1992,6 +2039,21 @@ mod tests {
             r#"ApplyDocumentError("invalid update document mutation, ids and masks size different")"#,
             format!("{:?}", res.err().unwrap())
         );
+    }
+    #[test]
+    fn db_store_create_database_wrong_path() {
+        let tmp_dir_path = TempDir::new("db_store_create_database_test").expect("create temp dir");
+        let addr = gen_address();
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let mut db = Box::pin(merk);
+        let collection_name = "db_store_create_database_test".to_string();
+        let db_mutation =
+            build_database_mutation_with_multi_key_index(&addr, collection_name.as_str());
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+
+        // create DB wrong path
+        let result = DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, 1000, 1);
+        assert!(result.is_err());
     }
 
     #[test]
