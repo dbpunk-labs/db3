@@ -136,14 +136,14 @@ db3>-$ new-db
  database address                           | mutation id
 --------------------------------------------+----------------------------------------------
  0x59cd014b73b81e36daa90f2dee940709474809ac | au3Q+hMreJe2MGXeIjxtKcUFhwJbPDciVyFOZd2bvgQ=
- ```
+```
 
 ```shell
  db3>-$ show-db --addr 0x59cd014b73b81e36daa90f2dee940709474809ac
  # | database address                           | description | sender address                             | related mutations                            | collections
 ---+--------------------------------------------+-------------+--------------------------------------------+----------------------------------------------+-------------
  1 | 0x59cd014b73b81e36daa90f2dee940709474809ac |             | 0x6922f1bf2cbde237e0bf53dda36186e9ed2e5e08 | au3Q+hMreJe2MGXeIjxtKcUFhwJbPDciVyFOZd2bvgQ= |
- ```
+```
 
 **3. Create a  new collection in the database**
 ```shell
@@ -159,7 +159,7 @@ db3>-$ show-collection --addr 0x59cd014b73b81e36daa90f2dee940709474809ac
  name     | index
 ----------+--------------------------------------------------------------------------------------------------------------------------------
  userinfo | {"name":"idx1","id":0,"fields":[{"field_path":"name","value_mode":{"Order":1}},{"field_path":"bio","value_mode":{"Order":2}}]}
- ```
+```
 
  **4. Create a  new doc in the collection**
 ```shell
@@ -168,14 +168,14 @@ send add document done
  mutation id
 ----------------------------------------------
  ct9xhtOtnrbUj+g6c8cppHaKn9RknQNSF5kx0xxw5NQ=
- ```
+```
 
 ```shell
 db3>-$ show-doc --addr 0x59cd014b73b81e36daa90f2dee940709474809ac --collection-name userinfo
  id_base64                            | owner                                      | document                                                                                             | mutation_id
 --------------------------------------+--------------------------------------------+------------------------------------------------------------------------------------------------------+----------------------------------------------
  AQAAAAAAAFy3AAEAAQAAAAAAAF0bAAEAAA== | 0x6922f1bf2cbde237e0bf53dda36186e9ed2e5e08 | Document({"name": String("Bob"), "age": Int64(43), "bio": String("a virtual person in Blockchain")}) | ct9xhtOtnrbUj+g6c8cppHaKn9RknQNSF5kx0xxw5NQ=
- ```
+```
 
 
 **5. Query a  doc by  limit**
@@ -184,16 +184,17 @@ db3>-$ show-doc --addr 0x59cd014b73b81e36daa90f2dee940709474809ac --collection-n
  id_base64                            | owner                                      | document                                                                                             | mutation_id
 --------------------------------------+--------------------------------------------+------------------------------------------------------------------------------------------------------+----------------------------------------------
  AQAAAAAAAFy3AAEAAQAAAAAAAF0bAAEAAA== | 0x6922f1bf2cbde237e0bf53dda36186e9ed2e5e08 | Document({"name": String("Bob"), "age": Int64(43), "bio": String("a virtual person in Blockchain")}) | ct9xhtOtnrbUj+g6c8cppHaKn9RknQNSF5kx0xxw5NQ=
- ```
+```
 ```shell
 db3>-$ show-doc --addr 0x59cd014b73b81e36daa90f2dee940709474809ac --collection-name userinfo  --limit 2
  id_base64                            | owner                                      | document                                                                                               | mutation_id
 --------------------------------------+--------------------------------------------+--------------------------------------------------------------------------------------------------------+----------------------------------------------
  AQAAAAAAAFy3AAEAAQAAAAAAAF0bAAEAAA== | 0x6922f1bf2cbde237e0bf53dda36186e9ed2e5e08 | Document({"name": String("Bob"), "age": Int64(43), "bio": String("a virtual person in Blockchain")})   | ct9xhtOtnrbUj+g6c8cppHaKn9RknQNSF5kx0xxw5NQ=
  AQAAAAAAAFy3AAEAAQAAAAAAAF8YAAEAAA== | 0x6922f1bf2cbde237e0bf53dda36186e9ed2e5e08 | Document({"name": String("alice"), "age": Int64(43), "bio": String("a virtual person in Blockchain")}) | X1Ml6FfwYm9x2ZWXdLCjWrDDk3YlLaOty/pOz/i/icE=
- ```
+```
 
 **6. Query a  doc by  filter**
 ```shell
 db3>-$ show-doc --addr  0x59cd014b73b81e36daa90f2dee940709474809ac  --collection-name  userinfo --filter '{"field": "name", "value": "Bob", "op": "=="}'
 
+```
