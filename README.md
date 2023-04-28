@@ -18,7 +18,7 @@
 
 ## DB3 Network
 
-DB3 Network is a robust and secure **decentralized database network** designed to tackle the expected problems faced by dApps. These applications frequently require the ability to **CRUD** vast amounts of user-generated data, all while maintaining a decentralized architecture. By utilizing DB3 Network, you can effortlessly create data-intensive applications such as social networking apps, gamefi, and more.
+DB3 Network is a robust and secure **decentralized data network** designed to tackle the expected problems faced by dApps. These applications frequently require the ability to **CRUD** vast amounts of user-generated data, all while maintaining a decentralized architecture. By utilizing DB3 Network, you can effortlessly create data-intensive applications such as social networking apps, gamefi, and more.
 
 <p align="center">
  <img width="500px" src="./docs/images/db3_overview.png" align="center"/>
