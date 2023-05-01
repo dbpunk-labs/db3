@@ -149,8 +149,7 @@ message StructuredQuery {
       // A filter on a document field.
       FieldFilter field_filter = 1;
       // A composite filter.
-      // TODO: Support in the future P2
-      // CompositeFilter composite_filter = 2;
+      CompositeFilter composite_filter = 2;
 
       // A filter that takes exactly one argument.
       // TODO: Support in the future P1
@@ -158,6 +157,31 @@ message StructuredQuery {
     }
   }
 
+  // A filter that merges multiple other filters using the given operator.
+  message CompositeFilter {
+    // A composite filter operator.
+    enum Operator {
+      // Unspecified. This value must not be used.
+      OPERATOR_UNSPECIFIED = 0;
+
+      // Documents are required to satisfy all of the combined filters.
+      AND = 1;
+
+      // Documents are required to satisfy at least one of the combined filters.
+      // TODO: support or in the P1
+      // OR = 2;
+    }
+
+    // The operator for combining multiple filters.
+    Operator op = 1;
+
+    // The list of filters to combine.
+    //
+    // Requires:
+    //
+    // * At least one filter is present.
+    repeated Filter filters = 2;
+  }
   // A message that can hold any of the supported value types.
   message Value {
     // Must have a value set.

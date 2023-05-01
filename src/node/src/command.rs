@@ -625,6 +625,11 @@ mod tests {
                     .to_string(),
                 r#"{"name":"idx2","fields":[{"field_path":"age","value_mode":{"Order":1}}]}"#
                     .to_string(),
+                r#"{"name":"idx_name_age","fields":[
+                    {"field_path":"name","value_mode":{"Order":1}},
+                    {"field_path":"age","value_mode":{"Order":1}}
+                ]}"#
+                .to_string(),
             ],
         };
 
@@ -740,6 +745,22 @@ mod tests {
                 r#"{"field": "name", "value": "John Doe", "op": ">"}"#,
                 vec![r#""name": String("Mike")"#],
             ),
+            (
+                r#"{"and":
+                [
+                    {"field": "name", "value": "Bill", "op": "=="},
+                    {"field": "age", "value": 44, "op": "=="}
+                ]}"#,
+                vec![r#""name": String("Bill")"#],
+            ),
+            (
+                r#"{"and":
+                [
+                    {"field": "name", "value": "Bill", "op": "=="},
+                    {"field": "age", "value": 46, "op": "=="}
+                ]}"#,
+                vec![],
+            ),
         ] {
             let cmd = DB3ClientCommand::ShowDocument {
                 addr: addr.clone(),
@@ -747,7 +768,8 @@ mod tests {
                 filter: filter.to_string(),
                 limit: -1,
             };
-            if let Ok(table) = cmd.execute(&mut ctx).await {
+            let res = cmd.execute(&mut ctx).await;
+            if let Ok(table) = res {
                 assert_eq!(exp.len(), table.len());
                 for i in 0..exp.len() {
                     assert!(
@@ -764,7 +786,7 @@ mod tests {
                     );
                 }
             } else {
-                assert!(false)
+                assert!(false, "{:?}", res);
             }
         }
         // run show document --filter = '{"field": "age", "value": 44, "op": "=="}'

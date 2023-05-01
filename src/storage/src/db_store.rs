@@ -24,6 +24,8 @@ use db3_crypto::{
     id::IndexId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
+use db3_proto::db3_database_proto::index::IndexField;
+use db3_proto::db3_database_proto::structured_query::composite_filter::Operator as CompositeOp;
 use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
 use db3_proto::db3_database_proto::structured_query::filter::FilterType;
 use db3_proto::db3_database_proto::{Collection, Database, Document, Index, StructuredQuery};
@@ -168,16 +170,6 @@ impl DbStore {
         );
         let (db, mut ops) =
             Self::new_database(&dbid, sender, tx, mutation, block_id, mutation_id, desc);
-        for c in &db.collections {
-            for index in &c.index_list {
-                if index.fields.len() > 1 {
-                    return Err(DB3Error::ApplyDatabaseError(format!(
-                        "currently not support multi-key index, index fields should be less than 1, but got {}",
-                        index.fields.len()
-                    )));
-                }
-            }
-        }
         let (batches, data_in_bytes) =
             Self::encode_database(dbid, &db, sender, block_id, mutation_id, true)?;
         ops.update_data_size(data_in_bytes as u64);
@@ -686,6 +678,24 @@ impl DbStore {
         field_index_map
     }
 
+    /// check if the fields_names is a prefix of field_indexes
+    /// e.g. fields_names = ["a", "b"]
+    ///     field_indexes = ["a", "b", "c", "d"]
+    fn index_start_with_fields(
+        fields_names: &Vec<String>,
+        field_indexes: &Vec<IndexField>,
+    ) -> bool {
+        if fields_names.len() > field_indexes.len() {
+            return false;
+        }
+
+        for i in 0..fields_names.len() {
+            if fields_names[i] != field_indexes[i].field_path {
+                return false;
+            }
+        }
+        true
+    }
     /// run a query to fetch target documents from given database and collection
     pub fn run_query(
         db: Pin<&Merk>,
@@ -747,6 +757,104 @@ impl DbStore {
                                     Operator::from_i32(field_filter.op),
                                 )?;
                                 Self::execute_query(db, &range, limit)
+                            }
+                            Some(FilterType::CompositeFilter(composite_filter)) => {
+                                match CompositeOp::from_i32(composite_filter.op) {
+                                    Some(CompositeOp::And) => {
+                                        let mut filter_names = vec![];
+                                        let mut keys = vec![];
+
+                                        for filter in composite_filter.filters.iter() {
+                                            match &filter.filter_type {
+                                                Some(FilterType::FieldFilter(field_filter)) => {
+                                                    match &field_filter.value {
+                                                        Some(value) => {
+                                                            if field_filter.op
+                                                                != Operator::Equal as i32
+                                                            {
+                                                                return Err(DB3Error::InvalidFilterValue(
+                                                                    "CompositeOp And only support Equal".to_string(),
+                                                                ));
+                                                            }
+                                                            filter_names.push(
+                                                                field_filter.field.to_string(),
+                                                            );
+                                                            keys.push(bson_util::bson_into_comparison_bytes(
+                                                                &bson_util::bson_value_from_proto_value(value)?,
+                                                            )?);
+                                                        }
+                                                        None => {
+                                                            return Err(DB3Error::InvalidFilterValue(
+                                                                "None field filter value un-support".to_string(),
+                                                            ));
+                                                        }
+                                                    }
+                                                }
+                                                _ => {
+                                                    return Err(DB3Error::InvalidFilterValue(
+                                                        "CompositeOp And only support FieldFilter"
+                                                            .to_string(),
+                                                    ));
+                                                }
+                                            }
+                                        }
+
+                                        if filter_names.is_empty() {
+                                            return Err(DB3Error::InvalidFilterValue(
+                                                "CompositeOp can't support empty filters"
+                                                    .to_string(),
+                                            ));
+                                        }
+
+                                        let index = match field_index_map.get(&filter_names[0]) {
+                                            Some(index_list) => {
+                                                match index_list.iter().find_or_first(|i| {
+                                                    Self::index_start_with_fields(
+                                                        &filter_names,
+                                                        &i.fields,
+                                                    )
+                                                }) {
+                                                    Some(index_match) => index_match,
+                                                    None => {
+                                                        return Err(
+                                                            DB3Error::IndexNotFoundForFiledFilter(
+                                                                filter_names[0].to_string(),
+                                                            ),
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            None => {
+                                                return Err(DB3Error::IndexNotFoundForFiledFilter(
+                                                    filter_names[0].to_string(),
+                                                ));
+                                            }
+                                        };
+                                        debug!("filter names: {:?}", filter_names);
+                                        debug!("keys: {:?}", keys);
+                                        debug!("index: {:?}", index);
+                                        let mut key = vec![];
+
+                                        for k in keys {
+                                            key.extend_from_slice(k.as_slice());
+                                        }
+
+                                        let range = Self::generate_range_with_single_field_filter(
+                                            &collection_id,
+                                            index,
+                                            &key,
+                                            Some(Operator::Equal),
+                                        )?;
+                                        debug!("range: {:?}", range);
+                                        Self::execute_query(db, &range, limit)
+                                    }
+                                    _ => {
+                                        return Err(DB3Error::InvalidFilterType(format!(
+                                            "Invalid composite op {:?}",
+                                            CompositeOp::from_i32(composite_filter.op)
+                                        )));
+                                    }
+                                }
                             }
                             None => {
                                 return Err(DB3Error::InvalidFilterType(
@@ -1095,7 +1203,7 @@ mod tests {
     use db3_crypto::key_derive;
     use db3_crypto::signature_scheme::SignatureScheme;
     use db3_proto::db3_database_proto::structured_query::{
-        value::ValueType, FieldFilter, Filter, Limit, Projection, Value,
+        value::ValueType, CompositeFilter, FieldFilter, Filter, Limit, Projection, Value,
     };
     use db3_proto::db3_database_proto::{
         index::index_field::{Order, ValueMode},
@@ -1242,6 +1350,7 @@ mod tests {
         println!("{json_data}");
         dm
     }
+
     fn build_database_mutation_with_multi_key_index(
         addr: &DB3Address,
         collection_name: &str,
@@ -1391,7 +1500,289 @@ mod tests {
     }
 
     #[test]
-    fn db_store_run_query_test() {
+    fn db_store_run_composite_filter_query_test() {
+        let tmp_dir_path =
+            TempDir::new("db_store_run_composite_filter_query_test").expect("create temp dir");
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let mut db = Box::pin(merk);
+        let collection_name = "db_store_run_composite_filter_query_test".to_string();
+        let block_id: u64 = 1001;
+
+        // create DB Test
+        let addr = gen_address();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        let db_mutation = build_database_mutation_with_multi_key_index(
+            &db_id.address(),
+            collection_name.as_str(),
+        );
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result =
+            DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, block_id, 1);
+        assert!(result.is_ok());
+
+        // add 4 documents into collection
+        let db_mutation = build_add_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![
+                r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+            ],
+        );
+
+        // add document test
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let (_, ids) =
+            DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, block_id, 2).unwrap();
+        assert_eq!(4, ids.len());
+
+        // test query with composite filter
+        for (name, age, exp) in [
+            // Select * from collection where name = "Bill" and age = 44
+            ("Bill", 44, vec![("Bill", 44)]),
+            // Select * from collection where name = "Bill" and age = 45
+            ("Bill", 45, vec![("Bill", 45)]),
+            // Select * from collection where name = "Bill" and age = 46
+            ("Bill", 46, vec![]),
+            // Select * from collection where name = "Mike" and age = 44
+            ("Mike", 44, vec![("Mike", 44)]),
+        ] {
+            let query = StructuredQuery {
+                collection_name: collection_name.to_string(),
+                select: Some(Projection { fields: vec![] }),
+                r#where: Some(Filter {
+                    filter_type: Some(FilterType::CompositeFilter(CompositeFilter {
+                        filters: vec![
+                            Filter {
+                                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                                    field: "name".to_string(),
+                                    op: Operator::Equal.into(),
+                                    value: Some(Value {
+                                        value_type: Some(ValueType::StringValue(name.to_string())),
+                                    }),
+                                })),
+                            },
+                            Filter {
+                                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                                    field: "age".to_string(),
+                                    op: Operator::Equal.into(),
+                                    value: Some(Value {
+                                        value_type: Some(ValueType::IntegerValue(age as i64)),
+                                    }),
+                                })),
+                            },
+                        ],
+                        op: CompositeOp::And.into(),
+                    })),
+                }),
+                limit: None,
+            };
+            let docs = DbStore::run_query(db.as_ref(), &db_id, &query).unwrap();
+            assert_eq!(exp.len(), docs.len(), "run query fail for {:?}", query);
+            for i in 0..exp.len() {
+                let document = bson_util::bytes_to_bson_document(docs[i].doc.clone()).unwrap();
+                assert_eq!(
+                    exp[i].0,
+                    document.get_str("name").unwrap(),
+                    "run query fail for {:?}",
+                    query
+                );
+                assert_eq!(
+                    exp[i].1,
+                    document.get_i64("age").unwrap(),
+                    "run query fail for {:?}",
+                    query
+                );
+            }
+        }
+    }
+    #[test]
+    fn db_store_run_composite_filter_query_wrong_path_test() {
+        let tmp_dir_path = TempDir::new("db_store_run_composite_filter_query_wrong_path_test")
+            .expect("create temp dir");
+        let merk = Merk::open(tmp_dir_path).unwrap();
+        let mut db = Box::pin(merk);
+        let collection_name = "db_store_run_composite_filter_query_wrong_path_test".to_string();
+        let block_id: u64 = 1001;
+
+        // create DB Test
+        let addr = gen_address();
+        let db_id = DbId::try_from((&addr, 1)).unwrap();
+        let db_mutation = build_database_mutation_with_multi_key_index(
+            &db_id.address(),
+            collection_name.as_str(),
+        );
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let result =
+            DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, block_id, 1);
+        assert!(result.is_ok());
+
+        // add 4 documents into collection
+        let db_mutation = build_add_document_mutation(
+            db_id.address(),
+            collection_name.as_str(),
+            vec![
+                r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Mike",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 44,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+                r#"
+        {
+            "name": "Bill",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
+            ],
+        );
+
+        // add document test
+        let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
+        let (_, ids) =
+            DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, block_id, 2).unwrap();
+        assert_eq!(4, ids.len());
+
+        // test query with composite filter
+        for (name, name_op, age, age_op, composite_op, is_ok) in [
+            // Select * from collection where name = "Bill" and age = 44
+            (
+                "Bill",
+                Operator::Equal,
+                44,
+                Operator::Equal,
+                CompositeOp::And,
+                true,
+            ),
+            (
+                "Bill",
+                Operator::Equal,
+                44,
+                Operator::Equal,
+                CompositeOp::Unspecified,
+                false,
+            ),
+            (
+                "Bill",
+                Operator::LessThan,
+                44,
+                Operator::Equal,
+                CompositeOp::And,
+                false,
+            ),
+            (
+                "Bill",
+                Operator::Equal,
+                44,
+                Operator::LessThan,
+                CompositeOp::And,
+                false,
+            ),
+        ] {
+            let query = StructuredQuery {
+                collection_name: collection_name.to_string(),
+                select: Some(Projection { fields: vec![] }),
+                r#where: Some(Filter {
+                    filter_type: Some(FilterType::CompositeFilter(CompositeFilter {
+                        filters: vec![
+                            Filter {
+                                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                                    field: "name".to_string(),
+                                    op: name_op.into(),
+                                    value: Some(Value {
+                                        value_type: Some(ValueType::StringValue(name.to_string())),
+                                    }),
+                                })),
+                            },
+                            Filter {
+                                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+                                    field: "age".to_string(),
+                                    op: age_op.into(),
+                                    value: Some(Value {
+                                        value_type: Some(ValueType::IntegerValue(age as i64)),
+                                    }),
+                                })),
+                            },
+                        ],
+                        op: composite_op.into(),
+                    })),
+                }),
+                limit: None,
+            };
+            let res = DbStore::run_query(db.as_ref(), &db_id, &query);
+            assert_eq!(is_ok, res.is_ok());
+            println!("res: {:?}", res);
+        }
+    }
+
+    #[test]
+    fn db_store_run_simple_query_test() {
         let tmp_dir_path = TempDir::new("db_store_run_query_test").expect("create temp dir");
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
@@ -2040,20 +2431,22 @@ mod tests {
             format!("{:?}", res.err().unwrap())
         );
     }
+
     #[test]
-    fn db_store_create_database_wrong_path() {
-        let tmp_dir_path = TempDir::new("db_store_create_database_test").expect("create temp dir");
+    fn db_store_create_database_happy_path() {
+        let tmp_dir_path =
+            TempDir::new("db_store_create_database_happy_path").expect("create temp dir");
         let addr = gen_address();
         let merk = Merk::open(tmp_dir_path).unwrap();
         let mut db = Box::pin(merk);
-        let collection_name = "db_store_create_database_test".to_string();
+        let collection_name = "db_store_create_database_happy_path".to_string();
         let db_mutation =
             build_database_mutation_with_multi_key_index(&addr, collection_name.as_str());
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
 
         // create DB wrong path
         let result = DbStore::apply_mutation(db_m, &addr, 1, &TxId::zero(), &db_mutation, 1000, 1);
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]

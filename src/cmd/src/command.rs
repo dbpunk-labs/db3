@@ -513,11 +513,11 @@ impl DB3ClientCommand {
                     );
                 }
                 // we currently only support index filter single field
-                for index in index_vec.iter() {
-                    if index.fields.len() != 1 {
-                        return Err("fail to create collection with multi-key index".to_string());
-                    }
-                }
+                // for index in index_vec.iter() {
+                //     if index.fields.len() != 1 {
+                //         return Err("fail to create collection with multi-key index".to_string());
+                //     }
+                // }
                 let collection = CollectionMutation {
                     index: index_vec.to_owned(),
                     collection_name: name.to_string(),
