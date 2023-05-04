@@ -102,20 +102,10 @@ DB3 Network is a layer2 network on Ethereum and Ethereum guards all the assets.
 
 Together, we can make db3 network better!
 
-# The internal of db3
-
-![relationship](./docs/images/db3-overview.svg)
-
-# The Architecture
-
-![arch](./docs/images/db3-architecture.svg)
 
 # How it works
 
-- [mutation](./docs/old/mutation.md)
-- [query session](./docs/old/query.md)
-- [dvm](./docs/old/dvm.md)
-- [merkdb](https://github.com/dbpunk-labs/db3/issues/100)
+go to the [dips](https://github.com/dbpunk-labs/DIPs) for more 
 
 # Other Decentralized Database
 
