@@ -21,7 +21,7 @@ use bytes::BytesMut;
 use db3_base::bson_util;
 use db3_crypto::{
     db3_address::DB3Address, id::CollectionId, id::DbId, id::DocumentEntryId, id::DocumentId,
-    id::IndexId, id::TxId,
+    id::FieldKey, id::IndexId, id::TxId,
 };
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_proto::index::IndexField;
@@ -605,7 +605,7 @@ impl DbStore {
                                     let index_id = IndexId::create(
                                         &collection_id,
                                         index.id,
-                                        &old_key,
+                                        &old_key.as_ref(),
                                         &document_id,
                                     )?;
                                     // remove old index entry
@@ -620,7 +620,7 @@ impl DbStore {
                                     let index_id = IndexId::create(
                                         &collection_id,
                                         index.id,
-                                        &new_key,
+                                        &new_key.as_ref(),
                                         &document_id,
                                     )?;
                                     // add new index entry
@@ -741,9 +741,9 @@ impl DbStore {
                                 };
 
                                 let key = match &field_filter.value {
-                                    Some(value) => bson_util::bson_into_comparison_bytes(
-                                        &bson_util::bson_value_from_proto_value(value)?,
-                                    )?,
+                                    Some(value) => FieldKey::create_single_key(Some(
+                                        bson_util::bson_value_from_proto_value(value)?,
+                                    ))?,
                                     None => {
                                         return Err(DB3Error::InvalidFilterValue(
                                             "None field filter value un-support".to_string(),
@@ -753,7 +753,7 @@ impl DbStore {
                                 let range = Self::generate_range_with_single_field_filter(
                                     &collection_id,
                                     index,
-                                    &key,
+                                    key.as_ref(),
                                     Operator::from_i32(field_filter.op),
                                 )?;
                                 Self::execute_query(db, &range, limit)
@@ -761,8 +761,8 @@ impl DbStore {
                             Some(FilterType::CompositeFilter(composite_filter)) => {
                                 match CompositeOp::from_i32(composite_filter.op) {
                                     Some(CompositeOp::And) => {
-                                        let mut filter_names = vec![];
-                                        let mut keys = vec![];
+                                        let mut fields_names = vec![];
+                                        let mut fields_values = vec![];
 
                                         for filter in composite_filter.filters.iter() {
                                             match &filter.filter_type {
@@ -776,12 +776,11 @@ impl DbStore {
                                                                     "CompositeOp And only support Equal".to_string(),
                                                                 ));
                                                             }
-                                                            filter_names.push(
+                                                            fields_names.push(
                                                                 field_filter.field.to_string(),
                                                             );
-                                                            keys.push(bson_util::bson_into_comparison_bytes(
-                                                                &bson_util::bson_value_from_proto_value(value)?,
-                                                            )?);
+                                                            fields_values.push(Some(
+                                                                bson_util::bson_value_from_proto_value(value)?));
                                                         }
                                                         None => {
                                                             return Err(DB3Error::InvalidFilterValue(
@@ -799,18 +798,18 @@ impl DbStore {
                                             }
                                         }
 
-                                        if filter_names.is_empty() {
+                                        if fields_names.is_empty() {
                                             return Err(DB3Error::InvalidFilterValue(
                                                 "CompositeOp can't support empty filters"
                                                     .to_string(),
                                             ));
                                         }
-
-                                        let index = match field_index_map.get(&filter_names[0]) {
+                                        let key = FieldKey::create(&fields_values)?;
+                                        let index = match field_index_map.get(&fields_names[0]) {
                                             Some(index_list) => {
                                                 match index_list.iter().find_or_first(|i| {
                                                     Self::index_start_with_fields(
-                                                        &filter_names,
+                                                        &fields_names,
                                                         &i.fields,
                                                     )
                                                 }) {
@@ -818,7 +817,7 @@ impl DbStore {
                                                     None => {
                                                         return Err(
                                                             DB3Error::IndexNotFoundForFiledFilter(
-                                                                filter_names[0].to_string(),
+                                                                fields_names[0].to_string(),
                                                             ),
                                                         );
                                                     }
@@ -826,23 +825,17 @@ impl DbStore {
                                             }
                                             None => {
                                                 return Err(DB3Error::IndexNotFoundForFiledFilter(
-                                                    filter_names[0].to_string(),
+                                                    fields_names[0].to_string(),
                                                 ));
                                             }
                                         };
-                                        debug!("filter names: {:?}", filter_names);
-                                        debug!("keys: {:?}", keys);
+                                        debug!("filter names: {:?}", fields_names);
                                         debug!("index: {:?}", index);
-                                        let mut key = vec![];
-
-                                        for k in keys {
-                                            key.extend_from_slice(k.as_slice());
-                                        }
 
                                         let range = Self::generate_range_with_single_field_filter(
                                             &collection_id,
                                             index,
-                                            &key,
+                                            key.as_ref(),
                                             Some(Operator::Equal),
                                         )?;
                                         debug!("range: {:?}", range);
@@ -1565,6 +1558,16 @@ mod tests {
             ]
         }"#
                 .to_string(),
+                r#"
+        {
+            "name": "",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
             ],
         );
 
@@ -1572,7 +1575,7 @@ mod tests {
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let (_, ids) =
             DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, block_id, 2).unwrap();
-        assert_eq!(4, ids.len());
+        assert_eq!(5, ids.len());
 
         // test query with composite filter
         for (name, age, exp) in [
@@ -1584,6 +1587,10 @@ mod tests {
             ("Bill", 46, vec![]),
             // Select * from collection where name = "Mike" and age = 44
             ("Mike", 44, vec![("Mike", 44)]),
+            // Select * from collection where name = "" and age = 45
+            ("", 45, vec![("", 45)]),
+            // Select * from collection where name = "" and age = 46
+            ("", 46, vec![]),
         ] {
             let query = StructuredQuery {
                 collection_name: collection_name.to_string(),
@@ -1700,6 +1707,16 @@ mod tests {
             ]
         }"#
                 .to_string(),
+                r#"
+        {
+            "name": "",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
             ],
         );
 
@@ -1707,7 +1724,7 @@ mod tests {
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let (_, ids) =
             DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, block_id, 2).unwrap();
-        assert_eq!(4, ids.len());
+        assert_eq!(5, ids.len());
 
         // test query with composite filter
         for (name, name_op, age, age_op, composite_op, is_ok) in [
@@ -1716,6 +1733,14 @@ mod tests {
                 "Bill",
                 Operator::Equal,
                 44,
+                Operator::Equal,
+                CompositeOp::And,
+                true,
+            ),
+            (
+                "",
+                Operator::Equal,
+                45,
                 Operator::Equal,
                 CompositeOp::And,
                 true,
@@ -1843,6 +1868,16 @@ mod tests {
             ]
         }"#
                 .to_string(),
+                r#"
+        {
+            "name": "",
+            "age": 45,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+                .to_string(),
             ],
         );
 
@@ -1850,7 +1885,7 @@ mod tests {
         let db_m: Pin<&mut Merk> = Pin::as_mut(&mut db);
         let (_, ids) =
             DbStore::add_document(db_m, &addr, &TxId::zero(), &db_mutation, block_id, 2).unwrap();
-        assert_eq!(4, ids.len());
+        assert_eq!(5, ids.len());
 
         // run query db not exist
         let query = StructuredQuery {
@@ -1882,7 +1917,7 @@ mod tests {
         };
         let res = DbStore::run_query(db.as_ref(), &db_id, &query);
         assert!(res.is_ok(), "{:?}", res);
-        assert_eq!(4, res.unwrap().len());
+        assert_eq!(5, res.unwrap().len());
 
         // run query: select * from collection limit 2
         let query = StructuredQuery {
@@ -1896,13 +1931,19 @@ mod tests {
 
         // test query with ==, <, <=, >, >= condition
         for (field, value_str, op, exp) in [
+            ("name", "", Operator::Equal, vec![""]),
             ("name", "Bill", Operator::Equal, vec!["Bill", "Bill"]),
-            ("name", "John Doe", Operator::LessThan, vec!["Bill", "Bill"]),
+            (
+                "name",
+                "John Doe",
+                Operator::LessThan,
+                vec!["", "Bill", "Bill"],
+            ),
             (
                 "name",
                 "John Doe",
                 Operator::LessThanOrEqual,
-                vec!["Bill", "Bill", "John Doe"],
+                vec!["", "Bill", "Bill", "John Doe"],
             ),
             (
                 "name",
@@ -2616,12 +2657,12 @@ mod tests {
             name: "idx1".to_string(),
             fields: vec![index_field_name],
         };
-        let key = bson_util::bson_into_comparison_bytes(&Bson::String("Bill".to_string())).unwrap();
+        let key = FieldKey::create_single_key(Some(Bson::String("Bill".to_string()))).unwrap();
 
         let res = DbStore::generate_range_with_single_field_filter(
             &collection_id,
             &index_name,
-            &key,
+            &key.as_ref(),
             Some(Operator::Equal),
         );
         assert!(res.is_ok(), "{:?}", res);
@@ -2647,7 +2688,7 @@ mod tests {
         let res = DbStore::generate_range_with_single_field_filter(
             &collection_id,
             &index_name,
-            &key,
+            &key.as_ref(),
             Some(Operator::GreaterThan),
         );
         assert!(res.is_ok(), "{:?}", res);
@@ -2674,7 +2715,7 @@ mod tests {
         let res = DbStore::generate_range_with_single_field_filter(
             &collection_id,
             &index_name,
-            &key,
+            &key.as_ref(),
             Some(Operator::GreaterThanOrEqual),
         );
         assert!(res.is_ok(), "{:?}", res);
@@ -2701,7 +2742,7 @@ mod tests {
         let res = DbStore::generate_range_with_single_field_filter(
             &collection_id,
             &index_name,
-            &key,
+            &key.as_ref(),
             Some(Operator::LessThan),
         );
         assert!(res.is_ok(), "{:?}", res);
@@ -2728,7 +2769,7 @@ mod tests {
         let res = DbStore::generate_range_with_single_field_filter(
             &collection_id,
             &index_name,
-            &key,
+            &key.as_ref(),
             Some(Operator::LessThanOrEqual),
         );
         assert!(res.is_ok(), "{:?}", res);
