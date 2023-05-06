@@ -17,13 +17,15 @@
 
 use crate::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use base64ct::Encoding as _;
-use byteorder::ReadBytesExt;
-use byteorder::{BigEndian, WriteBytesExt};
+use bson::Bson;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use bytes::Buf;
 use db3_error::{DB3Error, Result};
 use fastcrypto::hash::{HashFunction, Sha3_256};
 use rust_secp256k1::hashes::{sha256, Hash};
 use rust_secp256k1::ThirtyTwoByteHash;
 use std::fmt;
+use std::io::Cursor;
 
 // it's ethereum compatiable account id
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
@@ -152,6 +154,9 @@ pub const INDEX_FIELD_ID_LENGTH: usize = 4;
 pub const OP_ENTRY_ID_LENGTH: usize = 12;
 pub const DOCUMENT_ID_TYPE_ID: i8 = 1;
 pub const INDEX_ID_TYPE_ID: i8 = 2;
+
+/// FieldTypeId := 1 bytes
+pub const FIELD_TYPE_ID_LENGTH: usize = 1;
 
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
 pub struct OpEntryId {
@@ -318,6 +323,265 @@ impl fmt::Display for DocumentId {
         write!(f, "DOC|{}|{}", collection_id, document_entry_id)
     }
 }
+pub enum FieldTypeId {
+    Null = 0x01,
+    Bool = 0x02,
+    I32 = 0x03,
+    I64 = 0x04,
+    F32 = 0x05,
+    F64 = 0x06,
+    DateTime = 0x07,
+    String = 0x0a,
+}
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Clone, Debug)]
+pub struct FieldKey {
+    data: Vec<u8>,
+}
+impl FieldKey {
+    fn encode_i32(input: i32) -> u32 {
+        match input < 0 {
+            true => {
+                if input == i32::MIN {
+                    0
+                } else {
+                    let new_input = input as u32;
+                    (new_input & 0x7fffffff) as u32
+                }
+            }
+            false => {
+                let new_input = input as u32;
+                (new_input | 0x80000000) as u32
+            }
+        }
+    }
+    fn decode_u32(input: u32) -> i32 {
+        if input == 0 {
+            i32::MIN
+        } else {
+            if input as i32 > 0 {
+                (input | 0x80000000) as i32
+            } else {
+                (input & 0x7fffffff) as i32
+            }
+        }
+    }
+
+    fn encode_i64(input: i64) -> u64 {
+        match input < 0 {
+            true => {
+                if input == i64::MIN {
+                    0
+                } else {
+                    let new_input = input as u64;
+                    (new_input & 0x7fffffffffffffff) as u64
+                }
+            }
+            false => {
+                let new_input = input as u64;
+                (new_input | 0x8000000000000000) as u64
+            }
+        }
+    }
+    fn decode_u64(input: u64) -> i64 {
+        if input == 0 {
+            i64::MIN
+        } else {
+            if input as i64 > 0 {
+                (input | 0x8000000000000000) as i64
+            } else {
+                (input & 0x7fffffffffffffff) as i64
+            }
+        }
+    }
+
+    fn add(&mut self, field: &Option<Bson>) -> std::result::Result<(), DB3Error> {
+        match field {
+            None => {
+                self.data
+                    .write_u8(FieldTypeId::Null as u8)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+            }
+
+            Some(Bson::Boolean(b)) => {
+                self.data
+                    .write_u8(FieldTypeId::Bool as u8)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.data
+                    .write_u8(*b as u8)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+            }
+            Some(Bson::Int64(n)) => {
+                self.data
+                    .write_u8(FieldTypeId::I64 as u8)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.data
+                    .write_u64::<BigEndian>(Self::encode_i64(*n))
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+            }
+            Some(Bson::Int32(n)) => {
+                self.data
+                    .write_u8(FieldTypeId::I32 as u8)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.data
+                    .write_u32::<BigEndian>(Self::encode_i32(*n))
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+            }
+            // TODO: add \0 as the end of string.
+            Some(Bson::String(s)) => {
+                self.data
+                    .write_u8(FieldTypeId::String as u8)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.data.extend_from_slice(s.as_bytes());
+                self.data.extend_from_slice(&[0]);
+            }
+            Some(Bson::DateTime(dt)) => {
+                self.data
+                    .write_u8(FieldTypeId::DateTime as u8)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                let value: u64 = Self::encode_i64(dt.timestamp_millis());
+                self.data
+                    .write_u64::<BigEndian>(value)
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+            }
+            _ => {
+                return Err(DB3Error::DocumentDecodeError(
+                    "value type is not supported".to_string(),
+                ))
+            }
+        }
+        Ok(())
+    }
+
+    pub fn new() -> Self {
+        Self { data: Vec::new() }
+    }
+
+    pub fn create(fields: &Vec<Option<Bson>>) -> std::result::Result<Self, DB3Error> {
+        let mut key = Self::new();
+        if fields.len() > 16 {
+            return Err(DB3Error::DocumentDecodeError(format!(
+                "field length is over 16"
+            )));
+        }
+        for field in fields {
+            key.add(&field)?;
+        }
+        Ok(key)
+    }
+    pub fn create_single_key(field: Option<Bson>) -> std::result::Result<Self, DB3Error> {
+        Self::create(&vec![field])
+    }
+    fn read_next_field(
+        cursor: &mut Cursor<Vec<u8>>,
+    ) -> std::result::Result<Option<Bson>, DB3Error> {
+        let field_type = cursor
+            .read_u8()
+            .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+        match field_type {
+            0x01 => Ok(None),
+            0x02 => {
+                let value = cursor
+                    .read_u8()
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                Ok(Some(Bson::Boolean(value != 0)))
+            }
+            0x03 => {
+                let value = cursor
+                    .read_u32::<BigEndian>()
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                Ok(Some(Bson::Int32(Self::decode_u32(value))))
+            }
+            0x04 => {
+                let value = cursor
+                    .read_u64::<BigEndian>()
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                Ok(Some(Bson::Int64(Self::decode_u64(value))))
+            }
+            0x07 => {
+                let value = cursor
+                    .read_u64::<BigEndian>()
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                Ok(Some(Bson::DateTime(bson::DateTime::from_millis(
+                    Self::decode_u64(value),
+                ))))
+            }
+            0x0a => {
+                let mut buf = vec![];
+                while cursor.has_remaining() {
+                    let c = cursor
+                        .read_u8()
+                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                    if c == 0 {
+                        let value = String::from_utf8(buf)
+                            .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                        return Ok(Some(Bson::String(value)));
+                    }
+                    buf.push(c);
+                }
+
+                Err(DB3Error::DocumentDecodeError(
+                    "string field is not terminated by \0".to_string(),
+                ))
+            }
+            _ => Err(DB3Error::DocumentDecodeError(
+                "field type is not supported".to_string(),
+            )),
+        }
+    }
+    /// extract_fields extract fields from a key.
+    pub fn extract_fields(&self) -> std::result::Result<Vec<Option<Bson>>, DB3Error> {
+        if self.data.len() == 0 {
+            return Ok(Vec::new());
+        }
+        let mut fields = Vec::new();
+        let mut cursor = Cursor::new(self.data.clone());
+        while cursor.has_remaining() {
+            match Self::read_next_field(&mut cursor) {
+                Ok(field) => {
+                    fields.push(field);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(fields)
+    }
+    pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
+        Ok(Self {
+            data: data.to_vec(),
+        })
+    }
+}
+
+impl AsRef<Vec<u8>> for FieldKey {
+    fn as_ref(&self) -> &Vec<u8> {
+        &self.data
+    }
+}
+impl fmt::Display for FieldKey {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Customize so only `x` and `y` are denoted.
+        match self.extract_fields() {
+            Ok(fields) => {
+                let key_string = fields
+                    .iter()
+                    .map(|f| match f {
+                        Some(Bson::String(s)) => format!("{}", s).to_string(),
+                        Some(Bson::Int32(i)) => format!("{}", i).to_string(),
+                        Some(Bson::Int64(i)) => format!("{}", i).to_string(),
+                        Some(Bson::Boolean(b)) => format!("{}", b).to_string(),
+                        Some(Bson::DateTime(d)) => format!("{}", d).to_string(),
+                        None => "null".to_string(),
+                        _ => "NA".to_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join("#")
+                    .to_string();
+                write!(f, "{}", key_string)
+            }
+            Err(_) => write!(f, "NA"),
+        }
+    }
+}
 /// DocumentId := CollectionId + IndexFieldId + KeyBytes + DocumentEntryId
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Clone, Debug)]
 pub struct IndexId {
@@ -360,9 +624,12 @@ impl IndexId {
         u32::from_be_bytes(x)
     }
 
-    pub fn get_key(&self) -> std::result::Result<&str, DB3Error> {
-        // TODO: format get key
-        todo!()
+    pub fn get_key(&self) -> std::result::Result<FieldKey, DB3Error> {
+        FieldKey::try_from_bytes(
+            self.data[TYPE_ID_LENGTH + OP_ENTRY_ID_LENGTH + INDEX_FIELD_ID_LENGTH
+                ..self.data.len() - DOCUMENT_ID_LENGTH]
+                .as_ref(),
+        )
     }
 }
 impl AsRef<Vec<u8>> for IndexId {
@@ -375,12 +642,13 @@ impl fmt::Display for IndexId {
         // Customize so only `x` and `y` are denoted.
         let collection_id = self.get_collection_id().map_err(|e| e).unwrap();
         let document_id = self.get_document_id().map_err(|e| e).unwrap();
+        let field_key = self.get_key().map_err(|e| e).unwrap();
         write!(
             f,
             "INDEX|{}|{}|{}|{}",
             collection_id,
             self.get_index_field_id(),
-            "KEY_HIDE",
+            field_key,
             document_id
         )
     }
@@ -477,7 +745,7 @@ impl TryFrom<(&DB3Address, u64)> for DbId {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use chrono::Utc;
     #[test]
     fn it_works() {}
 
@@ -526,19 +794,16 @@ mod tests {
         let collection_id = CollectionId::create(1000, 100, 10).unwrap();
         let document_entry_id = DocumentEntryId::create(999, 99, 9).unwrap();
         let document_id = DocumentId::create(&collection_id, &document_entry_id).unwrap();
-
-        let index_id = IndexId::create(
-            &collection_id,
-            3,
-            "key_content".as_bytes().as_ref(),
-            &document_id,
-        )
-        .unwrap();
+        let field_key =
+            FieldKey::create_single_key(Some(Bson::String("key_content".to_string()))).unwrap();
+        let index_id =
+            IndexId::create(&collection_id, 3, &field_key.as_ref(), &document_id).unwrap();
         assert_eq!(collection_id, index_id.get_collection_id().unwrap());
         assert_eq!(document_id, index_id.get_document_id().unwrap());
         assert_eq!(3, index_id.get_index_field_id());
+        assert_eq!(field_key, index_id.get_key().unwrap());
         assert_eq!(
-            "INDEX|1000-100-10|3|KEY_HIDE|DOC|1000-100-10|999-99-9",
+            "INDEX|1000-100-10|3|key_content|DOC|1000-100-10|999-99-9",
             index_id.to_string()
         );
     }
@@ -565,5 +830,163 @@ mod tests {
         assert_eq!(b64_str.as_str(), "AAAAAAAAAAEAAg==");
         let (start, end) = BillId::get_block_range(1).unwrap();
         assert!(start.as_ref().cmp(end.as_ref()) == std::cmp::Ordering::Less);
+    }
+
+    /// helper method to adapter unit test
+    fn bson_into_comparison_bytes(field: &Bson) -> std::result::Result<FieldKey, DB3Error> {
+        let key = FieldKey::create(&vec![Some(field.clone())])?;
+        let extract_field = key.extract_fields()?[0].clone().unwrap();
+        assert_eq!(extract_field, field.clone());
+        Ok(key)
+    }
+
+    #[test]
+    fn i64_bson_into_comparison_bytes_ut() {
+        let i64_neg_2 = bson_into_comparison_bytes(&Bson::Int64(-2)).unwrap();
+        let i64_neg_1 = bson_into_comparison_bytes(&Bson::Int64(-1)).unwrap();
+        let i64_small_value1 = -(0x7F00000000000000 as i64);
+        let i64_small_1 = bson_into_comparison_bytes(&Bson::Int64(i64_small_value1)).unwrap();
+        let i64_small_value2 = -(0x7000000000000000 as i64);
+        let i64_small_2 = bson_into_comparison_bytes(&Bson::Int64(i64_small_value2)).unwrap();
+        let i64_0 = bson_into_comparison_bytes(&Bson::Int64(0)).unwrap();
+        let i64_1 = bson_into_comparison_bytes(&Bson::Int64(1)).unwrap();
+        let i64_big_value1 =
+            bson_into_comparison_bytes(&Bson::Int64(0x7000000000000000 as i64)).unwrap();
+        let i64_big_value2 =
+            bson_into_comparison_bytes(&Bson::Int64(0x7F00000000000000 as i64)).unwrap();
+        let i64_max = bson_into_comparison_bytes(&Bson::Int64(i64::MAX)).unwrap();
+        let i64_min = bson_into_comparison_bytes(&Bson::Int64(i64::MIN)).unwrap();
+        println!("i64_min: {:?}", i64_min);
+        println!("{} i64_small_value1: {:?}", i64_small_value1, i64_small_1);
+        println!("{} i64_small_value2: {:?}", i64_small_value2, i64_small_2);
+        println!("i64_-2: {:?}", i64_neg_2);
+        println!("i64_-1: {:?}", i64_neg_1);
+        println!("i64_0: {:?}", i64_0);
+        println!("i64_1: {:?}", i64_1);
+        println!(
+            "{} i64_big_value1: {:?}",
+            0x7000000000000000 as i64, i64_big_value1
+        );
+        println!(
+            "{} i64_big_value2: {:?}",
+            0x7F00000000000000 as i64, i64_big_value2
+        );
+        println!("i64_max: {:?}", i64_max);
+
+        assert!(i64_min < i64_small_1);
+        assert!(i64_small_1 < i64_small_2);
+        assert!(i64_small_2 < i64_neg_1);
+        assert!(i64_neg_2 < i64_1);
+        assert!(i64_neg_1 < i64_0);
+        assert!(i64_0 < i64_1);
+        assert!(i64_1 < i64_big_value1);
+        assert!(i64_big_value1 < i64_big_value2);
+        assert!(i64_big_value2 < i64_max);
+    }
+
+    #[test]
+    fn i32_bson_into_comparison_bytes_ut() {
+        let i32_small_value1 = -(0x7F000000 as i32);
+        let i32_small_1 = bson_into_comparison_bytes(&Bson::Int32(i32_small_value1)).unwrap();
+        let i32_small_value2 = -(0x70000000 as i32);
+        let i32_small_2 = bson_into_comparison_bytes(&Bson::Int32(i32_small_value2)).unwrap();
+        let i32_neg_2 = bson_into_comparison_bytes(&Bson::Int32(-2)).unwrap();
+        let i32_neg_1 = bson_into_comparison_bytes(&Bson::Int32(-1)).unwrap();
+        let i32_0 = bson_into_comparison_bytes(&Bson::Int32(0)).unwrap();
+        let i32_1 = bson_into_comparison_bytes(&Bson::Int32(1)).unwrap();
+        let i32_big_value1 = bson_into_comparison_bytes(&Bson::Int32(0x70000000 as i32)).unwrap();
+        let i32_big_value2 = bson_into_comparison_bytes(&Bson::Int32(0x7F000000 as i32)).unwrap();
+        let i32_max = bson_into_comparison_bytes(&Bson::Int32(i32::MAX)).unwrap();
+        let i32_min = bson_into_comparison_bytes(&Bson::Int32(i32::MIN)).unwrap();
+
+        println!("i32_min: {:?}", i32_min);
+        println!("{} i32_small_1: {:?}", i32_small_value1, i32_small_1);
+        println!("{} i32_small_2: {:?}", i32_small_value2, i32_small_2);
+        println!("i32_-2: {:?}", i32_neg_2);
+        println!("i32_-1: {:?}", i32_neg_1);
+        println!("i32_0: {:?}", i32_0);
+        println!("i32_1: {:?}", i32_1);
+        println!("{} i32_big_value1: {:?}", 0x70000000 as i32, i32_big_value1);
+        println!("{} i32_big_value2: {:?}", 0x7F000000 as i32, i32_big_value2);
+        println!("i32_max: {:?}", i32_max);
+
+        assert!(i32_min < i32_small_1);
+        assert!(i32_small_1 < i32_small_2);
+        assert!(i32_small_2 < i32_neg_2);
+        assert!(i32_neg_2 < i32_neg_1);
+        assert!(i32_neg_1 < i32_0);
+        assert!(i32_0 < i32_1);
+        assert!(i32_1 < i32_big_value1);
+        assert!(i32_big_value1 < i32_big_value2);
+        assert!(i32_big_value2 < i32_max);
+    }
+
+    #[test]
+    fn string_bson_into_comparison_bytes_ut() {
+        let empty_str = bson_into_comparison_bytes(&Bson::String("".to_string())).unwrap();
+        let a_str = bson_into_comparison_bytes(&Bson::String("a".to_string())).unwrap();
+        let z_str = bson_into_comparison_bytes(&Bson::String("z".to_string())).unwrap();
+        let a_long_str = bson_into_comparison_bytes(&Bson::String("abcdefg".to_string())).unwrap();
+        println!("empty_str: {:?}", empty_str);
+        println!("a_str: {:?}", a_str);
+        println!("z_str: {:?}", z_str);
+        println!("a_long_str: {:?}", a_long_str);
+        assert!(empty_str < a_str);
+        assert!(a_str < z_str);
+        assert!(a_long_str < z_str);
+    }
+
+    #[test]
+    fn datetime_bson_into_comparison_bytes_ut() {
+        let now_ts = Utc::now().timestamp_millis();
+        let now = bson_into_comparison_bytes(&Bson::DateTime(bson::DateTime::from_millis(now_ts)))
+            .unwrap();
+        let now_minus_one =
+            bson_into_comparison_bytes(&Bson::DateTime(bson::DateTime::from_millis(now_ts - 1)))
+                .unwrap();
+        let now_plus_one =
+            bson_into_comparison_bytes(&Bson::DateTime(bson::DateTime::from_millis(now_ts + 1)))
+                .unwrap();
+        let zero_ts =
+            bson_into_comparison_bytes(&Bson::DateTime(bson::DateTime::from_millis(0))).unwrap();
+        let min_ts = bson_into_comparison_bytes(&Bson::DateTime(bson::DateTime::MIN)).unwrap();
+        let max_ts = bson_into_comparison_bytes(&Bson::DateTime(bson::DateTime::MAX)).unwrap();
+
+        assert!(min_ts < zero_ts);
+        assert!(zero_ts < now_minus_one);
+        assert!(now_minus_one < now);
+        assert!(now < now_plus_one);
+        assert!(now_plus_one < max_ts);
+    }
+
+    #[test]
+    fn multiple_fields_key_ut() {
+        let fields = vec![
+            Some(Bson::String("a".to_string())),
+            Some(Bson::Int64(1 as i64)),
+        ];
+        let key = FieldKey::create(&fields).unwrap();
+        let extract_fields = key.extract_fields().unwrap();
+        assert_eq!(extract_fields[0], Some(Bson::String("a".to_string())));
+        assert_eq!(extract_fields[1], Some(Bson::Int64(1 as i64)));
+        assert_eq!("a#1", format!("{}", key));
+        let fields = vec![
+            Some(Bson::String("".to_string())),
+            Some(Bson::Int64(1 as i64)),
+        ];
+        let key = FieldKey::create(&fields).unwrap();
+        let extract_fields = key.extract_fields().unwrap();
+        assert_eq!(extract_fields[0], Some(Bson::String("".to_string())));
+        assert_eq!(extract_fields[1], Some(Bson::Int64(1 as i64)));
+        assert_eq!("#1", format!("{}", key));
+        let fields = vec![
+            Some(Bson::Int64(10 as i64)),
+            Some(Bson::String("".to_string())),
+        ];
+        let key = FieldKey::create(&fields).unwrap();
+        let extract_fields = key.extract_fields().unwrap();
+        assert_eq!(extract_fields[0], Some(Bson::Int64(10 as i64)));
+        assert_eq!(extract_fields[1], Some(Bson::String("".to_string())));
+        assert_eq!("10#", format!("{}", key));
     }
 }
