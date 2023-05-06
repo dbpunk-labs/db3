@@ -5,7 +5,7 @@
 </p>
 
 
-DB3 Network is a robust and secure **decentralized database network** designed to tackle the expected problems faced by dApps. These applications frequently require the ability to **CRUD** vast amounts of user-generated data, all while maintaining a decentralized architecture. By utilizing DB3 Network, you can effortlessly create data-intensive applications such as social networking apps, gamefi, and more.
+DB3 Network is a robust and secure **decentralized data network** designed to tackle the expected problems faced by dApps. These applications frequently require the ability to **CRUD** vast amounts of user-generated data, all while maintaining a decentralized architecture. By utilizing DB3 Network, you can effortlessly create data-intensive applications such as social networking apps, gamefi, and more.
 
 <p align="center">
  <img width="600px" src="../../images/db3_overview.png" align="center"/>
@@ -27,7 +27,7 @@ DB3 Network is a robust and secure **decentralized database network** designed t
 
 ### **[Refer to DB3.js =>](https://github.com/dbpunk-labs/db3.js)**##
 
-DB3 Network is a database the same as Firestore but in a decentralized way. DApps can directly interact with DB3 Network with db3 client. A properly designed `db3.js` package allow you do the "CRUD" job in the client never be easier
+DB3 Network is a data network the same as Firestore but in a decentralized way. DApps can directly interact with DB3 Network with db3 client. A properly designed `db3.js` package allow you do the "CRUD" job in the client never be easier
 
 ## **Run DB3 Node**
 

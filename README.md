@@ -18,7 +18,7 @@
 
 ## DB3 Network
 
-DB3 Network is a robust and secure **decentralized database network** designed to tackle the expected problems faced by dApps. These applications frequently require the ability to **CRUD** vast amounts of user-generated data, all while maintaining a decentralized architecture. By utilizing DB3 Network, you can effortlessly create data-intensive applications such as social networking apps, gamefi, and more.
+DB3 Network is a robust and secure **decentralized data network** designed to tackle the expected problems faced by dApps. These applications frequently require the ability to **CRUD** vast amounts of user-generated data, all while maintaining a decentralized architecture. By utilizing DB3 Network, you can effortlessly create data-intensive applications such as social networking apps, gamefi, and more.
 
 <p align="center">
  <img width="500px" src="./docs/images/db3_overview.png" align="center"/>
@@ -102,20 +102,10 @@ DB3 Network is a layer2 network on Ethereum and Ethereum guards all the assets.
 
 Together, we can make db3 network better!
 
-# The internal of db3
-
-![relationship](./docs/images/db3-overview.svg)
-
-# The Architecture
-
-![arch](./docs/images/db3-architecture.svg)
 
 # How it works
 
-- [mutation](./docs/old/mutation.md)
-- [query session](./docs/old/query.md)
-- [dvm](./docs/old/dvm.md)
-- [merkdb](https://github.com/dbpunk-labs/db3/issues/100)
+go to the [dips](https://github.com/dbpunk-labs/DIPs) for more 
 
 # Other Decentralized Database
 
@@ -126,16 +116,6 @@ Together, we can make db3 network better!
 - [spaceandtime](https://www.spaceandtime.io/), a decentralized data Warehouse
 - [OrbitDB](https://github.com/orbitdb/orbit-db) is a serverless, distributed, peer-to-peer database
 
-# Thanks support
-
-**I stood on the shoulders of giants and did only simple things. Thank you for your attention.**
-
-<table>
-  <tr>
-    <td align="center"><a href="https://protocol.ai/"><img src="https://user-images.githubusercontent.com/34047788/188373221-4819fd05-ef2f-4e53-b784-dcfffe9c018c.png" width="100px;" alt=""/><br /><sub><b>Protocol Labs</b></sub></a></td>
-    <td align="center"><a href="https://filecoin.io/"><img src="https://user-images.githubusercontent.com/34047788/188373584-e245e0bb-8a3c-4773-a741-17e4023bde65.png" width="100px;" alt=""/><br /><sub><b>Filecoin</b></sub></a></td>
-  </tr>
-</table>
 
 # License
 
