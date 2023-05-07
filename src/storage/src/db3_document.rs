@@ -21,7 +21,7 @@ use bson::Document;
 use bson::{Binary, Bson};
 use db3_base::bson_util;
 use db3_crypto::db3_address::DB3Address;
-use db3_crypto::id::{DocumentId, TxId};
+use db3_crypto::id::{DocumentId, FieldKey, TxId};
 use db3_error::DB3Error;
 #[derive(Debug)]
 pub struct DB3Document {
@@ -135,33 +135,37 @@ impl DB3Document {
     pub fn get_keys(
         &self,
         index: &db3_proto::db3_database_proto::Index,
-    ) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
+    ) -> std::result::Result<Option<FieldKey>, DB3Error> {
         let keys: Vec<_> = index.fields.iter().map(|f| f.field_path.as_str()).collect();
         match keys.len() {
             0 => Err(DB3Error::DocumentDecodeError(format!(
                 "fail to get empty keys"
             ))),
-            1 => self.get_single_key(keys[0]),
             _ => self.get_multiple_keys(keys),
         }
     }
 
-    fn get_single_key(&self, key: &str) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
-        match self.get_document()?.get(key) {
-            Some(value) => Ok(Some(bson_util::bson_into_comparison_bytes(value)?)),
-            None => Ok(None),
-        }
-    }
-
-    fn get_multiple_keys(&self, keys: Vec<&str>) -> std::result::Result<Option<Vec<u8>>, DB3Error> {
-        let mut data: Vec<u8> = Vec::new();
+    fn get_multiple_keys(
+        &self,
+        keys: Vec<&str>,
+    ) -> std::result::Result<Option<FieldKey>, DB3Error> {
+        let mut fields = vec![];
+        let mut has_field = false;
         for key in keys.iter() {
-            match self.get_single_key(key)? {
-                Some(v) => data.extend_from_slice(v.as_ref()),
-                None => data.extend_from_slice("_".as_bytes()),
+            match self.get_document()?.get(key) {
+                Some(value) => {
+                    fields.push(Some(value.clone()));
+                    has_field = true;
+                }
+                None => fields.push(None),
             }
         }
-        Ok(Some(data))
+        if has_field {
+            Ok(Some(FieldKey::create(&fields)?))
+        } else {
+            // if no fields exist, return None
+            Ok(None)
+        }
     }
 }
 impl AsRef<Document> for DB3Document {
@@ -323,7 +327,8 @@ mod tests {
             fields: vec![index_field],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!("John Doe", std::str::from_utf8(keys.as_ref()).unwrap())
+            let fields = keys.extract_fields().unwrap();
+            assert_eq!(Some(Bson::String("John Doe".to_string())), fields[0]);
         } else {
             assert!(false);
         }
@@ -355,7 +360,10 @@ mod tests {
             fields: vec![index_field],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!("John Doe", std::str::from_utf8(keys.as_ref()).unwrap())
+            assert_eq!(
+                Some(Bson::String("John Doe".to_string())),
+                keys.extract_fields().unwrap()[0]
+            );
         } else {
             assert!(false);
         }
@@ -387,7 +395,7 @@ mod tests {
             fields: vec![index_field],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!(vec![128, 0, 0, 0, 0, 0, 0, 43], keys);
+            assert_eq!(vec![4, 128, 0, 0, 0, 0, 0, 0, 43], *keys.as_ref());
         } else {
             assert!(false);
         }
@@ -456,12 +464,11 @@ mod tests {
             ],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            let str_len = "John Doe".to_string().as_str().len();
             assert_eq!(
-                "John Doe",
-                std::str::from_utf8(keys[0..str_len].as_ref()).unwrap()
+                Some(Bson::String("John Doe".to_string())),
+                keys.extract_fields().unwrap()[0]
             );
-            assert_eq!([128, 0, 0, 0, 0, 0, 0, 43], keys[str_len..]);
+            assert_eq!(Some(Bson::Int64(43)), keys.extract_fields().unwrap()[1]);
         } else {
             assert!(false);
         }
