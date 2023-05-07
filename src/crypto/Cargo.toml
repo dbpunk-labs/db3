@@ -26,8 +26,6 @@ schemars ="0.8.10"
 serde = { version = "1.0.144", features = ["derive"] }
 serde-name = "0.2.1"
 thiserror = "1.0.34"
-#serde_bytes = "0.11.7"
-#serde_json = "1.0.88"
 bson = "2.5.0"
 serde_json = { version = "1.0.64", default-features = false }
 serde_with = "2.1.0"
@@ -43,5 +41,8 @@ rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["bitco
 bip32 = "0.5.0"
 ethers = { workspace = true }
 chrono = "0.4.22"
+storekey = "0.5.0"
+enum-primitive-derive = "^0.2"
+num-traits = "^0.2"
 [dev-dependencies]
 tiny-bip39 = "1.0.0"
