@@ -21,11 +21,15 @@ use bson::Bson;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use bytes::Buf;
 use db3_error::{DB3Error, Result};
+use enum_primitive_derive::Primitive;
 use fastcrypto::hash::{HashFunction, Sha3_256};
+use num_traits::FromPrimitive;
 use rust_secp256k1::hashes::{sha256, Hash};
 use rust_secp256k1::ThirtyTwoByteHash;
+use serde::Serialize;
 use std::fmt;
 use std::io::Cursor;
+use storekey;
 
 // it's ethereum compatiable account id
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
@@ -323,130 +327,67 @@ impl fmt::Display for DocumentId {
         write!(f, "DOC|{}|{}", collection_id, document_entry_id)
     }
 }
+#[derive(Debug, Clone, Primitive, PartialEq)]
 pub enum FieldTypeId {
-    Null = 0x01,
-    Bool = 0x02,
-    I32 = 0x03,
-    I64 = 0x04,
-    F32 = 0x05,
-    F64 = 0x06,
-    DateTime = 0x07,
-    String = 0x0a,
+    Null = 1,
+    Bool = 10,
+    I32 = 20,
+    I64 = 21,
+    F32 = 22,
+    F64 = 23,
+    DateTime = 30,
+    String = 40,
 }
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Clone, Debug)]
 pub struct FieldKey {
     data: Vec<u8>,
 }
 impl FieldKey {
-    fn encode_i32(input: i32) -> u32 {
-        match input < 0 {
-            true => {
-                if input == i32::MIN {
-                    0
-                } else {
-                    let new_input = input as u32;
-                    (new_input & 0x7fffffff) as u32
-                }
-            }
-            false => {
-                let new_input = input as u32;
-                (new_input | 0x80000000) as u32
-            }
-        }
-    }
-    fn decode_u32(input: u32) -> i32 {
-        if input == 0 {
-            i32::MIN
-        } else {
-            if input as i32 > 0 {
-                (input | 0x80000000) as i32
-            } else {
-                (input & 0x7fffffff) as i32
-            }
-        }
+    fn add_field_type(&mut self, field_type: FieldTypeId) {
+        self.data.push(field_type as u8);
     }
 
-    fn encode_i64(input: i64) -> u64 {
-        match input < 0 {
-            true => {
-                if input == i64::MIN {
-                    0
-                } else {
-                    let new_input = input as u64;
-                    (new_input & 0x7fffffffffffffff) as u64
-                }
-            }
-            false => {
-                let new_input = input as u64;
-                (new_input | 0x8000000000000000) as u64
-            }
-        }
+    fn add_encode_field<T>(&mut self, v: &T) -> std::result::Result<(), DB3Error>
+    where
+        T: Serialize + ?Sized,
+    {
+        let buf =
+            storekey::serialize(v).map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+        self.data.extend_from_slice(buf.as_ref());
+        Ok(())
     }
-    fn decode_u64(input: u64) -> i64 {
-        if input == 0 {
-            i64::MIN
-        } else {
-            if input as i64 > 0 {
-                (input | 0x8000000000000000) as i64
-            } else {
-                (input & 0x7fffffffffffffff) as i64
-            }
-        }
-    }
-
-    fn add(&mut self, field: &Option<Bson>) -> std::result::Result<(), DB3Error> {
+    fn add_field(&mut self, field: &Option<Bson>) -> std::result::Result<(), DB3Error> {
         match field {
             None => {
-                self.data
-                    .write_u8(FieldTypeId::Null as u8)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.add_field_type(FieldTypeId::Null);
             }
 
             Some(Bson::Boolean(b)) => {
-                self.data
-                    .write_u8(FieldTypeId::Bool as u8)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                self.data
-                    .write_u8(*b as u8)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.add_field_type(FieldTypeId::Bool);
+                self.add_encode_field(b)?;
             }
             Some(Bson::Int64(n)) => {
-                self.data
-                    .write_u8(FieldTypeId::I64 as u8)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                self.data
-                    .write_u64::<BigEndian>(Self::encode_i64(*n))
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.add_field_type(FieldTypeId::I64);
+                self.add_encode_field(n)?;
             }
             Some(Bson::Int32(n)) => {
-                self.data
-                    .write_u8(FieldTypeId::I32 as u8)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                self.data
-                    .write_u32::<BigEndian>(Self::encode_i32(*n))
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.add_field_type(FieldTypeId::I32);
+                self.add_encode_field(n)?;
             }
             // TODO: add \0 as the end of string.
             Some(Bson::String(s)) => {
-                self.data
-                    .write_u8(FieldTypeId::String as u8)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                self.data.extend_from_slice(s.as_bytes());
-                self.data.extend_from_slice(&[0]);
+                self.add_field_type(FieldTypeId::String);
+                self.add_encode_field(&s)?;
             }
             Some(Bson::DateTime(dt)) => {
-                self.data
-                    .write_u8(FieldTypeId::DateTime as u8)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                let value: u64 = Self::encode_i64(dt.timestamp_millis());
-                self.data
-                    .write_u64::<BigEndian>(value)
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                self.add_field_type(FieldTypeId::DateTime);
+                self.add_encode_field(&dt.timestamp_millis())?;
             }
-            _ => {
-                return Err(DB3Error::DocumentDecodeError(
-                    "value type is not supported".to_string(),
-                ))
+            Some(v) => {
+                return Err(DB3Error::DocumentDecodeError(format!(
+                    "field type {:?} is not supported",
+                    v.element_type()
+                )))
             }
         }
         Ok(())
@@ -464,7 +405,7 @@ impl FieldKey {
             )));
         }
         for field in fields {
-            key.add(&field)?;
+            key.add_field(&field)?;
         }
         Ok(key)
     }
@@ -474,54 +415,43 @@ impl FieldKey {
     fn read_next_field(
         cursor: &mut Cursor<Vec<u8>>,
     ) -> std::result::Result<Option<Bson>, DB3Error> {
-        let field_type = cursor
+        let field_id = cursor
             .read_u8()
             .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-        match field_type {
-            0x01 => Ok(None),
-            0x02 => {
-                let value = cursor
-                    .read_u8()
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                Ok(Some(Bson::Boolean(value != 0)))
-            }
-            0x03 => {
-                let value = cursor
-                    .read_u32::<BigEndian>()
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                Ok(Some(Bson::Int32(Self::decode_u32(value))))
-            }
-            0x04 => {
-                let value = cursor
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                Ok(Some(Bson::Int64(Self::decode_u64(value))))
-            }
-            0x07 => {
-                let value = cursor
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                Ok(Some(Bson::DateTime(bson::DateTime::from_millis(
-                    Self::decode_u64(value),
-                ))))
-            }
-            0x0a => {
-                let mut buf = vec![];
-                while cursor.has_remaining() {
-                    let c = cursor
-                        .read_u8()
-                        .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                    if c == 0 {
-                        let value = String::from_utf8(buf)
-                            .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
-                        return Ok(Some(Bson::String(value)));
-                    }
-                    buf.push(c);
-                }
 
-                Err(DB3Error::DocumentDecodeError(
-                    "string field is not terminated by \0".to_string(),
-                ))
+        let field_type = FieldTypeId::from_u8(field_id)
+            .ok_or_else(|| DB3Error::DocumentDecodeError(format!("field type is not supported")))?;
+        match field_type {
+            FieldTypeId::Null => Ok(None),
+            FieldTypeId::Bool => {
+                let b: bool = storekey::deserialize(cursor.remaining_slice())
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                cursor.advance(1);
+                Ok(Some(Bson::Boolean(b)))
+            }
+            FieldTypeId::I32 => {
+                let n: i32 = storekey::deserialize(cursor.remaining_slice())
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                cursor.advance(4);
+                Ok(Some(Bson::Int32(n)))
+            }
+            FieldTypeId::I64 => {
+                let n: i64 = storekey::deserialize(cursor.remaining_slice())
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                cursor.advance(8);
+                Ok(Some(Bson::Int64(n)))
+            }
+            FieldTypeId::DateTime => {
+                let n: i64 = storekey::deserialize(cursor.remaining_slice())
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                cursor.advance(8);
+                Ok(Some(Bson::DateTime(bson::DateTime::from_millis(n))))
+            }
+            FieldTypeId::String => {
+                let s: String = storekey::deserialize(cursor.remaining_slice())
+                    .map_err(|e| DB3Error::DocumentDecodeError(format!("{e}")))?;
+                cursor.advance(s.len() + 1);
+                Ok(Some(Bson::String(s)))
             }
             _ => Err(DB3Error::DocumentDecodeError(
                 "field type is not supported".to_string(),
@@ -988,5 +918,25 @@ mod tests {
         assert_eq!(extract_fields[0], Some(Bson::Int64(10 as i64)));
         assert_eq!(extract_fields[1], Some(Bson::String("".to_string())));
         assert_eq!("10#", format!("{}", key));
+
+        let fields = vec![Some(Bson::Boolean(true)), Some(Bson::Int64(1 as i64))];
+        let key = FieldKey::create(&fields).unwrap();
+        let extract_fields = key.extract_fields().unwrap();
+        assert_eq!(extract_fields[0], Some(Bson::Boolean(true)));
+        assert_eq!(extract_fields[1], Some(Bson::Int64(1 as i64)));
+        assert_eq!("true#1", format!("{}", key));
+    }
+
+    #[test]
+    fn storekey_encode_ut() {
+        let v1: i32 = 1;
+        let serialized = storekey::serialize(&v1).unwrap();
+        let v2: i32 = storekey::deserialize(&serialized).unwrap();
+        assert_eq!(v1, v2);
+
+        let s1 = "abc";
+        let serialized = storekey::serialize(&s1).unwrap();
+        let s2: &str = storekey::deserialize(&serialized).unwrap();
+        assert_eq!(s1, s2);
     }
 }

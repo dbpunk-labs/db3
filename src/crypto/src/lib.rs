@@ -1,3 +1,4 @@
+#![feature(cursor_remaining)]
 //
 //
 // lib.rs
@@ -27,3 +28,5 @@ pub mod db3_verifier;
 pub mod id;
 pub mod key_derive;
 pub mod signature_scheme;
+extern crate enum_primitive_derive;
+extern crate num_traits;

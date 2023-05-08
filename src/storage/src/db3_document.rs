@@ -395,7 +395,7 @@ mod tests {
             fields: vec![index_field],
         };
         if let Ok(Some(keys)) = document.get_keys(&index) {
-            assert_eq!(vec![4, 128, 0, 0, 0, 0, 0, 0, 43], *keys.as_ref());
+            assert_eq!(vec![21, 128, 0, 0, 0, 0, 0, 0, 43], *keys.as_ref());
         } else {
             assert!(false);
         }
