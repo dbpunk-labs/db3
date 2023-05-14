@@ -32,8 +32,8 @@ use db3_proto::db3_node_proto::{
 };
 
 use db3_proto::db3_event_proto::{
-    event_filter, event_message, BlockEventFilter, EventFilter, EventType, MutationEventFilter,
-    Subscription,
+    event_filter, event_message, BlockEventFilter, EventFilter, EventMessage, EventType,
+    MutationEventFilter, Subscription,
 };
 use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySessionInfo};
 use db3_session::session_manager::{SessionPool, SessionStatus};
@@ -48,7 +48,7 @@ use prost::Message;
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use tonic::Status;
+use tonic::{Status, Streaming};
 use uuid::Uuid;
 
 pub struct StoreSDK {
@@ -345,7 +345,11 @@ impl StoreSDK {
         }
     }
 
-    pub async fn open_console(&mut self, all: bool) -> std::result::Result<(), Status> {
+    pub async fn subscribe_event_message(
+        &mut self,
+        all: bool,
+    ) -> Result<tonic::Response<Streaming<EventMessage>>, Status> {
+        let session_token = self.keep_session(true).await?;
         let m_filter = match all {
             true => MutationEventFilter {
                 sender: "".to_string(),
@@ -367,13 +371,16 @@ impl StoreSDK {
                 },
             ],
         };
-        let session_token = self.keep_session(true).await?;
         let req = SubscribeRequest {
             session_token,
             sub: Some(sub),
         };
         let mut client = self.client.as_ref().clone();
-        let mut stream = client.subscribe(req).await?.into_inner();
+        client.subscribe(req).await
+    }
+    /// open a console to subscribe the event
+    pub async fn open_console(&mut self, all: bool) -> Result<(), Status> {
+        let mut stream = self.subscribe_event_message(all).await?.into_inner();
         while let Some(event) = stream.message().await? {
             match event.event {
                 Some(event_message::Event::MutationEvent(me)) => {

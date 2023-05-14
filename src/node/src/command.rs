@@ -18,6 +18,7 @@
 use crate::abci_impl::AbciImpl;
 use crate::auth_storage::AuthStorage;
 use crate::context::Context;
+use crate::indexer_impl::IndexerImpl;
 use crate::json_rpc_impl;
 use crate::node_storage::NodeStorage;
 use crate::storage_node_impl::StorageNodeImpl;
@@ -124,6 +125,18 @@ pub enum DB3Command {
         /// the url of db3 grpc api
         #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26659")]
         public_grpc_url: String,
+    },
+
+    /// Start db3 indexer
+    #[clap(name = "indexer")]
+    Indexer {
+        /// the url of db3 grpc api
+        #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26659")]
+        public_grpc_url: String,
+        #[clap(short, long, default_value = "./indexer.db")]
+        db_path: String,
+        #[clap(long, default_value = "16")]
+        db_tree_level_in_memory: u8,
     },
 
     /// Run db3 client
@@ -391,6 +404,32 @@ impl DB3Command {
                     .unwrap();
             }
 
+            DB3Command::Indexer {
+                public_grpc_url,
+                db_path,
+                db_tree_level_in_memory,
+            } => {
+                let ctx = Self::build_context(public_grpc_url.as_ref());
+
+                let opts = Merk::default_db_opts();
+                let merk = Merk::open_opt(&db_path, opts, db_tree_level_in_memory).unwrap();
+                let node_store = Arc::new(Mutex::new(Box::pin(NodeStorage::new(
+                    AuthStorage::new(merk),
+                ))));
+                match node_store.lock() {
+                    Ok(mut store) => {
+                        if store.get_auth_store().init().is_err() {
+                            warn!("Fail to init auth storage!");
+                            return;
+                        }
+                    }
+                    _ => todo!(),
+                }
+                let mut indexer_impl = IndexerImpl::new(ctx.store_sdk.unwrap(), node_store);
+                indexer_impl.start().await.unwrap();
+                println!("exit standalone indexer")
+            }
+
             DB3Command::Client {
                 cmd,
                 public_grpc_url,
@@ -585,6 +624,7 @@ impl DB3Command {
         handler
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::command::DB3Command;
