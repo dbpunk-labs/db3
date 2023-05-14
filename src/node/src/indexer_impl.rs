@@ -3,6 +3,7 @@ use db3_cmd::command::DB3ClientContext;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, id::TxId};
 use db3_proto::db3_event_proto::event_message;
 use db3_proto::db3_event_proto::mutation_event::MutationEventStatus;
+use db3_proto::db3_event_proto::EventMessage;
 use db3_proto::db3_mutation_proto::DatabaseMutation;
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_sdk::store_sdk::StoreSDK;
@@ -34,8 +35,6 @@ impl IndexerImpl {
     pub async fn start(&mut self) -> std::result::Result<(), Status> {
         println!("[Indexer] start indexer ...");
         println!("[Indexer] subscribe event from db3 network");
-        // let mut stjoream = &self.db3_ctx.store_sdk.unwrap()
-        //     .subscribe_event_message(true).await?.into_inner();
         let mut stream = self
             .store_sdk
             .subscribe_event_message(true)
@@ -43,22 +42,42 @@ impl IndexerImpl {
             .into_inner();
         println!("listen and handle event message");
         while let Some(event) = stream.message().await? {
-            match event.event {
-                Some(event_message::Event::MutationEvent(me)) => {
-                    if let Some(status_type) = MutationEventStatus::from_i32(me.status) {
-                        println!(
-                            "[Indexer] receive mutation:{:?}\t{}\t{}\t{}\t{}\t{:?}",
-                            status_type, me.height, me.sender, me.to, me.hash, me.collections
-                        );
-                    } else {
-                        println!(
-                            "[Indexer] receive mutation: unknown\t{}\t{}\t{}\t{}\t{:?}",
-                            me.height, me.sender, me.to, me.hash, me.collections
-                        );
-                    }
+            match self.handle_event(event).await {
+                Err(e) => {
+                    println!("[Indexer] handle event error: {:?}", e);
                 }
                 _ => {}
             }
+        }
+        Ok(())
+    }
+
+    /// handle event message
+    async fn handle_event(&mut self, event: EventMessage) -> std::result::Result<(), Status> {
+        match event.event {
+            Some(event_message::Event::MutationEvent(me)) => {
+                if let Some(status_type) = MutationEventStatus::from_i32(me.status) {
+                    println!(
+                        "[Indexer] receive mutation:{:?}\t{}\t{}\t{}\t{}\t{:?}",
+                        status_type, me.height, me.sender, me.to, me.hash, me.collections
+                    );
+                } else {
+                    println!(
+                        "[Indexer] receive mutation: unknown\t{}\t{}\t{}\t{}\t{:?}",
+                        me.height, me.sender, me.to, me.hash, me.collections
+                    );
+                }
+            }
+            Some(event_message::Event::BlockEvent(be)) => {
+                println!(
+                    "Block\t{}\t0x{}\t0x{}\t{}",
+                    be.height,
+                    hex::encode(be.block_hash),
+                    hex::encode(be.app_hash),
+                    be.gas
+                );
+            }
+            _ => {}
         }
         Ok(())
     }
