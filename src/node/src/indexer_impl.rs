@@ -2,6 +2,7 @@ use crate::node_storage::NodeStorage;
 use db3_cmd::command::DB3ClientContext;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, id::TxId};
 use db3_proto::db3_event_proto::event_message;
+use db3_proto::db3_event_proto::mutation_event::MutationEventStatus;
 use db3_proto::db3_mutation_proto::DatabaseMutation;
 use db3_proto::db3_session_proto::QuerySessionInfo;
 use db3_sdk::store_sdk::StoreSDK;
@@ -44,10 +45,17 @@ impl IndexerImpl {
         while let Some(event) = stream.message().await? {
             match event.event {
                 Some(event_message::Event::MutationEvent(me)) => {
-                    println!(
-                        "[Indexer] receive mutation\t{}\t{}\t{}\t{}\t{:?}",
-                        me.height, me.sender, me.to, me.hash, me.collections
-                    );
+                    if let Some(status_type) = MutationEventStatus::from_i32(me.status) {
+                        println!(
+                            "[Indexer] receive mutation:{:?}\t{}\t{}\t{}\t{}\t{:?}",
+                            status_type, me.height, me.sender, me.to, me.hash, me.collections
+                        );
+                    } else {
+                        println!(
+                            "[Indexer] receive mutation: unknown\t{}\t{}\t{}\t{}\t{:?}",
+                            me.height, me.sender, me.to, me.hash, me.collections
+                        );
+                    }
                 }
                 _ => {}
             }
