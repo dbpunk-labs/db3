@@ -1,5 +1,4 @@
 use crate::node_storage::NodeStorage;
-use db3_cmd::command::DB3ClientContext;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, id::TxId};
 use db3_proto::db3_event_proto::event_message;
 use db3_proto::db3_event_proto::mutation_event::MutationEventStatus;

@@ -115,6 +115,8 @@ pub enum DB3Error {
     InvalidJson(String),
     #[error("fail to request faucet for {0}")]
     RequestFaucetError(String),
+    #[error("fail to fetch faucet for {0}")]
+    FetchBlockError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
