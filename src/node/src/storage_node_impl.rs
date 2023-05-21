@@ -772,7 +772,6 @@ impl StorageNode for StorageNodeImpl {
         &self,
         request: Request<BlockRequest>,
     ) -> std::result::Result<Response<BlockResponse>, Status> {
-        info!("get block request {:?}", request);
         let r = request.into_inner();
         let response = self
             .context
@@ -781,7 +780,6 @@ impl StorageNode for StorageNodeImpl {
             .await
             .map_err(|e| Status::internal(format!("{}", e)))?;
 
-        info!("response {:?}", response);
         let block_encoded =
             serde_json::to_vec(&response.block).map_err(|e| Status::internal(format!("{}", e)))?;
         Ok(Response::new(BlockResponse {
