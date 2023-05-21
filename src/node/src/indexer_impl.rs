@@ -55,19 +55,6 @@ impl IndexerImpl {
     /// handle event message
     async fn handle_event(&mut self, event: EventMessage) -> std::result::Result<(), Status> {
         match event.event {
-            Some(event_message::Event::MutationEvent(me)) => {
-                if let Some(status_type) = MutationEventStatus::from_i32(me.status) {
-                    info!(
-                        "[Indexer] receive mutation:{:?}\t{}\t{}\t{}\t{}\t{:?}",
-                        status_type, me.height, me.sender, me.to, me.hash, me.collections
-                    );
-                } else {
-                    info!(
-                        "[Indexer] receive mutation: unknown\t{}\t{}\t{}\t{}\t{:?}",
-                        me.height, me.sender, me.to, me.hash, me.collections
-                    );
-                }
-            }
             Some(event_message::Event::BlockEvent(be)) => {
                 info!(
                     "Block\t{}\t0x{}\t0x{}\t{}",

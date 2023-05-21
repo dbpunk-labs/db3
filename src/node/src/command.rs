@@ -130,13 +130,21 @@ pub enum DB3Command {
     /// Start db3 indexer
     #[clap(name = "indexer")]
     Indexer {
-        /// the url of db3 grpc api
-        #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26659")]
-        public_grpc_url: String,
+        /// the db3 storage chain grpc url
+        #[clap(
+        long = "db3_storage_grpc_url",
+        default_value = "http://127.0.0.1:26659"
+        )]
+        db3_storage_grpc_url: String,
         #[clap(short, long, default_value = "./indexer.db")]
         db_path: String,
         #[clap(long, default_value = "16")]
         db_tree_level_in_memory: u8,
+        #[clap(short, long)]
+        verbose: bool,
+        /// Suppress all output logging (overrides --verbose).
+        #[clap(short, long)]
+        quiet: bool,
     },
 
     /// Run db3 client
@@ -405,11 +413,23 @@ impl DB3Command {
             }
 
             DB3Command::Indexer {
-                public_grpc_url,
+                db3_storage_grpc_url,
                 db_path,
                 db_tree_level_in_memory,
+                verbose,
+                quiet,
             } => {
-                let ctx = Self::build_context(public_grpc_url.as_ref());
+                let log_level = if quiet {
+                    LevelFilter::OFF
+                } else if verbose {
+                    LevelFilter::DEBUG
+                } else {
+                    LevelFilter::INFO
+                };
+                tracing_subscriber::fmt().with_max_level(log_level).init();
+                info!("{ABOUT}");
+
+                let ctx = Self::build_context(db3_storage_grpc_url.as_ref());
 
                 let opts = Merk::default_db_opts();
                 let merk = Merk::open_opt(&db_path, opts, db_tree_level_in_memory).unwrap();
