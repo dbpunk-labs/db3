@@ -9,7 +9,7 @@ use db3_sdk::store_sdk::StoreSDK;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tonic::Status;
-
+use tracing::info;
 pub struct IndexerImpl {
     store_sdk: StoreSDK,
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
@@ -32,18 +32,18 @@ impl IndexerImpl {
     /// 1. subscribe db3 event
     /// 2. handle event
     pub async fn start(&mut self) -> std::result::Result<(), Status> {
-        println!("[Indexer] start indexer ...");
-        println!("[Indexer] subscribe event from db3 network");
+        info!("[Indexer] start indexer ...");
+        info!("[Indexer] subscribe event from db3 network");
         let mut stream = self
             .store_sdk
             .subscribe_event_message(true)
             .await?
             .into_inner();
-        println!("listen and handle event message");
+        info!("listen and handle event message");
         while let Some(event) = stream.message().await? {
             match self.handle_event(event).await {
                 Err(e) => {
-                    println!("[Indexer] handle event error: {:?}", e);
+                    info!("[Indexer] handle event error: {:?}", e);
                 }
                 _ => {}
             }
@@ -54,21 +54,8 @@ impl IndexerImpl {
     /// handle event message
     async fn handle_event(&mut self, event: EventMessage) -> std::result::Result<(), Status> {
         match event.event {
-            Some(event_message::Event::MutationEvent(me)) => {
-                if let Some(status_type) = MutationEventStatus::from_i32(me.status) {
-                    println!(
-                        "[Indexer] receive mutation:{:?}\t{}\t{}\t{}\t{}\t{:?}",
-                        status_type, me.height, me.sender, me.to, me.hash, me.collections
-                    );
-                } else {
-                    println!(
-                        "[Indexer] receive mutation: unknown\t{}\t{}\t{}\t{}\t{:?}",
-                        me.height, me.sender, me.to, me.hash, me.collections
-                    );
-                }
-            }
             Some(event_message::Event::BlockEvent(be)) => {
-                println!(
+                info!(
                     "Block\t{}\t0x{}\t0x{}\t{}",
                     be.height,
                     hex::encode(be.block_hash),
