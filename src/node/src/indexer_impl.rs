@@ -160,7 +160,10 @@ impl IndexerImpl {
                         },
                         Err(e) => {
                             warn!("invalid write request: {:?}", e);
-                            return Err(Status::internal(format!("invalid write request: {:?}", e)));
+                            return Err(Status::internal(format!(
+                                "invalid write request: {:?}",
+                                e
+                            )));
                         }
                     }
                 }
