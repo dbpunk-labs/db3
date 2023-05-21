@@ -132,8 +132,8 @@ pub enum DB3Command {
     Indexer {
         /// the db3 storage chain grpc url
         #[clap(
-        long = "db3_storage_grpc_url",
-        default_value = "http://127.0.0.1:26659"
+            long = "db3_storage_grpc_url",
+            default_value = "http://127.0.0.1:26659"
         )]
         db3_storage_grpc_url: String,
         #[clap(short, long, default_value = "./indexer.db")]
