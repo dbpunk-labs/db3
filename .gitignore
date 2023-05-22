@@ -22,3 +22,4 @@ db3.log
 /bridge/node_modules/
 /bridge/cache/
 /bridge/artifacts/
+indexer.db
