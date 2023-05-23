@@ -28,6 +28,7 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.8.1"
+    "@openzeppelin/contracts": "^4.8.1",
+    "@openzeppelin/merkle-tree": "^1.0.4"
   }
 }
