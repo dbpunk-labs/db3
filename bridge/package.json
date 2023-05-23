@@ -20,6 +20,8 @@
     "ethers": "^5.4.7",
     "hardhat": "^2.12.7",
     "hardhat-gas-reporter": "^1.0.8",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "^0.3.10",
     "prettier": "^2.8.4",
     "prettier-plugin-solidity": "^1.1.2",
     "solidity-coverage": "^0.8.0",

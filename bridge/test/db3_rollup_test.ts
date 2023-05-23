@@ -17,9 +17,20 @@
 
 import { expect } from "chai";
 import hre from "hardhat";
+import { MerkleTree } from "merkletreejs";
+import keccak256 from "keccak256";
 
 describe("DB3 Rollup test", function () {
   it("test get locked balance", async function () {
+    const elements =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=".split(
+        ""
+      );
+    const merkleTree = new MerkleTree(elements, keccak256, {
+      hashLeaves: true,
+      sortPairs: true,
+    });
+    const root = merkleTree.getHexRoot();
     const [owner, otherAccount] = await hre.ethers.getSigners();
     const owner_balance = 10_000_000_000_000;
     // deploy a lock contract where funds can be withdrawn
@@ -27,11 +38,13 @@ describe("DB3 Rollup test", function () {
     const Token = await hre.ethers.getContractFactory("Db3Token");
     const token = await Token.deploy();
     const Rollup = await hre.ethers.getContractFactory("DB3Rollup");
-    const rollup = await Rollup.deploy(token.address);
+    const rollup = await Rollup.deploy(token.address, root);
     await token.approve(rollup.address, 10 * 1000_000_000);
     expect(await token.balanceOf(owner.address)).to.equal(owner_balance);
     await rollup.deposit(1 * 1000_000_000);
-    expect(await rollup.getLockedBalance(owner.address)).to.equal(1 * 1000_000_000);
+    expect(await rollup.getLockedBalance(owner.address)).to.equal(
+      1 * 1000_000_000
+    );
     expect(await token.balanceOf(owner.address)).to.equal(9999 * 1000_000_000);
     expect(await token.balanceOf(rollup.address)).to.equal(1 * 1000_000_000);
   });

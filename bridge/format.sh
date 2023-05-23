@@ -4,4 +4,4 @@
 
 
 
-yarn prettier --write contracts
+yarn prettier --write contracts test
