@@ -25,10 +25,11 @@ use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_mutation_proto::PayloadType;
 use db3_proto::db3_node_proto::{
-    storage_node_client::StorageNodeClient, CloseSessionRequest, GetAccountRequest,
-    GetDocumentRequest, GetSessionInfoRequest, NetworkStatus, OpenSessionRequest,
-    OpenSessionResponse, QueryBillKey, QueryBillRequest, RunQueryRequest, RunQueryResponse,
-    SessionIdentifier, ShowDatabaseRequest, ShowNetworkStatusRequest, SubscribeRequest,
+    storage_node_client::StorageNodeClient, BlockRequest, BlockResponse, BlockType,
+    CloseSessionRequest, GetAccountRequest, GetDocumentRequest, GetSessionInfoRequest,
+    NetworkStatus, OpenSessionRequest, OpenSessionResponse, QueryBillKey, QueryBillRequest,
+    RunQueryRequest, RunQueryResponse, SessionIdentifier, ShowDatabaseRequest,
+    ShowNetworkStatusRequest, SubscribeRequest,
 };
 
 use db3_proto::db3_event_proto::{
@@ -701,6 +702,21 @@ impl StoreSDK {
             SessionStatus::from_i32(response.session_status).unwrap(),
         ))
     }
+
+    pub async fn fetch_block_by_height(&self, height: u64) -> Result<BlockResponse, Status> {
+        let request = tonic::Request::new(BlockRequest {
+            block_height: height,
+            block_hash: vec![],
+            block_type: BlockType::BlockByHeight.into(),
+        });
+        let mut client = self.client.as_ref().clone();
+        let response = client
+            .get_block(request)
+            .await
+            .map_err(|e| Status::internal(format!("fail to get block from node service: {e}")))?
+            .into_inner();
+        Ok(response)
+    }
 }
 
 #[cfg(test)]
@@ -721,9 +737,9 @@ mod tests {
     use db3_proto::db3_session_proto::OpenSessionPayload;
     use std::sync::Arc;
     use std::time;
+    use tendermint::block;
     use tonic::transport::Endpoint;
     use uuid::Uuid;
-
     async fn run_get_bills_flow(
         use_typed_format: bool,
         client: Arc<StorageNodeClient<tonic::transport::Channel>>,
@@ -751,6 +767,18 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    async fn run_fetch_block_flow(
+        use_typed_format: bool,
+        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+        counter: i64,
+    ) {
+        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let mut sdk = StoreSDK::new(client, signer, use_typed_format);
+        let res = sdk.fetch_block_by_height(1).await;
+        assert!(res.is_ok(), "{:?}", res);
+        let block: block::Block = serde_json::from_slice(res.unwrap().block.as_slice()).unwrap();
+        assert_eq!(block.header.height.value(), 1);
+    }
     #[tokio::test]
     async fn get_bills_smoke_test() {
         let ep = "http://127.0.0.1:26659";
@@ -947,4 +975,14 @@ mod tests {
     /// write a test case for method get_my_database
     #[tokio::test]
     async fn test_get_my_database() {}
+
+    #[tokio::test]
+    async fn fetch_block_by_height() {
+        let ep = "http://127.0.0.1:26659";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeClient::new(channel));
+
+        run_fetch_block_flow(false, client.clone(), 200).await;
+    }
 }

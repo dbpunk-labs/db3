@@ -447,7 +447,7 @@ impl DB3Command {
                 }
                 let mut indexer_impl = IndexerImpl::new(ctx.store_sdk.unwrap(), node_store);
                 indexer_impl.start().await.unwrap();
-                println!("exit standalone indexer")
+                info!("exit standalone indexer")
             }
 
             DB3Command::Client {
