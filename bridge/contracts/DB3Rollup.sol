@@ -2,7 +2,6 @@
 pragma solidity ^0.8.9;
 
 import "./DB3Token.sol";
-import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract DB3Rollup {
@@ -31,9 +30,14 @@ contract DB3Rollup {
 
     function _conversion(
         bytes[] calldata states
-    ) private pure returns (bytes32[] memory) {
+    ) private view returns (bytes32[] memory) {
         bytes32[] memory leaves = new bytes32[](states.length);
         for (uint i = 0; i < states.length; i++) {
+            (address account, uint256 balance) = abi.decode(
+                states[i],
+                (address, uint256)
+            );
+            require(_balances[account] > balance);
             bytes32 leaf = keccak256(bytes.concat(keccak256(states[i])));
             leaves[i] = leaf;
         }

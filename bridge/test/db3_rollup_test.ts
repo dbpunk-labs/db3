@@ -23,28 +23,16 @@ import { ethers } from "ethers";
 
 describe("DB3 Rollup test", function () {
   it("test get locked balance", async function () {
+    const [owner, otherAccount] = await hre.ethers.getSigners();
     const abi = ethers.utils.defaultAbiCoder;
     const values = [
       ["0x1111111111111111111111111111111111111111", "5000000000000000000"],
       ["0x2222222222222222222222222222222222222222", "2500000000000000000"],
-      ["0x3333333333333333333333333333333333333333", "2400000000000000000"],
+      [owner.address, 400_000_000],
     ];
     const tree = StandardMerkleTree.of(values, ["address", "uint256"]);
-    const { proof, proofFlags, leaves } = tree.getMultiProof([0, 1]);
-
-    console.log(proof);
-    console.log(leaves);
-    let leaf1 = abi.encode(
-      ["address", "uint256"],
-      ["0x1111111111111111111111111111111111111111", "5000000000000000000"]
-    );
-
-    let leaf2 = abi.encode(
-      ["address", "uint256"],
-      ["0x2222222222222222222222222222222222222222", "2500000000000000000"]
-    );
-
-    const [owner, otherAccount] = await hre.ethers.getSigners();
+    const { proof, proofFlags, leaves } = tree.getMultiProof([2]);
+    let leaf = abi.encode(["address", "uint256"], leaves[0]);
     const owner_balance = 10_000_000_000_000;
     // deploy a lock contract where funds can be withdrawn
     // one year in the future
@@ -58,14 +46,14 @@ describe("DB3 Rollup test", function () {
     expect(await rollup.getLockedBalance(owner.address)).to.equal(
       1 * 1000_000_000
     );
-
-    expect(
-      await rollup.verifyStates(proof, proofFlags, tree.root, tree.root, [
-        leaf2,
-        leaf1,
-      ])
-    ).to.equal(true);
     expect(await token.balanceOf(owner.address)).to.equal(9999 * 1000_000_000);
     expect(await token.balanceOf(rollup.address)).to.equal(1 * 1000_000_000);
+    expect(
+      await rollup.verifyStates(proof, proofFlags, tree.root, tree.root, [leaf])
+    ).to.equal(true);
+    await rollup.processUpdateStates(proof, proofFlags, tree.root, tree.root, [
+      leaf,
+    ]);
+    expect(await rollup.getLockedBalance(owner.address)).to.equal(400_000_000);
   });
 });
