@@ -1,13 +1,13 @@
+use crate::auth_storage::AuthStorage;
 use crate::node_storage::NodeStorage;
 use bytes::Bytes;
+use chrono::Utc;
 use db3_crypto::id::AccountId;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
 use db3_error::DB3Error;
 use db3_proto::db3_event_proto::event_message;
 use db3_proto::db3_event_proto::EventMessage;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, PayloadType, WriteRequest};
-use db3_proto::db3_session_proto::QuerySessionInfo;
-use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use ethers::core::types::Bytes as EthersBytes;
 use ethers::types::transaction::eip712::{Eip712, TypedData};
@@ -23,7 +23,7 @@ use tracing::{info, warn};
 /// TODO duplicate with abci impl. will refactor later
 macro_rules! parse_mutation {
     ($func:ident, $type:ident) => {
-        fn $func(&self, payload: &[u8]) -> Result<$type, DB3Error> {
+        fn $func(payload: &[u8]) -> Result<$type, DB3Error> {
             match $type::decode(payload) {
                 Ok(dm) => match &dm.meta {
                     Some(_) => Ok(dm),
@@ -43,10 +43,15 @@ macro_rules! parse_mutation {
         }
     };
 }
+struct DatabaseMutationTask {
+    account_addr: AccountAddress,
+    mutation: DatabaseMutation,
+    tx_id: TxId,
+}
+
 pub struct IndexerImpl {
     store_sdk: StoreSDK,
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
 impl IndexerImpl {
@@ -54,7 +59,6 @@ impl IndexerImpl {
         Self {
             store_sdk,
             node_store,
-            pending_databases: Arc::new(Mutex::new(Vec::new())),
         }
     }
     parse_mutation!(parse_database_mutation, DatabaseMutation);
@@ -103,61 +107,25 @@ impl IndexerImpl {
                 let block: block::Block =
                     serde_json::from_slice(response.block.as_slice()).unwrap();
                 info!("Block transaction size: {}", block.data.len());
-                for tx in block.data {
-                    let tx_id = TxId::from(tx.as_ref());
-                    let wrequest = WriteRequest::decode(tx.as_ref());
-                    info!("TxId: {}", tx_id.to_base64());
-                    match wrequest {
-                        Ok(req) => match self.unwrap_and_verify(req) {
-                            Ok((data, data_type, account_id)) => match data_type {
-                                PayloadType::DatabasePayload => {
-                                    match self.parse_database_mutation(data.as_ref()) {
-                                        Ok(dm) => match self.pending_databases.lock() {
-                                            Ok(mut s) => {
-                                                let action = DatabaseAction::from_i32(dm.action);
-                                                info!(
-                                                    "Pending database mutation size: {}",
-                                                    s.len()
-                                                );
-                                                info!("Add action: {:?}, mutation : {:?} into pending queue", action, dm);
-                                                s.push((account_id.addr, dm, tx_id));
-                                            }
-                                            _ => {
-                                                let msg = format!("lock pending_databases failed");
-                                                return Err(Status::internal(msg));
-                                            }
-                                        },
-                                        Err(e) => {
-                                            let msg = format!("{e}");
-                                            return Err(Status::internal(msg));
-                                        }
-                                    }
-                                }
-                                PayloadType::QuerySessionPayload => {
-                                    info!("Skip QuerySessionPayload");
-                                }
-                                PayloadType::MintCreditsPayload => {
-                                    info!("Skip MintCreditsPayload");
-                                }
-                                _ => {
-                                    info!("Skip other payload type");
-                                }
-                            },
-                            Err(e) => {
-                                warn!("invalid write request: {:?}", e);
-                                return Err(Status::internal(format!(
-                                    "invalid write request: {:?}",
-                                    e
-                                )));
-                            }
-                        },
-                        Err(e) => {
-                            warn!("invalid write request: {:?}", e);
-                            return Err(Status::internal(format!(
-                                "invalid write request: {:?}",
-                                e
-                            )));
-                        }
+                match self.node_store.lock() {
+                    Ok(mut store) => {
+                        store.get_auth_store().begin_block(
+                            block.header.height.value(),
+                            Utc::now().timestamp() as u64,
+                        );
+                        let mut pending_databases: Vec<(AccountAddress, DatabaseMutation, TxId)> =
+                            vec![];
+                        Self::parse_and_pending_mutations(&block.data, &mut pending_databases)
+                            .await?;
+                        Self::apply_database_mutations(
+                            store.get_auth_store(),
+                            &mut pending_databases,
+                        )
+                        .await?;
+                    }
+                    Err(e) => {
+                        warn!("get node store error: {:?}", e);
+                        return Err(Status::internal(format!("get node store error: {:?}", e)));
                     }
                 }
             }
@@ -165,11 +133,98 @@ impl IndexerImpl {
         }
         Ok(())
     }
+    async fn parse_and_pending_mutations(
+        txs: &Vec<Vec<u8>>,
+        database_mutations: &mut Vec<(AccountAddress, DatabaseMutation, TxId)>,
+    ) -> Result<(), Status> {
+        for tx in txs {
+            let tx_id = TxId::from(tx.as_ref());
+            let wrequest = WriteRequest::decode(tx.as_ref());
+            info!("TxId: {}", tx_id.to_base64());
+            match wrequest {
+                Ok(req) => match Self::unwrap_and_verify(req) {
+                    Ok((data, data_type, account_id)) => match data_type {
+                        PayloadType::DatabasePayload => {
+                            match Self::parse_database_mutation(data.as_ref()) {
+                                Ok(dm) => {
+                                    let action = DatabaseAction::from_i32(dm.action);
+                                    info!(
+                                        "Add action: {:?}, mutation : {:?} into pending queue",
+                                        action, dm
+                                    );
+                                    database_mutations.push((account_id.addr, dm, tx_id));
+                                }
+                                Err(e) => {
+                                    let msg = format!("{e}");
+                                    return Err(Status::internal(msg));
+                                }
+                            }
+                        }
+                        PayloadType::QuerySessionPayload => {
+                            info!("Skip QuerySessionPayload");
+                        }
+                        PayloadType::MintCreditsPayload => {
+                            info!("Skip MintCreditsPayload");
+                        }
+                        _ => {
+                            info!("Skip other payload type");
+                        }
+                    },
+                    Err(e) => {
+                        warn!("invalid write request: {:?}", e);
+                        return Err(Status::internal(format!("invalid write request: {:?}", e)));
+                    }
+                },
+                Err(e) => {
+                    warn!("invalid write request: {:?}", e);
+                    return Err(Status::internal(format!("invalid write request: {:?}", e)));
+                }
+            }
+        }
+        Ok(())
+    }
+    async fn apply_database_mutations(
+        auth_store: &mut AuthStorage,
+        pending_databases: &mut Vec<(AccountAddress, DatabaseMutation, TxId)>,
+    ) -> std::result::Result<(), Status> {
+        info!(
+            "Pending database mutations queue size: {}",
+            pending_databases.len()
+        );
 
+        for (account_addr, mutation, tx_id) in pending_databases {
+            let action = DatabaseAction::from_i32(mutation.action);
+            info!(
+                "apply database mutation transaction tx: {}, mutation: action: {:?}",
+                &tx_id.to_base64(),
+                action
+            );
+            let nonce: u64 = match &mutation.meta {
+                Some(m) => m.nonce,
+                //TODO will not go to here
+                None => 1,
+            };
+            match auth_store.apply_database(&account_addr, nonce, &tx_id, &mutation) {
+                Ok(_) => {
+                    info!("apply transaction {} success", &tx_id.to_base64());
+                }
+                Err(e) => {
+                    warn!("fail to apply database for {e}");
+                    return Err(Status::internal(format!("fail to apply database for {e}")));
+                }
+            };
+        }
+        auth_store
+            .commit()
+            .map_err(|e| Status::internal(format!("fail to commit database for {e}")))?;
+        info!("last block state: {:?}", auth_store.get_last_block_state());
+        // TODO: add show indexer state api
+        info!("indexer state: {:?}", auth_store.get_state());
+        Ok(())
+    }
     /// unwrap and verify write request
     /// TODO: duplicate with abci unwrap_and_verify, refactor it to a common/util function
     fn unwrap_and_verify(
-        &self,
         req: WriteRequest,
     ) -> Result<(EthersBytes, PayloadType, AccountId), DB3Error> {
         if req.payload_type == 3 {
@@ -224,4 +279,9 @@ impl IndexerImpl {
             Ok((EthersBytes(data), data_type, account_id))
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
 }

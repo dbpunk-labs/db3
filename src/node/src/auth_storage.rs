@@ -41,7 +41,7 @@ use tracing::info;
 
 pub const HASH_LENGTH: usize = 32;
 pub type Hash = [u8; HASH_LENGTH];
-
+#[derive(Debug)]
 pub struct NetworkState {
     pub total_storage_bytes: Arc<AtomicU64>,
     pub total_mutation_count: Arc<AtomicU64>,
