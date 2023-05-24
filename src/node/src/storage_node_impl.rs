@@ -31,12 +31,12 @@ use db3_proto::db3_event_proto::{
 };
 use db3_proto::db3_mutation_proto::{PayloadType, WriteRequest};
 use db3_proto::db3_node_proto::{
-    storage_node_server::StorageNode, BroadcastRequest, BroadcastResponse, CloseSessionRequest,
-    CloseSessionResponse, GetAccountRequest, GetAccountResponse, GetDocumentRequest,
-    GetDocumentResponse, GetSessionInfoRequest, GetSessionInfoResponse, NetworkStatus,
-    OpenSessionRequest, OpenSessionResponse, QueryBillRequest, QueryBillResponse, RunQueryRequest,
-    RunQueryResponse, ShowDatabaseRequest, ShowDatabaseResponse, ShowNetworkStatusRequest,
-    SubscribeRequest,
+    storage_node_server::StorageNode, BlockRequest, BlockResponse, BroadcastRequest,
+    BroadcastResponse, CloseSessionRequest, CloseSessionResponse, GetAccountRequest,
+    GetAccountResponse, GetDocumentRequest, GetDocumentResponse, GetSessionInfoRequest,
+    GetSessionInfoResponse, NetworkStatus, OpenSessionRequest, OpenSessionResponse,
+    QueryBillRequest, QueryBillResponse, RunQueryRequest, RunQueryResponse, ShowDatabaseRequest,
+    ShowDatabaseResponse, ShowNetworkStatusRequest, SubscribeRequest,
 };
 use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySession, QuerySessionInfo};
 use db3_session::query_session_verifier;
@@ -59,6 +59,7 @@ use tendermint_rpc::{
 
 use std::collections::BTreeMap;
 use std::collections::HashSet;
+use tendermint::block;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::ReceiverStream;
@@ -767,6 +768,25 @@ impl StorageNode for StorageNodeImpl {
         }))
     }
 
+    async fn get_block(
+        &self,
+        request: Request<BlockRequest>,
+    ) -> std::result::Result<Response<BlockResponse>, Status> {
+        let r = request.into_inner();
+        let response = self
+            .context
+            .client
+            .block(block::Height::try_from(r.block_height).unwrap())
+            .await
+            .map_err(|e| Status::internal(format!("{}", e)))?;
+
+        let block_encoded =
+            serde_json::to_vec(&response.block).map_err(|e| Status::internal(format!("{}", e)))?;
+        Ok(Response::new(BlockResponse {
+            block_id: response.block_id.hash.as_bytes().to_vec(),
+            block: block_encoded,
+        }))
+    }
     async fn show_network_status(
         &self,
         _request: Request<ShowNetworkStatusRequest>,

@@ -108,6 +108,21 @@ message BroadcastResponse {
     bytes hash = 2;
 }
 
+enum BlockType {
+    BlockByHeight = 0;
+    BlockByHash = 1;
+    LatestBlock = 2;
+}
+message BlockRequest {
+    BlockType block_type = 1;
+    uint64 block_height= 2;
+    bytes block_hash = 3;
+}
+
+message BlockResponse {
+    bytes block_id = 1;
+    bytes block = 2;
+}
 message ShowDatabaseRequest {
     string session_token = 1;
     // the database address in hex format
@@ -172,4 +187,6 @@ service StorageNode {
     rpc ShowNetworkStatus(ShowNetworkStatusRequest) returns (NetworkStatus){}
     // method for subscribution
     rpc Subscribe(SubscribeRequest) returns (stream db3_event_proto.EventMessage) {}
+    // method for get block
+    rpc GetBlock(BlockRequest) returns (BlockResponse) {}
 }
