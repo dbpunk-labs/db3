@@ -445,11 +445,7 @@ impl DB3Command {
                     }
                     _ => todo!(),
                 }
-                let mut indexer_impl = IndexerImpl::new(
-                    ctx.store_sdk.unwrap(),
-                    ctx.mutation_sdk.unwrap(),
-                    node_store,
-                );
+                let mut indexer_impl = IndexerImpl::new(ctx.store_sdk.unwrap(), node_store);
                 indexer_impl.start().await.unwrap();
                 info!("exit standalone indexer")
             }

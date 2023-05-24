@@ -4,7 +4,6 @@ use db3_crypto::id::AccountId;
 use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
 use db3_error::DB3Error;
 use db3_proto::db3_event_proto::event_message;
-use db3_proto::db3_event_proto::mutation_event::MutationEventStatus;
 use db3_proto::db3_event_proto::EventMessage;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, PayloadType, WriteRequest};
 use db3_proto::db3_session_proto::QuerySessionInfo;
@@ -18,7 +17,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tendermint::block;
 use tonic::Status;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// parse mutation
 /// TODO duplicate with abci impl. will refactor later
@@ -46,20 +45,14 @@ macro_rules! parse_mutation {
 }
 pub struct IndexerImpl {
     store_sdk: StoreSDK,
-    mutation_sdk: MutationSDK,
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
     pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
 impl IndexerImpl {
-    pub fn new(
-        store_sdk: StoreSDK,
-        mutation_sdk: MutationSDK,
-        node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    ) -> Self {
+    pub fn new(store_sdk: StoreSDK, node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>) -> Self {
         Self {
             store_sdk,
-            mutation_sdk,
             node_store,
             pending_databases: Arc::new(Mutex::new(Vec::new())),
         }
@@ -101,7 +94,7 @@ impl IndexerImpl {
                     be.gas
                 );
                 let response = self
-                    .mutation_sdk
+                    .store_sdk
                     .fetch_block_by_height(be.height)
                     .await
                     .map_err(|e| Status::internal(format!("fetch block error: {:?}", e)))?;

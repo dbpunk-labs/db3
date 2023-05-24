@@ -29,10 +29,7 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_proto::{
     DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
 };
-use db3_proto::db3_node_proto::{
-    storage_node_client::StorageNodeClient, BlockRequest, BlockResponse, BlockType,
-    BroadcastRequest,
-};
+use db3_proto::db3_node_proto::{storage_node_client::StorageNodeClient, BroadcastRequest};
 use prost::Message;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -213,23 +210,6 @@ impl MutationSDK {
         let db_id = DbId::try_from((&sender, nonce))?;
         Ok((db_id, tx_id))
     }
-
-    pub async fn fetch_block_by_height(&self, height: u64) -> Result<BlockResponse> {
-        let request = tonic::Request::new(BlockRequest {
-            block_height: height,
-            block_hash: vec![],
-            block_type: BlockType::BlockByHeight.into(),
-        });
-        let mut client = self.client.as_ref().clone();
-        let response = client
-            .get_block(request)
-            .await
-            .map_err(|e| {
-                DB3Error::FetchBlockError(format!("fail to get block from node service: {e}"))
-            })?
-            .into_inner();
-        Ok(response)
-    }
 }
 
 #[cfg(test)]
@@ -240,7 +220,6 @@ mod tests {
     use crate::store_sdk::StoreSDK;
     use std::sync::Arc;
     use std::{thread, time};
-    use tendermint::block;
     use tonic::transport::Endpoint;
 
     async fn run_mint_credits_mutation_flow(
@@ -284,19 +263,6 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    async fn run_fetch_block_flow(
-        use_typed_format: bool,
-        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        counter: i64,
-    ) {
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let sdk = MutationSDK::new(client.clone(), signer, use_typed_format);
-        let res = sdk.fetch_block_by_height(1).await;
-        assert!(res.is_ok(), "{:?}", res);
-        let block: block::Block = serde_json::from_slice(res.unwrap().block.as_slice()).unwrap();
-        assert_eq!(block.header.height.value(), 1);
-    }
-
     #[tokio::test]
     async fn smoke_test_run_mint_credits_mutation_flow() {
         let ep = "http://127.0.0.1:26659";
@@ -315,15 +281,5 @@ mod tests {
         let client = Arc::new(StorageNodeClient::new(channel));
         run_database_mutation_flow(false, client.clone(), 20).await;
         run_database_mutation_flow(true, client.clone(), 30).await;
-    }
-
-    #[tokio::test]
-    async fn fetch_block_by_height() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-
-        run_fetch_block_flow(false, client.clone(), 200).await;
     }
 }
