@@ -97,3 +97,50 @@ impl MutationUtil {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::BytesMut;
+    use chrono::Utc;
+    use db3_crypto::db3_address::DB3Address;
+    use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+    use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
+    use db3_proto::db3_mutation_proto::DatabaseAction;
+    use fastcrypto::traits::EncodeDecodeBase64;
+    fn create_a_database_mutation() -> DatabaseMutation {
+        let meta = BroadcastMeta {
+            //TODO get from network
+            nonce: Utc::now().timestamp() as u64,
+            //TODO use config
+            chain_id: ChainId::DevNet.into(),
+            //TODO use config
+            chain_role: ChainRole::StorageShardChain.into(),
+        };
+        let dm = DatabaseMutation {
+            meta: Some(meta),
+            collection_mutations: vec![],
+            db_address: vec![],
+            action: DatabaseAction::CreateDb.into(),
+            document_mutations: vec![],
+            db_desc: "".to_string(),
+        };
+        dm
+    }
+    #[test]
+    pub fn unwrap_and_verify_ut() {
+        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
+        let signer = Db3MultiSchemeSigner::new(kp);
+        let dm = create_a_database_mutation();
+        let mut mbuf = BytesMut::with_capacity(1024 * 4);
+        dm.encode(&mut mbuf).unwrap();
+        let mbuf = mbuf.freeze();
+        let signature = signer.sign(mbuf.as_ref()).unwrap();
+        let request = WriteRequest {
+            signature: signature.as_ref().to_vec(),
+            payload: mbuf.as_ref().to_vec().to_owned(),
+            payload_type: PayloadType::DatabasePayload.into(),
+        };
+        let (bytes, payload_type, account_id) = MutationUtil::unwrap_and_verify(request).unwrap();
+        assert_eq!(PayloadType::DatabasePayload, payload_type);
+    }
+}
