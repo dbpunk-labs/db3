@@ -1,48 +1,19 @@
 use crate::auth_storage::AuthStorage;
+use crate::mutation_utils::MutationUtil;
 use crate::node_storage::NodeStorage;
-use bytes::Bytes;
 use chrono::Utc;
-use db3_crypto::id::AccountId;
-use db3_crypto::{db3_address::DB3Address as AccountAddress, db3_verifier, id::TxId};
-use db3_error::DB3Error;
+use db3_crypto::{db3_address::DB3Address as AccountAddress, id::TxId};
 use db3_proto::db3_event_proto::event_message;
 use db3_proto::db3_event_proto::EventMessage;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, PayloadType, WriteRequest};
 use db3_sdk::store_sdk::StoreSDK;
-use ethers::core::types::Bytes as EthersBytes;
-use ethers::types::transaction::eip712::{Eip712, TypedData};
 use prost::Message;
 use std::pin::Pin;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tendermint::block;
 use tonic::Status;
 use tracing::{debug, info, warn};
 
-/// parse mutation
-/// TODO duplicate with abci impl. will refactor later
-macro_rules! parse_mutation {
-    ($func:ident, $type:ident) => {
-        fn $func(payload: &[u8]) -> Result<$type, DB3Error> {
-            match $type::decode(payload) {
-                Ok(dm) => match &dm.meta {
-                    Some(_) => Ok(dm),
-                    None => {
-                        warn!("no meta for mutation");
-                        Err(DB3Error::ApplyMutationError("meta is none".to_string()))
-                    }
-                },
-                Err(e) => {
-                    //TODO add event ?
-                    warn!("invalid mutation data {e}");
-                    Err(DB3Error::ApplyMutationError(
-                        "invalid mutation data".to_string(),
-                    ))
-                }
-            }
-        }
-    };
-}
 pub struct IndexerImpl {
     store_sdk: StoreSDK,
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
@@ -55,7 +26,6 @@ impl IndexerImpl {
             node_store,
         }
     }
-    parse_mutation!(parse_database_mutation, DatabaseMutation);
 
     /// start standalone indexer
     /// 1. subscribe db3 event
@@ -147,10 +117,10 @@ impl IndexerImpl {
             let tx_id = TxId::from(tx.as_ref());
             let wrequest = WriteRequest::decode(tx.as_ref());
             match wrequest {
-                Ok(req) => match Self::unwrap_and_verify(req) {
+                Ok(req) => match MutationUtil::unwrap_and_verify(req) {
                     Ok((data, data_type, account_id)) => match data_type {
                         PayloadType::DatabasePayload => {
-                            match Self::parse_database_mutation(data.as_ref()) {
+                            match MutationUtil::parse_database_mutation(data.as_ref()) {
                                 Ok(dm) => {
                                     let action = DatabaseAction::from_i32(dm.action);
                                     info!(
@@ -219,63 +189,6 @@ impl IndexerImpl {
             };
         }
         Ok(())
-    }
-    /// unwrap and verify write request
-    /// TODO: duplicate with abci unwrap_and_verify, refactor it to a common/util function
-    fn unwrap_and_verify(
-        req: WriteRequest,
-    ) -> Result<(EthersBytes, PayloadType, AccountId), DB3Error> {
-        if req.payload_type == 3 {
-            // typed data
-            match serde_json::from_slice::<TypedData>(req.payload.as_ref()) {
-                Ok(data) => {
-                    let hashed_message = data.encode_eip712().map_err(|e| {
-                        DB3Error::ApplyMutationError(format!("invalid payload type for err {e}"))
-                    })?;
-                    let account_id = db3_verifier::DB3Verifier::verify_hashed(
-                        &hashed_message,
-                        req.signature.as_ref(),
-                    )?;
-                    if let (Some(payload), Some(payload_type)) =
-                        (data.message.get("payload"), data.message.get("payloadType"))
-                    {
-                        //TODO advoid data copy
-                        let data: EthersBytes =
-                            serde_json::from_value(payload.clone()).map_err(|e| {
-                                DB3Error::ApplyMutationError(format!(
-                                    "invalid payload type for err {e}"
-                                ))
-                            })?;
-                        let internal_data_type = i32::from_str(payload_type.as_str().ok_or(
-                            DB3Error::QuerySessionVerifyError("invalid payload type".to_string()),
-                        )?)
-                        .map_err(|e| {
-                            DB3Error::QuerySessionVerifyError(format!(
-                                "fail to convert payload type to i32 {e}"
-                            ))
-                        })?;
-                        let data_type: PayloadType = PayloadType::from_i32(internal_data_type)
-                            .ok_or(DB3Error::ApplyMutationError(
-                                "invalid payload type".to_string(),
-                            ))?;
-                        Ok((data, data_type, account_id))
-                    } else {
-                        Err(DB3Error::ApplyMutationError("bad typed data".to_string()))
-                    }
-                }
-                Err(e) => Err(DB3Error::ApplyMutationError(format!(
-                    "bad typed data for err {e}"
-                ))),
-            }
-        } else {
-            let account_id =
-                db3_verifier::DB3Verifier::verify(req.payload.as_ref(), req.signature.as_ref())?;
-            let data_type: PayloadType = PayloadType::from_i32(req.payload_type).ok_or(
-                DB3Error::ApplyMutationError("invalid payload type".to_string()),
-            )?;
-            let data = Bytes::from(req.payload);
-            Ok((EthersBytes(data), data_type, account_id))
-        }
     }
 }
 
