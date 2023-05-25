@@ -17,7 +17,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tendermint::block;
 use tonic::Status;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// parse mutation
 /// TODO duplicate with abci impl. will refactor later
@@ -43,12 +43,6 @@ macro_rules! parse_mutation {
         }
     };
 }
-struct DatabaseMutationTask {
-    account_addr: AccountAddress,
-    mutation: DatabaseMutation,
-    tx_id: TxId,
-}
-
 pub struct IndexerImpl {
     store_sdk: StoreSDK,
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
@@ -91,7 +85,7 @@ impl IndexerImpl {
         match event.event {
             Some(event_message::Event::BlockEvent(be)) => {
                 info!(
-                    "Block\t{}\t0x{}\t0x{}\t{}",
+                    "[Indexer] Receive BlockEvent: Block\t{}\t0x{}\t0x{}\t{}",
                     be.height,
                     hex::encode(be.block_hash),
                     hex::encode(be.app_hash),
@@ -103,10 +97,10 @@ impl IndexerImpl {
                     .await
                     .map_err(|e| Status::internal(format!("fetch block error: {:?}", e)))?;
 
-                info!("Block Id: {:?}", response.block_id);
+                debug!("Block Id: {:?}", response.block_id);
                 let block: block::Block =
                     serde_json::from_slice(response.block.as_slice()).unwrap();
-                info!("Block transaction size: {}", block.data.len());
+                debug!("Block transaction size: {}", block.data.len());
                 match self.node_store.lock() {
                     Ok(mut store) => {
                         store.get_auth_store().begin_block(
@@ -122,9 +116,21 @@ impl IndexerImpl {
                             &mut pending_databases,
                         )
                         .await?;
+                        store.get_auth_store().commit().map_err(|e| {
+                            Status::internal(format!("fail to commit database for {e}"))
+                        })?;
+                        // TODO: add show indexer state api
+                        info!(
+                            "[Indexer] last block state: {:?}",
+                            store.get_auth_store().get_last_block_state()
+                        );
+                        info!(
+                            "[Indexer] indexer state: {:?}",
+                            store.get_auth_store().get_state()
+                        );
                     }
                     Err(e) => {
-                        warn!("get node store error: {:?}", e);
+                        warn!("[Indexer] get node store error: {:?}", e);
                         return Err(Status::internal(format!("get node store error: {:?}", e)));
                     }
                 }
@@ -140,7 +146,6 @@ impl IndexerImpl {
         for tx in txs {
             let tx_id = TxId::from(tx.as_ref());
             let wrequest = WriteRequest::decode(tx.as_ref());
-            info!("TxId: {}", tx_id.to_base64());
             match wrequest {
                 Ok(req) => match Self::unwrap_and_verify(req) {
                     Ok((data, data_type, account_id)) => match data_type {
@@ -149,9 +154,8 @@ impl IndexerImpl {
                                 Ok(dm) => {
                                     let action = DatabaseAction::from_i32(dm.action);
                                     info!(
-                                        "Add action: {:?}, mutation : {:?} into pending queue",
-                                        action, dm
-                                    );
+                                        "Add account: {}, mutation : {:?}, tx: {} into pending queue",
+                                        account_id.addr.to_hex(), action, tx_id.to_base64());
                                     database_mutations.push((account_id.addr, dm, tx_id));
                                 }
                                 Err(e) => {
@@ -161,22 +165,22 @@ impl IndexerImpl {
                             }
                         }
                         PayloadType::QuerySessionPayload => {
-                            info!("Skip QuerySessionPayload");
+                            debug!("[Indexer] Skip QuerySessionPayload");
                         }
                         PayloadType::MintCreditsPayload => {
-                            info!("Skip MintCreditsPayload");
+                            debug!("[Indexer] Skip MintCreditsPayload");
                         }
                         _ => {
-                            info!("Skip other payload type");
+                            debug!("[Indexer] Skip other payload type");
                         }
                     },
                     Err(e) => {
-                        warn!("invalid write request: {:?}", e);
+                        warn!("[Indexer] invalid write request: {:?}", e);
                         return Err(Status::internal(format!("invalid write request: {:?}", e)));
                     }
                 },
                 Err(e) => {
-                    warn!("invalid write request: {:?}", e);
+                    warn!("[Indexer] invalid write request: {:?}", e);
                     return Err(Status::internal(format!("invalid write request: {:?}", e)));
                 }
             }
@@ -214,12 +218,6 @@ impl IndexerImpl {
                 }
             };
         }
-        auth_store
-            .commit()
-            .map_err(|e| Status::internal(format!("fail to commit database for {e}")))?;
-        info!("last block state: {:?}", auth_store.get_last_block_state());
-        // TODO: add show indexer state api
-        info!("indexer state: {:?}", auth_store.get_state());
         Ok(())
     }
     /// unwrap and verify write request
