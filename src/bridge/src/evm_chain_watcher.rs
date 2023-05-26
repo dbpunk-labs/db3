@@ -32,10 +32,12 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use tracing::{info, warn};
+
 abigen!(
     DB3RollupContract,
     "bridge/artifacts/contracts/DB3Rollup.sol/DB3Rollup.json"
 );
+
 #[derive(Debug)]
 pub struct EvmChainConfig {
     pub chain_id: u32,

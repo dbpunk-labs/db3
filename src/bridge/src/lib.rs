@@ -16,4 +16,5 @@
 //
 
 pub mod evm_chain_watcher;
+pub mod settlement_executor;
 pub mod storage_chain_minter;

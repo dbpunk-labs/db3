@@ -70,6 +70,7 @@ message MintCreditsMutation {
     bytes to = 5;
     uint64 amount = 6;
     db3_base_proto.BroadcastMeta meta = 7;
+    bytes owner = 8;
 }
 
 enum PayloadType {

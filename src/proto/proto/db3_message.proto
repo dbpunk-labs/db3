@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 syntax = "proto3";
+
 package db3_message_proto;
 
 message DepositEvent {
@@ -31,4 +32,10 @@ message DepositEvent {
     // the signature of transacion
     bytes signature = 6;
     bytes tx_signed_hash = 7;
+}
+
+message SettleAccountEvent {
+    bytes owner = 1;
+    uint64 credits = 2;
+    uint32 chain_id = 3;
 }

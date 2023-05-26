@@ -19,13 +19,16 @@ syntax = "proto3";
 
 package db3_account_proto;
 
-//
-//
 message Account {
     uint64 bills = 1;
     uint64 credits = 2;
+    // TODO exclude the root hash
     uint64 total_storage_in_bytes = 3;
+    // TODO exclude the root hash
     uint64 total_mutation_count = 4;
+    // TODO exclude the root hash
     uint64 total_session_count = 5;
     uint64 nonce = 6;
+    bytes owner = 7;
+    uint32 chain_id = 8;
 }

@@ -84,7 +84,6 @@ impl AbciImpl {
             pending_credits: Arc::new(Mutex::new(Vec::new())),
         }
     }
-
     parse_mutation!(parse_database_mutation, DatabaseMutation);
     parse_mutation!(parse_mint_credits_mutation, MintCreditsMutation);
     parse_mutation!(parse_query_session, QuerySession);

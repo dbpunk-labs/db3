@@ -9,15 +9,17 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 ///
 ///
 contract Db3Token is ERC20 {
+
     /// the constructor for DB3 Token
     constructor() ERC20("db3 token", "db3") {
-        // assign the sender 1000 DB3
-        _mint(msg.sender, 10000 * 10 ** decimals());
+        // assign the sender 100000000 DB3
+        _mint(msg.sender, 100000000 * 10 ** decimals());
     }
 
-    /// the smallest unit is tai
-    /// 1 db3 = 1000_000_000 tai
+    /// the smallest unit is bit
+    /// 1 db3 = 1000_000_000 bit
     function decimals() public pure override returns (uint8) {
         return 9;
     }
+
 }

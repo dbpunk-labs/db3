@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 //
+
 use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
@@ -62,7 +63,13 @@ impl AccountStore {
     /// Create a account for the storage chains
     ///
     ///
-    pub fn new_account(db: Pin<&mut Merk>, addr: &DB3Address, credits: u64) -> Result<Account> {
+    pub fn new_account(
+        db: Pin<&mut Merk>,
+        addr: &DB3Address,
+        credits: u64,
+        chain_id: u32,
+        owner: &[u8],
+    ) -> Result<Account> {
         let key = AccountKey(addr);
         let encoded_key = key.encode()?;
         let values = db
@@ -81,6 +88,8 @@ impl AccountStore {
                 total_mutation_count: 0,
                 total_session_count: 0,
                 nonce: 0,
+                chain_id,
+                owner: owner.to_vec(),
             };
             Self::override_account(db, encoded_key, &new_account)?;
             Ok(new_account)

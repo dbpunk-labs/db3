@@ -18,6 +18,7 @@
 use db3_crypto::{
     db3_address::DB3Address, db3_public_key::DB3PublicKey, signature_scheme::SignatureScheme,
 };
+
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_mutation_proto::MintCreditsMutation;
@@ -119,6 +120,7 @@ impl StorageChainMinter {
                         event.signature.as_ref(),
                         event.tx_signed_hash.as_ref(),
                     )?;
+
                     let mutation = MintCreditsMutation {
                         chain_id,
                         block_id,
@@ -126,6 +128,7 @@ impl StorageChainMinter {
                         to: to_address.as_ref().to_vec(),
                         amount: event.amount,
                         meta: Some(meta),
+                        owner: event.sender.to_vec(),
                     };
                     let txid = self.sdk.submit_mint_credit_mutation(&mutation).await?;
                     let addr_str = format!("0x{}", hex::encode(to_address.as_ref()));

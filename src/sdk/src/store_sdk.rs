@@ -1,5 +1,5 @@
 //
-// bill_sdk.rs
+// store_sdk.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -344,6 +344,25 @@ impl StoreSDK {
             let response = client.run_query(request).await?.into_inner();
             Ok(response)
         }
+    }
+
+    pub async fn subscribe_block_message(
+        &mut self,
+    ) -> Result<tonic::Response<Streaming<EventMessage>>, Status> {
+        let session_token = self.keep_session(true).await?;
+        let b_filter = BlockEventFilter {};
+        let sub = Subscription {
+            topics: vec![EventType::Block.into()],
+            filters: vec![EventFilter {
+                filter: Some(event_filter::Filter::Bfilter(b_filter)),
+            }],
+        };
+        let req = SubscribeRequest {
+            session_token,
+            sub: Some(sub),
+        };
+        let mut client = self.client.as_ref().clone();
+        client.subscribe(req).await
     }
 
     pub async fn subscribe_event_message(

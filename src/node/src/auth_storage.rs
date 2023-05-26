@@ -291,32 +291,41 @@ impl AuthStorage {
         mint: &MintCreditsMutation,
     ) -> Result<()> {
         //TODO the sender address must be limited
-        let _account = match AccountStore::get_account(self.db.as_ref(), sender)? {
-            Some(account) => Ok(account),
-            None => {
-                //TODO remove the action for adding a new user
-                let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
-                self.network_state
-                    .total_account_count
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                AccountStore::new_account(db, sender, 10)
-            }
-        }?;
+        // check the sender should equal
+        //let _account = match AccountStore::get_account(self.db.as_ref(), sender)? {
+        //    Some(account) => Ok(account),
+        //    None => {
+        //        //TODO remove the action for adding a new user
+        //        let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
+        //        self.network_state
+        //            .total_account_count
+        //            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        //        AccountStore::new_account(db, sender, 10)
+        //    }
+        //}?;
+
         let to_address_ref: &[u8] = mint.to.as_ref();
         let to_address = DB3Address::try_from(to_address_ref)?;
         match AccountStore::get_account(self.db.as_ref(), &to_address)? {
             Some(mut account) => {
                 account.credits += mint.amount;
+                account.owner = mint.owner.to_vec();
+                account.chain_id = mint.chain_id;
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
                 AccountStore::update_account(db, &to_address, &account)?;
             }
             None => {
-                //TODO remove the action for adding a new user
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
                 self.network_state
                     .total_account_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                AccountStore::new_account(db, &to_address, mint.amount / 1000_000_000)?;
+                AccountStore::new_account(
+                    db,
+                    &to_address,
+                    mint.amount / 1000_000_000,
+                    mint.chain_id,
+                    mint.owner.as_ref(),
+                )?;
             }
         };
         let bill_id = BillId::new(

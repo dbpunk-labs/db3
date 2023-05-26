@@ -9,6 +9,7 @@ contract DB3Rollup {
     // the locked balance of an address
     mapping(address => uint256) private _balances;
     bytes32 private _root;
+    uint256 private _totalUnsignedFee;
     event Deposit(address from, uint256 amount);
     event Settlement(address owner, uint256 amount);
 
@@ -26,6 +27,10 @@ contract DB3Rollup {
 
     function getLockedBalance(address owner) public view returns (uint256) {
         return _balances[owner];
+    }
+
+    function getTotalGasFee() public view returns(uint256) {
+        return _totalUnsignedFee;
     }
 
     function _conversion(
@@ -84,6 +89,7 @@ contract DB3Rollup {
                 states[i],
                 (address, uint256)
             );
+            _totalUnsignedFee += _balances[account] - balance;
             _balances[account] = balance;
         }
         _root = postRootHash;
