@@ -102,11 +102,9 @@ mod tests {
     use super::*;
     use bytes::BytesMut;
     use chrono::Utc;
-    use db3_crypto::db3_address::DB3Address;
     use db3_crypto::db3_signer::Db3MultiSchemeSigner;
     use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
     use db3_proto::db3_mutation_proto::DatabaseAction;
-    use fastcrypto::traits::EncodeDecodeBase64;
     fn create_a_database_mutation() -> DatabaseMutation {
         let meta = BroadcastMeta {
             //TODO get from network
@@ -140,7 +138,7 @@ mod tests {
             payload: mbuf.as_ref().to_vec().to_owned(),
             payload_type: PayloadType::DatabasePayload.into(),
         };
-        let (bytes, payload_type, account_id) = MutationUtil::unwrap_and_verify(request).unwrap();
+        let (_, payload_type, _) = MutationUtil::unwrap_and_verify(request).unwrap();
         assert_eq!(PayloadType::DatabasePayload, payload_type);
     }
 }

@@ -81,11 +81,8 @@ impl IndexerImpl {
                             vec![];
                         Self::parse_and_pending_mutations(&block.data, &mut pending_databases)
                             .await?;
-                        Self::apply_database_mutations(
-                            store.get_auth_store(),
-                            &mut pending_databases,
-                        )
-                        .await?;
+                        Self::apply_database_mutations(store.get_auth_store(), &pending_databases)
+                            .await?;
                         store.get_auth_store().commit().map_err(|e| {
                             Status::internal(format!("fail to commit database for {e}"))
                         })?;
@@ -159,7 +156,7 @@ impl IndexerImpl {
     }
     async fn apply_database_mutations(
         auth_store: &mut AuthStorage,
-        pending_databases: &mut Vec<(AccountAddress, DatabaseMutation, TxId)>,
+        pending_databases: &Vec<(AccountAddress, DatabaseMutation, TxId)>,
     ) -> std::result::Result<(), Status> {
         info!(
             "Pending database mutations queue size: {}",
