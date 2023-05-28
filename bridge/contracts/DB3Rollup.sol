@@ -3,8 +3,10 @@ pragma solidity ^0.8.9;
 
 import "./DB3Token.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract DB3Rollup {
+contract DB3Rollup is Initializable {
     Db3Token private _tokenContract;
     // the locked balance of an address
     mapping(address => uint256) private _balances;
@@ -13,7 +15,15 @@ contract DB3Rollup {
     event Deposit(address from, uint256 amount);
     event Settlement(address owner, uint256 amount);
 
-    constructor(Db3Token tokenContract, bytes32 root) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        Db3Token tokenContract,
+        bytes32 root
+    ) public initializer {
         _tokenContract = tokenContract;
         _root = root;
     }
@@ -29,7 +39,7 @@ contract DB3Rollup {
         return _balances[owner];
     }
 
-    function getTotalGasFee() public view returns(uint256) {
+    function getTotalGasFee() public view returns (uint256) {
         return _totalUnsignedFee;
     }
 
