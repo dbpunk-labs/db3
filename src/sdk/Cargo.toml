@@ -31,7 +31,7 @@ tendermint = "0.31.1"
 [dev-dependencies]
 db3-base={path="../base", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
-criterion = { version = "0.3.4", default-features = false,features = ["async_futures", "async_tokio"]}
+criterion = { version = "0.5.1", default-features = false,features = ["async_futures", "async_tokio"]}
 [dependencies.uuid]
 version = "1.2.2"
 features = [
