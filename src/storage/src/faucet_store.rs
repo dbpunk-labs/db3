@@ -74,7 +74,7 @@ impl FaucetStore {
         //
         // allow to request faucet in every hour
         //
-        let key: Vec<u8> = faucet_key::build_faucet_key(addr, ts / 60)?;
+        let key: Vec<u8> = faucet_key::build_faucet_key(addr, ts / (60 * 60 * 24))?;
         let key_ref: &[u8] = key.as_ref();
         {
             let read_table = tx
@@ -118,14 +118,13 @@ impl FaucetStore {
                 .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
         }
 
-        {
+        let fund = {
             let mut mut_table = tx
                 .open_table(TOTAL_FUND_TABLE)
                 .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
             let value = mut_table
                 .insert(TOTAL_FUND_KEY.as_bytes(), amount.to_be_bytes().as_ref())
                 .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
-
             let fund = match value {
                 Some(old_value) => {
                     let fixed_bytes: [u8; 8] = old_value
@@ -136,18 +135,18 @@ impl FaucetStore {
                 }
                 _ => 0,
             };
+            fund
+        };
 
-            if fund > 0 {
-                let new_amount = fund + amount;
-                let mut mut_table = tx
-                    .open_table(TOTAL_FUND_TABLE)
-                    .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
-                mut_table
-                    .insert(TOTAL_FUND_KEY.as_bytes(), new_amount.to_be_bytes().as_ref())
-                    .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
-            }
+        if fund > 0 {
+            let mut mut_table = tx
+                .open_table(TOTAL_FUND_TABLE)
+                .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
+            let new_amount = fund + amount;
+            mut_table
+                .insert(TOTAL_FUND_KEY.as_bytes(), new_amount.to_be_bytes().as_ref())
+                .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
         }
-
         tx.commit()
             .map_err(|e| DB3Error::StoreFaucetError(format!("{e}")))?;
         Ok(())

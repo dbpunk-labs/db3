@@ -100,7 +100,7 @@ impl FaucetNodeImpl {
 impl FaucetNode for FaucetNodeImpl {
     async fn get_faucet_state(
         &self,
-        request: Request<GetFaucetStateRequest>,
+        _request: Request<GetFaucetStateRequest>,
     ) -> std::result::Result<Response<FaucetState>, Status> {
         let read_txn = self
             .db
