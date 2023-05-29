@@ -184,6 +184,9 @@ pub enum DB3Command {
         /// Suppress all output logging (overrides --verbose).
         #[clap(short, long)]
         quiet: bool,
+        /// Send some eth to the accout that requests the db3 token
+        #[clap(long, default_value = "false")]
+        enable_eth_fund: bool,
     },
     /// Run db3 bridge
     #[clap(name = "bridge")]
@@ -295,6 +298,7 @@ impl DB3Command {
                 amount,
                 verbose,
                 quiet,
+                enable_eth_fund,
             } => {
                 let log_level = if quiet {
                     LevelFilter::OFF
@@ -322,6 +326,7 @@ impl DB3Command {
                     erc20_address: token_address,
                     node_list,
                     amount,
+                    enable_eth_fund,
                 };
                 let pk = db3_cmd::keystore::KeyStore::get_private_key(home.clone()).unwrap();
                 if let Ok(wallet) = pk.parse::<LocalWallet>() {

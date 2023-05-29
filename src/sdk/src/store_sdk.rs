@@ -773,7 +773,7 @@ mod tests {
         counter: i64,
     ) {
         let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut sdk = StoreSDK::new(client, signer, use_typed_format);
+        let sdk = StoreSDK::new(client, signer, use_typed_format);
         let res = sdk.fetch_block_by_height(1).await;
         assert!(res.is_ok(), "{:?}", res);
         let block: block::Block = serde_json::from_slice(res.unwrap().block.as_slice()).unwrap();
