@@ -25,6 +25,7 @@ use tracing::{debug, info, warn};
 pub struct IndexerBlockSyncer {
     store_sdk: StoreSDK,
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
+    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
 impl IndexerBlockSyncer {
