@@ -42,31 +42,14 @@ use uuid::Uuid;
 pub struct IndexerSDK {
     client: Arc<IndexerNodeClient<tonic::transport::Channel>>,
     signer: Db3MultiSchemeSigner,
-    types: Types,
-    use_typed_format: bool,
 }
 
 impl IndexerSDK {
     pub fn new(
         client: Arc<IndexerNodeClient<tonic::transport::Channel>>,
         signer: Db3MultiSchemeSigner,
-        use_typed_format: bool,
     ) -> Self {
-        let json = serde_json::json!({
-          "EIP712Domain": [
-          ],
-          "Message":[
-          {"name":"payload", "type":"bytes"},
-          {"name":"payloadType", "type":"string"}
-          ]
-        });
-        let types: Types = serde_json::from_value(json).unwrap();
-        Self {
-            client,
-            signer,
-            types,
-            use_typed_format,
-        }
+        Self { client, signer }
     }
 
     pub async fn check_node(&self) -> std::result::Result<(), Status> {
@@ -194,13 +177,12 @@ mod tests {
     use uuid::Uuid;
 
     async fn run_doc_crud_happy_path(
-        use_typed_format: bool,
         storage_client: Arc<StorageNodeClient<tonic::transport::Channel>>,
         indexer_client: Arc<IndexerNodeClient<tonic::transport::Channel>>,
         counter: i64,
     ) {
         let (addr1, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let msdk = MutationSDK::new(storage_client.clone(), signer, use_typed_format);
+        let msdk = MutationSDK::new(storage_client.clone(), signer, true);
         let dm = sdk_test::create_a_database_mutation();
         let result = msdk.submit_database_mutation(&dm).await;
         assert!(result.is_ok(), "{:?}", result.err());
@@ -214,7 +196,7 @@ mod tests {
         assert!(result.is_ok());
         std::thread::sleep(sleep_seconds);
         let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut sdk = IndexerSDK::new(indexer_client.clone(), signer, use_typed_format);
+        let mut sdk = IndexerSDK::new(indexer_client.clone(), signer);
         let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
         assert_eq!(true, my_dbs.len() > 0);
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
@@ -290,21 +272,10 @@ mod tests {
         let channel = rpc_endpoint.connect_lazy();
         Arc::new(IndexerNodeClient::new(channel))
     }
-    #[tokio::test]
-    async fn proto_doc_curd_happy_path_smoke_test() {
-        run_doc_crud_happy_path(
-            false,
-            create_storage_node_client(),
-            create_indexer_node_client(),
-            132,
-        )
-        .await;
-    }
 
     #[tokio::test]
     async fn typed_data_doc_curd_happy_path_smoke_test() {
         run_doc_crud_happy_path(
-            true,
             create_storage_node_client(),
             create_indexer_node_client(),
             131,
@@ -319,7 +290,7 @@ mod tests {
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(IndexerNodeClient::new(channel));
         let (_addr, signer) = sdk_test::gen_ed25519_signer(150);
-        let sdk = IndexerSDK::new(client.clone(), signer, false);
+        let sdk = IndexerSDK::new(client.clone(), signer);
         let result = sdk.get_state().await;
         assert!(result.is_ok());
     }

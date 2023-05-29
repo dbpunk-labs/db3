@@ -12,7 +12,6 @@ use db3_proto::db3_indexer_proto::{
     ShowDatabaseRequest, ShowDatabaseResponse, ShowIndexerStatusRequest,
 };
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, PayloadType, WriteRequest};
-use db3_sdk::indexer_sdk::IndexerSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use prost::Message;
 use std::pin::Pin;
@@ -25,7 +24,6 @@ use tracing::{debug, info, warn};
 pub struct IndexerBlockSyncer {
     store_sdk: StoreSDK,
     node_store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    pending_databases: Arc<Mutex<Vec<(AccountAddress, DatabaseMutation, TxId)>>>,
 }
 
 impl IndexerBlockSyncer {
