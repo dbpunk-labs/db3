@@ -136,7 +136,7 @@ pub enum DB3Command {
             default_value = "http://127.0.0.1:26659"
         )]
         db3_storage_grpc_url: String,
-        #[clap(short, long, default_value = "./indexer.db")]
+        #[clap(short, long, default_value = "./indexer")]
         db_path: String,
         #[clap(long, default_value = "16")]
         db_tree_level_in_memory: u8,
