@@ -36,6 +36,13 @@ message FaucetResponse {
     string msg = 2;
 }
 
+message GetFaucetStateRequest {}
+message FaucetState {
+    uint64 total_amount = 1;
+    uint64 total_address = 2;
+}
+
 service FaucetNode {
     rpc Faucet(FaucetRequest) returns (FaucetResponse){}
+    rpc GetFaucetState(GetFaucetStateRequest) returns(FaucetState){}
 }

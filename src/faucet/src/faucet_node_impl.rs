@@ -23,7 +23,10 @@ use ethers::{
 };
 
 use db3_error::{DB3Error, Result as DB3Result};
-use db3_proto::db3_faucet_proto::{faucet_node_server::FaucetNode, FaucetRequest, FaucetResponse};
+use db3_proto::db3_faucet_proto::{
+    faucet_node_server::FaucetNode, FaucetRequest, FaucetResponse, FaucetState,
+    GetFaucetStateRequest,
+};
 use db3_storage::faucet_store::FaucetStore;
 use hex;
 use redb::Database;
@@ -43,6 +46,7 @@ pub struct FaucetNodeConfig {
     pub node_list: Vec<String>,
     // a amount for every faucet request
     pub amount: u64,
+    pub enable_eth_fund: bool,
 }
 
 pub struct FaucetNodeImpl {
@@ -83,6 +87,7 @@ impl FaucetNodeImpl {
             erc20_address,
         })
     }
+
     fn current_seconds() -> u32 {
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(n) => n.as_secs() as u32,
@@ -93,6 +98,22 @@ impl FaucetNodeImpl {
 
 #[tonic::async_trait]
 impl FaucetNode for FaucetNodeImpl {
+    async fn get_faucet_state(
+        &self,
+        _request: Request<GetFaucetStateRequest>,
+    ) -> std::result::Result<Response<FaucetState>, Status> {
+        let read_txn = self
+            .db
+            .begin_read()
+            .map_err(|e| Status::internal(format!("fail to open transacion {e}")))?;
+        let (count, total_fund) = FaucetStore::get_state(read_txn)
+            .map_err(|e| Status::internal(format!("fail to open transacion {e}")))?;
+        return Ok(Response::new(FaucetState {
+            total_amount: total_fund,
+            total_address: count,
+        }));
+    }
+
     async fn faucet(
         &self,
         request: Request<FaucetRequest>,
@@ -129,19 +150,21 @@ impl FaucetNode for FaucetNodeImpl {
                 }
             }
         }
-        // 0.05 eth
-        let one_eth: u64 = 50_000_000_000_000_000;
         // send x_eth to faucet account
-        let tx = TransactionRequest::new()
-            .to(address)
-            .value(one_eth)
-            .from(self.address);
-        self.client
-            .send_transaction(tx, None)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+        if self.config.enable_eth_fund {
+            // 0.005 eth
+            let one_eth: u64 = 5_000_000_000_000_000;
+            let tx = TransactionRequest::new()
+                .to(address)
+                .value(one_eth)
+                .from(self.address);
+            self.client
+                .send_transaction(tx, None)
+                .await
+                .unwrap()
+                .await
+                .unwrap();
+        }
         let token_contract = DB3TokenContract::new(self.erc20_address, self.client.clone());
         let balance = token_contract.balance_of(self.address).call().await;
         info!("the main account balance {:?}", balance);
