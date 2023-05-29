@@ -18,7 +18,7 @@
 use crate::abci_impl::AbciImpl;
 use crate::auth_storage::AuthStorage;
 use crate::context::Context;
-use crate::indexer_impl::IndexerImpl;
+use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
 use crate::json_rpc_impl;
 use crate::node_storage::NodeStorage;
 use crate::storage_node_impl::StorageNodeImpl;
@@ -36,6 +36,7 @@ use db3_faucet::{
 };
 use db3_proto::db3_event_proto::{EventMessage, Subscription};
 use db3_proto::db3_faucet_proto::faucet_node_server::FaucetNodeServer;
+use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_sdk::mutation_sdk::MutationSDK;
@@ -130,6 +131,12 @@ pub enum DB3Command {
     /// Start db3 indexer
     #[clap(name = "indexer")]
     Indexer {
+        /// Bind the gprc server to this .
+        #[clap(long, default_value = "127.0.0.1")]
+        public_host: String,
+        /// The port of grpc api
+        #[clap(long, default_value = "26639")]
+        public_grpc_port: u16,
         /// the db3 storage chain grpc url
         #[clap(
             long = "db3_storage_grpc_url",
@@ -413,6 +420,8 @@ impl DB3Command {
             }
 
             DB3Command::Indexer {
+                public_host,
+                public_grpc_port,
                 db3_storage_grpc_url,
                 db_path,
                 db_tree_level_in_memory,
@@ -445,8 +454,29 @@ impl DB3Command {
                     }
                     _ => todo!(),
                 }
-                let mut indexer_impl = IndexerImpl::new(ctx.store_sdk.unwrap(), node_store);
-                indexer_impl.start().await.unwrap();
+                let indexer_node_impl = IndexerNodeImpl::new(node_store.clone());
+                let addr = format!("{public_host}:{public_grpc_port}");
+                let listen = tokio::spawn(async move {
+                    info!("start db3 indexer listener ...");
+                    let mut indexer_block_syncer =
+                        IndexerBlockSyncer::new(ctx.store_sdk.unwrap(), node_store.clone());
+                    indexer_block_syncer.start().await.unwrap();
+                });
+                info!("start db3 indexer node on public addr {}", addr);
+                let cors_layer = CorsLayer::new()
+                    .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+                    .allow_headers(Any)
+                    .allow_origin(Any);
+                Server::builder()
+                    .accept_http1(true)
+                    .layer(cors_layer)
+                    .layer(tonic_web::GrpcWebLayer::new())
+                    .add_service(IndexerNodeServer::new(indexer_node_impl))
+                    .serve(addr.parse().unwrap())
+                    .await
+                    .unwrap();
+                let (r1,) = tokio::join!(listen);
+                r1.unwrap();
                 info!("exit standalone indexer")
             }
 

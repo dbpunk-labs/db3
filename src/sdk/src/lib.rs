@@ -16,6 +16,7 @@
 //
 
 pub mod faucet_sdk;
+pub mod indexer_sdk;
 pub mod mutation_sdk;
 #[cfg(test)]
 pub mod sdk_test;

@@ -1,0 +1,73 @@
+//
+//
+// db3_node.proto
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+syntax = "proto3";
+import "db3_database.proto";
+package db3_indexer_proto;
+
+message IndexerStatus {
+    uint64 total_database_count = 1;
+    uint64 total_collection_count = 2;
+    uint64 total_document_count = 3;
+    uint64 total_account_count = 4;
+    uint64 total_mutation_count = 5;
+    uint64 total_storage_in_bytes = 7;
+}
+
+message ShowDatabaseRequest {
+    // the database address in hex format
+    string address = 2;
+    // the owner address in hex format
+    string owner_address = 3;
+}
+
+message ShowDatabaseResponse {
+    repeated db3_database_proto.Database dbs = 1;
+}
+
+message RunQueryRequest {
+    // a hex string
+    string address = 2;
+    db3_database_proto.StructuredQuery query = 3;
+    // TODO: support paging setting (e.g page_size, page_token)
+    // TODO: support document mask
+}
+message GetDocumentRequest {
+    // a hex string
+    string id = 2;
+}
+
+message GetDocumentResponse {
+    db3_database_proto.Document document = 1;
+}
+
+message RunQueryResponse{
+    repeated db3_database_proto.Document documents = 2;
+    // TODO: support next_page_token for page loading
+}
+message ShowIndexerStatusRequest {}
+
+service IndexerNode {
+    // method for show indexer status
+    rpc ShowIndexerStatus(ShowIndexerStatusRequest) returns (IndexerStatus){}
+    // method for show database
+    rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
+    // method for query document
+    rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
+    // method for get document
+    rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
+}
