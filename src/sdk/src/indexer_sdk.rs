@@ -15,46 +15,22 @@
 // limitations under the License.
 //
 
-use bytes::BytesMut;
-use chrono::Utc;
-use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
-use db3_proto::db3_account_proto::Account;
 use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
 use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
 use db3_proto::db3_indexer_proto::{
     indexer_node_client::IndexerNodeClient, GetDocumentRequest, IndexerStatus, RunQueryRequest,
     RunQueryResponse, ShowDatabaseRequest, ShowIndexerStatusRequest,
 };
-use ethers::core::types::{
-    transaction::eip712::{EIP712Domain, TypedData, Types},
-    Bytes,
-};
-
-use hex;
-use num_traits::cast::FromPrimitive;
-use prost::Message;
-use std::collections::BTreeMap;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tonic::Status;
-use uuid::Uuid;
 
 pub struct IndexerSDK {
     client: Arc<IndexerNodeClient<tonic::transport::Channel>>,
-    signer: Db3MultiSchemeSigner,
 }
 
 impl IndexerSDK {
-    pub fn new(
-        client: Arc<IndexerNodeClient<tonic::transport::Channel>>,
-        signer: Db3MultiSchemeSigner,
-    ) -> Self {
-        Self { client, signer }
-    }
-
-    pub async fn check_node(&self) -> std::result::Result<(), Status> {
-        let state = self.get_state().await?;
-        Ok(())
+    pub fn new(client: Arc<IndexerNodeClient<tonic::transport::Channel>>) -> Self {
+        Self { client }
     }
 
     /// show document with given db addr and collection name
@@ -161,9 +137,7 @@ mod tests {
     use super::*;
     use crate::mutation_sdk::MutationSDK;
     use crate::sdk_test;
-    use bytes::BytesMut;
 
-    use chrono::Utc;
     use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
     use db3_proto::db3_database_proto::structured_query::filter::FilterType;
     use db3_proto::db3_database_proto::structured_query::value::ValueType;
@@ -196,7 +170,7 @@ mod tests {
         assert!(result.is_ok());
         std::thread::sleep(sleep_seconds);
         let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut sdk = IndexerSDK::new(indexer_client.clone(), signer);
+        let mut sdk = IndexerSDK::new(indexer_client.clone());
         let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
         assert_eq!(true, my_dbs.len() > 0);
         let database = sdk.get_database(db_id.to_hex().as_str()).await;
@@ -290,7 +264,7 @@ mod tests {
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(IndexerNodeClient::new(channel));
         let (_addr, signer) = sdk_test::gen_ed25519_signer(150);
-        let sdk = IndexerSDK::new(client.clone(), signer);
+        let sdk = IndexerSDK::new(client.clone());
         let result = sdk.get_state().await;
         assert!(result.is_ok());
     }
