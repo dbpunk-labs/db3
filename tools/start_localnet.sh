@@ -45,6 +45,10 @@ sleep 1
 echo "start tendermint node..."
 ./tendermint unsafe_reset_all >> tm.log 2>&1  && ./tendermint start >> tm.log 2>&1 &
 sleep 1
+echo "start db3 indexer..."
+../target/${BUILD_MODE}/db3 indexer >indexer.log 2>&1  &
+sleep 1
+
 
 if [[ $RUN_L1_CHAIN == 'OK' ]]; then
     echo "start evm chain network..."

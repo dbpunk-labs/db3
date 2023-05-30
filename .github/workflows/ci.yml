@@ -65,6 +65,8 @@ jobs:
           ../target/debug/db3 client new-db
           sleep 1
           ../target/debug/db3 client show-state
+          sleep 1
+          ../target/debug/db3 indexer
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
@@ -74,6 +76,8 @@ jobs:
           name: db3-log-artifact
           path: |
             tools/db3.log
+            tools/indexer.log
+            tools/tm.log
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}
