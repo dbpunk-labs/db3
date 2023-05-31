@@ -50,7 +50,7 @@ if you want update db3 documents , you can follow the steps
 ### Install Mkdocs
 
 ```shell
-pip install mkdocs
+pip install mkdocs-material
 ```
 ### Document Template
 
