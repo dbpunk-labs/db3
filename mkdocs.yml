@@ -66,7 +66,10 @@ nav:
       # - Overview: build/overview.md
 
       - Quick Start: build/quick_start.md
+      - Client: build/client/terminal_client.md
       - DMS: build/data_manager.md
+      - SDK:
+          - JS SDK: build/sdk/js_sdk.md
       - Nodes:
           - Community Nodes: build/node/community_node.md
           - Self Running Node: build/node/run_locally.md
@@ -79,7 +82,7 @@ nav:
       #     - Easy html: build/demos/html_demo.md
       #     - Nextjs Demo: build/demos/nextjs_demo.md
 
-  - White Paper: white_paper.md
+  # - White Paper: white_paper.md
   - Forum: "https://community.db3.network/"
 
 extra:
