@@ -74,6 +74,8 @@ jobs:
           name: db3-log-artifact
           path: |
             tools/db3.log
+            tools/indexer.log
+            tools/tm.log
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}

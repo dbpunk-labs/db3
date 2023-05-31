@@ -32,6 +32,7 @@ fn main() {
                 "proto/db3_message.proto",
                 "proto/db3_faucet.proto",
                 "proto/db3_event.proto",
+                "proto/db3_indexer.proto",
             ],
             &["proto"],
         )

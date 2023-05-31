@@ -46,3 +46,6 @@ pub mod db3_faucet_proto {
 pub mod db3_event_proto {
     tonic::include_proto!("db3_event_proto");
 }
+pub mod db3_indexer_proto {
+    tonic::include_proto!("db3_indexer_proto");
+}
