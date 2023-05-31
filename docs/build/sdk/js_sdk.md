@@ -9,7 +9,7 @@ Start with `npm install db3.js`
 // the key seed
 const mnemonic = "...";
 // create a wallet
-const wallet = DB3BrowserWallet.createNew(mnemonic, "DB3_SECP259K1");
+const wallet = DB3BrowserWallet.createNew(mnemonic, "DB3_SECP256K1");
 // build db3 client
 const client = new DB3Client("http://127.0.0.1:26659", wallet);
 ```
