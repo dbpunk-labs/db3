@@ -152,8 +152,8 @@ impl FaucetNode for FaucetNodeImpl {
         }
         // send x_eth to faucet account
         if self.config.enable_eth_fund {
-            // 0.005 eth
-            let one_eth: u64 = 5_000_000_000_000_000;
+            // 0.05 eth
+            let one_eth: u64 = 500_000_000_000_000_000;
             let tx = TransactionRequest::new()
                 .to(address)
                 .value(one_eth)

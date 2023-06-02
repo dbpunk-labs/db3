@@ -299,7 +299,7 @@ impl AuthStorage {
                 self.network_state
                     .total_account_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                AccountStore::new_account(db, sender, 10)
+                AccountStore::new_account(db, sender, 10 * 1000_000_000)
             }
         }?;
         let to_address_ref: &[u8] = mint.to.as_ref();
@@ -311,12 +311,11 @@ impl AuthStorage {
                 AccountStore::update_account(db, &to_address, &account)?;
             }
             None => {
-                //TODO remove the action for adding a new user
                 let db: Pin<&mut Merk> = Pin::as_mut(&mut self.db);
                 self.network_state
                     .total_account_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                AccountStore::new_account(db, &to_address, mint.amount / 1000_000_000)?;
+                AccountStore::new_account(db, &to_address, mint.amount)?;
             }
         };
         let bill_id = BillId::new(

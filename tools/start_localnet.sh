@@ -4,7 +4,7 @@
 killall db3 tendermint
 test_dir=`pwd`
 BUILD_MODE='debug'
-RUN_L1_CHAIN=""
+RUN_L1_CHAIN="OK"
 if [[ $1 == 'release' ]] ; then
   BUILD_MODE='release'
 fi
@@ -61,10 +61,13 @@ if [[ $RUN_L1_CHAIN == 'OK' ]]; then
     echo "rollup address ${ADDRESS}"
     echo "erc20 address ${TOKEN_ADDRESS}"
     echo "start db3 bridge node ..."
+
+    test -e bridge.db && rm bridge.db
     cd ${test_dir} && ../target/${BUILD_MODE}/db3 bridge --evm-chain-ws ws://127.0.0.1:8545 --evm-chain-id 1 --contract-address ${ADDRESS} --db_path ${test_dir}/bridge.db > bridge.log 2>&1 &
     sleep 1
     echo "start db3 faucet node ..."
-    cd ${test_dir} && ../target/${BUILD_MODE}/db3 faucet --evm-chain-ws ws://127.0.0.1:8545  --token-address ${TOKEN_ADDRESS} --db_path ${test_dir}/faucet.db > faucet.log 2>&1 &
+    test -e faucet.db && rm faucet.db
+    cd ${test_dir} && ../target/${BUILD_MODE}/db3 faucet --enable-eth-fund --evm-chain-ws ws://127.0.0.1:8545  --token-address ${TOKEN_ADDRESS}  --db_path ${test_dir}/faucet.db > faucet.log 2>&1 &
     echo "start local development done!"
 fi
 while true; do sleep 1 ; done

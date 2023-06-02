@@ -37,6 +37,7 @@ message FaucetResponse {
 }
 
 message GetFaucetStateRequest {}
+
 message FaucetState {
     uint64 total_amount = 1;
     uint64 total_address = 2;
