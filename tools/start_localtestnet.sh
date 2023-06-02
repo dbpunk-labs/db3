@@ -72,7 +72,7 @@ sleep 1
 ./tendermint start --home node3 > tm3.log 2>&1 &
 sleep 1
 echo "start db3 indexer..."
-../target/${BUILD_MODE}/db3 indexer >indexer.log 2>&1  &
+../target/${BUILD_MODE}/db3 indexer --public-grpc-port 46639 --db3_storage_grpc_url 46659 >indexer.log 2>&1  &
 sleep 1
 
 if [[ $RUN_L1_CHAIN == 'OK' ]]; then
