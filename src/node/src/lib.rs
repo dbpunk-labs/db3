@@ -20,8 +20,6 @@ pub mod auth_storage;
 pub mod command;
 pub mod context;
 pub mod indexer_impl;
-mod json_rpc;
-pub mod json_rpc_impl;
 mod mutation_utils;
 pub mod node_key;
 pub mod node_storage;

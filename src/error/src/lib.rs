@@ -117,6 +117,10 @@ pub enum DB3Error {
     RequestFaucetError(String),
     #[error("fail to fetch faucet for {0}")]
     FetchBlockError(String),
+    #[error("fail to open db3 with path {0} for error {1}")]
+    OpenStoreError(String, String),
+    #[error("fail to write store for error {0}")]
+    WriteStoreError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

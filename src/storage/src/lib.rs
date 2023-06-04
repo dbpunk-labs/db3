@@ -27,3 +27,4 @@ pub mod event_store;
 mod faucet_key;
 pub mod faucet_store;
 pub mod key;
+pub mod mutation_store;

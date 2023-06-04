@@ -14,9 +14,8 @@ tendermint-proto = "0.31.1"
 tendermint-rpc = {version = "0.31.1",  features=["http-client", "websocket-client"]}
 tendermint-config = "0.31.1"
 tendermint = "0.31.1"
-actix-web = "4.2.1"
-actix-cors = "0.6"
 futures-util = "0.3.25"
+actix-rt = "2.8.0"
 flex-error = { version = "0.4.4", default-features = false }
 db3-proto={path="../proto", version="0.1.0"}
 db3-crypto={path="../crypto", version="0.1.0"}

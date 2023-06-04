@@ -56,6 +56,8 @@ impl TryFrom<&[u8]> for AccountId {
     }
 }
 
+pub const TX_ORDER_ID: usize = 128;
+
 pub const TX_ID_LENGTH: usize = 32;
 #[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct TxId {
@@ -73,6 +75,12 @@ impl TxId {
     pub fn to_base64(&self) -> String {
         base64ct::Base64::encode_string(self.as_ref())
     }
+
+    #[inline]
+    pub fn to_hex(&self) -> String {
+        format!("0x{}", hex::encode(self.data.as_ref()))
+    }
+
     pub fn try_from_base64(input: &str) -> std::result::Result<Self, DB3Error> {
         Self::try_from_bytes(base64ct::Base64::decode_vec(input).unwrap().as_slice())
     }

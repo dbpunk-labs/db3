@@ -146,9 +146,7 @@ mod tests {
     use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
     use std::sync::Arc;
     use std::time;
-    use tendermint::block;
     use tonic::transport::Endpoint;
-    use uuid::Uuid;
 
     async fn run_doc_crud_happy_path(
         storage_client: Arc<StorageNodeClient<tonic::transport::Channel>>,

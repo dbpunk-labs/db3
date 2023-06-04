@@ -19,11 +19,9 @@ use crate::abci_impl::AbciImpl;
 use crate::auth_storage::AuthStorage;
 use crate::context::Context;
 use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
-use crate::json_rpc_impl;
 use crate::node_storage::NodeStorage;
 use crate::storage_node_impl::StorageNodeImpl;
-use actix_cors::Cors;
-use actix_web::{rt, web, App, HttpServer};
+use actix_rt as rt;
 use clap::Parser;
 use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
 use db3_bridge::storage_chain_minter::StorageChainMinter;
@@ -89,8 +87,6 @@ pub enum DB3Command {
         /// The port of grpc api
         #[clap(long, default_value = "26659")]
         public_grpc_port: u16,
-        #[clap(long, default_value = "26670")]
-        public_json_rpc_port: u16,
         /// Bind the abci server to this port.
         #[clap(long, default_value = "26658")]
         abci_port: u16,
@@ -395,6 +391,7 @@ impl DB3Command {
                         .block_on(async { watcher.start(sender).await })
                         .unwrap();
                 });
+
                 let ctx = Self::build_context(db3_storage_grpc_url.as_ref());
                 let sdk = ctx.mutation_sdk.unwrap();
                 let minter = StorageChainMinter::new(db, sdk);
@@ -500,7 +497,6 @@ impl DB3Command {
             DB3Command::Start {
                 public_host,
                 public_grpc_port,
-                public_json_rpc_port,
                 abci_port,
                 tendermint_port,
                 read_buf_size,
@@ -538,7 +534,6 @@ impl DB3Command {
                     Self::start_abci_service(abci_port, read_buf_size, node_store.clone());
                 let tm_addr = format!("http://127.0.0.1:{tendermint_port}");
                 let ws_tm_addr = format!("ws://127.0.0.1:{tendermint_port}/websocket");
-                info!("db3 json rpc server will connect to tendermint {tm_addr}");
                 let client = HttpClient::new(tm_addr.as_str()).unwrap();
                 let context = Context {
                     node_store: node_store.clone(),
@@ -546,11 +541,6 @@ impl DB3Command {
                     ws_url: ws_tm_addr,
                     disable_query_session,
                 };
-                let json_rpc_handler = Self::start_json_rpc_service(
-                    &public_host,
-                    public_json_rpc_port,
-                    context.clone(),
-                );
                 Self::start_grpc_service(&public_host, public_grpc_port, disable_grpc_web, context)
                     .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -566,7 +556,6 @@ impl DB3Command {
                     } else {
                         info!("stop db3...");
                         abci_handler.join().unwrap();
-                        json_rpc_handler.join().unwrap();
                         break;
                     }
                 }
@@ -613,44 +602,6 @@ impl DB3Command {
                 .await
                 .unwrap();
         }
-    }
-
-    ///
-    /// Start JSON RPC Service
-    ///
-    fn start_json_rpc_service(
-        public_host: &str,
-        public_json_rpc_port: u16,
-        context: Context,
-    ) -> JoinHandle<()> {
-        let local_public_host = public_host.to_string();
-        let addr = format!("{local_public_host}:{public_json_rpc_port}");
-        info!("start json rpc server with addr {}", addr.as_str());
-        let handler = thread::spawn(move || {
-            rt::System::new()
-                .block_on(async {
-                    HttpServer::new(move || {
-                        let cors = Cors::default()
-                            .allow_any_origin()
-                            .allow_any_method()
-                            .allow_any_header()
-                            .max_age(3600);
-                        App::new()
-                            .app_data(web::Data::new(context.clone()))
-                            .wrap(cors)
-                            .service(
-                                web::resource("/").route(web::post().to(json_rpc_impl::rpc_router)),
-                            )
-                    })
-                    .disable_signals()
-                    .bind((local_public_host, public_json_rpc_port))
-                    .unwrap()
-                    .run()
-                    .await
-                })
-                .unwrap();
-        });
-        handler
     }
 
     ///
