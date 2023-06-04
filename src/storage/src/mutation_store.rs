@@ -77,7 +77,12 @@ impl MutationStore {
         })
     }
 
-    pub fn add_mutation(&self, payload: &[u8], signature: &[u8]) -> Result<()> {
+    pub fn increase_block(&self) {
+        self.block
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn add_mutation(&self, payload: &[u8], signature: &[u8]) -> Result<String> {
         let block = self.block.load(std::sync::atomic::Ordering::Relaxed);
         let order = self
             .order_in_block
@@ -112,7 +117,8 @@ impl MutationStore {
         batch.put_cf(&block_cf_handle, &encoded_id, buf.as_ref());
         self.se
             .write(batch)
-            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(tx_id.to_hex())
     }
 }
 

@@ -41,7 +41,6 @@ message GetNonceResponse {
     uint64 nonce = 2;
 }
 
-
 service StorageNode {
     rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
     //rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}

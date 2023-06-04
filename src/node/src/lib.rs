@@ -24,3 +24,4 @@ mod mutation_utils;
 pub mod node_key;
 pub mod node_storage;
 pub mod storage_node_impl;
+pub mod storage_node_light_impl;
