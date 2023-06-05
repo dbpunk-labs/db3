@@ -96,10 +96,10 @@ pub enum DB3Command {
         #[clap(short, long)]
         verbose: bool,
         /// The database path for mutation
-        #[clap(short, long, default_value = "./mutation_db_path")]
+        #[clap(short, long, default_value = "./mutation_db")]
         mutation_db_path: String,
         /// The database path for state
-        #[clap(short, long, default_value = "./state_db_path")]
+        #[clap(short, long, default_value = "./state_db")]
         state_db_path: String,
     },
 

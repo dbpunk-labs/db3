@@ -44,7 +44,6 @@ message DatabaseMutation {
     // the description of database
     // max bytes = 140
     string db_desc = 6;
-    uint64 nonce = 7;
 }
 
 message CollectionMutation {

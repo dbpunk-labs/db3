@@ -76,18 +76,23 @@ impl StorageNode for StorageNodeV2Impl {
         let (_data, _payload_type, account, nonce) =
             MutationUtil::unwrap_and_light_verify(&r.payload, &r.signature)
                 .map_err(|e| Status::internal(format!("{e}")))?;
-        debug!("send mutation address {}", account.addr.to_hex());
-        self.state_store
-            .incr_nonce(&account.addr, nonce)
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let id = self
-            .storage
-            .add_mutation(&r.payload, &r.signature)
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        Ok(Response::new(SendMutationResponse {
-            id,
-            code: 0,
-            msg: "ok".to_string(),
-        }))
+        match self.state_store.incr_nonce(&account.addr, nonce) {
+            Ok(_) => {
+                let id = self
+                    .storage
+                    .add_mutation(&r.payload, &r.signature)
+                    .map_err(|e| Status::internal(format!("{e}")))?;
+                Ok(Response::new(SendMutationResponse {
+                    id,
+                    code: 0,
+                    msg: "ok".to_string(),
+                }))
+            }
+            Err(_e) => Ok(Response::new(SendMutationResponse {
+                id: "".to_string(),
+                code: 1,
+                msg: "bad nonce".to_string(),
+            })),
+        }
     }
 }

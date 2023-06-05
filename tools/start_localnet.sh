@@ -37,6 +37,12 @@ if [ -e ./bridge.db ]
 then
     rm bridge.db
 fi
+
+if [ -e ./mutation_db ]
+then
+    rm -rf ./mutation_db
+fi
+
 echo "start db3 node..."
 ./tendermint init > tm.log 2>&1 
 export RUST_BACKTRACE=1
@@ -45,6 +51,11 @@ sleep 1
 echo "start tendermint node..."
 ./tendermint unsafe_reset_all >> tm.log 2>&1  && ./tendermint start >> tm.log 2>&1 &
 sleep 1
+
+echo "start db3 store..."
+../target/${BUILD_MODE}/db3 store -v >store.log 2>&1  &
+sleep 1
+
 echo "start db3 indexer..."
 ../target/${BUILD_MODE}/db3 indexer >indexer.log 2>&1  &
 sleep 1
