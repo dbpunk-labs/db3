@@ -76,4 +76,3 @@ message MutationMessage {
     uint64 block_id = 3;
     uint32 order = 4;
 }
-

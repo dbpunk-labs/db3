@@ -125,8 +125,6 @@ impl MutationStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_proto::db3_bill_proto::BillType;
-    use std::boxed::Box;
     use tempdir::TempDir;
 
     #[test]

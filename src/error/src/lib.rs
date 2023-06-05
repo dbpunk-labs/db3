@@ -121,6 +121,8 @@ pub enum DB3Error {
     OpenStoreError(String, String),
     #[error("fail to write store for error {0}")]
     WriteStoreError(String),
+    #[error("fail to read store for error {0}")]
+    ReadStoreError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

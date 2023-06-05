@@ -21,6 +21,7 @@ use crate::context::Context;
 use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
 use crate::node_storage::NodeStorage;
 use crate::storage_node_impl::StorageNodeImpl;
+use crate::storage_node_light_impl::StorageNodeV2Impl;
 use actix_rt as rt;
 use clap::Parser;
 use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
@@ -32,15 +33,19 @@ use db3_faucet::{
     faucet_node_impl::{FaucetNodeConfig, FaucetNodeImpl},
     fund_faucet,
 };
+
 use db3_proto::db3_event_proto::{EventMessage, Subscription};
 use db3_proto::db3_faucet_proto::faucet_node_server::FaucetNodeServer;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
+use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_storage::event_store::EventStore;
 use db3_storage::faucet_store::FaucetStore;
+use db3_storage::mutation_store::MutationStoreConfig;
+use db3_storage::state_store::StateStoreConfig;
 use ethers::signers::LocalWallet;
 use http::Uri;
 use merkdb::Merk;
@@ -78,6 +83,26 @@ const ABOUT: &str = "
 #[clap(name = "db3")]
 #[clap(about = ABOUT, long_about = None)]
 pub enum DB3Command {
+    /// Start the store node
+    #[clap(name = "store")]
+    Store {
+        /// Bind the gprc server to this .
+        #[clap(long, default_value = "127.0.0.1")]
+        public_host: String,
+        /// The port of grpc api
+        #[clap(long, default_value = "26619")]
+        public_grpc_port: u16,
+        /// Bind the abci server to this port.
+        #[clap(short, long)]
+        verbose: bool,
+        /// The database path for mutation
+        #[clap(short, long, default_value = "./mutation_db_path")]
+        mutation_db_path: String,
+        /// The database path for state
+        #[clap(short, long, default_value = "./state_db_path")]
+        state_db_path: String,
+    },
+
     /// Start db3 network
     #[clap(name = "start")]
     Start {
@@ -275,6 +300,44 @@ impl DB3Command {
 
     pub async fn execute(self) {
         match self {
+            DB3Command::Store {
+                public_host,
+                public_grpc_port,
+                verbose,
+                mutation_db_path,
+                state_db_path,
+            } => {
+                let log_level = if verbose {
+                    LevelFilter::DEBUG
+                } else {
+                    LevelFilter::INFO
+                };
+                tracing_subscriber::fmt().with_max_level(log_level).init();
+                info!("{ABOUT}");
+                Self::start_store_grpc_service(
+                    public_host.as_str(),
+                    public_grpc_port,
+                    mutation_db_path.as_str(),
+                    state_db_path.as_str(),
+                )
+                .await;
+                let running = Arc::new(AtomicBool::new(true));
+                let r = running.clone();
+                ctrlc::set_handler(move || {
+                    r.store(false, Ordering::SeqCst);
+                })
+                .expect("Error setting Ctrl-C handler");
+                loop {
+                    if running.load(Ordering::SeqCst) {
+                        let ten_millis = Duration::from_millis(10);
+                        thread::sleep(ten_millis);
+                    } else {
+                        info!("stop db3 store node...");
+                        break;
+                    }
+                }
+            }
+
             DB3Command::FundFaucet {
                 evm_chain_ws,
                 private_key,
@@ -561,6 +624,39 @@ impl DB3Command {
                 }
             }
         }
+    }
+    /// Start store grpc service
+    async fn start_store_grpc_service(
+        public_host: &str,
+        public_grpc_port: u16,
+        mutation_db_path: &str,
+        state_db_path: &str,
+    ) {
+        let addr = format!("{public_host}:{public_grpc_port}");
+        let store_config = MutationStoreConfig {
+            db_path: mutation_db_path.to_string(),
+            block_store_cf_name: "block_store_cf".to_string(),
+            tx_store_cf_name: "tx_store_cf".to_string(),
+            message_max_buffer: 4 * 1024,
+        };
+        let state_config = StateStoreConfig {
+            db_path: state_db_path.to_string(),
+        };
+
+        let storage_node = StorageNodeV2Impl::new(store_config, state_config).unwrap();
+        info!("start db3 store node on public addr {}", addr);
+        let cors_layer = CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+            .allow_headers(Any)
+            .allow_origin(Any);
+        Server::builder()
+            .accept_http1(true)
+            .layer(cors_layer)
+            .layer(tonic_web::GrpcWebLayer::new())
+            .add_service(StorageNodeV2Server::new(storage_node))
+            .serve(addr.parse().unwrap())
+            .await
+            .unwrap();
     }
 
     /// Start GRPC Service

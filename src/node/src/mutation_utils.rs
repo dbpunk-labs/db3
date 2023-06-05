@@ -41,6 +41,60 @@ impl MutationUtil {
     parse_mutation!(parse_mint_credits_mutation, MintCreditsMutation);
     parse_mutation!(parse_query_session, QuerySession);
     /// unwrap and verify write request
+    pub fn unwrap_and_light_verify(
+        payload: &[u8],
+        signature: &[u8],
+    ) -> Result<(EthersBytes, PayloadType, AccountId, u64), DB3Error> {
+        match serde_json::from_slice::<TypedData>(payload) {
+            Ok(data) => {
+                let hashed_message = data.encode_eip712().map_err(|e| {
+                    DB3Error::ApplyMutationError(format!("invalid payload type for err {e}"))
+                })?;
+                let account_id = db3_verifier::DB3Verifier::verify_evm_hashed(
+                    &hashed_message,
+                    signature.as_ref(),
+                )?;
+                if let (Some(payload), Some(payload_type), Some(nonce)) = (
+                    data.message.get("payload"),
+                    data.message.get("payloadType"),
+                    data.message.get("nonce"),
+                ) {
+                    let data: EthersBytes =
+                        serde_json::from_value(payload.clone()).map_err(|e| {
+                            DB3Error::ApplyMutationError(format!(
+                                "invalid payload type for err {e}"
+                            ))
+                        })?;
+                    let internal_data_type = i32::from_str(payload_type.as_str().ok_or(
+                        DB3Error::ApplyMutationError("invalid payload type".to_string()),
+                    )?)
+                    .map_err(|e| {
+                        DB3Error::ApplyMutationError(format!(
+                            "fail to convert payload type to i32 {e}"
+                        ))
+                    })?;
+                    let data_type: PayloadType = PayloadType::from_i32(internal_data_type).ok_or(
+                        DB3Error::ApplyMutationError("invalid payload type".to_string()),
+                    )?;
+                    let real_nonce = u64::from_str(nonce.as_str().ok_or(
+                        DB3Error::ApplyMutationError("invalid payload type".to_string()),
+                    )?)
+                    .map_err(|e| {
+                        DB3Error::ApplyMutationError(format!(
+                            "fail to convert payload type to i32 {e}"
+                        ))
+                    })?;
+                    Ok((data, data_type, account_id, real_nonce))
+                } else {
+                    Err(DB3Error::ApplyMutationError("bad typed data".to_string()))
+                }
+            }
+            Err(e) => Err(DB3Error::ApplyMutationError(format!(
+                "bad typed data for err {e}"
+            ))),
+        }
+    }
+
     pub fn unwrap_and_verify(
         req: WriteRequest,
     ) -> Result<(EthersBytes, PayloadType, AccountId), DB3Error> {

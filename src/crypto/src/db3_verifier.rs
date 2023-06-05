@@ -35,6 +35,31 @@ impl DB3Verifier {
         Ok(AccountId::new(db3_address))
     }
 
+    pub fn verify_evm_hashed(hashed: &[u8], signature_raw: &[u8]) -> Result<AccountId> {
+        let signature = Signature::from_bytes(signature_raw)
+            .map_err(|e| DB3Error::InvalidSignature(format!("fail to generate signature {e}")))?;
+        let spk =
+            DB3PublicKey::try_from_bytes(SignatureScheme::Secp256k1, signature.public_key_bytes())
+                .map_err(|e| DB3Error::InvalidSignature(format!("bad public key  {e}")))?;
+        let sig = Secp256k1Signature::from_bytes(signature.signature_bytes())
+            .map_err(|e| DB3Error::InvalidSignature(format!("bad signature scheme {e}")))?;
+        if let Signature::Secp256k1DB3Signature(_) = signature {
+            let db3_address = DB3Address::from_evm_public_key(&spk);
+            if let DB3PublicKey::Secp256k1(internal_pk) = spk {
+                internal_pk.verify_hashed(hashed, &sig).map_err(|e| {
+                    DB3Error::InvalidSignature(format!("invalid hashed message for {e}"))
+                })?;
+                Ok(AccountId::new(db3_address))
+            } else {
+                Err(DB3Error::InvalidSignature("bad signature".to_string()))
+            }
+        } else {
+            Err(DB3Error::InvalidSignature(
+                "bad signature secp256k1 expected".to_string(),
+            ))
+        }
+    }
+
     pub fn verify_hashed(hashed: &[u8], signature_raw: &[u8]) -> Result<AccountId> {
         let signature = Signature::from_bytes(signature_raw)
             .map_err(|e| DB3Error::InvalidSignature(format!("fail to generate signature {e}")))?;

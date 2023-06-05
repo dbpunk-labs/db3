@@ -43,5 +43,5 @@ message GetNonceResponse {
 
 service StorageNode {
     rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
-    //rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
+    rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
 }
