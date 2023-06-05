@@ -16,6 +16,7 @@
 //
 
 use bytes::BytesMut;
+use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::MutationMessage;
@@ -28,6 +29,7 @@ use tracing::{debug, info};
 
 pub type StorageEngine = DBWithThreadMode<MultiThreaded>;
 
+#[derive(Clone)]
 pub struct MutationStoreConfig {
     pub db_path: String,
     pub block_store_cf_name: String,
@@ -82,7 +84,12 @@ impl MutationStore {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    pub fn add_mutation(&self, payload: &[u8], signature: &[u8]) -> Result<String> {
+    pub fn add_mutation(
+        &self,
+        payload: &[u8],
+        signature: &[u8],
+        sender: &DB3Address,
+    ) -> Result<String> {
         let block = self.block.load(std::sync::atomic::Ordering::Relaxed);
         let order = self
             .order_in_block
@@ -98,6 +105,7 @@ impl MutationStore {
             signature: signature.to_vec(),
             block_id: block,
             order,
+            sender: sender.as_ref().to_vec(),
         };
         let mut buf = BytesMut::with_capacity(self.config.message_max_buffer);
         mutation_msg
@@ -158,9 +166,11 @@ mod tests {
         if let Ok(store) = result {
             let payload: Vec<u8> = vec![1];
             let signature: Vec<u8> = vec![1];
-            let result = store.add_mutation(payload.as_ref(), signature.as_ref());
+            let result =
+                store.add_mutation(payload.as_ref(), signature.as_ref(), &DB3Address::ZERO);
             assert!(result.is_ok());
-            let result = store.add_mutation(payload.as_ref(), signature.as_ref());
+            let result =
+                store.add_mutation(payload.as_ref(), signature.as_ref(), &DB3Address::ZERO);
             assert!(result.is_ok());
         } else {
             assert!(false);

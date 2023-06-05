@@ -21,7 +21,7 @@ use crate::context::Context;
 use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
 use crate::node_storage::NodeStorage;
 use crate::storage_node_impl::StorageNodeImpl;
-use crate::storage_node_light_impl::StorageNodeV2Impl;
+use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use actix_rt as rt;
 use clap::Parser;
 use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
@@ -96,11 +96,14 @@ pub enum DB3Command {
         #[clap(short, long)]
         verbose: bool,
         /// The database path for mutation
-        #[clap(short, long, default_value = "./mutation_db")]
+        #[clap(long, default_value = "./mutation_db")]
         mutation_db_path: String,
         /// The database path for state
-        #[clap(short, long, default_value = "./state_db")]
+        #[clap(long, default_value = "./state_db")]
         state_db_path: String,
+        /// The network id
+        #[clap(long, default_value = "10")]
+        network_id: u64,
     },
 
     /// Start db3 network
@@ -306,6 +309,7 @@ impl DB3Command {
                 verbose,
                 mutation_db_path,
                 state_db_path,
+                network_id,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -319,6 +323,7 @@ impl DB3Command {
                     public_grpc_port,
                     mutation_db_path.as_str(),
                     state_db_path.as_str(),
+                    network_id,
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -631,6 +636,7 @@ impl DB3Command {
         public_grpc_port: u16,
         mutation_db_path: &str,
         state_db_path: &str,
+        network_id: u64,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
         let store_config = MutationStoreConfig {
@@ -643,8 +649,16 @@ impl DB3Command {
             db_path: state_db_path.to_string(),
         };
 
-        let storage_node = StorageNodeV2Impl::new(store_config, state_config).unwrap();
-        info!("start db3 store node on public addr {}", addr);
+        let config = StorageNodeV2Config {
+            store_config,
+            state_config,
+            network_id,
+        };
+        let storage_node = StorageNodeV2Impl::new(config).unwrap();
+        info!(
+            "start db3 store node on public addr {} and network {}",
+            addr, network_id
+        );
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(Any)

@@ -661,6 +661,21 @@ impl From<DB3Address> for DbId {
     }
 }
 
+impl From<(&DB3Address, u64, u64)> for DbId {
+    fn from(input: (&DB3Address, u64, u64)) -> Self {
+        let mut hasher = Sha3_256::default();
+        hasher.update(input.1.to_be_bytes());
+        hasher.update(input.2.to_be_bytes());
+        hasher.update(input.0);
+        let g_arr = hasher.finalize();
+        let mut res = [0u8; DB3_ADDRESS_LENGTH];
+        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
+        Self {
+            addr: DB3Address::from(&res),
+        }
+    }
+}
+
 impl TryFrom<(&DB3Address, u64)> for DbId {
     type Error = DB3Error;
     fn try_from(input: (&DB3Address, u64)) -> std::result::Result<Self, DB3Error> {

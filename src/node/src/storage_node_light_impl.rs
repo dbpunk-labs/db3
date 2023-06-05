@@ -17,11 +17,14 @@
 
 use crate::mutation_utils::MutationUtil;
 use db3_crypto::db3_address::DB3Address;
+use db3_crypto::id::DbId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_storage_proto::{
-    storage_node_server::StorageNode, GetNonceRequest, GetNonceResponse, SendMutationRequest,
-    SendMutationResponse,
+    storage_node_server::StorageNode, ExtraItem, GetNonceRequest, GetNonceResponse,
+    SendMutationRequest, SendMutationResponse,
 };
+
+use db3_proto::db3_mutation_v2_proto::DatabaseAction;
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use tonic::{Request, Response, Status};
@@ -30,20 +33,23 @@ use tracing::{debug, info};
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
+    pub network_id: u64,
 }
 
 pub struct StorageNodeV2Impl {
     storage: MutationStore,
     state_store: StateStore,
+    config: StorageNodeV2Config,
 }
 
 impl StorageNodeV2Impl {
-    pub fn new(store_config: MutationStoreConfig, state_config: StateStoreConfig) -> Result<Self> {
-        let storage = MutationStore::new(store_config)?;
-        let state_store = StateStore::new(state_config)?;
+    pub fn new(config: StorageNodeV2Config) -> Result<Self> {
+        let storage = MutationStore::new(config.store_config.clone())?;
+        let state_store = StateStore::new(config.state_config.clone())?;
         Ok(Self {
             storage,
             state_store,
+            config,
         })
     }
 }
@@ -72,26 +78,49 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<SendMutationRequest>,
     ) -> std::result::Result<Response<SendMutationResponse>, Status> {
         let r = request.into_inner();
-        // validate the request message
-        let (_data, _payload_type, account, nonce) =
-            MutationUtil::unwrap_and_light_verify(&r.payload, &r.signature)
-                .map_err(|e| Status::internal(format!("{e}")))?;
+
+        // validate the signature
+        let (dm, account, nonce) = MutationUtil::unwrap_and_light_verify(&r.payload, &r.signature)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let action = DatabaseAction::from_i32(dm.action)
+            .ok_or(Status::internal("fail to convert action type".to_string()))?;
+        // TODO validate the database mutation
         match self.state_store.incr_nonce(&account.addr, nonce) {
             Ok(_) => {
+                // mutation id
                 let id = self
                     .storage
-                    .add_mutation(&r.payload, &r.signature)
+                    .add_mutation(&r.payload, &r.signature, &account.addr)
                     .map_err(|e| Status::internal(format!("{e}")))?;
-                Ok(Response::new(SendMutationResponse {
-                    id,
-                    code: 0,
-                    msg: "ok".to_string(),
-                }))
+                match action {
+                    DatabaseAction::CreateDb => {
+                        let db_addr =
+                            DbId::from((&account.addr, nonce, self.config.network_id)).to_hex();
+                        let item = ExtraItem {
+                            key: "db_addr".to_string(),
+                            value: db_addr,
+                        };
+                        Ok(Response::new(SendMutationResponse {
+                            id,
+                            code: 0,
+                            msg: "ok".to_string(),
+                            items: vec![item],
+                        }))
+                    }
+                    _ => Ok(Response::new(SendMutationResponse {
+                        id,
+                        code: 0,
+                        msg: "ok".to_string(),
+                        items: vec![],
+                    })),
+                }
             }
             Err(_e) => Ok(Response::new(SendMutationResponse {
                 id: "".to_string(),
                 code: 1,
                 msg: "bad nonce".to_string(),
+
+                items: vec![],
             })),
         }
     }

@@ -43,6 +43,11 @@ then
     rm -rf ./mutation_db
 fi
 
+if [ -e ./state_db ]
+then
+    rm -rf ./state_db
+fi
+
 echo "start db3 node..."
 ./tendermint init > tm.log 2>&1 
 export RUST_BACKTRACE=1
