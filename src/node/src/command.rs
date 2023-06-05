@@ -36,9 +36,11 @@ use db3_faucet::{
 };
 use db3_proto::db3_event_proto::{EventMessage, Subscription};
 use db3_proto::db3_faucet_proto::faucet_node_server::FaucetNodeServer;
+use db3_proto::db3_indexer_proto::indexer_node_client::IndexerNodeClient;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
+use db3_sdk::indexer_sdk::IndexerSDK;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_storage::event_store::EventStore;
@@ -61,7 +63,7 @@ use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
 use tokio::sync::mpsc::Sender;
 use tonic::codegen::http::Method;
-use tonic::transport::{ClientTlsConfig, Endpoint, Server};
+use tonic::transport::{Channel, ClientTlsConfig, Endpoint, Server};
 use tonic::Status;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
@@ -123,9 +125,16 @@ pub enum DB3Command {
     /// Start db3 interactive console
     #[clap(name = "console")]
     Console {
-        /// the url of db3 grpc api
+        /// the url of db3 grpc api for database write
         #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26659")]
         public_grpc_url: String,
+        /// the url of indexer grpc api for database read
+        #[clap(
+            long = "indexer_url",
+            global = true,
+            default_value = "http://127.0.0.1:26639"
+        )]
+        indexer_public_grpc_url: String,
     },
 
     /// Start db3 indexer
@@ -160,6 +169,13 @@ pub enum DB3Command {
         /// the url of db3 grpc api
         #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26659")]
         public_grpc_url: String,
+        /// the url of db3 grpc api
+        #[clap(
+            long = "indexer_url",
+            global = true,
+            default_value = "http://127.0.0.1:26639"
+        )]
+        indexer_public_grpc_url: String,
         /// the subcommand
         #[clap(subcommand)]
         cmd: Option<DB3ClientCommand>,
@@ -245,9 +261,9 @@ pub enum DB3Command {
 }
 
 impl DB3Command {
-    fn build_context(public_grpc_url: &str) -> DB3ClientContext {
+    fn create_endpoint(public_grpc_url: &str) -> Endpoint {
         let uri = public_grpc_url.parse::<Uri>().unwrap();
-        let endpoint = match uri.scheme_str() == Some("https") {
+        match uri.scheme_str() == Some("https") {
             true => {
                 let rpc_endpoint = Endpoint::new(public_grpc_url.to_string())
                     .unwrap()
@@ -259,8 +275,10 @@ impl DB3Command {
                 let rpc_endpoint = Endpoint::new(public_grpc_url.to_string()).unwrap();
                 rpc_endpoint
             }
-        };
-        let channel = endpoint.connect_lazy();
+        }
+    }
+    fn build_context(public_grpc_url: &str, indexer_grpc_url: Option<&str>) -> DB3ClientContext {
+        let channel = Self::create_endpoint(public_grpc_url).connect_lazy();
         let node = Arc::new(StorageNodeClient::new(channel));
         if !db3_cmd::keystore::KeyStore::has_key(None) {
             db3_cmd::keystore::KeyStore::recover_keypair(None).unwrap();
@@ -271,9 +289,19 @@ impl DB3Command {
         let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
         let signer = Db3MultiSchemeSigner::new(kp);
         let store_sdk = StoreSDK::new(node, signer, true);
+
+        let indexer_sdk = match indexer_grpc_url {
+            Some(url) => {
+                let channel = Self::create_endpoint(url).connect_lazy();
+                let node = Arc::new(IndexerNodeClient::new(channel));
+                Some(IndexerSDK::new(node))
+            }
+            None => None,
+        };
         DB3ClientContext {
             mutation_sdk: Some(mutation_sdk),
             store_sdk: Some(store_sdk),
+            indexer_sdk,
         }
     }
 
@@ -395,7 +423,7 @@ impl DB3Command {
                         .block_on(async { watcher.start(sender).await })
                         .unwrap();
                 });
-                let ctx = Self::build_context(db3_storage_grpc_url.as_ref());
+                let ctx = Self::build_context(db3_storage_grpc_url.as_ref(), None);
                 let sdk = ctx.mutation_sdk.unwrap();
                 let minter = StorageChainMinter::new(db, sdk);
                 minter.start(receiver).await.unwrap();
@@ -417,8 +445,14 @@ impl DB3Command {
                 }
             }
 
-            DB3Command::Console { public_grpc_url } => {
-                let ctx = Self::build_context(public_grpc_url.as_ref());
+            DB3Command::Console {
+                public_grpc_url,
+                indexer_public_grpc_url,
+            } => {
+                let ctx = Self::build_context(
+                    public_grpc_url.as_ref(),
+                    Some(indexer_public_grpc_url.as_ref()),
+                );
                 db3_cmd::console::start_console(ctx, &mut stdout(), &mut stderr())
                     .await
                     .unwrap();
@@ -443,7 +477,7 @@ impl DB3Command {
                 tracing_subscriber::fmt().with_max_level(log_level).init();
                 info!("{ABOUT}");
 
-                let ctx = Self::build_context(db3_storage_grpc_url.as_ref());
+                let ctx = Self::build_context(db3_storage_grpc_url.as_ref(), None);
 
                 let opts = Merk::default_db_opts();
                 let merk = Merk::open_opt(&db_path, opts, db_tree_level_in_memory).unwrap();
@@ -488,8 +522,12 @@ impl DB3Command {
             DB3Command::Client {
                 cmd,
                 public_grpc_url,
+                indexer_public_grpc_url,
             } => {
-                let mut ctx = Self::build_context(public_grpc_url.as_ref());
+                let mut ctx = Self::build_context(
+                    public_grpc_url.as_ref(),
+                    Some(indexer_public_grpc_url.as_ref()),
+                );
                 if let Some(c) = cmd {
                     match c.execute(&mut ctx).await {
                         Ok(table) => table.printstd(),
@@ -688,7 +726,8 @@ mod tests {
 
     #[tokio::test]
     async fn client_cmd_smoke_test() {
-        let mut ctx = DB3Command::build_context("http://127.0.0.1:26659");
+        let mut ctx =
+            DB3Command::build_context("http://127.0.0.1:26659", Some("http://127.0.0.1:26639"));
         let cmd = DB3ClientCommand::Init {};
         if let Ok(_) = cmd.execute(&mut ctx).await {
         } else {

@@ -32,7 +32,9 @@ use db3_proto::db3_mutation_proto::{
     CollectionMutation, DatabaseAction, DatabaseMutation, DocumentMask, DocumentMutation,
 };
 use db3_proto::db3_node_proto::NetworkStatus;
-use db3_sdk::{faucet_sdk::FaucetSDK, mutation_sdk::MutationSDK, store_sdk::StoreSDK};
+use db3_sdk::{
+    faucet_sdk::FaucetSDK, indexer_sdk::IndexerSDK, mutation_sdk::MutationSDK, store_sdk::StoreSDK,
+};
 use ethers::signers::LocalWallet;
 use ethers::types::Address;
 use http::Uri;
@@ -44,6 +46,7 @@ use tonic::transport::{ClientTlsConfig, Endpoint};
 pub struct DB3ClientContext {
     pub mutation_sdk: Option<MutationSDK>,
     pub store_sdk: Option<StoreSDK>,
+    pub indexer_sdk: Option<IndexerSDK>,
 }
 
 #[derive(Debug, Parser)]
@@ -560,7 +563,7 @@ impl DB3ClientCommand {
             }
             DB3ClientCommand::GetDocument { id } => {
                 match ctx
-                    .store_sdk
+                    .indexer_sdk
                     .as_mut()
                     .unwrap()
                     .get_document(id.as_str())
@@ -592,7 +595,7 @@ impl DB3ClientCommand {
                     limit,
                 };
                 match ctx
-                    .store_sdk
+                    .indexer_sdk
                     .as_mut()
                     .unwrap()
                     .run_query(addr.as_ref(), query)
@@ -604,7 +607,7 @@ impl DB3ClientCommand {
             }
             DB3ClientCommand::ShowCollection { addr } => {
                 match ctx
-                    .store_sdk
+                    .indexer_sdk
                     .as_mut()
                     .unwrap()
                     .get_database(addr.as_ref())
@@ -618,7 +621,7 @@ impl DB3ClientCommand {
 
             DB3ClientCommand::ShowDB { addr } => {
                 match ctx
-                    .store_sdk
+                    .indexer_sdk
                     .as_mut()
                     .unwrap()
                     .get_database(addr.as_ref())
@@ -639,7 +642,7 @@ impl DB3ClientCommand {
                         Ok(ks) => {
                             let owner = ks.get_address().unwrap();
                             match ctx
-                                .store_sdk
+                                .indexer_sdk
                                 .as_mut()
                                 .unwrap()
                                 .get_my_database(owner.to_hex().as_str())
@@ -655,7 +658,13 @@ impl DB3ClientCommand {
                         ),
                     }
                 } else {
-                    match ctx.store_sdk.as_mut().unwrap().get_my_database(&addr).await {
+                    match ctx
+                        .indexer_sdk
+                        .as_mut()
+                        .unwrap()
+                        .get_my_database(&addr)
+                        .await
+                    {
                         Ok(databases) => Self::show_database(databases.as_ref()),
                         Err(_) => Err("fail to get account".to_string()),
                     }

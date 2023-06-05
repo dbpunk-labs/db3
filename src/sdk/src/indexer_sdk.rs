@@ -169,7 +169,7 @@ mod tests {
         let result = msdk.submit_database_mutation(&cm).await;
         assert!(result.is_ok());
         std::thread::sleep(sleep_seconds);
-        let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let (addr, _) = sdk_test::gen_secp256k1_signer(counter);
         let mut sdk = IndexerSDK::new(indexer_client.clone());
         let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
         assert_eq!(true, my_dbs.len() > 0);
