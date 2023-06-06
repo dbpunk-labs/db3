@@ -20,7 +20,7 @@ use db3_error::{DB3Error, Result};
 use libmdbx::{Database, NoWriteMap, TableFlags, WriteFlags};
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::info;
 
 const ACCOUNT_META_TABLE: &str = "ACCOUNT_META_TABLE";
 const DATABASE_META_TABLE: &str = "DATABASE_META_TABLE";
@@ -32,7 +32,6 @@ pub struct StateStoreConfig {
 }
 
 pub struct StateStore {
-    config: StateStoreConfig,
     db: Arc<DB>,
 }
 
@@ -58,7 +57,7 @@ impl StateStore {
             "open state store with path {} done",
             config.db_path.as_str()
         );
-        Ok(Self { config, db })
+        Ok(Self { db })
     }
 
     //pub fn get_database(&self, id: &DB3Address) {

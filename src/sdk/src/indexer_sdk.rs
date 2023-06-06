@@ -167,7 +167,7 @@ mod tests {
         let result = msdk.submit_database_mutation(&cm).await;
         assert!(result.is_ok());
         std::thread::sleep(sleep_seconds);
-        let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let (addr, _signer) = sdk_test::gen_secp256k1_signer(counter);
         let mut sdk = IndexerSDK::new(indexer_client.clone());
         let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
         assert_eq!(true, my_dbs.len() > 0);
@@ -261,7 +261,7 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(IndexerNodeClient::new(channel));
-        let (_addr, signer) = sdk_test::gen_ed25519_signer(150);
+        let (_addr, _signer) = sdk_test::gen_ed25519_signer(150);
         let sdk = IndexerSDK::new(client.clone());
         let result = sdk.get_state().await;
         assert!(result.is_ok());

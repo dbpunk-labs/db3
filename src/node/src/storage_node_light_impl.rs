@@ -18,7 +18,7 @@
 use crate::mutation_utils::MutationUtil;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::DbId;
-use db3_error::{Result};
+use db3_error::Result;
 use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, ExtraItem, GetNonceRequest, GetNonceResponse,
     SendMutationRequest, SendMutationResponse,
@@ -28,7 +28,7 @@ use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use tonic::{Request, Response, Status};
-use tracing::{debug};
+use tracing::debug;
 
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
