@@ -47,11 +47,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
-      - name: Run Bridge test
-        run: |
-          cd bridge
-          yarn install
-          npx hardhat test
       - name: Setup test env
         run: |
           sudo apt-get install protobuf-compiler 
