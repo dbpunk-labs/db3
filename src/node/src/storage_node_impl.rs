@@ -16,12 +16,10 @@
 //
 
 use super::context::Context;
+use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_crypto::{db3_verifier::DB3Verifier, id::DbId, id::DocumentId};
-use ethers::core::types::transaction::eip712::{Eip712, TypedData};
-
-use bytes::BytesMut;
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_event_proto::{
     event_filter,
@@ -42,6 +40,8 @@ use db3_proto::db3_session_proto::{OpenSessionPayload, QuerySession, QuerySessio
 use db3_session::query_session_verifier;
 use db3_session::session_manager::DEFAULT_SESSION_PERIOD;
 use db3_session::session_manager::DEFAULT_SESSION_QUERY_LIMIT;
+use ethers::core::types::transaction::eip712::TypedData;
+use ethers::types::transaction::eip712::Eip712;
 use ethers::types::Bytes;
 use prost::Message;
 use std::boxed::Box;

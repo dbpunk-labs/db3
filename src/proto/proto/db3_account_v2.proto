@@ -1,5 +1,5 @@
 //
-// lib.rs
+// db3_account_v2.proto
 // Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,5 +15,12 @@
 // limitations under the License.
 //
 
-pub mod faucet_node_impl;
-pub mod fund_faucet;
+
+syntax = "proto3";
+
+package db3_account_v2_proto;
+
+message Account {
+    uint64 nonce = 1;
+    uint64 total_storage_in_bytes = 2;
+}

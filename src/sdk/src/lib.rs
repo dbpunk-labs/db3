@@ -15,7 +15,6 @@
 // limitations under the License.
 //
 
-pub mod faucet_sdk;
 pub mod indexer_sdk;
 pub mod mutation_sdk;
 #[cfg(test)]

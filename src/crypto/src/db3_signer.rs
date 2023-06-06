@@ -241,6 +241,8 @@ mod tests {
         assert!(result.is_ok());
         let account = result.unwrap();
         println!("{}", serde_json::to_string(&account.addr).unwrap());
+        let result = DB3Verifier::verify_evm_hashed(&hashed_message, signature.as_ref()).unwrap();
+        println!("{}", serde_json::to_string(&result.addr).unwrap());
         println!("0x2df74619717c29a7253455e5767f4d992cfb6e3e");
     }
 }

@@ -1,17 +1,23 @@
 use bytes::Bytes;
+use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_verifier;
 use db3_crypto::id::AccountId;
 use db3_error::DB3Error;
 use db3_proto::db3_mutation_proto::{
     DatabaseMutation, MintCreditsMutation, PayloadType, WriteRequest,
 };
+use db3_proto::db3_mutation_v2_proto::Mutation as MutationV2;
 use db3_proto::db3_session_proto::QuerySession;
 use ethers::core::types::Bytes as EthersBytes;
-use ethers::types::transaction::eip712::{Eip712, TypedData};
+use ethers::types::{
+    transaction::eip712::{Eip712, TypedData},
+    Signature,
+};
 use prost::Message;
 use std::str::FromStr;
 use tracing::warn;
 /// parse mutation
+
 macro_rules! parse_mutation {
     ($func:ident, $type:ident) => {
         pub fn $func(payload: &[u8]) -> Result<$type, DB3Error> {
@@ -41,6 +47,51 @@ impl MutationUtil {
     parse_mutation!(parse_mint_credits_mutation, MintCreditsMutation);
     parse_mutation!(parse_query_session, QuerySession);
     /// unwrap and verify write request
+    pub fn unwrap_and_light_verify(
+        payload: &[u8],
+        sig: &str,
+    ) -> Result<(MutationV2, DB3Address, u64), DB3Error> {
+        match serde_json::from_slice::<TypedData>(payload) {
+            Ok(data) => {
+                // serde signature
+                let signature = Signature::from_str(sig).map_err(|e| {
+                    DB3Error::ApplyMutationError(format!("invalid signature for err {e}"))
+                })?;
+                if let (Some(payload), Some(nonce)) =
+                    (data.message.get("payload"), data.message.get("nonce"))
+                {
+                    let address = signature.recover_typed_data(&data).map_err(|e| {
+                        DB3Error::ApplyMutationError(format!("invalid typed data for err {e}"))
+                    })?;
+                    let db3_address = DB3Address::from(address.as_fixed_bytes());
+                    let data: EthersBytes =
+                        serde_json::from_value(payload.clone()).map_err(|e| {
+                            DB3Error::ApplyMutationError(format!("invalid payload for err {e}"))
+                        })?;
+                    let dm = MutationV2::decode(data.as_ref()).map_err(|e| {
+                        DB3Error::ApplyMutationError(format!("invalid mutation for err {e}"))
+                    })?;
+                    let real_nonce = u64::from_str(
+                        nonce
+                            .as_str()
+                            .ok_or(DB3Error::ApplyMutationError("invalid nonce".to_string()))?,
+                    )
+                    .map_err(|e| {
+                        DB3Error::ApplyMutationError(format!(
+                            "fail to convert payload type to i32 {e}"
+                        ))
+                    })?;
+                    Ok((dm, db3_address, real_nonce))
+                } else {
+                    Err(DB3Error::ApplyMutationError("bad typed data".to_string()))
+                }
+            }
+            Err(e) => Err(DB3Error::ApplyMutationError(format!(
+                "bad typed data for err {e}"
+            ))),
+        }
+    }
+
     pub fn unwrap_and_verify(
         req: WriteRequest,
     ) -> Result<(EthersBytes, PayloadType, AccountId), DB3Error> {

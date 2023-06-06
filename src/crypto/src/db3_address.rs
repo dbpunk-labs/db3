@@ -25,7 +25,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 pub const DB3_ADDRESS_LENGTH: usize = 20;
-
 #[serde_as]
 #[derive(
     Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema,
@@ -67,9 +66,19 @@ impl DB3Address {
     pub fn to_inner(self) -> [u8; DB3_ADDRESS_LENGTH] {
         self.0
     }
+
     #[inline]
     pub fn to_hex(&self) -> String {
         format!("0x{}", hex::encode(self.0.as_ref()))
+    }
+
+    pub fn from_evm_public_key(pk: &DB3PublicKey) -> Self {
+        let mut hasher = Sha3_256::default();
+        hasher.update(pk);
+        let g_arr = hasher.finalize();
+        let mut res = [0u8; DB3_ADDRESS_LENGTH];
+        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
+        DB3Address(res)
     }
 }
 
