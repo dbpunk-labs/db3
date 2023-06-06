@@ -17,8 +17,8 @@ db3-session={path="../session", version="0.1.0"}
 bytes = { version = "1.0", default-features = false }
 merkdb = {version= "2.0.0", path = "../../thirdparty/merkdb"}
 tokio = { version = "1.17.0", features = ["full"] }
-tonic = { version = "0.9.1", features = ["tls-roots"]}
-tonic-web = "0.9.1"
+tonic = { workspace=true, features = ["tls-roots"]}
+tonic-web = {workspace=true}
 prost = "0.11"
 prost-types = "0.11"
 chrono = "0.4.22"

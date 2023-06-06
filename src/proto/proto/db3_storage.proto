@@ -19,8 +19,8 @@ syntax = "proto3";
 package db3_storage_proto;
 
 message SendMutationRequest {
-    // the signature of payload
-    bytes signature = 1;
+    // a hex signature string
+    string signature = 1;
     // the payload of mutation
     bytes payload = 2;
 }

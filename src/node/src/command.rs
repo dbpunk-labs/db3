@@ -22,31 +22,19 @@ use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
 use crate::node_storage::NodeStorage;
 use crate::storage_node_impl::StorageNodeImpl;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
-use actix_rt as rt;
 use clap::Parser;
-use db3_bridge::evm_chain_watcher::{EvmChainConfig, EvmChainWatcher};
-use db3_bridge::storage_chain_minter::StorageChainMinter;
 use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
-use db3_faucet::{
-    faucet_node_impl::{FaucetNodeConfig, FaucetNodeImpl},
-    fund_faucet,
-};
-
 use db3_proto::db3_event_proto::{EventMessage, Subscription};
-use db3_proto::db3_faucet_proto::faucet_node_server::FaucetNodeServer;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
-use db3_storage::event_store::EventStore;
-use db3_storage::faucet_store::FaucetStore;
 use db3_storage::mutation_store::MutationStoreConfig;
 use db3_storage::state_store::StateStoreConfig;
-use ethers::signers::LocalWallet;
 use http::Uri;
 use merkdb::Merk;
 use redb::Database;
@@ -188,84 +176,6 @@ pub enum DB3Command {
         #[clap(subcommand)]
         cmd: Option<DB3ClientCommand>,
     },
-
-    /// Run db3 faucet
-    #[clap(name = "faucet")]
-    Faucet {
-        /// Bind the gprc server to this .
-        #[clap(long, default_value = "127.0.0.1")]
-        public_host: String,
-        /// The port of grpc api
-        #[clap(long, default_value = "26649")]
-        public_grpc_port: u16,
-        /// the websocket addres of evm chain
-        #[clap(long)]
-        evm_chain_ws: String,
-        /// the erc20 address
-        #[clap(long)]
-        token_address: String,
-        /// the database path to store all faucets
-        #[clap(long = "db_path", default_value = "./faucet.db")]
-        db_path: String,
-        /// the default amount = 1 db3
-        #[clap(long, default_value = "1000000000")]
-        amount: u64,
-        #[clap(short, long)]
-        verbose: bool,
-        /// Suppress all output logging (overrides --verbose).
-        #[clap(short, long)]
-        quiet: bool,
-        /// Send some eth to the accout that requests the db3 token
-        #[clap(long, default_value = "false")]
-        enable_eth_fund: bool,
-    },
-    /// Run db3 bridge
-    #[clap(name = "bridge")]
-    Bridge {
-        /// the websocket address of evm chain
-        #[clap(long)]
-        evm_chain_ws: String,
-        /// the evm chain id
-        #[clap(long, default_value = "1")]
-        evm_chain_id: u32,
-        /// the roll contract address
-        #[clap(long)]
-        contract_address: String,
-        /// the db3 storage chain grpc url
-        #[clap(
-            long = "db3_storage_grpc_url",
-            default_value = "http://127.0.0.1:26659"
-        )]
-        db3_storage_grpc_url: String,
-        /// the database path to store all events
-        #[clap(long = "db_path", default_value = "./db")]
-        db_path: String,
-        #[clap(short, long)]
-        verbose: bool,
-        /// Suppress all output logging (overrides --verbose).
-        #[clap(short, long)]
-        quiet: bool,
-    },
-
-    /// this is just for development
-    #[clap(name = "fund-faucet")]
-    FundFaucet {
-        /// the websocket address of evm chain
-        #[clap(long)]
-        evm_chain_ws: String,
-        /// the private key of wallet
-        #[clap(long)]
-        private_key: String,
-        /// the faucet evm address
-        #[clap(long)]
-        faucet_address: String,
-        /// the erc20 contract address
-        #[clap(long)]
-        erc20_address: String,
-        /// the fund amount 100 db3
-        #[clap(long, default_value = "100000000000")]
-        amount: u64,
-    },
 }
 
 impl DB3Command {
@@ -338,145 +248,6 @@ impl DB3Command {
                         thread::sleep(ten_millis);
                     } else {
                         info!("stop db3 store node...");
-                        break;
-                    }
-                }
-            }
-
-            DB3Command::FundFaucet {
-                evm_chain_ws,
-                private_key,
-                faucet_address,
-                erc20_address,
-                amount,
-            } => {
-                fund_faucet::send_fund_to_faucet(
-                    evm_chain_ws.as_str(),
-                    private_key.as_str(),
-                    erc20_address.as_str(),
-                    faucet_address.as_str(),
-                    amount,
-                )
-                .await
-                .unwrap();
-            }
-            DB3Command::Faucet {
-                public_host,
-                public_grpc_port,
-                evm_chain_ws,
-                token_address,
-                db_path,
-                amount,
-                verbose,
-                quiet,
-                enable_eth_fund,
-            } => {
-                let log_level = if quiet {
-                    LevelFilter::OFF
-                } else if verbose {
-                    LevelFilter::DEBUG
-                } else {
-                    LevelFilter::INFO
-                };
-                tracing_subscriber::fmt().with_max_level(log_level).init();
-                info!("{ABOUT}");
-                let path = Path::new(&db_path);
-                let db = Arc::new(Database::create(&path).unwrap());
-                {
-                    let write_txn = db.begin_write().unwrap();
-                    FaucetStore::init_table(write_txn).unwrap();
-                }
-                let mut home = dirs::home_dir().unwrap();
-                home.push(".faucet");
-                let home = Some(home);
-                if !db3_cmd::keystore::KeyStore::has_key(home.clone()) {
-                    db3_cmd::keystore::KeyStore::recover_keypair(home.clone()).unwrap();
-                }
-                let node_list: Vec<String> = vec![evm_chain_ws];
-                let config = FaucetNodeConfig {
-                    erc20_address: token_address,
-                    node_list,
-                    amount,
-                    enable_eth_fund,
-                };
-                let pk = db3_cmd::keystore::KeyStore::get_private_key(home.clone()).unwrap();
-                if let Ok(wallet) = pk.parse::<LocalWallet>() {
-                    if let Ok(node) = FaucetNodeImpl::new(db, config, wallet).await {
-                        let addr = format!("{public_host}:{public_grpc_port}");
-                        info!("start db3 faucet node on public addr {}", addr);
-                        let cors_layer = CorsLayer::new()
-                            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-                            .allow_headers(Any)
-                            .allow_origin(Any);
-                        Server::builder()
-                            .accept_http1(true)
-                            .layer(cors_layer)
-                            .layer(tonic_web::GrpcWebLayer::new())
-                            .add_service(FaucetNodeServer::new(node))
-                            .serve(addr.parse().unwrap())
-                            .await
-                            .unwrap();
-                    }
-                }
-            }
-            DB3Command::Bridge {
-                evm_chain_ws,
-                evm_chain_id,
-                contract_address,
-                db3_storage_grpc_url,
-                db_path,
-                verbose,
-                quiet,
-            } => {
-                let log_level = if quiet {
-                    LevelFilter::OFF
-                } else if verbose {
-                    LevelFilter::DEBUG
-                } else {
-                    LevelFilter::INFO
-                };
-                tracing_subscriber::fmt().with_max_level(log_level).init();
-                info!("{ABOUT}");
-
-                let (sender, receiver) = std::sync::mpsc::sync_channel::<(u32, u64)>(1024);
-                let path = Path::new(&db_path);
-                let db = Arc::new(Database::create(&path).unwrap());
-                {
-                    let write_txn = db.begin_write().unwrap();
-                    EventStore::init_table(write_txn).unwrap();
-                }
-
-                let node_list: Vec<String> = vec![evm_chain_ws];
-                let config = EvmChainConfig {
-                    chain_id: evm_chain_id,
-                    node_list,
-                    contract_address: contract_address.to_string(),
-                };
-
-                let watcher = EvmChainWatcher::new(config, db.clone()).await.unwrap();
-                let watcher_handler = thread::spawn(move || {
-                    rt::System::new()
-                        .block_on(async { watcher.start(sender).await })
-                        .unwrap();
-                });
-
-                let ctx = Self::build_context(db3_storage_grpc_url.as_ref());
-                let sdk = ctx.mutation_sdk.unwrap();
-                let minter = StorageChainMinter::new(db, sdk);
-                minter.start(receiver).await.unwrap();
-                let running = Arc::new(AtomicBool::new(true));
-                let r = running.clone();
-                ctrlc::set_handler(move || {
-                    r.store(false, Ordering::SeqCst);
-                })
-                .expect("Error setting Ctrl-C handler");
-                loop {
-                    if running.load(Ordering::SeqCst) {
-                        let ten_millis = Duration::from_millis(10);
-                        thread::sleep(ten_millis);
-                    } else {
-                        info!("stop db3 bridge ...");
-                        watcher_handler.join().unwrap();
                         break;
                     }
                 }

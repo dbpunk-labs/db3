@@ -24,7 +24,7 @@ use db3_proto::db3_storage_proto::{
     SendMutationRequest, SendMutationResponse,
 };
 
-use db3_proto::db3_mutation_v2_proto::DatabaseAction;
+use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use tonic::{Request, Response, Status};
@@ -78,24 +78,24 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<SendMutationRequest>,
     ) -> std::result::Result<Response<SendMutationResponse>, Status> {
         let r = request.into_inner();
-
         // validate the signature
-        let (dm, account, nonce) = MutationUtil::unwrap_and_light_verify(&r.payload, &r.signature)
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let action = DatabaseAction::from_i32(dm.action)
+        let (dm, address, nonce) =
+            MutationUtil::unwrap_and_light_verify(&r.payload, r.signature.as_str())
+                .map_err(|e| Status::internal(format!("{e}")))?;
+        let action = MutationAction::from_i32(dm.action)
             .ok_or(Status::internal("fail to convert action type".to_string()))?;
         // TODO validate the database mutation
-        match self.state_store.incr_nonce(&account.addr, nonce) {
+        match self.state_store.incr_nonce(&address, nonce) {
             Ok(_) => {
                 // mutation id
                 let id = self
                     .storage
-                    .add_mutation(&r.payload, &r.signature, &account.addr)
+                    .add_mutation(&r.payload, r.signature.as_bytes(), &address)
                     .map_err(|e| Status::internal(format!("{e}")))?;
                 match action {
-                    DatabaseAction::CreateDb => {
+                    MutationAction::CreateDocumentDb => {
                         let db_addr =
-                            DbId::from((&account.addr, nonce, self.config.network_id)).to_hex();
+                            DbId::from((&address, nonce, self.config.network_id)).to_hex();
                         let item = ExtraItem {
                             key: "db_addr".to_string(),
                             value: db_addr,
@@ -119,7 +119,6 @@ impl StorageNode for StorageNodeV2Impl {
                 id: "".to_string(),
                 code: 1,
                 msg: "bad nonce".to_string(),
-
                 items: vec![],
             })),
         }

@@ -18,8 +18,7 @@ anyhow = "1.0.68"
 prost = "0.11"
 prost-types = "0.11"
 rand = "0.8.5"
-#bytes = "1"
-bytes = { version = "1.3.0", features = ["serde"] }
+bytes = { version = "1.4.0", features = ["serde"] }
 hex = "0.4.3"
 base64ct = { version = "1.5.3", features = ["alloc"] }
 schemars ="0.8.10"

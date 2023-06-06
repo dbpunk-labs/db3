@@ -1,0 +1,450 @@
+//
+//
+// db3_database.proto
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+syntax = "proto3";
+package db3_database_v2_proto;
+
+//
+// the definition of database
+//
+message DocumentDatabase {
+    bytes address = 1;
+    // the owner of the Database
+    bytes sender = 2;
+    repeated Collection collections = 4;
+    string desc = 5;
+}
+
+message EventDatabase {
+    bytes address = 1;
+    bytes sender = 2;
+    uint64 chain_id = 3;
+    bytes contract_address = 4;
+    string desc = 5;
+    repeated EventTable tables = 6;
+    uint64 ttl = 7;
+}
+
+message EventTable {
+    string name = 1;
+}
+
+message Collection {
+    bytes id = 1;
+    string name = 2;
+    repeated Index index_list = 3;
+}
+
+message Document {
+  bytes id = 1;
+  bytes doc = 2;
+  bytes owner = 3;
+  bytes tx_id = 4;
+}
+
+message Index {
+
+  // A field in an index.
+  // The field_path describes which field is indexed, the value_mode describes
+  // how the field value is indexed.
+  message IndexField {
+    // The supported orderings.
+    enum Order {
+      // The ordering is unspecified. Not a valid option.
+      ORDER_UNSPECIFIED = 0;
+
+      // The field is ordered by ascending field value.
+      ASCENDING = 1;
+
+      // The field is ordered by descending field value.
+      DESCENDING = 2;
+    }
+
+    // The supported array value configurations.
+    enum ArrayConfig {
+      // The index does not support additional array queries.
+      ARRAY_CONFIG_UNSPECIFIED = 0;
+
+      // The index supports array containment queries.
+      CONTAINS = 1;
+    }
+
+    // Can be __name__.
+    // For single field indexes, this must match the name of the field or may
+    // be omitted.
+    string field_path = 1;
+
+    // How the field value is indexed.
+    oneof value_mode {
+      // Indicates that this field supports ordering by the specified order or
+      // comparing using =, !=, <, <=, >, >=.
+      Order order = 2;
+
+      // Indicates that this field supports operations on `array_value`s.
+      ArrayConfig array_config = 3;
+    }
+  }
+
+  // The state of an index. During index creation, an index will be in the
+  // `CREATING` state. If the index is created successfully, it will transition
+  // to the `READY` state. If the index creation encounters a problem, the index
+  // will transition to the `NEEDS_REPAIR` state.
+  enum State {
+    // The state is unspecified.
+    STATE_UNSPECIFIED = 0;
+
+    // The index is being created.
+    // There is an active long-running operation for the index.
+    // The index is updated when writing a document.
+    // Some index data may exist.
+    CREATING = 1;
+
+    // The index is ready to be used.
+    // The index is updated when writing a document.
+    // The index is fully populated from all stored documents it applies to.
+    READY = 2;
+
+    // The index was being created, but something went wrong.
+    // There is no active long-running operation for the index,
+    // and the most recently finished long-running operation failed.
+    // The index is not updated when writing a document.
+    // Some index data may exist.
+    // Use the google.longrunning.Operations API to determine why the operation
+    // that last attempted to create this index failed, then re-create the
+    // index.
+    NEEDS_REPAIR = 3;
+  }
+
+  // Output only. A server defined name for this index.
+  // The form of this name for composite indexes will be:
+  // `projects/{project_id}/databases/{database_id}/collectionGroups/{collection_id}/indexes/{composite_index_id}`
+  // For single field indexes, this field will be empty.
+  string name = 1;
+  // Id of the index filed in the collection
+  uint32 id = 2;
+
+  // The fields supported by this index.
+  //
+  // For composite indexes, this is always 2 or more fields.
+  // The last field entry is always for the field path `__name__`. If, on
+  // creation, `__name__` was not specified as the last field, it will be added
+  // automatically with the same direction as that of the last field defined. If
+  // the final field in a composite index is not directional, the `__name__`
+  // will be ordered ASCENDING (unless explicitly specified).
+  //
+  // For single field indexes, this will always be exactly one entry with a
+  // field path equal to the field path of the associated field.
+  repeated IndexField fields = 3;
+}
+
+// A Firestore query.
+message StructuredQuery {
+  // A filter.
+  message Filter {
+    // The type of filter.
+    oneof filter_type {
+      // A filter on a document field.
+      FieldFilter field_filter = 1;
+      // A composite filter.
+      CompositeFilter composite_filter = 2;
+
+      // A filter that takes exactly one argument.
+      // TODO: Support in the future P1
+      // UnaryFilter unary_filter = 3;
+    }
+  }
+
+  // A filter that merges multiple other filters using the given operator.
+  message CompositeFilter {
+    // A composite filter operator.
+    enum Operator {
+      // Unspecified. This value must not be used.
+      OPERATOR_UNSPECIFIED = 0;
+
+      // Documents are required to satisfy all of the combined filters.
+      AND = 1;
+
+      // Documents are required to satisfy at least one of the combined filters.
+      // TODO: support or in the P1
+      // OR = 2;
+    }
+
+    // The operator for combining multiple filters.
+    Operator op = 1;
+
+    // The list of filters to combine.
+    //
+    // Requires:
+    //
+    // * At least one filter is present.
+    repeated Filter filters = 2;
+  }
+  // A message that can hold any of the supported value types.
+  message Value {
+    // Must have a value set.
+    oneof value_type {
+      // A null value.
+      // TODO: support P2
+      // google.protobuf.NullValue null_value = 11;
+
+      // A boolean value.
+      bool boolean_value = 1;
+
+      // An integer value.
+      int64 integer_value = 2;
+
+      // A double value.
+      double double_value = 3;
+
+      // A timestamp value.
+      //
+      // Precise only to microseconds. When stored, any additional precision is
+      // rounded down.
+      // TODO: support P2
+      // google.protobuf.Timestamp timestamp_value = 10;
+
+      // A string value.
+      //
+      // The string, represented as UTF-8, must not exceed 1 MiB - 89 bytes.
+      // Only the first 1,500 bytes of the UTF-8 representation are considered by
+      // queries.
+      string string_value = 17;
+
+      // A bytes value.
+      //
+      // Must not exceed 1 MiB - 89 bytes.
+      // Only the first 1,500 bytes are considered by queries.
+      // bytes bytes_value = 18;
+
+      // A reference to a document. For example:
+      // `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
+      // string reference_value = 5;
+
+      // A geo point value representing a point on the surface of Earth.
+      // google.type.LatLng geo_point_value = 8;
+
+      // An array value.
+      //
+      // Cannot directly contain another array value, though can contain an
+      // map which contains another array.
+      // TODO: support P2
+      // ArrayValue array_value = 9;
+
+      // A map value.
+      // MapValue map_value = 6;
+    }
+  }
+  // A filter on a specific field.
+  message FieldFilter {
+    // A field filter operator.
+    enum Operator {
+      // Unspecified. This value must not be used.
+      OPERATOR_UNSPECIFIED = 0;
+
+      // The given `field` is less than the given `value`.
+      //
+      // Requires:
+      //
+      // * That `field` come first in `order_by`.
+      LESS_THAN = 1;
+
+      // The given `field` is less than or equal to the given `value`.
+      //
+      // Requires:
+      //
+      // * That `field` come first in `order_by`.
+      LESS_THAN_OR_EQUAL = 2;
+
+      // The given `field` is greater than the given `value`.
+      //
+      // Requires:
+      //
+      // * That `field` come first in `order_by`.
+      GREATER_THAN = 3;
+
+      // The given `field` is greater than or equal to the given `value`.
+      //
+      // Requires:
+      //
+      // * That `field` come first in `order_by`.
+      GREATER_THAN_OR_EQUAL = 4;
+
+      // The given `field` is equal to the given `value`.
+      EQUAL = 5;
+
+      // The given `field` is not equal to the given `value`.
+      //
+      // Requires:
+      //
+      // * No other `NOT_EQUAL`, `NOT_IN`, `IS_NOT_NULL`, or `IS_NOT_NAN`.
+      // * That `field` comes first in the `order_by`.
+      NOT_EQUAL = 6;
+      // The given `field` is an array that contains the given `value`.
+      ARRAY_CONTAINS = 7;
+
+      // The given `field` is equal to at least one value in the given array.
+      //
+      // Requires:
+      //
+      // * That `value` is a non-empty `ArrayValue` with at most 10 values.
+      // * No other `IN` or `ARRAY_CONTAINS_ANY` or `NOT_IN`.
+      // TODO: Support in the future P2
+      // IN = 8;
+
+      // The given `field` is an array that contains any of the values in the
+      // given array.
+      //
+      // Requires:
+      //
+      // * That `value` is a non-empty `ArrayValue` with at most 10 values.
+      // * No other `IN` or `ARRAY_CONTAINS_ANY` or `NOT_IN`.
+      // ARRAY_CONTAINS_ANY = 9;
+
+      // The value of the `field` is not in the given array.
+      //
+      // Requires:
+      //
+      // * That `value` is a non-empty `ArrayValue` with at most 10 values.
+      // * No other `IN`, `ARRAY_CONTAINS_ANY`, `NOT_IN`, `NOT_EQUAL`,
+      //   `IS_NOT_NULL`, or `IS_NOT_NAN`.
+      // * That `field` comes first in the `order_by`.
+      // TODO: P2
+      // NOT_IN = 10;
+    }
+
+    // The field to filter by.
+    string field = 1;
+
+    // The operator to filter by.
+    Operator op = 2;
+
+    // The bytes of Bson value to compare to.
+    Value value = 3;
+  }
+
+  // The projection of document's fields to return.
+  message Projection {
+    // The fields to return.
+    //
+    // If empty, all fields are returned.
+    repeated string fields = 1;
+  }
+
+  message Limit {
+    int32 limit = 1;
+  }
+  // The projection to return.
+  Projection select = 1;
+
+  // The collections to query.
+  // TODO: Will support repeated collection in the future
+  string collection_name = 2;
+
+  // The filter to apply.
+  Filter where = 3;
+
+  // The maximum number of results to return.
+  //
+  // Applies after all other constraints.
+  //
+  // Requires:
+  //
+  // * The value must be greater than or equal to zero if specified.
+  Limit limit = 5;
+
+  // The number of documents to skip before returning the first result.
+  //
+  // This applies after the constraints specified by the `WHERE`, `START AT`, &
+  // `END AT` but before the `LIMIT` clause.
+  //
+  // Requires:
+  //
+  // * The value must be greater than or equal to zero if specified.
+  // TODO: P1 Support offset in the future
+  // int32 offset = 6;
+
+  // The order to apply to the query results.
+  //
+  // Firestore allows callers to provide a full ordering, a partial ordering, or
+  // no ordering at all. In all cases, Firestore guarantees a stable ordering
+  // through the following rules:
+  //
+  //  * The `order_by` is required to reference all fields used with an
+  //    inequality filter.
+  //  * All fields that are required to be in the `order_by` but are not already
+  //    present are appended in lexicographical ordering of the field name.
+  //  * If an order on `__name__` is not specified, it is appended by default.
+  //
+  // Fields are appended with the same sort direction as the last order
+  // specified, or 'ASCENDING' if no order was specified. For example:
+  //
+  //  * `ORDER BY a` becomes `ORDER BY a ASC, __name__ ASC`
+  //  * `ORDER BY a DESC` becomes `ORDER BY a DESC, __name__ DESC`
+  //  * `WHERE a > 1` becomes `WHERE a > 1 ORDER BY a ASC, __name__ ASC`
+  //  * `WHERE __name__ > ... AND a > 1` becomes
+  //     `WHERE __name__ > ... AND a > 1 ORDER BY a ASC, __name__ ASC`
+  // TODO: P1 Support order in the future
+  //  repeated Order order_by = 4;
+
+  // A potential prefix of a position in the result set to start the query at.
+  //
+  // The ordering of the result set is based on the `ORDER BY` clause of the
+  // original query.
+  //
+  // ```
+  // SELECT * FROM k WHERE a = 1 AND b > 2 ORDER BY b ASC, __name__ ASC;
+  // ```
+  //
+  // This query's results are ordered by `(b ASC, __name__ ASC)`.
+  //
+  // Cursors can reference either the full ordering or a prefix of the location,
+  // though it cannot reference more fields than what are in the provided
+  // `ORDER BY`.
+  //
+  // Continuing off the example above, attaching the following start cursors
+  // will have varying impact:
+  //
+  // - `START BEFORE (2, /k/123)`: start the query right before `a = 1 AND
+  //    b > 2 AND __name__ > /k/123`.
+  // - `START AFTER (10)`: start the query right after `a = 1 AND b > 10`.
+  //
+  // Unlike `OFFSET` which requires scanning over the first N results to skip,
+  // a start cursor allows the query to begin at a logical position. This
+  // position is not required to match an actual result, it will scan forward
+  // from this position to find the next document.
+  //
+  // Requires:
+  //
+  // * The number of values cannot be greater than the number of fields
+  //   specified in the `ORDER BY` clause.
+  // Cursor start_at = 7;
+
+  // A potential prefix of a position in the result set to end the query at.
+  //
+  // This is similar to `START_AT` but with it controlling the end position
+  // rather than the start position.
+  //
+  // Requires:
+  //
+  // * The number of values cannot be greater than the number of fields
+  //   specified in the `ORDER BY` clause.
+  // Cursor end_at = 8;
+
+
+}
+

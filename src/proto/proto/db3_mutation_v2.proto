@@ -22,29 +22,6 @@ import "db3_database.proto";
 
 package db3_mutation_v2_proto;
 
-enum DatabaseType {
-    DocumentDatabase = 0;
-    // database for smark contract
-    EventDatabase = 1;
-}
-
-enum DatabaseAction {
-    CreateDB = 0;
-    AddCollection = 1;
-    AddDocument = 2;
-    DeleteDocument = 3;
-    UpdateDocument = 4;
-}
-
-message DatabaseMutation {
-    DatabaseAction action = 2;
-    bytes db_address = 3;
-    repeated CollectionMutation collection_mutations = 4;
-    repeated DocumentMutation document_mutations = 5;
-    // the description of database
-    // max bytes = 140
-    string db_desc = 6;
-}
 
 message CollectionMutation {
     repeated db3_database_proto.Index index = 1;
@@ -65,9 +42,29 @@ message DocumentMutation {
     repeated DocumentMask masks = 4;
 }
 
+message EventTableIndex {
+    string name = 1;
+    repeated string fields = 2;
+}
+
+message EventTableMutation {
+    string name = 1;
+    repeated EventTableIndex index_list = 2;
+}
+
+message EventDatabaseMutation {
+    uint64 chain_id = 1;
+    bytes contract_address = 2;
+    uint64 ttl = 3;
+    string desc = 4;
+    repeated EventTableMutation tables = 5;
+    bytes contract_api = 6;
+}
+
 message DocumentMask {
     repeated string fields = 1;
 }
+
 
 message MutationMessage {
     bytes payload = 1;
@@ -75,4 +72,25 @@ message MutationMessage {
     uint64 block_id = 3;
     uint32 order = 4;
     bytes sender = 5;
+}
+
+
+enum MutationAction {
+    CreateDocumentDB = 0;
+    AddCollection = 1;
+    AddDocument = 2;
+    DeleteDocument = 3;
+    UpdateDocument = 4;
+    CreateEventDB = 5;
+}
+
+message Mutation {
+    MutationAction action = 1;
+    bytes db_address = 2;
+    repeated CollectionMutation collection_mutations = 3;
+    repeated DocumentMutation document_mutations = 4;
+    // the description of database
+    // max bytes = 140
+    string db_desc = 5;
+    EventDatabaseMutation event_database_mutation = 6;
 }

@@ -9,11 +9,11 @@ members = [
     "src/storage",
     "src/node",
     "src/sdk",
-    "src/cmd",
-    "src/bridge",
-    "src/faucet",
+    "src/cmd"
 ]
 
 [workspace.dependencies]
 fastcrypto = {git = "https://github.com/MystenLabs/fastcrypto", rev = "306465d4fe04f6c26359d885f3b0a548b661de40"}
-ethers = {git="https://github.com/gakonst/ethers-rs", rev="ed47eaadad7d751cff9c0f59517b0fc3fb284cd3"}
+ethers = {git="https://github.com/imotai/ethers-rs", rev="12479d6e53adef5ff5df1a02a5a080ae7de4d088"}
+tonic = {git="https://github.com/hyperium/tonic", rev="ae7580160431cd25c1eecda4c85014ef6ce8d93f"}
+tonic-web = {git="https://github.com/hyperium/tonic", rev="ae7580160431cd25c1eecda4c85014ef6ce8d93f"}
