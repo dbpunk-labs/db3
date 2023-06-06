@@ -16,7 +16,9 @@
 //
 
 use db3_crypto::db3_address::DB3Address;
+use db3_proto::db3_database_v2_proto::{DatabaseMessage};
 use db3_error::{DB3Error, Result};
+ use prost::Message;
 use libmdbx::{Database, NoWriteMap, TableFlags, WriteFlags};
 use std::path::Path;
 use std::sync::Arc;
@@ -60,23 +62,23 @@ impl StateStore {
         Ok(Self { db })
     }
 
-    //pub fn get_database(&self, id: &DB3Address) {
-    //    let tx = self
-    //        .db
-    //        .begin_ro_txn()
-    //        .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
-    //    let table = tx
-    //        .open_table(Some(DATABASE_META_TABLE))
-    //        .map_err(|e| DB3Error::ReadStoreError(format!("open table {e}")))?;
-    //    let value = tx
-    //        .get::<Vec<u8>>(&table, id.as_ref())
-    //        .map_err(|e| DB3Error::ReadStoreError(format!("get value with key {e}")))?;
-    //    if let Some(_v) = value {
-    //        Ok(None)
-    //    } else {
-    //        Ok(None)
-    //    }
-    //}
+    pub fn get_database(&self, id: &DB3Address) -> Result<Option<DatabaseMessage>>{
+        let tx = self
+            .db
+            .begin_ro_txn()
+            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+        let table = tx
+            .open_table(Some(DATABASE_META_TABLE))
+            .map_err(|e| DB3Error::ReadStoreError(format!("open table {e}")))?;
+        let value = tx
+            .get::<Vec<u8>>(&table, id.as_ref())
+            .map_err(|e| DB3Error::ReadStoreError(format!("get value with key {e}")))?;
+        if let Some(_v) = value {
+            Ok(None)
+        } else {
+            Ok(None)
+        }
+    }
 
     pub fn get_nonce(&self, id: &DB3Address) -> Result<u64> {
         let tx = self

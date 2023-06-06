@@ -47,6 +47,16 @@ message GetNonceResponse {
     uint64 nonce = 2;
 }
 
+message SubscribeRequest {
+    string signature = 1;
+    bytes payload = 2;
+}
+
+message BlockEvent {
+    uint64 block_id = 1;
+    uint64 mutation_count = 2;
+}
+
 service StorageNode {
     rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
     rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}

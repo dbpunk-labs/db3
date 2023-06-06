@@ -55,3 +55,6 @@ pub mod db3_storage_proto {
 pub mod db3_mutation_v2_proto {
     tonic::include_proto!("db3_mutation_v2_proto");
 }
+pub mod db3_database_v2_proto {
+    tonic::include_proto!("db3_database_v2_proto");
+}

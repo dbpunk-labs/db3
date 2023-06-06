@@ -22,6 +22,7 @@ package db3_database_v2_proto;
 //
 // the definition of database
 //
+
 message DocumentDatabase {
     bytes address = 1;
     // the owner of the Database
@@ -39,6 +40,20 @@ message EventDatabase {
     repeated EventTable tables = 6;
     uint64 ttl = 7;
 }
+
+enum DatabaseType {
+    DocumentType = 0;
+    EventType = 1;
+}
+
+message DatabaseMessage {
+    DatabaseType dtype = 1;
+    oneof database {
+        DocumentDatabase doc_db = 2;
+        EventDatabase event_db = 3;
+    }
+}
+
 
 message EventTable {
     string name = 1;

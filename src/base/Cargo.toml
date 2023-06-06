@@ -18,7 +18,7 @@ db3-error={path="../error", version="0.1.0"}
 ed25519-dalek = "2.0.0-rc.2"
 rand = "0.8.5"
 bson = "2.5.0"
-serde_json = "1.0.96"
+serde_json = {workspace=true}
 byteorder = "1.4.3"
 [dev-dependencies]
 chrono = "0.4.22"

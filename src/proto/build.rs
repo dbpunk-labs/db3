@@ -30,6 +30,7 @@ fn main() {
                 "proto/db3_account.proto",
                 "proto/db3_node.proto",
                 "proto/db3_database.proto",
+                "proto/db3_database_v2.proto",
                 "proto/db3_message.proto",
                 "proto/db3_event.proto",
                 "proto/db3_indexer.proto",
