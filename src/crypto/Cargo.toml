@@ -27,7 +27,7 @@ serde-name = "0.2.1"
 thiserror = "1.0.34"
 bson = "2.5.0"
 serde_json = {workspace=true}
-serde_with = "2.1.0"
+serde_with = "3.0.0"
 serde_repr = "0.1"
 signature = "1.6.0"
 eyre = "0.6.8"
