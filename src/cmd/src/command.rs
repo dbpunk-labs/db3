@@ -31,12 +31,8 @@ use db3_proto::db3_mutation_proto::{
 use db3_proto::db3_node_proto::NetworkStatus;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
-use ethers::types::Address;
-use http::Uri;
 use prettytable::{format, Table};
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tonic::transport::{ClientTlsConfig, Endpoint};
 
 pub struct DB3ClientContext {
     pub mutation_sdk: Option<MutationSDK>,

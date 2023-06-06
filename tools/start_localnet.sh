@@ -33,11 +33,6 @@ if [ -e ./db ]
 then
     rm -rf db
 fi
-if [ -e ./bridge.db ]
-then
-    rm bridge.db
-fi
-
 if [ -e ./mutation_db ]
 then
     rm -rf ./mutation_db
@@ -47,7 +42,11 @@ if [ -e ./state_db ]
 then
     rm -rf ./state_db
 fi
-
+# clean indexer
+if [ -e ./indexer ]
+then
+    rm -rf indexer
+fi
 echo "start db3 node..."
 ./tendermint init > tm.log 2>&1 
 export RUST_BACKTRACE=1
@@ -65,22 +64,4 @@ echo "start db3 indexer..."
 ../target/${BUILD_MODE}/db3 indexer >indexer.log 2>&1  &
 sleep 1
 
-
-if [[ $RUN_L1_CHAIN == 'OK' ]]; then
-    echo "start evm chain network..."
-    ganache --chain.chainId 1 -m 'road entire survey elevator employ toward city flee pupil vessel flock point' > evm.log 2>&1 &
-    sleep 2
-    echo "deploy rollup contract to evm chain"
-    cd ${test_dir}/../bridge && bash deploy_to_local.sh > address.log
-    export TOKEN_ADDRESS=`less address.log | awk '{print $3}'`
-    export ADDRESS=`less address.log | awk '{print $6}'`
-    echo "rollup address ${ADDRESS}"
-    echo "erc20 address ${TOKEN_ADDRESS}"
-    echo "start db3 bridge node ..."
-    cd ${test_dir} && ../target/${BUILD_MODE}/db3 bridge --evm-chain-ws ws://127.0.0.1:8545 --evm-chain-id 1 --contract-address ${ADDRESS} --db_path ${test_dir}/bridge.db > bridge.log 2>&1 &
-    sleep 1
-    echo "start db3 faucet node ..."
-    cd ${test_dir} && ../target/${BUILD_MODE}/db3 faucet --evm-chain-ws ws://127.0.0.1:8545  --token-address ${TOKEN_ADDRESS} --db_path ${test_dir}/faucet.db > faucet.log 2>&1 &
-    echo "start local development done!"
-fi
 while true; do sleep 1 ; done
