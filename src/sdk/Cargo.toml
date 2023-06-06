@@ -27,7 +27,7 @@ num-traits = "^0.2"
 rand = "0.8.5"
 serde_json = {workspace=true}
 hex = "0.4.3"
-tendermint = "0.31.1"
+tendermint = "0.32.0"
 [dev-dependencies]
 db3-base={path="../base", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
