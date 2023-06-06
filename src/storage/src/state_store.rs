@@ -15,11 +15,12 @@
 // limitations under the License.
 //
 
+use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
-use db3_proto::db3_database_v2_proto::{DatabaseMessage};
 use db3_error::{DB3Error, Result};
- use prost::Message;
+use db3_proto::db3_database_v2_proto::DatabaseMessage;
 use libmdbx::{Database, NoWriteMap, TableFlags, WriteFlags};
+use prost::Message;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::info;
@@ -62,7 +63,36 @@ impl StateStore {
         Ok(Self { db })
     }
 
-    pub fn get_database(&self, id: &DB3Address) -> Result<Option<DatabaseMessage>>{
+    pub fn add_database(&self, id: &DB3Address, db: &DatabaseMessage) -> Result<()> {
+        let txn = self
+            .db
+            .begin_rw_txn()
+            .map_err(|e| DB3Error::WriteStoreError(format!("open tx {e}")))?;
+        let table = txn
+            .open_table(Some(DATABASE_META_TABLE))
+            .map_err(|e| DB3Error::WriteStoreError(format!("open table {e}")))?;
+        let value = txn
+            .get::<Vec<u8>>(&table, id.as_ref())
+            .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+        if let Some(_) = value {
+            Err(DB3Error::WriteStoreError(format!(
+                "database with address {} exist",
+                id.to_hex()
+            )))
+        } else {
+            let mut buf = BytesMut::with_capacity(8 * 1024);
+            db.encode(&mut buf)
+                .map_err(|e| DB3Error::WriteStoreError(format!("{}", e)))?;
+            let buf = buf.freeze();
+            txn.put(&table, id.as_ref(), &buf, WriteFlags::UPSERT)
+                .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+            txn.commit()
+                .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+            Ok(())
+        }
+    }
+
+    pub fn get_database(&self, id: &DB3Address) -> Result<Option<DatabaseMessage>> {
         let tx = self
             .db
             .begin_ro_txn()
@@ -73,8 +103,13 @@ impl StateStore {
         let value = tx
             .get::<Vec<u8>>(&table, id.as_ref())
             .map_err(|e| DB3Error::ReadStoreError(format!("get value with key {e}")))?;
-        if let Some(_v) = value {
-            Ok(None)
+        if let Some(v) = value {
+            match DatabaseMessage::decode(v.as_ref()) {
+                Ok(db) => Ok(Some(db)),
+                Err(e) => Err(DB3Error::ReadStoreError(format!(
+                    "fail to decode database message {e}"
+                ))),
+            }
         } else {
             Ok(None)
         }
@@ -139,6 +174,7 @@ impl StateStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use db3_proto::db3_database_v2_proto::{database_message, DatabaseType, DocumentDatabase};
     use tempdir::TempDir;
 
     #[test]
@@ -164,6 +200,7 @@ mod tests {
             assert!(false);
         }
     }
+
     #[test]
     fn test_incr_nonce() {
         let tmp_dir_path = TempDir::new("nonce_").expect("create temp dir");
@@ -176,6 +213,38 @@ mod tests {
             assert_eq!(false, result.is_ok());
             let nonce = store.incr_nonce(&DB3Address::ZERO, 2).unwrap();
             assert_eq!(2, nonce);
+        } else {
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn test_add_database() {
+        let tmp_dir_path = TempDir::new("database").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = StateStoreConfig { db_path: real_path };
+        if let Ok(store) = StateStore::new(config) {
+            if let Ok(Some(_db)) = store.get_database(&DB3Address::ZERO) {
+                assert!(false);
+            }
+            let dd = DocumentDatabase {
+                address: DB3Address::ZERO.as_ref().to_vec(),
+                sender: DB3Address::ZERO.as_ref().to_vec(),
+                collections: vec![],
+                desc: "".to_string(),
+            };
+            let dm = DatabaseMessage {
+                dtype: DatabaseType::DocumentType.into(),
+                database: Some(database_message::Database::DocDb(dd)),
+            };
+            if let Err(_) = store.add_database(&DB3Address::ZERO, &dm) {
+                assert!(false);
+            }
+            if let Ok(Some(_db)) = store.get_database(&DB3Address::ZERO) {
+                assert!(true);
+            } else {
+                assert!(false);
+            }
         } else {
             assert!(false)
         }
