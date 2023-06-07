@@ -413,6 +413,7 @@ impl DB3Command {
             block_store_cf_name: "block_store_cf".to_string(),
             tx_store_cf_name: "tx_store_cf".to_string(),
             message_max_buffer: 4 * 1024,
+            scan_max_limit: 50,
         };
         let state_config = StateStoreConfig {
             db_path: state_db_path.to_string(),

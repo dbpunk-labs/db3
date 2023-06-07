@@ -35,6 +35,7 @@ pub struct MutationStoreConfig {
     pub block_store_cf_name: String,
     pub tx_store_cf_name: String,
     pub message_max_buffer: usize,
+    pub scan_max_limit: usize,
 }
 
 impl Default for MutationStoreConfig {
@@ -44,6 +45,7 @@ impl Default for MutationStoreConfig {
             block_store_cf_name: "block_store_cf".to_string(),
             tx_store_cf_name: "tx_store_cf".to_string(),
             message_max_buffer: 8 * 1024,
+            scan_max_limit: 50,
         }
     }
 }
@@ -83,6 +85,40 @@ impl MutationStore {
         })
     }
 
+    pub fn scan_mutation_headers(&self, from: u32, limit: u32) -> Result<Vec<MutationHeader>> {
+        if limit > self.config.scan_max_limit as u32 {
+            return Err(DB3Error::ReadStoreError(
+                "reach the scan max limit".to_string(),
+            ));
+        }
+
+        let block_cf_handle = self
+            .se
+            .cf_handle(self.config.block_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&block_cf_handle);
+        it.seek_to_last();
+        let mut mutation_headers: Vec<MutationHeader> = Vec::new();
+        let mut count: u32 = 0;
+        let start: u32 = from;
+        let end: u32 = from + limit;
+        while it.valid() && count < start {
+            count += 1;
+            it.prev();
+        }
+
+        while it.valid() && count < end {
+            count += 1;
+            if let Some(v) = it.value() {
+                if let Ok(m) = MutationHeader::decode(v) {
+                    mutation_headers.push(m);
+                }
+            }
+            it.prev();
+        }
+        Ok(mutation_headers)
+    }
+
     pub fn increase_block(&self) -> Result<()> {
         match self.block_state.lock() {
             Ok(mut state) => {
@@ -118,6 +154,25 @@ impl MutationStore {
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         if let Some(v) = value {
             match MutationHeader::decode(v.as_ref()) {
+                Ok(m) => Ok(Some(m)),
+                Err(e) => Err(DB3Error::ReadStoreError(format!("{e}"))),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_mutation(&self, tx_id: &TxId) -> Result<Option<MutationBody>> {
+        let tx_cf_handle = self
+            .se
+            .cf_handle(self.config.tx_store_cf_name.as_str())
+            .ok_or(DB3Error::WriteStoreError("cf is not found".to_string()))?;
+        let value = self
+            .se
+            .get_cf(&tx_cf_handle, &tx_id)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let Some(v) = value {
+            match MutationBody::decode(v.as_ref()) {
                 Ok(m) => Ok(Some(m)),
                 Err(e) => Err(DB3Error::ReadStoreError(format!("{e}"))),
             }
@@ -195,9 +250,45 @@ mod tests {
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
             message_max_buffer: 4 * 1024,
+            scan_max_limit: 50,
         };
         if let Err(e) = MutationStore::new(config) {
             println!("{:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_scan_mutation() {
+        let tmp_dir_path = TempDir::new("scan mutation store path").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = MutationStoreConfig {
+            db_path: real_path,
+            block_store_cf_name: "cf1".to_string(),
+            tx_store_cf_name: "cf2".to_string(),
+            message_max_buffer: 4 * 1024,
+            scan_max_limit: 50,
+        };
+        let result = MutationStore::new(config);
+        assert!(result.is_ok());
+        if let Ok(store) = result {
+            let payload: Vec<u8> = vec![1];
+            let signature: &str = "0xasdasdsad";
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
+            assert!(result.is_ok());
+            if let Ok(headers) = store.scan_mutation_headers(0, 1) {
+                assert_eq!(1, headers.len());
+            } else {
+                assert!(false);
+            }
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
+            assert!(result.is_ok());
+            if let Ok(headers) = store.scan_mutation_headers(0, 1) {
+                assert_eq!(1, headers.len());
+            } else {
+                assert!(false);
+            }
+        } else {
+            assert!(false);
         }
     }
 
@@ -210,6 +301,7 @@ mod tests {
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
             message_max_buffer: 4 * 1024,
+            scan_max_limit: 50,
         };
         let result = MutationStore::new(config);
         assert!(result.is_ok());
@@ -218,9 +310,16 @@ mod tests {
             let signature: &str = "0xasdasdsad";
             let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
             assert!(result.is_ok());
-            if let Ok((_id, block, order)) = result {
+            if let Ok((id, block, order)) = result {
                 if let Ok(Some(v)) = store.get_mutation_header(block, order) {
                     assert_eq!(DB3Address::ZERO.as_ref(), &v.sender);
+                } else {
+                    assert!(false);
+                }
+                println!("{id}");
+                let tx_id = TxId::try_from_hex(id.as_str()).unwrap();
+                if let Ok(Some(m)) = store.get_mutation(&tx_id) {
+                    assert_eq!(m.signature.as_str(), signature);
                 } else {
                     assert!(false);
                 }

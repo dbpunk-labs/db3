@@ -17,12 +17,13 @@
 
 use crate::mutation_utils::MutationUtil;
 use db3_crypto::db3_address::DB3Address;
-use db3_crypto::id::DbId;
+use db3_crypto::id::{DbId, TxId};
 use db3_error::Result;
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::{
-    storage_node_server::StorageNode, ExtraItem, GetMutationHeaderRequest,
-    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, SendMutationRequest,
+    storage_node_server::StorageNode, ExtraItem, GetMutationBodyRequest, GetMutationBodyResponse,
+    GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
+    ScanMutationHeaderRequest, ScanMutationHeaderResponse, SendMutationRequest,
     SendMutationResponse,
 };
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
@@ -56,6 +57,32 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn get_mutation_body(
+        &self,
+        request: Request<GetMutationBodyRequest>,
+    ) -> std::result::Result<Response<GetMutationBodyResponse>, Status> {
+        let r = request.into_inner();
+        let tx_id =
+            TxId::try_from_hex(r.id.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
+        let body = self
+            .storage
+            .get_mutation(&tx_id)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(GetMutationBodyResponse { body }))
+    }
+
+    async fn scan_mutation_header(
+        &self,
+        request: Request<ScanMutationHeaderRequest>,
+    ) -> std::result::Result<Response<ScanMutationHeaderResponse>, Status> {
+        let r = request.into_inner();
+        let headers = self
+            .storage
+            .scan_mutation_headers(r.start, r.limit)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(ScanMutationHeaderResponse { headers }))
+    }
+
     async fn get_mutation_header(
         &self,
         request: Request<GetMutationHeaderRequest>,

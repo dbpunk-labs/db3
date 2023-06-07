@@ -72,8 +72,27 @@ message GetMutationHeaderResponse {
   bytes rollup_tx = 4;
 }
 
+message GetMutationBodyRequest {
+    string id = 1;
+}
+
+message GetMutationBodyResponse {
+    db3_mutation_v2_proto.MutationBody body = 1;
+}
+
+message ScanMutationHeaderRequest {
+  uint32 start = 1;
+  uint32 limit = 2;
+}
+
+message ScanMutationHeaderResponse {
+  repeated db3_mutation_v2_proto.MutationHeader headers = 1;
+}
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
   rpc GetMutationHeader(GetMutationHeaderRequest) returns (GetMutationHeaderResponse) {}
+  rpc ScanMutationHeader(ScanMutationHeaderRequest) returns (ScanMutationHeaderResponse) {}
+  rpc GetMutationBody(GetMutationBodyRequest) returns (GetMutationBodyResponse) {}
 }

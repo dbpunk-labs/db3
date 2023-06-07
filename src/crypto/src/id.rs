@@ -85,6 +85,19 @@ impl TxId {
         Self::try_from_bytes(base64ct::Base64::decode_vec(input).unwrap().as_slice())
     }
 
+    pub fn try_from_hex(input: &str) -> std::result::Result<Self, DB3Error> {
+        if input.starts_with("0x") {
+            let new_input = &input[2..];
+            let data = hex::decode(new_input)
+                .map_err(|e| DB3Error::KeyCodecError(format!("fail to decode tx id for {e}")))?;
+            Self::try_from_bytes(data.as_slice())
+        } else {
+            let data = hex::decode(input)
+                .map_err(|e| DB3Error::KeyCodecError(format!("fail to decode tx id for {e}")))?;
+            Self::try_from_bytes(data.as_slice())
+        }
+    }
+
     pub fn try_from_bytes(data: &[u8]) -> std::result::Result<Self, DB3Error> {
         let arr: [u8; TX_ID_LENGTH] = data.try_into().map_err(|_| DB3Error::InvalidAddress)?;
         Ok(Self { data: arr })
