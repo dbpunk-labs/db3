@@ -101,8 +101,8 @@ message Mutation {
   MutationAction action = 1;
   message BodyWrapper {
     oneof body {
-      CollectionMutation collection_mutations = 1;
-      DocumentMutation document_mutations = 2;
+      CollectionMutation collection_mutation = 1;
+      DocumentMutation document_mutation = 2;
       EventDatabaseMutation event_database_mutation = 3;
       DocumentDatabaseMutation doc_database_mutation = 4;
     }
