@@ -17,72 +17,73 @@
 //
 
 syntax = "proto3";
-import "db3_base.proto";
-import "db3_database.proto";
 
 package db3_mutation_proto;
 
+import "db3_base.proto";
+import "db3_database.proto";
+
 enum DatabaseAction {
-    CreateDB = 0;
-    AddCollection = 1;
-    AddDocument = 2;
-    DeleteDocument = 3;
-    UpdateDocument = 4;
+  CreateDB = 0;
+  AddCollection = 1;
+  AddDocument = 2;
+  DeleteDocument = 3;
+  UpdateDocument = 4;
 }
 
 message DatabaseMutation {
-    db3_base_proto.BroadcastMeta meta = 1;
-    DatabaseAction action = 2;
-    bytes db_address = 3;
-    repeated CollectionMutation collection_mutations = 4;
-    repeated DocumentMutation document_mutations = 5;
-    // the description of database
-    // max bytes = 140
-    string db_desc = 6;
+  db3_base_proto.BroadcastMeta meta = 1;
+  DatabaseAction action = 2;
+  bytes db_address = 3;
+  repeated CollectionMutation collection_mutations = 4;
+  repeated DocumentMutation document_mutations = 5;
+  // the description of database
+  // max bytes = 140
+  string db_desc = 6;
 }
 
 message CollectionMutation {
-    repeated db3_database_proto.Index index = 1;
-    string collection_name = 2;
+  repeated db3_database_proto.Index index = 1;
+  string collection_name = 2;
 }
 
 message DocumentMutation {
-    string collection_name = 1;
-    repeated bytes documents = 2;
-    repeated string ids = 3;
-    // The fields to update.
-    // None of the field paths in the mask may contain a reserved name.
-    //
-    // If the document exists on the server and has fields not referenced in the
-    // mask, they are left unchanged.
-    // Fields referenced in the mask, but not present in the input document, are
-    // deleted from the document on the server.
-    repeated DocumentMask masks = 4;
+  string collection_name = 1;
+  repeated bytes documents = 2;
+  repeated string ids = 3;
+  // The fields to update.
+  // None of the field paths in the mask may contain a reserved name.
+  //
+  // If the document exists on the server and has fields not referenced in the
+  // mask, they are left unchanged.
+  // Fields referenced in the mask, but not present in the input document, are
+  // deleted from the document on the server.
+  repeated DocumentMask masks = 4;
 }
 message DocumentMask {
-    repeated string fields = 1;
+  repeated string fields = 1;
 }
 
 message MintCreditsMutation {
-    uint32 chain_id = 1;
-    uint64 block_id = 2;
-    bytes tx_id = 3;
-    bytes to = 5;
-    uint64 amount = 6;
-    db3_base_proto.BroadcastMeta meta = 7;
+  uint32 chain_id = 1;
+  uint64 block_id = 2;
+  bytes tx_id = 3;
+  bytes to = 5;
+  uint64 amount = 6;
+  db3_base_proto.BroadcastMeta meta = 7;
 }
 
 enum PayloadType {
-    QuerySessionPayload =0;
-    DatabasePayload = 1;
-    MintCreditsPayload = 2;
-    // a evm chain request
-    TypedDataPayload = 3;
+  QuerySessionPayload = 0;
+  DatabasePayload = 1;
+  MintCreditsPayload = 2;
+  // a evm chain request
+  TypedDataPayload = 3;
 }
 
 message WriteRequest {
-    bytes signature = 1;
-    // the protobuf binary format
-    bytes payload = 2;
-    PayloadType payload_type = 4;
+  bytes signature = 1;
+  // the protobuf binary format
+  bytes payload = 2;
+  PayloadType payload_type = 4;
 }

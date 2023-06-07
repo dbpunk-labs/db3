@@ -19,12 +19,12 @@ use crate::mutation_utils::MutationUtil;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::DbId;
 use db3_error::Result;
+use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::{
-    storage_node_server::StorageNode, ExtraItem, GetNonceRequest, GetNonceResponse,
-    SendMutationRequest, SendMutationResponse,
+    storage_node_server::StorageNode, ExtraItem, GetMutationHeaderRequest,
+    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, SendMutationRequest,
+    SendMutationResponse,
 };
-
-use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use tonic::{Request, Response, Status};
@@ -56,6 +56,21 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn get_mutation_header(
+        &self,
+        request: Request<GetMutationHeaderRequest>,
+    ) -> std::result::Result<Response<GetMutationHeaderResponse>, Status> {
+        let r = request.into_inner();
+        let header = self
+            .storage
+            .get_mutation_header(r.block_id, r.order_id)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(GetMutationHeaderResponse {
+            header,
+            status: MutationRollupStatus::Pending.into(),
+            rollup_tx: vec![],
+        }))
+    }
     async fn get_nonce(
         &self,
         request: Request<GetNonceRequest>,
@@ -88,9 +103,9 @@ impl StorageNode for StorageNodeV2Impl {
         match self.state_store.incr_nonce(&address, nonce) {
             Ok(_) => {
                 // mutation id
-                let id = self
+                let (id, block, order) = self
                     .storage
-                    .add_mutation(&r.payload, r.signature.as_bytes(), &address)
+                    .add_mutation(&r.payload, r.signature.as_str(), &address)
                     .map_err(|e| Status::internal(format!("{e}")))?;
                 match action {
                     MutationAction::CreateDocumentDb => {
@@ -100,11 +115,14 @@ impl StorageNode for StorageNodeV2Impl {
                             key: "db_addr".to_string(),
                             value: db_addr,
                         };
+
                         Ok(Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items: vec![item],
+                            block,
+                            order,
                         }))
                     }
                     _ => Ok(Response::new(SendMutationResponse {
@@ -112,6 +130,8 @@ impl StorageNode for StorageNodeV2Impl {
                         code: 0,
                         msg: "ok".to_string(),
                         items: vec![],
+                        block,
+                        order,
                     })),
                 }
             }
@@ -120,6 +140,8 @@ impl StorageNode for StorageNodeV2Impl {
                 code: 1,
                 msg: "bad nonce".to_string(),
                 items: vec![],
+                block: 0,
+                order: 0,
             })),
         }
     }

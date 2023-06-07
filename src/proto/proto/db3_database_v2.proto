@@ -24,45 +24,44 @@ package db3_database_v2_proto;
 //
 
 message DocumentDatabase {
-    bytes address = 1;
-    // the owner of the Database
-    bytes sender = 2;
-    repeated Collection collections = 4;
-    string desc = 5;
+  bytes address = 1;
+  // the owner of the Database
+  bytes sender = 2;
+  repeated Collection collections = 4;
+  string desc = 5;
 }
 
 message EventDatabase {
-    bytes address = 1;
-    bytes sender = 2;
-    uint64 chain_id = 3;
-    bytes contract_address = 4;
-    string desc = 5;
-    repeated EventTable tables = 6;
-    uint64 ttl = 7;
+  bytes address = 1;
+  bytes sender = 2;
+  uint64 chain_id = 3;
+  bytes contract_address = 4;
+  string desc = 5;
+  repeated EventTable tables = 6;
+  uint64 ttl = 7;
 }
 
 enum DatabaseType {
-    DocumentType = 0;
-    EventType = 1;
+  DocumentType = 0;
+  EventType = 1;
 }
 
 message DatabaseMessage {
-    DatabaseType dtype = 1;
-    oneof database {
-        DocumentDatabase doc_db = 2;
-        EventDatabase event_db = 3;
-    }
+  DatabaseType dtype = 1;
+  oneof database {
+    DocumentDatabase doc_db = 2;
+    EventDatabase event_db = 3;
+  }
 }
 
-
 message EventTable {
-    string name = 1;
+  string name = 1;
 }
 
 message Collection {
-    bytes id = 1;
-    string name = 2;
-    repeated Index index_list = 3;
+  bytes id = 1;
+  string name = 2;
+  repeated Index index_list = 3;
 }
 
 message Document {
@@ -73,7 +72,6 @@ message Document {
 }
 
 message Index {
-
   // A field in an index.
   // The field_path describes which field is indexed, the value_mode describes
   // how the field value is indexed.
@@ -459,7 +457,4 @@ message StructuredQuery {
   // * The number of values cannot be greater than the number of fields
   //   specified in the `ORDER BY` clause.
   // Cursor end_at = 8;
-
-
 }
-

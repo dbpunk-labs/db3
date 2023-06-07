@@ -20,28 +20,28 @@ syntax = "proto3";
 package db3_bill_proto;
 
 enum BillType {
-    BillForMutation = 0;
-    BillForQuery = 1;
-    BillForMint = 2;
+  BillForMutation = 0;
+  BillForQuery = 1;
+  BillForMint = 2;
 }
 
 message Bill {
-    // uint256
-    uint64 gas_fee = 1;
-    // the block id 
-    uint64 block_id = 2;
-    // query session or mutation
-    BillType bill_type = 4;
-    // time on block created
-    uint64 time = 5;
-    // mutation id or query session id
-    bytes tx_id = 6;
-    // owner address
-    bytes owner = 8;
-    // to address
-    bytes to = 9;
+  // uint256
+  uint64 gas_fee = 1;
+  // the block id
+  uint64 block_id = 2;
+  // query session or mutation
+  BillType bill_type = 4;
+  // time on block created
+  uint64 time = 5;
+  // mutation id or query session id
+  bytes tx_id = 6;
+  // owner address
+  bytes owner = 8;
+  // to address
+  bytes to = 9;
 }
 
 message BillQueryRequest {
-    uint64 block_height = 1;
+  uint64 block_height = 1;
 }

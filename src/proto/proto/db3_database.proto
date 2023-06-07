@@ -23,19 +23,19 @@ package db3_database_proto;
 // the definition of database
 //
 message Database {
-    bytes address = 1;
-    // the owner of the Database
-    bytes sender = 2;
-    // the history of database modification
-    repeated bytes tx = 3;
-    repeated Collection collections = 4;
-    string desc =5;
+  bytes address = 1;
+  // the owner of the Database
+  bytes sender = 2;
+  // the history of database modification
+  repeated bytes tx = 3;
+  repeated Collection collections = 4;
+  string desc = 5;
 }
 
 message Collection {
-    bytes id = 1;
-    string name = 2;
-    repeated Index index_list = 3;
+  bytes id = 1;
+  string name = 2;
+  repeated Index index_list = 3;
 }
 
 message Document {
@@ -46,7 +46,6 @@ message Document {
 }
 
 message Index {
-
   // A field in an index.
   // The field_path describes which field is indexed, the value_mode describes
   // how the field value is indexed.
@@ -432,7 +431,4 @@ message StructuredQuery {
   // * The number of values cannot be greater than the number of fields
   //   specified in the `ORDER BY` clause.
   // Cursor end_at = 8;
-
-
 }
-

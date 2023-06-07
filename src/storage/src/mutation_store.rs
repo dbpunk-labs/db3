@@ -16,15 +16,15 @@
 //
 
 use bytes::BytesMut;
+use db3_base::times;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_v2_proto::MutationMessage;
+use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, AtomicU64};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::{debug, info};
 
 pub type StorageEngine = DBWithThreadMode<MultiThreaded>;
@@ -48,11 +48,15 @@ impl Default for MutationStoreConfig {
     }
 }
 
+struct BlockState {
+    pub block: u64,
+    pub order: u32,
+}
+
 pub struct MutationStore {
     config: MutationStoreConfig,
     se: StorageEngine,
-    block: Arc<AtomicU64>,
-    order_in_block: Arc<AtomicU32>,
+    block_state: Arc<Mutex<BlockState>>,
 }
 
 impl MutationStore {
@@ -74,44 +78,90 @@ impl MutationStore {
         Ok(Self {
             config,
             se,
-            block: Arc::new(AtomicU64::new(0)),
-            order_in_block: Arc::new(AtomicU32::new(0)),
+            //TODO Recover from local storage or meta contract
+            block_state: Arc::new(Mutex::new(BlockState { block: 0, order: 0 })),
         })
     }
 
-    pub fn increase_block(&self) {
-        self.block
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    pub fn increase_block(&self) -> Result<()> {
+        match self.block_state.lock() {
+            Ok(mut state) => {
+                state.block += 1;
+                state.order = 0;
+                Ok(())
+            }
+            Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
+        }
+    }
+
+    fn increase_order(&self) -> Result<(u64, u32)> {
+        match self.block_state.lock() {
+            Ok(mut state) => {
+                state.order += 1;
+                Ok((state.block, state.order))
+            }
+            Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
+        }
+    }
+
+    pub fn get_mutation_header(&self, block: u64, order: u32) -> Result<Option<MutationHeader>> {
+        let mut encoded_id: Vec<u8> = Vec::new();
+        encoded_id.extend_from_slice(&block.to_be_bytes());
+        encoded_id.extend_from_slice(&order.to_be_bytes());
+        let block_cf_handle = self
+            .se
+            .cf_handle(self.config.block_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let value = self
+            .se
+            .get_cf(&block_cf_handle, &encoded_id)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let Some(v) = value {
+            match MutationHeader::decode(v.as_ref()) {
+                Ok(m) => Ok(Some(m)),
+                Err(e) => Err(DB3Error::ReadStoreError(format!("{e}"))),
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn add_mutation(
         &self,
         payload: &[u8],
-        signature: &[u8],
+        signature: &str,
         sender: &DB3Address,
-    ) -> Result<String> {
-        let block = self.block.load(std::sync::atomic::Ordering::Relaxed);
-        let order = self
-            .order_in_block
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    ) -> Result<(String, u64, u32)> {
         //TODO avoid the duplicated tx id
         let tx_id = TxId::from(payload);
-        debug!("the tx id is {}", tx_id.to_hex());
+        let hex_id = tx_id.to_hex();
+        debug!("the tx id is {}", hex_id);
+        let (block, order) = self.increase_order()?;
         let mut encoded_id: Vec<u8> = Vec::new();
         encoded_id.extend_from_slice(&block.to_be_bytes());
         encoded_id.extend_from_slice(&order.to_be_bytes());
-        let mutation_msg = MutationMessage {
+        let mutation_body = MutationBody {
             payload: payload.to_vec(),
-            signature: signature.to_vec(),
-            block_id: block,
-            order,
-            sender: sender.as_ref().to_vec(),
+            signature: signature.to_string(),
         };
         let mut buf = BytesMut::with_capacity(self.config.message_max_buffer);
-        mutation_msg
+        mutation_body
             .encode(&mut buf)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         let buf = buf.freeze();
+        let mutation_header = MutationHeader {
+            block_id: block,
+            order_id: order,
+            sender: sender.as_ref().to_vec(),
+            time: times::get_current_time_in_secs(),
+            id: hex_id.to_string(),
+            size: buf.len() as u32,
+        };
+        let mut header_buf = BytesMut::with_capacity(1024);
+        mutation_header
+            .encode(&mut header_buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let header_buf = header_buf.freeze();
         let tx_cf_handle = self
             .se
             .cf_handle(self.config.tx_store_cf_name.as_str())
@@ -121,12 +171,14 @@ impl MutationStore {
             .cf_handle(self.config.block_store_cf_name.as_str())
             .ok_or(DB3Error::WriteStoreError("cf is not found".to_string()))?;
         let mut batch = WriteBatch::default();
-        batch.put_cf(&tx_cf_handle, &tx_id, &encoded_id);
-        batch.put_cf(&block_cf_handle, &encoded_id, buf.as_ref());
+        // store the mutation body
+        batch.put_cf(&tx_cf_handle, &tx_id, buf.as_ref());
+        // store the mutation header
+        batch.put_cf(&block_cf_handle, &encoded_id, header_buf.as_ref());
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-        Ok(tx_id.to_hex())
+        Ok((hex_id, block, order))
     }
 }
 
@@ -134,7 +186,6 @@ impl MutationStore {
 mod tests {
     use super::*;
     use tempdir::TempDir;
-
     #[test]
     fn test_new_mutation_store() {
         let tmp_dir_path = TempDir::new("new_mutation_store_path").expect("create temp dir");
@@ -143,7 +194,6 @@ mod tests {
             db_path: real_path,
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
-
             message_max_buffer: 4 * 1024,
         };
         if let Err(e) = MutationStore::new(config) {
@@ -165,13 +215,16 @@ mod tests {
         assert!(result.is_ok());
         if let Ok(store) = result {
             let payload: Vec<u8> = vec![1];
-            let signature: Vec<u8> = vec![1];
-            let result =
-                store.add_mutation(payload.as_ref(), signature.as_ref(), &DB3Address::ZERO);
+            let signature: &str = "0xasdasdsad";
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
             assert!(result.is_ok());
-            let result =
-                store.add_mutation(payload.as_ref(), signature.as_ref(), &DB3Address::ZERO);
-            assert!(result.is_ok());
+            if let Ok((_id, block, order)) = result {
+                if let Ok(Some(v)) = store.get_mutation_header(block, order) {
+                    assert_eq!(DB3Address::ZERO.as_ref(), &v.sender);
+                } else {
+                    assert!(false);
+                }
+            }
         } else {
             assert!(false);
         }
