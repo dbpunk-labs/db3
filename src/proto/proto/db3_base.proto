@@ -16,26 +16,25 @@
 // limitations under the License.
 //
 
-
 syntax = "proto3";
 package db3_base_proto;
 
 enum ChainRole {
-    SettlementChain = 0;
-    StorageShardChain = 10;
-    DvmComputingChain = 20;
+  SettlementChain = 0;
+  StorageShardChain = 10;
+  DvmComputingChain = 20;
 }
 
 enum ChainId {
-    MainNet = 0;
-    TestNet = 10;
-    DevNet = 20;
+  MainNet = 0;
+  TestNet = 10;
+  DevNet = 20;
 }
 
 message BroadcastMeta {
-    uint64 nonce = 1;
-    // the chain id of db3
-    ChainId chain_id = 2;
-    // the chain role of db3
-    ChainRole chain_role = 3;
+  uint64 nonce = 1;
+  // the chain id of db3
+  ChainId chain_id = 2;
+  // the chain role of db3
+  ChainRole chain_role = 3;
 }

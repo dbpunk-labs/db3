@@ -18,46 +18,81 @@ syntax = "proto3";
 
 package db3_storage_proto;
 
+import "db3_mutation_v2.proto";
+
 message SendMutationRequest {
-    // a hex signature string
-    string signature = 1;
-    // the payload of mutation
-    bytes payload = 2;
+  // a hex signature string
+  string signature = 1;
+  // the payload of mutation
+  bytes payload = 2;
 }
 
 message ExtraItem {
-    string key = 1;
-    string value = 2;
+  string key = 1;
+  string value = 2;
 }
 
 message SendMutationResponse {
-    // a hex format id
-    string id = 1;
-    int32 code = 2;
-    string msg = 3;
-    repeated ExtraItem items = 4;
+  // a hex format id
+  string id = 1;
+  int32 code = 2;
+  string msg = 3;
+  repeated ExtraItem items = 4;
+  uint64 block = 5;
+  uint32 order = 6;
 }
 
 message GetNonceRequest {
-    // a hex format address
-    string address = 1;
+  // a hex format address
+  string address = 1;
 }
 
 message GetNonceResponse {
-    uint64 nonce = 2;
+  uint64 nonce = 2;
 }
 
 message SubscribeRequest {
-    string signature = 1;
-    bytes payload = 2;
+  string signature = 1;
+  bytes payload = 2;
 }
 
 message BlockEvent {
-    uint64 block_id = 1;
-    uint64 mutation_count = 2;
+  uint64 block_id = 1;
+  uint64 mutation_count = 2;
+}
+
+message GetMutationHeaderRequest {
+  uint64 block_id = 1;
+  uint32 order_id = 2;
+}
+
+message GetMutationHeaderResponse {
+  db3_mutation_v2_proto.MutationHeader header = 1;
+  db3_mutation_v2_proto.MutationRollupStatus status = 2;
+  bytes rollup_tx = 4;
+}
+
+message GetMutationBodyRequest {
+  string id = 1;
+}
+
+message GetMutationBodyResponse {
+  db3_mutation_v2_proto.MutationBody body = 1;
+}
+
+message ScanMutationHeaderRequest {
+  uint32 start = 1;
+  uint32 limit = 2;
+}
+
+message ScanMutationHeaderResponse {
+  repeated db3_mutation_v2_proto.MutationHeader headers = 1;
 }
 
 service StorageNode {
-    rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
-    rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
+  rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
+  rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
+  rpc GetMutationHeader(GetMutationHeaderRequest) returns (GetMutationHeaderResponse) {}
+  rpc ScanMutationHeader(ScanMutationHeaderRequest) returns (ScanMutationHeaderResponse) {}
+  rpc GetMutationBody(GetMutationBodyRequest) returns (GetMutationBodyResponse) {}
 }

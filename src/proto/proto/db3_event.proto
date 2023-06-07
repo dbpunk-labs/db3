@@ -19,69 +19,69 @@ syntax = "proto3";
 package db3_event_proto;
 
 enum EventType {
-    Block = 0;
-    Mutation = 1;
-    Query = 2;
+  Block = 0;
+  Mutation = 1;
+  Query = 2;
 }
 
 // the node will dispatch a block event when a new block has been proposed
 message BlockEvent {
-    uint64 height= 1;
-    bytes block_hash = 2;
-    bytes app_hash = 3;
-    string chain_id = 4;
-    uint64 gas = 5;
+  uint64 height = 1;
+  bytes block_hash = 2;
+  bytes app_hash = 3;
+  string chain_id = 4;
+  uint64 gas = 5;
 }
 
 // the node will dispatch a mutation event when a mutation has been checked
 message MutationEvent {
-    string sender = 1;
-    enum MutationEventStatus {
-        // the mutation has been deliveried
-        Deliveried = 0;
-        // not enough gas
-        OutOfGas = 1;
-        // invalid mutation
-        Invalid = 2;
-    }
-    enum ToAddressType {
-        // mutation for data 
-        Database = 0;
-        // mutation for credit
-        Account = 1;
-    }
-    MutationEventStatus status = 2;
-    // the address that mutation has been send to
-    string to = 3;
-    uint64 gas = 4;
-    uint64 height= 5;
-    string hash = 6;
-    ToAddressType to_addr_type = 7;
-    repeated string collections = 8;
+  string sender = 1;
+  enum MutationEventStatus {
+    // the mutation has been deliveried
+    Deliveried = 0;
+    // not enough gas
+    OutOfGas = 1;
+    // invalid mutation
+    Invalid = 2;
+  }
+  enum ToAddressType {
+    // mutation for data
+    Database = 0;
+    // mutation for credit
+    Account = 1;
+  }
+  MutationEventStatus status = 2;
+  // the address that mutation has been send to
+  string to = 3;
+  uint64 gas = 4;
+  uint64 height = 5;
+  string hash = 6;
+  ToAddressType to_addr_type = 7;
+  repeated string collections = 8;
 }
 
 message EventMessage {
-    EventType type = 1;
-    oneof event {
-        MutationEvent mutation_event = 2;
-        BlockEvent block_event = 3;
-    }
+  EventType type = 1;
+  oneof event {
+    MutationEvent mutation_event = 2;
+    BlockEvent block_event = 3;
+  }
 }
 
 message MutationEventFilter {
-    string sender = 1;
+  string sender = 1;
 }
 
 message BlockEventFilter {}
 
 message EventFilter {
-    oneof filter {
-        MutationEventFilter mfilter = 1;
-        BlockEventFilter bfilter = 2;
-    }
+  oneof filter {
+    MutationEventFilter mfilter = 1;
+    BlockEventFilter bfilter = 2;
+  }
 }
 
 message Subscription {
-    repeated EventType topics = 1;
-    repeated EventFilter filters = 2;
+  repeated EventType topics = 1;
+  repeated EventFilter filters = 2;
 }

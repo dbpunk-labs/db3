@@ -17,80 +17,96 @@
 
 syntax = "proto3";
 
+package db3_mutation_v2_proto;
+
 import "db3_base.proto";
 import "db3_database.proto";
 
-package db3_mutation_v2_proto;
-
+message DocumentDatabaseMutation {
+  string db_desc = 1;
+}
 
 message CollectionMutation {
-    repeated db3_database_proto.Index index = 1;
-    string collection_name = 2;
+  repeated db3_database_proto.Index index = 1;
+  string collection_name = 2;
 }
 
 message DocumentMutation {
-    string collection_name = 1;
-    repeated bytes documents = 2;
-    repeated string ids = 3;
-    // The fields to update.
-    // None of the field paths in the mask may contain a reserved name.
-    //
-    // If the document exists on the server and has fields not referenced in the
-    // mask, they are left unchanged.
-    // Fields referenced in the mask, but not present in the input document, are
-    // deleted from the document on the server.
-    repeated DocumentMask masks = 4;
+  string collection_name = 1;
+  repeated bytes documents = 2;
+  repeated string ids = 3;
+  // The fields to update.
+  // None of the field paths in the mask may contain a reserved name.
+  //
+  // If the document exists on the server and has fields not referenced in the
+  // mask, they are left unchanged.
+  // Fields referenced in the mask, but not present in the input document, are
+  // deleted from the document on the server.
+  repeated DocumentMask masks = 4;
 }
 
 message EventTableIndex {
-    string name = 1;
-    repeated string fields = 2;
+  string name = 1;
+  repeated string fields = 2;
 }
 
 message EventTableMutation {
-    string name = 1;
-    repeated EventTableIndex index_list = 2;
+  string name = 1;
+  repeated EventTableIndex index_list = 2;
 }
 
 message EventDatabaseMutation {
-    uint64 chain_id = 1;
-    bytes contract_address = 2;
-    uint64 ttl = 3;
-    string desc = 4;
-    repeated EventTableMutation tables = 5;
-    bytes contract_api = 6;
+  uint64 chain_id = 1;
+  bytes contract_address = 2;
+  uint64 ttl = 3;
+  string desc = 4;
+  repeated EventTableMutation tables = 5;
+  bytes contract_api = 6;
 }
 
 message DocumentMask {
-    repeated string fields = 1;
+  repeated string fields = 1;
 }
 
-
-message MutationMessage {
-    bytes payload = 1;
-    bytes signature = 2;
-    uint64 block_id = 3;
-    uint32 order = 4;
-    bytes sender = 5;
+message MutationHeader {
+  uint64 block_id = 1;
+  uint32 order_id = 2;
+  bytes sender = 3;
+  uint64 time = 4;
+  string id = 5;
+  uint32 size = 6;
 }
 
+message MutationBody {
+  bytes payload = 1;
+  string signature = 2;
+}
 
 enum MutationAction {
-    CreateDocumentDB = 0;
-    AddCollection = 1;
-    AddDocument = 2;
-    DeleteDocument = 3;
-    UpdateDocument = 4;
-    CreateEventDB = 5;
+  CreateDocumentDB = 0;
+  AddCollection = 1;
+  AddDocument = 2;
+  DeleteDocument = 3;
+  UpdateDocument = 4;
+  CreateEventDB = 5;
+}
+
+enum MutationRollupStatus {
+  Pending = 0;
+  Doing = 1;
+  Done = 2;
 }
 
 message Mutation {
-    MutationAction action = 1;
-    bytes db_address = 2;
-    repeated CollectionMutation collection_mutations = 3;
-    repeated DocumentMutation document_mutations = 4;
-    // the description of database
-    // max bytes = 140
-    string db_desc = 5;
-    EventDatabaseMutation event_database_mutation = 6;
+  MutationAction action = 1;
+  message BodyWrapper {
+    oneof body {
+      CollectionMutation collection_mutation = 1;
+      DocumentMutation document_mutation = 2;
+      EventDatabaseMutation event_database_mutation = 3;
+      DocumentDatabaseMutation doc_database_mutation = 4;
+    }
+    bytes db_address = 5;
+  }
+  repeated BodyWrapper bodies = 3;
 }

@@ -15,12 +15,11 @@
 // limitations under the License.
 //
 
-
 syntax = "proto3";
 
 package db3_account_v2_proto;
 
 message Account {
-    uint64 nonce = 1;
-    uint64 total_storage_in_bytes = 2;
+  uint64 nonce = 1;
+  uint64 total_storage_in_bytes = 2;
 }

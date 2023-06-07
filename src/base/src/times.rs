@@ -1,5 +1,5 @@
 //
-// db3_message.proto
+// times.rs
 // Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,21 +14,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-syntax = "proto3";
-package db3_message_proto;
 
-message DepositEvent {
-  // the evm chain id
-  uint32 chain_id = 1;
-  // the evm chain user address
-  bytes sender = 2;
-  // the deposit amount
-  uint64 amount = 3;
-  // the block id of evm chain
-  uint64 block_id = 4;
-  // the transacion id
-  bytes transaction_id = 5;
-  // the signature of transacion
-  bytes signature = 6;
-  bytes tx_signed_hash = 7;
+use std::time::SystemTime;
+
+pub fn get_current_time_in_secs() -> u64 {
+    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(n) => n.as_secs(),
+        Err(_) => 0,
+    }
 }
