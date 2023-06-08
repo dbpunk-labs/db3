@@ -18,6 +18,7 @@
 use arrow::array::{ArrayRef, BinaryBuilder, StringBuilder, UInt32Builder, UInt64Builder};
 use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
+use arweave_rs::Arweave;
 use db3_base::times;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
@@ -29,6 +30,7 @@ use parquet::basic::GzipLevel;
 use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 use tempdir::TempDir;
@@ -39,27 +41,36 @@ pub struct RollupExecutorConfig {
     // the interval in ms
     pub rollup_interval: u64,
     pub temp_data_path: String,
+    pub ar_key_path: String,
+    pub ar_node_url: String,
 }
 
 pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
     schema: SchemaRef,
+    arweave: Arweave,
 }
 
 impl RollupExecutor {
-    pub fn new(config: RollupExecutorConfig, storage: MutationStore) -> Self {
+    pub fn new(config: RollupExecutorConfig, storage: MutationStore) -> Result<Self> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("payload", DataType::Binary, true),
             Field::new("signature", DataType::Utf8, true),
             Field::new("block", DataType::UInt64, true),
             Field::new("order", DataType::UInt32, true),
         ]));
-        Self {
+        let arweave_url = url::Url::from_str(config.ar_node_url.as_str())
+            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        let path = Path::new(config.ar_key_path.as_str());
+        let arweave = Arweave::from_keypair_path(path, arweave_url)
+            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        Ok(Self {
             config,
             storage,
             schema,
-        }
+            arweave,
+        })
     }
 
     fn convert_to_recordbatch(
@@ -112,7 +123,21 @@ impl RollupExecutor {
         Ok((meta.num_rows as u64, metadata.len()))
     }
 
-    pub fn process(&self) -> Result<()> {
+    async fn upload_data(&self, path: &Path) -> Result<(String, u64)> {
+        let metadata =
+            std::fs::metadata(path).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        let fee = self
+            .arweave
+            .get_fee_by_size(metadata.len())
+            .await
+            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        self.arweave
+            .upload_file_from_path(path, vec![], fee)
+            .await
+            .map_err(|e| DB3Error::RollupError(format!("{e}")))
+    }
+
+    pub async fn process(&self) -> Result<()> {
         let next_rollup_start_block = match self.storage.get_last_rollup_record()? {
             Some(r) => r.end_block + 1,
             _ => 0_u64,
@@ -137,16 +162,20 @@ impl RollupExecutor {
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
         let file_path = tmp_dir.path().join("rollup.parquet.gz");
         let (num_rows, size) = self.dump_recordbatch(&file_path, &recordbatch)?;
+        let (id, reward) = self.upload_data(&file_path).await?;
+        info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} cost {}", now.elapsed().as_secs(),
+        id.as_str(), reward
+        );
         let record = RollupRecord {
             end_block: current_block - 1,
             raw_data_size: memory_size as u64,
             compress_data_size: size,
             processed_time: now.elapsed().as_secs(),
-            arweave_tx: "".to_string(),
+            arweave_tx: id,
             time: times::get_current_time_in_secs(),
             mutation_count: num_rows,
+            cost: reward,
         };
-        info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {}", now.elapsed().as_secs());
         self.storage
             .add_rollup_record(&record)
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;

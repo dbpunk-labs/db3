@@ -98,6 +98,10 @@ pub enum DB3Command {
         rollup_interval: u64,
         #[clap(long, default_value = "./rollup_data")]
         rollup_data_path: String,
+        #[clap(long, default_value = "http://127.0.0.1:1984/")]
+        ar_node_url: String,
+        #[clap(long, default_value = "./wallet.json")]
+        ar_key_path: String,
     },
 
     /// Start db3 network
@@ -229,6 +233,8 @@ impl DB3Command {
                 block_interval,
                 rollup_interval,
                 rollup_data_path,
+                ar_node_url,
+                ar_key_path,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -246,6 +252,8 @@ impl DB3Command {
                     block_interval,
                     rollup_interval,
                     rollup_data_path.as_str(),
+                    ar_node_url.as_str(),
+                    ar_key_path.as_str(),
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -423,11 +431,15 @@ impl DB3Command {
         block_interval: u64,
         rollup_interval: u64,
         rollup_data_path: &str,
+        ar_node_url: &str,
+        ar_key_path: &str,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
         let rollup_config = RollupExecutorConfig {
             rollup_interval,
             temp_data_path: rollup_data_path.to_string(),
+            ar_node_url: ar_node_url.to_string(),
+            ar_key_path: ar_key_path.to_string(),
         };
         let store_config = MutationStoreConfig {
             db_path: mutation_db_path.to_string(),
@@ -455,7 +467,7 @@ impl DB3Command {
         );
         std::fs::create_dir_all(rollup_data_path).unwrap();
         storage_node.start_to_produce_block();
-        storage_node.start_to_rollup();
+        storage_node.start_to_rollup().await;
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(Any)

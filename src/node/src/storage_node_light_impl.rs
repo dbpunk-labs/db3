@@ -82,17 +82,18 @@ impl StorageNodeV2Impl {
         });
     }
 
-    pub fn start_to_rollup(&self) {
+    pub async fn start_to_rollup(&self) {
         let local_running = self.running.clone();
         let local_storage = self.storage.clone();
         let rollup_config = self.config.rollup_config.clone();
-        task::spawn_blocking(move || {
+        task::spawn(async move {
             info!("start the rollup thread");
             let rollup_interval = rollup_config.rollup_interval;
-            let executor = RollupExecutor::new(rollup_config, local_storage);
+            //TODO handle err
+            let executor = RollupExecutor::new(rollup_config, local_storage).unwrap();
             while local_running.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(rollup_interval));
-                match executor.process() {
+                match executor.process().await {
                     Ok(()) => {}
                     Err(e) => {
                         warn!("fail to rollup for error {e}");

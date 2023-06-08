@@ -27,4 +27,5 @@ message RollupRecord {
     string arweave_tx = 5;
     uint64 time = 6;
     uint64 mutation_count = 7;
+    uint64 cost = 8;
 }
