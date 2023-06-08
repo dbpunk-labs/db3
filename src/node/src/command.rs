@@ -20,6 +20,7 @@ use crate::auth_storage::AuthStorage;
 use crate::context::Context;
 use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
 use crate::node_storage::NodeStorage;
+use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_impl::StorageNodeImpl;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use clap::Parser;
@@ -90,6 +91,13 @@ pub enum DB3Command {
         /// The network id
         #[clap(long, default_value = "10")]
         network_id: u64,
+        /// The block interval
+        #[clap(long, default_value = "2000")]
+        block_interval: u64,
+        #[clap(long, default_value = "60000")]
+        rollup_interval: u64,
+        #[clap(long, default_value = "./rollup_data")]
+        rollup_data_path: String,
     },
 
     /// Start db3 network
@@ -218,6 +226,9 @@ impl DB3Command {
                 mutation_db_path,
                 state_db_path,
                 network_id,
+                block_interval,
+                rollup_interval,
+                rollup_data_path,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -232,6 +243,9 @@ impl DB3Command {
                     mutation_db_path.as_str(),
                     state_db_path.as_str(),
                     network_id,
+                    block_interval,
+                    rollup_interval,
+                    rollup_data_path.as_str(),
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -406,12 +420,20 @@ impl DB3Command {
         mutation_db_path: &str,
         state_db_path: &str,
         network_id: u64,
+        block_interval: u64,
+        rollup_interval: u64,
+        rollup_data_path: &str,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
+        let rollup_config = RollupExecutorConfig {
+            rollup_interval,
+            temp_data_path: rollup_data_path.to_string(),
+        };
         let store_config = MutationStoreConfig {
             db_path: mutation_db_path.to_string(),
             block_store_cf_name: "block_store_cf".to_string(),
             tx_store_cf_name: "tx_store_cf".to_string(),
+            rollup_store_cf_name: "rollup_store_cf".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -422,13 +444,18 @@ impl DB3Command {
         let config = StorageNodeV2Config {
             store_config,
             state_config,
+            rollup_config,
             network_id,
+            block_interval,
         };
         let storage_node = StorageNodeV2Impl::new(config).unwrap();
         info!(
             "start db3 store node on public addr {} and network {}",
             addr, network_id
         );
+        std::fs::create_dir_all(rollup_data_path).unwrap();
+        storage_node.start_to_produce_block();
+        storage_node.start_to_rollup();
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(Any)

@@ -16,6 +16,7 @@
 //
 
 use crate::mutation_utils::MutationUtil;
+use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::{DbId, TxId};
 use db3_error::Result;
@@ -28,19 +29,27 @@ use db3_proto::db3_storage_proto::{
 };
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::task;
 use tonic::{Request, Response, Status};
-use tracing::debug;
+use tracing::{debug, info, warn};
 
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
+    pub rollup_config: RollupExecutorConfig,
     pub network_id: u64,
+    pub block_interval: u64,
 }
 
 pub struct StorageNodeV2Impl {
     storage: MutationStore,
     state_store: StateStore,
     config: StorageNodeV2Config,
+    running: Arc<AtomicBool>,
 }
 
 impl StorageNodeV2Impl {
@@ -51,7 +60,46 @@ impl StorageNodeV2Impl {
             storage,
             state_store,
             config,
+            running: Arc::new(AtomicBool::new(true)),
         })
+    }
+
+    pub fn start_to_produce_block(&self) {
+        let local_running = self.running.clone();
+        let local_storage = self.storage.clone();
+        let local_block_interval = self.config.block_interval;
+        task::spawn_blocking(move || {
+            info!("start the block producer thread");
+            while local_running.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(local_block_interval));
+                match local_storage.increase_block() {
+                    Ok(()) => {}
+                    Err(e) => {
+                        warn!("fail to produce block for error {e}");
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn start_to_rollup(&self) {
+        let local_running = self.running.clone();
+        let local_storage = self.storage.clone();
+        let rollup_config = self.config.rollup_config.clone();
+        task::spawn_blocking(move || {
+            info!("start the rollup thread");
+            let rollup_interval = rollup_config.rollup_interval;
+            let executor = RollupExecutor::new(rollup_config, local_storage);
+            while local_running.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(rollup_interval));
+                match executor.process() {
+                    Ok(()) => {}
+                    Err(e) => {
+                        warn!("fail to rollup for error {e}");
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -98,6 +146,7 @@ impl StorageNode for StorageNodeV2Impl {
             rollup_tx: vec![],
         }))
     }
+
     async fn get_nonce(
         &self,
         request: Request<GetNonceRequest>,

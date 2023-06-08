@@ -21,6 +21,7 @@ use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
+use db3_proto::db3_rollup_proto::RollupRecord;
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
@@ -34,6 +35,7 @@ pub struct MutationStoreConfig {
     pub db_path: String,
     pub block_store_cf_name: String,
     pub tx_store_cf_name: String,
+    pub rollup_store_cf_name: String,
     pub message_max_buffer: usize,
     pub scan_max_limit: usize,
 }
@@ -44,6 +46,7 @@ impl Default for MutationStoreConfig {
             db_path: "./store".to_string(),
             block_store_cf_name: "block_store_cf".to_string(),
             tx_store_cf_name: "tx_store_cf".to_string(),
+            rollup_store_cf_name: "rollup_store_cf".to_string(),
             message_max_buffer: 8 * 1024,
             scan_max_limit: 50,
         }
@@ -55,9 +58,10 @@ struct BlockState {
     pub order: u32,
 }
 
+#[derive(Clone)]
 pub struct MutationStore {
     config: MutationStoreConfig,
-    se: StorageEngine,
+    se: Arc<StorageEngine>,
     block_state: Arc<Mutex<BlockState>>,
 }
 
@@ -68,15 +72,18 @@ impl MutationStore {
         cf_opts.create_missing_column_families(true);
         info!("open mutation store with path {}", config.db_path.as_str());
         let path = Path::new(config.db_path.as_str());
-        let se = StorageEngine::open_cf(
-            &cf_opts,
-            &path,
-            [
-                config.block_store_cf_name.as_str(),
-                config.tx_store_cf_name.as_str(),
-            ],
-        )
-        .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?;
+        let se = Arc::new(
+            StorageEngine::open_cf(
+                &cf_opts,
+                &path,
+                [
+                    config.block_store_cf_name.as_str(),
+                    config.tx_store_cf_name.as_str(),
+                    config.rollup_store_cf_name.as_str(),
+                ],
+            )
+            .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
+        );
         Ok(Self {
             config,
             se,
@@ -85,13 +92,51 @@ impl MutationStore {
         })
     }
 
+    pub fn add_rollup_record(&self, record: &RollupRecord) -> Result<()> {
+        // validate the end block
+        let rollup_cf_handle = self
+            .se
+            .cf_handle(self.config.rollup_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let id = record.end_block.to_be_bytes();
+        let mut buf = BytesMut::with_capacity(1024);
+        record
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let buf = buf.freeze();
+        let mut batch = WriteBatch::default();
+        // store the rollup record
+        batch.put_cf(&rollup_cf_handle, &id, buf.as_ref());
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
+    }
+
+    pub fn get_last_rollup_record(&self) -> Result<Option<RollupRecord>> {
+        let rollup_cf_handle = self
+            .se
+            .cf_handle(self.config.rollup_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&rollup_cf_handle);
+        it.seek_to_last();
+        if it.valid() {
+            if let Some(v) = it.value() {
+                match RollupRecord::decode(v) {
+                    Ok(r) => return Ok(Some(r)),
+                    Err(e) => return Err(DB3Error::ReadStoreError(format!("{e}"))),
+                }
+            }
+        }
+        Ok(None)
+    }
+
     pub fn scan_mutation_headers(&self, from: u32, limit: u32) -> Result<Vec<MutationHeader>> {
         if limit > self.config.scan_max_limit as u32 {
             return Err(DB3Error::ReadStoreError(
                 "reach the scan max limit".to_string(),
             ));
         }
-
         let block_cf_handle = self
             .se
             .cf_handle(self.config.block_store_cf_name.as_str())
@@ -130,6 +175,13 @@ impl MutationStore {
         }
     }
 
+    pub fn get_current_block(&self) -> Result<u64> {
+        match self.block_state.lock() {
+            Ok(state) => Ok(state.block),
+            Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
+        }
+    }
+
     fn increase_order(&self) -> Result<(u64, u32)> {
         match self.block_state.lock() {
             Ok(mut state) => {
@@ -138,6 +190,54 @@ impl MutationStore {
             }
             Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
         }
+    }
+
+    pub fn get_range_mutations(
+        &self,
+        block_start: u64,
+        block_end: u64,
+    ) -> Result<Vec<(MutationHeader, MutationBody)>> {
+        // the block_start should be less than the block end
+        if block_start >= block_end {
+            return Err(DB3Error::ReadStoreError("invalid block range".to_string()));
+        }
+        let block_cf_handle = self
+            .se
+            .cf_handle(self.config.block_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&block_cf_handle);
+        let mut start_id: Vec<u8> = Vec::new();
+        start_id.extend_from_slice(&block_start.to_be_bytes());
+        start_id.extend_from_slice(&0_u32.to_be_bytes());
+        let mut end_id: Vec<u8> = Vec::new();
+        end_id.extend_from_slice(&block_end.to_be_bytes());
+        end_id.extend_from_slice(&0_u32.to_be_bytes());
+        let end_id_ref: &[u8] = &end_id;
+        it.seek(&start_id);
+        let mut mutations: Vec<(MutationHeader, MutationBody)> = Vec::new();
+        loop {
+            if !it.valid() {
+                break;
+            }
+            if let Some(k) = it.key() {
+                if k >= end_id_ref {
+                    break;
+                }
+                if let Some(v) = it.value() {
+                    if let Ok(m) = MutationHeader::decode(v) {
+                        let tx_id = TxId::try_from_hex(m.id.as_str())
+                            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+                        if let Ok(Some(mb)) = self.get_mutation(&tx_id) {
+                            mutations.push((m, mb));
+                        }
+                    }
+                }
+            } else {
+                break;
+            }
+            it.next()
+        }
+        Ok(mutations)
     }
 
     pub fn get_mutation_header(&self, block: u64, order: u32) -> Result<Option<MutationHeader>> {
@@ -249,6 +349,7 @@ mod tests {
             db_path: real_path,
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
+            rollup_store_cf_name: "rf3".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -265,6 +366,7 @@ mod tests {
             db_path: real_path,
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
+            rollup_store_cf_name: "rf3".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -293,6 +395,82 @@ mod tests {
     }
 
     #[test]
+    fn test_add_and_get_rollup_record() {
+        let tmp_dir_path = TempDir::new("rollup").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = MutationStoreConfig {
+            db_path: real_path,
+            block_store_cf_name: "cf1".to_string(),
+            tx_store_cf_name: "cf2".to_string(),
+            rollup_store_cf_name: "rf3".to_string(),
+            message_max_buffer: 4 * 1024,
+            scan_max_limit: 50,
+        };
+        let result = MutationStore::new(config);
+        assert!(result.is_ok());
+        if let Ok(store) = result {
+            let result = store.get_last_rollup_record();
+            assert!(result.is_ok());
+            if let Ok(None) = result {
+            } else {
+                assert!(false);
+            }
+            let record = RollupRecord {
+                end_block: 1,
+                raw_data_size: 10,
+                compress_data_size: 1,
+                processed_time: 1,
+                arweave_tx: "xx".to_string(),
+                time: 111,
+            };
+            let result = store.add_rollup_record(&record);
+            assert!(result.is_ok());
+            let result = store.get_last_rollup_record();
+            if let Ok(Some(r)) = result {
+                assert_eq!(r.end_block, 1);
+            } else {
+                assert!(false);
+            }
+        }
+    }
+
+    #[test]
+    fn test_range_mutations() {
+        let tmp_dir_path = TempDir::new("range store path").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = MutationStoreConfig {
+            db_path: real_path,
+            block_store_cf_name: "cf1".to_string(),
+            tx_store_cf_name: "cf2".to_string(),
+            rollup_store_cf_name: "rf3".to_string(),
+            message_max_buffer: 4 * 1024,
+            scan_max_limit: 50,
+        };
+        let result = MutationStore::new(config);
+        assert!(result.is_ok());
+        if let Ok(store) = result {
+            let result = store.get_range_mutations(0, 10);
+            if let Ok(r) = result {
+                assert_eq!(0, r.len());
+            } else {
+                assert!(false);
+            }
+            let payload: Vec<u8> = vec![1];
+            let signature: &str = "0xasdasdsad";
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
+            assert!(result.is_ok());
+            let result = store.get_range_mutations(0, 1);
+            if let Ok(r) = result {
+                assert_eq!(1, r.len());
+            } else {
+                assert!(false);
+            }
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
     fn test_add_mutation() {
         let tmp_dir_path = TempDir::new("add mutation store path").expect("create temp dir");
         let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
@@ -300,6 +478,7 @@ mod tests {
             db_path: real_path,
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
+            rollup_store_cf_name: "rf3".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };

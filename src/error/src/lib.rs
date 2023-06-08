@@ -123,6 +123,8 @@ pub enum DB3Error {
     WriteStoreError(String),
     #[error("fail to read store for error {0}")]
     ReadStoreError(String),
+    #[error("fail to rollup data for error {0}")]
+    RollupError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
