@@ -79,7 +79,7 @@ pub enum DB3Command {
         /// The port of grpc api
         #[clap(long, default_value = "26619")]
         public_grpc_port: u16,
-        /// Bind the abci server to this port.
+        /// Log more logs
         #[clap(short, long)]
         verbose: bool,
         /// The database path for mutation
@@ -94,12 +94,16 @@ pub enum DB3Command {
         /// The block interval
         #[clap(long, default_value = "2000")]
         block_interval: u64,
+        /// The interval of rollup
         #[clap(long, default_value = "60000")]
         rollup_interval: u64,
+        /// The data path of rollup
         #[clap(long, default_value = "./rollup_data")]
         rollup_data_path: String,
+        /// The Ar miner node
         #[clap(long, default_value = "http://127.0.0.1:1984/")]
         ar_node_url: String,
+        /// The Ar wallet path
         #[clap(long, default_value = "./wallet.json")]
         ar_key_path: String,
     },

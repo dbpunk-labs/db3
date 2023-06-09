@@ -49,8 +49,8 @@ then
     rm -rf indexer
 fi
 
-echo "start ar miner..."
-bash ./ar_miner.sh > miner.log 2>&1 &
+#echo "start ar miner..."
+#bash ./ar_miner.sh > miner.log 2>&1 &
 echo "start db3 node..."
 ./tendermint init > tm.log 2>&1 
 export RUST_BACKTRACE=1
@@ -61,7 +61,7 @@ echo "start tendermint node..."
 sleep 1
 
 echo "start db3 store..."
-../target/${BUILD_MODE}/db3 store --rollup-interval 120000 >store.log 2>&1  &
+../target/${BUILD_MODE}/db3 store --rollup-interval 240000 >store.log 2>&1  &
 sleep 1
 
 echo "start db3 indexer..."

@@ -455,6 +455,7 @@ mod tests {
                 processed_time: 1,
                 arweave_tx: "xx".to_string(),
                 time: 111,
+                mutation_count: 1,
                 cost: 11111,
             };
             let result = store.add_rollup_record(&record);
