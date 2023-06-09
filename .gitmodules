@@ -1,3 +1,6 @@
 [submodule "thirdparty/merkdb"]
 	path = thirdparty/merkdb
 	url = https://github.com/dbpunk-labs/merkdb.git
+[submodule "thirdparty/arweave-rs"]
+	path = thirdparty/arweave-rs
+	url = https://github.com/imotai/arweave-rs.git

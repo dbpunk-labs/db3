@@ -20,6 +20,7 @@ use crate::auth_storage::AuthStorage;
 use crate::context::Context;
 use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
 use crate::node_storage::NodeStorage;
+use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_impl::StorageNodeImpl;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use clap::Parser;
@@ -78,7 +79,7 @@ pub enum DB3Command {
         /// The port of grpc api
         #[clap(long, default_value = "26619")]
         public_grpc_port: u16,
-        /// Bind the abci server to this port.
+        /// Log more logs
         #[clap(short, long)]
         verbose: bool,
         /// The database path for mutation
@@ -90,6 +91,21 @@ pub enum DB3Command {
         /// The network id
         #[clap(long, default_value = "10")]
         network_id: u64,
+        /// The block interval
+        #[clap(long, default_value = "2000")]
+        block_interval: u64,
+        /// The interval of rollup
+        #[clap(long, default_value = "60000")]
+        rollup_interval: u64,
+        /// The data path of rollup
+        #[clap(long, default_value = "./rollup_data")]
+        rollup_data_path: String,
+        /// The Ar miner node
+        #[clap(long, default_value = "http://127.0.0.1:1984/")]
+        ar_node_url: String,
+        /// The Ar wallet path
+        #[clap(long, default_value = "./wallet.json")]
+        ar_key_path: String,
     },
 
     /// Start db3 network
@@ -218,6 +234,11 @@ impl DB3Command {
                 mutation_db_path,
                 state_db_path,
                 network_id,
+                block_interval,
+                rollup_interval,
+                rollup_data_path,
+                ar_node_url,
+                ar_key_path,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -232,6 +253,11 @@ impl DB3Command {
                     mutation_db_path.as_str(),
                     state_db_path.as_str(),
                     network_id,
+                    block_interval,
+                    rollup_interval,
+                    rollup_data_path.as_str(),
+                    ar_node_url.as_str(),
+                    ar_key_path.as_str(),
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -406,12 +432,24 @@ impl DB3Command {
         mutation_db_path: &str,
         state_db_path: &str,
         network_id: u64,
+        block_interval: u64,
+        rollup_interval: u64,
+        rollup_data_path: &str,
+        ar_node_url: &str,
+        ar_key_path: &str,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
+        let rollup_config = RollupExecutorConfig {
+            rollup_interval,
+            temp_data_path: rollup_data_path.to_string(),
+            ar_node_url: ar_node_url.to_string(),
+            ar_key_path: ar_key_path.to_string(),
+        };
         let store_config = MutationStoreConfig {
             db_path: mutation_db_path.to_string(),
             block_store_cf_name: "block_store_cf".to_string(),
             tx_store_cf_name: "tx_store_cf".to_string(),
+            rollup_store_cf_name: "rollup_store_cf".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -422,13 +460,18 @@ impl DB3Command {
         let config = StorageNodeV2Config {
             store_config,
             state_config,
+            rollup_config,
             network_id,
+            block_interval,
         };
         let storage_node = StorageNodeV2Impl::new(config).unwrap();
         info!(
             "start db3 store node on public addr {} and network {}",
             addr, network_id
         );
+        std::fs::create_dir_all(rollup_data_path).unwrap();
+        storage_node.start_to_produce_block();
+        storage_node.start_to_rollup().await;
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(Any)

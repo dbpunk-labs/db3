@@ -27,6 +27,7 @@ use tracing::info;
 
 const ACCOUNT_META_TABLE: &str = "ACCOUNT_META_TABLE";
 const DATABASE_META_TABLE: &str = "DATABASE_META_TABLE";
+
 type DB = Database<NoWriteMap>;
 
 #[derive(Clone)]

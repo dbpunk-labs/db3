@@ -1,6 +1,6 @@
 //
-// lib.rs
-// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+// db3_rullup.proto
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#![feature(iter_intersperse)]
-pub mod abci_impl;
-pub mod auth_storage;
-pub mod command;
-pub mod context;
-pub mod indexer_impl;
-mod mutation_utils;
-pub mod node_key;
-pub mod node_storage;
-pub mod rollup_executor;
-pub mod storage_node_impl;
-pub mod storage_node_light_impl;
+
+syntax = "proto3";
+
+package db3_rollup_proto;
+
+message RollupRecord {
+  uint64 end_block = 1;
+  uint64 raw_data_size = 2;
+  uint64 compress_data_size = 3;
+  uint64 processed_time = 4;
+  string arweave_tx = 5;
+  uint64 time = 6;
+  uint64 mutation_count = 7;
+  uint64 cost = 8;
+}
