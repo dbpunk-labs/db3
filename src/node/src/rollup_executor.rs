@@ -34,7 +34,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 use tempdir::TempDir;
-use tracing::{debug, info};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct RollupExecutorConfig {
