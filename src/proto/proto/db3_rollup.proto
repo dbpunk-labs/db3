@@ -20,12 +20,12 @@ syntax = "proto3";
 package db3_rollup_proto;
 
 message RollupRecord {
-    uint64 end_block = 1;
-    uint64 raw_data_size = 2;
-    uint64 compress_data_size = 3;
-    uint64 processed_time = 4;
-    string arweave_tx = 5;
-    uint64 time = 6;
-    uint64 mutation_count = 7;
-    uint64 cost = 8;
+  uint64 end_block = 1;
+  uint64 raw_data_size = 2;
+  uint64 compress_data_size = 3;
+  uint64 processed_time = 4;
+  string arweave_tx = 5;
+  uint64 time = 6;
+  uint64 mutation_count = 7;
+  uint64 cost = 8;
 }

@@ -131,6 +131,39 @@ impl MutationStore {
         Ok(None)
     }
 
+    pub fn scan_rollup_records(&self, from: u32, limit: u32) -> Result<Vec<RollupRecord>> {
+        if limit > self.config.scan_max_limit as u32 {
+            return Err(DB3Error::ReadStoreError(
+                "reach the scan max limit".to_string(),
+            ));
+        }
+        let rollup_cf_handle = self
+            .se
+            .cf_handle(self.config.rollup_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&rollup_cf_handle);
+        it.seek_to_last();
+        let mut records: Vec<RollupRecord> = Vec::new();
+        let mut count: u32 = 0;
+        let start: u32 = from;
+        let end: u32 = from + limit;
+        while it.valid() && count < start {
+            count += 1;
+            it.prev();
+        }
+
+        while it.valid() && count < end {
+            count += 1;
+            if let Some(v) = it.value() {
+                if let Ok(m) = RollupRecord::decode(v) {
+                    records.push(m);
+                }
+            }
+            it.prev();
+        }
+        Ok(records)
+    }
+
     pub fn scan_mutation_headers(&self, from: u32, limit: u32) -> Result<Vec<MutationHeader>> {
         if limit > self.config.scan_max_limit as u32 {
             return Err(DB3Error::ReadStoreError(

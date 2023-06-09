@@ -65,6 +65,10 @@ impl RollupExecutor {
         let path = Path::new(config.ar_key_path.as_str());
         let arweave = Arweave::from_keypair_path(path, arweave_url)
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        info!(
+            "start rollup executor with ar account {}",
+            arweave.get_wallet_address().as_str()
+        );
         Ok(Self {
             config,
             storage,
@@ -131,6 +135,7 @@ impl RollupExecutor {
             .get_fee_by_size(metadata.len())
             .await
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        //TODO add app name
         self.arweave
             .upload_file_from_path(path, vec![], fee)
             .await

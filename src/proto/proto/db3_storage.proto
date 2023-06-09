@@ -19,6 +19,7 @@ syntax = "proto3";
 package db3_storage_proto;
 
 import "db3_mutation_v2.proto";
+import "db3_rollup.proto";
 
 message SendMutationRequest {
   // a hex signature string
@@ -89,10 +90,20 @@ message ScanMutationHeaderResponse {
   repeated db3_mutation_v2_proto.MutationHeader headers = 1;
 }
 
+message ScanRollupRecordRequest {
+  uint32 start = 1;
+  uint32 limit = 2;
+}
+
+message ScanRollupRecordResponse {
+  repeated db3_rollup_proto.RollupRecord records = 1;
+}
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
   rpc GetMutationHeader(GetMutationHeaderRequest) returns (GetMutationHeaderResponse) {}
   rpc ScanMutationHeader(ScanMutationHeaderRequest) returns (ScanMutationHeaderResponse) {}
   rpc GetMutationBody(GetMutationBodyRequest) returns (GetMutationBodyResponse) {}
+  rpc ScanRollupRecord(ScanRollupRecordRequest) returns (ScanRollupRecordResponse) {}
 }

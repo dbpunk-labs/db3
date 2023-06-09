@@ -24,8 +24,8 @@ use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, ExtraItem, GetMutationBodyRequest, GetMutationBodyResponse,
     GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
-    ScanMutationHeaderRequest, ScanMutationHeaderResponse, SendMutationRequest,
-    SendMutationResponse,
+    ScanMutationHeaderRequest, ScanMutationHeaderResponse, ScanRollupRecordRequest,
+    ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
 };
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
@@ -118,6 +118,18 @@ impl StorageNode for StorageNodeV2Impl {
             .get_mutation(&tx_id)
             .map_err(|e| Status::internal(format!("{e}")))?;
         Ok(Response::new(GetMutationBodyResponse { body }))
+    }
+
+    async fn scan_rollup_record(
+        &self,
+        request: Request<ScanRollupRecordRequest>,
+    ) -> std::result::Result<Response<ScanRollupRecordResponse>, Status> {
+        let r = request.into_inner();
+        let records = self
+            .storage
+            .scan_rollup_records(r.start, r.limit)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(ScanRollupRecordResponse { records }))
     }
 
     async fn scan_mutation_header(
