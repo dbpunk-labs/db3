@@ -319,10 +319,9 @@ impl MutationStore {
         payload: &[u8],
         signature: &str,
         sender: &DB3Address,
-        nonce: u64
+        nonce: u64,
     ) -> Result<(String, u64, u32)> {
-        //TODO avoid the duplicated tx id
-        let tx_id = TxId::from(payload);
+        let tx_id = TxId::from((payload, signature.as_bytes()));
         let hex_id = tx_id.to_hex();
         debug!("the tx id is {}", hex_id);
         let (block, order) = self.increase_order()?;
@@ -345,7 +344,7 @@ impl MutationStore {
             time: times::get_current_time_in_secs(),
             id: hex_id.to_string(),
             size: buf.len() as u32,
-            nonce
+            nonce,
         };
         let mut header_buf = BytesMut::with_capacity(1024);
         mutation_header

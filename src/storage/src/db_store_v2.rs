@@ -93,10 +93,10 @@ impl DBStoreV2 {
         let mut entries: Vec<DatabaseMessage> = Vec::new();
         while it.valid() {
             if let Some(k) = it.key() {
-                if &k[0 .. owner.as_ref().len()] != owner.as_ref() {
+                if &k[0..owner.as_ref().len()] != owner.as_ref() {
                     break;
                 }
-            }else {
+            } else {
                 break;
             }
             if let Some(v) = it.value() {
@@ -123,10 +123,10 @@ impl DBStoreV2 {
         let mut entries: Vec<T> = Vec::new();
         while it.valid() {
             if let Some(k) = it.key() {
-                if &k[0.. prefix.len()] != prefix {
+                if &k[0..prefix.len()] != prefix {
                     break;
                 }
-            }else {
+            } else {
                 break;
             }
             if let Some(v) = it.value() {
@@ -256,10 +256,8 @@ impl DBStoreV2 {
             .se
             .cf_handle(self.config.db_owner_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        info!("sender {:?}", sender.as_ref());
         let db_owner = DbOwnerKey(sender, block, order);
         let db_owner_encoded_key = db_owner.encode()?;
-        info!("db_owner {:?}", db_owner_encoded_key);
         let database = DocumentDatabase {
             address: db_addr.as_ref().to_vec(),
             sender: sender.as_ref().to_vec(),

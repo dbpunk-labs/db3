@@ -38,8 +38,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task;
+use tokio::time::{sleep, Duration as TokioDuration};
 use tonic::{Request, Response, Status};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
@@ -100,7 +101,7 @@ impl StorageNodeV2Impl {
             //TODO handle err
             let executor = RollupExecutor::new(rollup_config, local_storage).unwrap();
             while local_running.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_millis(rollup_interval));
+                sleep(TokioDuration::from_millis(rollup_interval)).await;
                 match executor.process().await {
                     Ok(()) => {}
                     Err(e) => {
@@ -125,7 +126,11 @@ impl StorageNode for StorageNodeV2Impl {
             .db_store
             .get_database_of_owner(&addr)
             .map_err(|e| Status::internal(format!("{e}")))?;
-        info!("query database list count {} with account {}", databases.len(),  r.owner.as_str());
+        info!(
+            "query database list count {} with account {}",
+            databases.len(),
+            r.owner.as_str()
+        );
         Ok(Response::new(GetDatabaseOfOwnerResponse { databases }))
     }
 
@@ -164,7 +169,12 @@ impl StorageNode for StorageNodeV2Impl {
             .storage
             .scan_mutation_headers(r.start, r.limit)
             .map_err(|e| Status::internal(format!("{e}")))?;
-        info!("scan mutation headers {} with start {} and limit {}", headers.len(), r.start, r.limit);
+        info!(
+            "scan mutation headers {} with start {} and limit {}",
+            headers.len(),
+            r.start,
+            r.limit
+        );
         Ok(Response::new(ScanMutationHeaderResponse { headers }))
     }
 
@@ -172,7 +182,6 @@ impl StorageNode for StorageNodeV2Impl {
         &self,
         request: Request<GetMutationHeaderRequest>,
     ) -> std::result::Result<Response<GetMutationHeaderResponse>, Status> {
-        
         let r = request.into_inner();
         let header = self
             .storage
@@ -192,7 +201,6 @@ impl StorageNode for StorageNodeV2Impl {
         let r = request.into_inner();
         let address = DB3Address::try_from(r.address.as_str())
             .map_err(|e| Status::internal(format!("{e}")))?;
-        info!("start to get used nonce with addr {} ", address.to_hex());
         let used_nonce = self
             .state_store
             .get_nonce(&address)
@@ -240,7 +248,11 @@ impl StorageNode for StorageNodeV2Impl {
                                     )
                                     .map_err(|e| Status::internal(format!("{e}")))?;
                                 let db_id_hex = db_id.to_hex();
-                                info!("add database with addr {} from owner {}", db_id_hex.as_str(), address.to_hex().as_str());
+                                info!(
+                                    "add database with addr {} from owner {}",
+                                    db_id_hex.as_str(),
+                                    address.to_hex().as_str()
+                                );
                                 let item = ExtraItem {
                                     key: "db_addr".to_string(),
                                     value: db_id_hex,
