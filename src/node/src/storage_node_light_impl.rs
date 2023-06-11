@@ -125,6 +125,7 @@ impl StorageNode for StorageNodeV2Impl {
             .db_store
             .get_database_of_owner(&addr)
             .map_err(|e| Status::internal(format!("{e}")))?;
+        info!("query database list count {} with account {}", databases.len(),  r.owner.as_str());
         Ok(Response::new(GetDatabaseOfOwnerResponse { databases }))
     }
 
@@ -163,6 +164,7 @@ impl StorageNode for StorageNodeV2Impl {
             .storage
             .scan_mutation_headers(r.start, r.limit)
             .map_err(|e| Status::internal(format!("{e}")))?;
+        info!("scan mutation headers {} with start {} and limit {}", headers.len(), r.start, r.limit);
         Ok(Response::new(ScanMutationHeaderResponse { headers }))
     }
 
@@ -170,6 +172,7 @@ impl StorageNode for StorageNodeV2Impl {
         &self,
         request: Request<GetMutationHeaderRequest>,
     ) -> std::result::Result<Response<GetMutationHeaderResponse>, Status> {
+        
         let r = request.into_inner();
         let header = self
             .storage
@@ -189,11 +192,12 @@ impl StorageNode for StorageNodeV2Impl {
         let r = request.into_inner();
         let address = DB3Address::try_from(r.address.as_str())
             .map_err(|e| Status::internal(format!("{e}")))?;
+        info!("start to get used nonce with addr {} ", address.to_hex());
         let used_nonce = self
             .state_store
             .get_nonce(&address)
             .map_err(|e| Status::internal(format!("{e}")))?;
-        debug!("address {} used nonce {}", address.to_hex(), used_nonce);
+        info!("address {} used nonce {}", address.to_hex(), used_nonce);
         Ok(Response::new(GetNonceResponse {
             nonce: used_nonce + 1,
         }))
@@ -216,7 +220,7 @@ impl StorageNode for StorageNodeV2Impl {
                 // mutation id
                 let (id, block, order) = self
                     .storage
-                    .add_mutation(&r.payload, r.signature.as_str(), &address)
+                    .add_mutation(&r.payload, r.signature.as_str(), &address, nonce)
                     .map_err(|e| Status::internal(format!("{e}")))?;
                 match action {
                     MutationAction::CreateDocumentDb => {
@@ -235,9 +239,11 @@ impl StorageNode for StorageNodeV2Impl {
                                         order,
                                     )
                                     .map_err(|e| Status::internal(format!("{e}")))?;
+                                let db_id_hex = db_id.to_hex();
+                                info!("add database with addr {} from owner {}", db_id_hex.as_str(), address.to_hex().as_str());
                                 let item = ExtraItem {
                                     key: "db_addr".to_string(),
-                                    value: db_id.to_hex(),
+                                    value: db_id_hex,
                                 };
                                 items.push(item);
                                 break;

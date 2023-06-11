@@ -75,6 +75,7 @@ message MutationHeader {
   uint64 time = 4;
   string id = 5;
   uint32 size = 6;
+  uint64 nonce = 7;
 }
 
 message MutationBody {

@@ -92,6 +92,13 @@ impl DBStoreV2 {
         let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, owner).into();
         let mut entries: Vec<DatabaseMessage> = Vec::new();
         while it.valid() {
+            if let Some(k) = it.key() {
+                if &k[0 .. owner.as_ref().len()] != owner.as_ref() {
+                    break;
+                }
+            }else {
+                break;
+            }
             if let Some(v) = it.value() {
                 let addr = DB3Address::try_from(v)
                     .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
@@ -113,9 +120,15 @@ impl DBStoreV2 {
             .cf_handle(cf)
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
         let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, prefix).into();
-
         let mut entries: Vec<T> = Vec::new();
         while it.valid() {
+            if let Some(k) = it.key() {
+                if &k[0.. prefix.len()] != prefix {
+                    break;
+                }
+            }else {
+                break;
+            }
             if let Some(v) = it.value() {
                 match T::decode(v.as_ref()) {
                     Ok(c) => {
@@ -198,6 +211,7 @@ impl DBStoreV2 {
                 collection.collection_name.as_str()
             )));
         }
+
         let id = OpEntryId::create(block, order, idx)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
 
@@ -242,8 +256,10 @@ impl DBStoreV2 {
             .se
             .cf_handle(self.config.db_owner_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        info!("sender {:?}", sender.as_ref());
         let db_owner = DbOwnerKey(sender, block, order);
         let db_owner_encoded_key = db_owner.encode()?;
+        info!("db_owner {:?}", db_owner_encoded_key);
         let database = DocumentDatabase {
             address: db_addr.as_ref().to_vec(),
             sender: sender.as_ref().to_vec(),
