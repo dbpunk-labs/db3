@@ -125,6 +125,8 @@ pub enum DB3Error {
     ReadStoreError(String),
     #[error("fail to rollup data for error {0}")]
     RollupError(String),
+    #[error("invalid collection name for error {0}")]
+    InvalidCollectionNameError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

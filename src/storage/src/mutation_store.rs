@@ -28,7 +28,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, info};
 
-pub type StorageEngine = DBWithThreadMode<MultiThreaded>;
+type StorageEngine = DBWithThreadMode<MultiThreaded>;
 
 #[derive(Clone)]
 pub struct MutationStoreConfig {

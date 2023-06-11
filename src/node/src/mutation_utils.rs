@@ -40,6 +40,7 @@ macro_rules! parse_mutation {
         }
     };
 }
+
 pub struct MutationUtil {}
 
 impl MutationUtil {
