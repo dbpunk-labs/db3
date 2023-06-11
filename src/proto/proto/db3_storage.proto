@@ -109,6 +109,14 @@ message GetDatabaseOfOwnerResponse {
   repeated db3_database_v2_proto.DatabaseMessage databases = 1;
 }
 
+message GetCollectionOfDatabaseRequest {
+  string db_addr = 1;
+}
+
+message GetCollectionOfDatabaseResponse {
+  repeated db3_database_v2_proto.Collection collections = 1;
+}
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
@@ -117,4 +125,5 @@ service StorageNode {
   rpc GetMutationBody(GetMutationBodyRequest) returns (GetMutationBodyResponse) {}
   rpc ScanRollupRecord(ScanRollupRecordRequest) returns (ScanRollupRecordResponse) {}
   rpc GetDatabaseOfOwner(GetDatabaseOfOwnerRequest) returns (GetDatabaseOfOwnerResponse) {}
+  rpc GetCollectionOfDatabase(GetCollectionOfDatabaseRequest) returns (GetCollectionOfDatabaseResponse) {}
 }

@@ -24,11 +24,12 @@ use db3_proto::db3_mutation_v2_proto::{
     mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
 use db3_proto::db3_storage_proto::{
-    storage_node_server::StorageNode, ExtraItem, GetDatabaseOfOwnerRequest,
-    GetDatabaseOfOwnerResponse, GetMutationBodyRequest, GetMutationBodyResponse,
-    GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
-    ScanMutationHeaderRequest, ScanMutationHeaderResponse, ScanRollupRecordRequest,
-    ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
+    storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
+    GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
+    GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest,
+    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanMutationHeaderRequest,
+    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
+    SendMutationRequest, SendMutationResponse,
 };
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
@@ -115,6 +116,26 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn get_collection_of_database(
+        &self,
+        request: Request<GetCollectionOfDatabaseRequest>,
+    ) -> std::result::Result<Response<GetCollectionOfDatabaseResponse>, Status> {
+        let r = request.into_inner();
+        let addr = DB3Address::from_hex(r.db_addr.as_str())
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let collections = self
+            .db_store
+            .get_collection_of_database(&addr)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        info!(
+            "query collection count {} with database {}",
+            collections.len(),
+            r.db_addr.as_str()
+        );
+        Ok(Response::new(GetCollectionOfDatabaseResponse {
+            collections,
+        }))
+    }
     async fn get_database_of_owner(
         &self,
         request: Request<GetDatabaseOfOwnerRequest>,
