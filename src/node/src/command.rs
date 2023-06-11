@@ -34,6 +34,7 @@ use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
+use db3_storage::db_store_v2::DBStoreV2Config;
 use db3_storage::mutation_store::MutationStoreConfig;
 use db3_storage::state_store::StateStoreConfig;
 use http::Uri;
@@ -88,6 +89,9 @@ pub enum DB3Command {
         /// The database path for state
         #[clap(long, default_value = "./state_db")]
         state_db_path: String,
+        /// The database path for doc db
+        #[clap(long, default_value = "./doc_db")]
+        doc_db_path: String,
         /// The network id
         #[clap(long, default_value = "10")]
         network_id: u64,
@@ -233,6 +237,7 @@ impl DB3Command {
                 verbose,
                 mutation_db_path,
                 state_db_path,
+                doc_db_path,
                 network_id,
                 block_interval,
                 rollup_interval,
@@ -252,6 +257,7 @@ impl DB3Command {
                     public_grpc_port,
                     mutation_db_path.as_str(),
                     state_db_path.as_str(),
+                    doc_db_path.as_str(),
                     network_id,
                     block_interval,
                     rollup_interval,
@@ -431,6 +437,7 @@ impl DB3Command {
         public_grpc_port: u16,
         mutation_db_path: &str,
         state_db_path: &str,
+        doc_db_path: &str,
         network_id: u64,
         block_interval: u64,
         rollup_interval: u64,
@@ -456,11 +463,22 @@ impl DB3Command {
         let state_config = StateStoreConfig {
             db_path: state_db_path.to_string(),
         };
+        let db_store_config = DBStoreV2Config {
+            db_path: doc_db_path.to_string(),
+            db_store_cf_name: "db_store_cf".to_string(),
+            doc_store_cf_name: "doc_store_cf".to_string(),
+            collection_store_cf_name: "col_store_cf".to_string(),
+            index_store_cf_name: "idx_store_cf".to_string(),
+            doc_owner_store_cf_name: "doc_owner_store_cf".to_string(),
+            db_owner_store_cf_name: "db_owner_cf".to_string(),
+            scan_max_limit: 1000,
+        };
 
         let config = StorageNodeV2Config {
             store_config,
             state_config,
             rollup_config,
+            db_store_config,
             network_id,
             block_interval,
         };

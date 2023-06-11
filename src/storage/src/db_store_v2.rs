@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use crate::db_owner_key::DbOwnerKey;
+use crate::db_owner_key_v2::DbOwnerKey;
 use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::DbId;
@@ -27,12 +27,13 @@ use db3_proto::db3_database_v2_proto::{
 };
 use db3_proto::db3_mutation_v2_proto::{CollectionMutation, DocumentDatabaseMutation};
 use prost::Message;
-use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
+use rocksdb::{DBRawIteratorWithThreadMode, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
 use std::sync::Arc;
 use tracing::info;
 
 type StorageEngine = DBWithThreadMode<MultiThreaded>;
+type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, StorageEngine>;
 
 #[derive(Clone)]
 pub struct DBStoreV2Config {
@@ -76,26 +77,87 @@ impl DBStoreV2 {
         Ok(Self { config, se })
     }
 
-    pub fn get_collection(&self, db_addr: &DB3Address, name: &str) -> Result<Option<Collection>> {
-        let ck = collection_key::build_collection_key(db_addr, name)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        let ck_ref: &[u8] = ck.as_ref();
-        let collection_store_cf_handle = self
+    pub fn get_collection_of_database(&self, db_addr: &DB3Address) -> Result<Vec<Collection>> {
+        self.get_entries_with_prefix::<Collection>(
+            db_addr.as_ref(),
+            self.config.collection_store_cf_name.as_str(),
+        )
+    }
+
+    pub fn get_database_of_owner(&self, owner: &DB3Address) -> Result<Vec<DatabaseMessage>> {
+        let cf_handle = self
             .se
-            .cf_handle(self.config.collection_store_cf_name.as_str())
+            .cf_handle(self.config.db_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, owner).into();
+        let mut entries: Vec<DatabaseMessage> = Vec::new();
+        while it.valid() {
+            if let Some(v) = it.value() {
+                let addr = DB3Address::try_from(v)
+                    .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+                if let Ok(Some(d)) = self.get_database(&addr) {
+                    entries.push(d);
+                }
+            }
+            it.next();
+        }
+        Ok(entries)
+    }
+
+    fn get_entries_with_prefix<T>(&self, prefix: &[u8], cf: &str) -> Result<Vec<T>>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
+            .se
+            .cf_handle(cf)
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, prefix).into();
+
+        let mut entries: Vec<T> = Vec::new();
+        while it.valid() {
+            if let Some(v) = it.value() {
+                match T::decode(v.as_ref()) {
+                    Ok(c) => {
+                        entries.push(c);
+                    }
+                    Err(e) => {
+                        return Err(DB3Error::ReadStoreError(format!("{e}")));
+                    }
+                }
+            }
+            it.next();
+        }
+        Ok(entries)
+    }
+
+    fn get_entry<T>(&self, cf: &str, id: &[u8]) -> Result<Option<T>>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
+            .se
+            .cf_handle(cf)
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
         let value = self
             .se
-            .get_cf(&collection_store_cf_handle, ck_ref)
+            .get_cf(&cf_handle, id)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         if let Some(v) = value {
-            match Collection::decode(v.as_ref()) {
+            match T::decode(v.as_ref()) {
                 Ok(c) => Ok(Some(c)),
                 Err(e) => Err(DB3Error::ReadStoreError(format!("{e}"))),
             }
         } else {
             Ok(None)
         }
+    }
+
+    pub fn get_collection(&self, db_addr: &DB3Address, name: &str) -> Result<Option<Collection>> {
+        let ck = collection_key::build_collection_key(db_addr, name)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let ck_ref: &[u8] = ck.as_ref();
+        self.get_entry::<Collection>(self.config.collection_store_cf_name.as_str(), ck_ref)
     }
 
     pub fn create_collection(
@@ -159,22 +221,7 @@ impl DBStoreV2 {
     }
 
     pub fn get_database(&self, db_addr: &DB3Address) -> Result<Option<DatabaseMessage>> {
-        let db_store_cf_handle = self
-            .se
-            .cf_handle(self.config.db_store_cf_name.as_str())
-            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let value = self
-            .se
-            .get_cf(&db_store_cf_handle, db_addr.as_ref())
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        if let Some(v) = value {
-            match DatabaseMessage::decode(v.as_ref()) {
-                Ok(m) => Ok(Some(m)),
-                Err(e) => Err(DB3Error::ReadStoreError(format!("{e}"))),
-            }
-        } else {
-            Ok(None)
-        }
+        self.get_entry::<DatabaseMessage>(self.config.db_store_cf_name.as_str(), db_addr.as_ref())
     }
 
     pub fn create_doc_database(
@@ -195,8 +242,7 @@ impl DBStoreV2 {
             .se
             .cf_handle(self.config.db_owner_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        //TODO use u32
-        let db_owner = DbOwnerKey(sender, block, order as u16);
+        let db_owner = DbOwnerKey(sender, block, order);
         let db_owner_encoded_key = db_owner.encode()?;
         let database = DocumentDatabase {
             address: db_addr.as_ref().to_vec(),
@@ -247,6 +293,55 @@ mod tests {
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
     }
+    #[test]
+    fn test_collection_test() {
+        let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = DBStoreV2Config {
+            db_path: real_path,
+            db_store_cf_name: "db".to_string(),
+            doc_store_cf_name: "doc".to_string(),
+            collection_store_cf_name: "cf2".to_string(),
+            index_store_cf_name: "index".to_string(),
+            doc_owner_store_cf_name: "doc_owner".to_string(),
+            db_owner_store_cf_name: "db_owner".to_string(),
+            scan_max_limit: 50,
+        };
+        let result = DBStoreV2::new(config);
+        assert_eq!(result.is_ok(), true);
+        let db_m = DocumentDatabaseMutation {
+            db_desc: "test_desc".to_string(),
+        };
+        let db3_store = result.unwrap();
+        let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 1, 1, 1, 1);
+        assert!(result.is_ok());
+        let db_id = result.unwrap();
+        if let Ok(Some(db)) = db3_store.get_database(db_id.address()) {
+            if let Some(database_message::Database::DocDb(doc_db)) = db.database {
+                assert_eq!("test_desc", doc_db.desc.as_str());
+            }
+        } else {
+            assert!(false);
+        }
+        let collection = CollectionMutation {
+            index: vec![],
+            collection_name: "col1".to_string(),
+        };
+        let result =
+            db3_store.create_collection(&DB3Address::ZERO, db_id.address(), &collection, 1, 1, 1);
+        assert!(result.is_ok());
+        let result = db3_store.get_collection(db_id.address(), "col1");
+        if let Ok(Some(_c)) = result {
+            assert!(true);
+        } else {
+            assert!(false);
+        }
+        if let Ok(cl) = db3_store.get_collection_of_database(db_id.address()) {
+            assert_eq!(cl.len(), 1);
+        } else {
+            assert!(false);
+        }
+    }
 
     #[test]
     fn test_create_doc_db() {
@@ -275,6 +370,12 @@ mod tests {
             if let Some(database_message::Database::DocDb(doc_db)) = db.database {
                 assert_eq!("test_desc", doc_db.desc.as_str());
             }
+        } else {
+            assert!(false);
+        }
+
+        if let Ok(dbs) = db3_store.get_database_of_owner(&DB3Address::ZERO) {
+            assert_eq!(dbs.len(), 1);
         } else {
             assert!(false);
         }

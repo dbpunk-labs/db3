@@ -22,6 +22,7 @@ pub mod commit_store;
 mod db3_document;
 mod db_key;
 pub mod db_owner_key;
+pub mod db_owner_key_v2;
 pub mod db_store;
 pub mod db_store_v2;
 pub mod key;
