@@ -18,15 +18,20 @@
 use crate::mutation_utils::MutationUtil;
 use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use db3_crypto::db3_address::DB3Address;
-use db3_crypto::id::{DbId, TxId};
+use db3_crypto::id::TxId;
 use db3_error::Result;
-use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
-use db3_proto::db3_storage_proto::{
-    storage_node_server::StorageNode, ExtraItem, GetMutationBodyRequest, GetMutationBodyResponse,
-    GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
-    ScanMutationHeaderRequest, ScanMutationHeaderResponse, ScanRollupRecordRequest,
-    ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
+use db3_proto::db3_mutation_v2_proto::{
+    mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
+use db3_proto::db3_storage_proto::{
+    storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
+    GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
+    GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest,
+    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanMutationHeaderRequest,
+    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
+    SendMutationRequest, SendMutationResponse,
+};
+use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use std::sync::atomic::AtomicBool;
@@ -34,13 +39,15 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task;
+use tokio::time::{sleep, Duration as TokioDuration};
 use tonic::{Request, Response, Status};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
     pub rollup_config: RollupExecutorConfig,
+    pub db_store_config: DBStoreV2Config,
     pub network_id: u64,
     pub block_interval: u64,
 }
@@ -50,17 +57,20 @@ pub struct StorageNodeV2Impl {
     state_store: StateStore,
     config: StorageNodeV2Config,
     running: Arc<AtomicBool>,
+    db_store: DBStoreV2,
 }
 
 impl StorageNodeV2Impl {
     pub fn new(config: StorageNodeV2Config) -> Result<Self> {
         let storage = MutationStore::new(config.store_config.clone())?;
         let state_store = StateStore::new(config.state_config.clone())?;
+        let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         Ok(Self {
             storage,
             state_store,
             config,
             running: Arc::new(AtomicBool::new(true)),
+            db_store,
         })
     }
 
@@ -92,7 +102,7 @@ impl StorageNodeV2Impl {
             //TODO handle err
             let executor = RollupExecutor::new(rollup_config, local_storage).unwrap();
             while local_running.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_millis(rollup_interval));
+                sleep(TokioDuration::from_millis(rollup_interval)).await;
                 match executor.process().await {
                     Ok(()) => {}
                     Err(e) => {
@@ -106,6 +116,45 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn get_collection_of_database(
+        &self,
+        request: Request<GetCollectionOfDatabaseRequest>,
+    ) -> std::result::Result<Response<GetCollectionOfDatabaseResponse>, Status> {
+        let r = request.into_inner();
+        let addr = DB3Address::from_hex(r.db_addr.as_str())
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let collections = self
+            .db_store
+            .get_collection_of_database(&addr)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        info!(
+            "query collection count {} with database {}",
+            collections.len(),
+            r.db_addr.as_str()
+        );
+        Ok(Response::new(GetCollectionOfDatabaseResponse {
+            collections,
+        }))
+    }
+    async fn get_database_of_owner(
+        &self,
+        request: Request<GetDatabaseOfOwnerRequest>,
+    ) -> std::result::Result<Response<GetDatabaseOfOwnerResponse>, Status> {
+        let r = request.into_inner();
+        let addr =
+            DB3Address::from_hex(r.owner.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
+        let databases = self
+            .db_store
+            .get_database_of_owner(&addr)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        info!(
+            "query database list count {} with account {}",
+            databases.len(),
+            r.owner.as_str()
+        );
+        Ok(Response::new(GetDatabaseOfOwnerResponse { databases }))
+    }
+
     async fn get_mutation_body(
         &self,
         request: Request<GetMutationBodyRequest>,
@@ -141,6 +190,12 @@ impl StorageNode for StorageNodeV2Impl {
             .storage
             .scan_mutation_headers(r.start, r.limit)
             .map_err(|e| Status::internal(format!("{e}")))?;
+        info!(
+            "scan mutation headers {} with start {} and limit {}",
+            headers.len(),
+            r.start,
+            r.limit
+        );
         Ok(Response::new(ScanMutationHeaderResponse { headers }))
     }
 
@@ -171,7 +226,7 @@ impl StorageNode for StorageNodeV2Impl {
             .state_store
             .get_nonce(&address)
             .map_err(|e| Status::internal(format!("{e}")))?;
-        debug!("address {} used nonce {}", address.to_hex(), used_nonce);
+        info!("address {} used nonce {}", address.to_hex(), used_nonce);
         Ok(Response::new(GetNonceResponse {
             nonce: used_nonce + 1,
         }))
@@ -194,22 +249,77 @@ impl StorageNode for StorageNodeV2Impl {
                 // mutation id
                 let (id, block, order) = self
                     .storage
-                    .add_mutation(&r.payload, r.signature.as_str(), &address)
+                    .add_mutation(&r.payload, r.signature.as_str(), &address, nonce)
                     .map_err(|e| Status::internal(format!("{e}")))?;
                 match action {
                     MutationAction::CreateDocumentDb => {
-                        let db_addr =
-                            DbId::from((&address, nonce, self.config.network_id)).to_hex();
-                        let item = ExtraItem {
-                            key: "db_addr".to_string(),
-                            value: db_addr,
-                        };
-
+                        let mut items: Vec<ExtraItem> = Vec::new();
+                        for body in dm.bodies {
+                            if let Some(Body::DocDatabaseMutation(ref doc_db_mutation)) = &body.body
+                            {
+                                let db_id = self
+                                    .db_store
+                                    .create_doc_database(
+                                        &address,
+                                        doc_db_mutation,
+                                        nonce,
+                                        self.config.network_id,
+                                        block,
+                                        order,
+                                    )
+                                    .map_err(|e| Status::internal(format!("{e}")))?;
+                                let db_id_hex = db_id.to_hex();
+                                info!(
+                                    "add database with addr {} from owner {}",
+                                    db_id_hex.as_str(),
+                                    address.to_hex().as_str()
+                                );
+                                let item = ExtraItem {
+                                    key: "db_addr".to_string(),
+                                    value: db_id_hex,
+                                };
+                                items.push(item);
+                                break;
+                            }
+                        }
                         Ok(Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
-                            items: vec![item],
+                            items,
+                            block,
+                            order,
+                        }))
+                    }
+                    MutationAction::AddCollection => {
+                        let mut items: Vec<ExtraItem> = Vec::new();
+                        for (i, body) in dm.bodies.iter().enumerate() {
+                            let db_address_ref: &[u8] = body.db_address.as_ref();
+                            let db_addr = DB3Address::try_from(db_address_ref)
+                                .map_err(|e| Status::internal(format!("{e}")))?;
+                            if let Some(Body::CollectionMutation(ref col_mutation)) = &body.body {
+                                self.db_store
+                                    .create_collection(
+                                        &address,
+                                        &db_addr,
+                                        col_mutation,
+                                        block,
+                                        order,
+                                        i as u16,
+                                    )
+                                    .map_err(|e| Status::internal(format!("{e}")))?;
+                                let item = ExtraItem {
+                                    key: "collection".to_string(),
+                                    value: col_mutation.collection_name.to_string(),
+                                };
+                                items.push(item);
+                            }
+                        }
+                        Ok(Response::new(SendMutationResponse {
+                            id,
+                            code: 0,
+                            msg: "ok".to_string(),
+                            items,
                             block,
                             order,
                         }))

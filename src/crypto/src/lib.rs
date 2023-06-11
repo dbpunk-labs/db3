@@ -26,6 +26,7 @@ pub mod db3_signature;
 pub mod db3_signer;
 pub mod db3_verifier;
 pub mod id;
+pub mod id_v2;
 pub mod key_derive;
 pub mod signature_scheme;
 extern crate enum_primitive_derive;

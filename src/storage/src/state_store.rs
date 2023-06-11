@@ -175,7 +175,7 @@ impl StateStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_proto::db3_database_v2_proto::{database_message, DatabaseType, DocumentDatabase};
+    use db3_proto::db3_database_v2_proto::{database_message, DocumentDatabase};
     use tempdir::TempDir;
 
     #[test]
@@ -231,11 +231,9 @@ mod tests {
             let dd = DocumentDatabase {
                 address: DB3Address::ZERO.as_ref().to_vec(),
                 sender: DB3Address::ZERO.as_ref().to_vec(),
-                collections: vec![],
                 desc: "".to_string(),
             };
             let dm = DatabaseMessage {
-                dtype: DatabaseType::DocumentType.into(),
                 database: Some(database_message::Database::DocDb(dd)),
             };
             if let Err(_) = store.add_database(&DB3Address::ZERO, &dm) {

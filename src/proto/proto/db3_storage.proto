@@ -18,6 +18,7 @@ syntax = "proto3";
 
 package db3_storage_proto;
 
+import "db3_database_v2.proto";
 import "db3_mutation_v2.proto";
 import "db3_rollup.proto";
 
@@ -99,6 +100,23 @@ message ScanRollupRecordResponse {
   repeated db3_rollup_proto.RollupRecord records = 1;
 }
 
+message GetDatabaseOfOwnerRequest {
+  // a hex string
+  string owner = 1;
+}
+
+message GetDatabaseOfOwnerResponse {
+  repeated db3_database_v2_proto.DatabaseMessage databases = 1;
+}
+
+message GetCollectionOfDatabaseRequest {
+  string db_addr = 1;
+}
+
+message GetCollectionOfDatabaseResponse {
+  repeated db3_database_v2_proto.Collection collections = 1;
+}
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
@@ -106,4 +124,6 @@ service StorageNode {
   rpc ScanMutationHeader(ScanMutationHeaderRequest) returns (ScanMutationHeaderResponse) {}
   rpc GetMutationBody(GetMutationBodyRequest) returns (GetMutationBodyResponse) {}
   rpc ScanRollupRecord(ScanRollupRecordRequest) returns (ScanRollupRecordResponse) {}
+  rpc GetDatabaseOfOwner(GetDatabaseOfOwnerRequest) returns (GetDatabaseOfOwnerResponse) {}
+  rpc GetCollectionOfDatabase(GetCollectionOfDatabaseRequest) returns (GetCollectionOfDatabaseResponse) {}
 }

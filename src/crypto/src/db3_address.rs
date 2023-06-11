@@ -45,7 +45,7 @@ impl DB3Address {
     pub fn optional_address_as_hex<S>(
         key: &Option<DB3Address>,
         serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {
@@ -70,6 +70,19 @@ impl DB3Address {
     #[inline]
     pub fn to_hex(&self) -> String {
         format!("0x{}", hex::encode(self.0.as_ref()))
+    }
+    #[inline]
+    pub fn from_hex(input: &str) -> Result<Self, DB3Error> {
+        if input.starts_with("0x") {
+            let new_input = &input[2..];
+            let data = hex::decode(new_input)
+                .map_err(|e| DB3Error::KeyCodecError(format!("fail to decode tx id for {e}")))?;
+            Self::try_from(data.as_slice())
+        } else {
+            let data = hex::decode(input)
+                .map_err(|e| DB3Error::KeyCodecError(format!("fail to decode tx id for {e}")))?;
+            Self::try_from(data.as_slice())
+        }
     }
 
     pub fn from_evm_public_key(pk: &DB3PublicKey) -> Self {

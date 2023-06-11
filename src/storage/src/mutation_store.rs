@@ -28,7 +28,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, info};
 
-pub type StorageEngine = DBWithThreadMode<MultiThreaded>;
+type StorageEngine = DBWithThreadMode<MultiThreaded>;
 
 #[derive(Clone)]
 pub struct MutationStoreConfig {
@@ -319,9 +319,9 @@ impl MutationStore {
         payload: &[u8],
         signature: &str,
         sender: &DB3Address,
+        nonce: u64,
     ) -> Result<(String, u64, u32)> {
-        //TODO avoid the duplicated tx id
-        let tx_id = TxId::from(payload);
+        let tx_id = TxId::from((payload, signature.as_bytes()));
         let hex_id = tx_id.to_hex();
         debug!("the tx id is {}", hex_id);
         let (block, order) = self.increase_order()?;
@@ -344,6 +344,7 @@ impl MutationStore {
             time: times::get_current_time_in_secs(),
             id: hex_id.to_string(),
             size: buf.len() as u32,
+            nonce,
         };
         let mut header_buf = BytesMut::with_capacity(1024);
         mutation_header
@@ -408,14 +409,14 @@ mod tests {
         if let Ok(store) = result {
             let payload: Vec<u8> = vec![1];
             let signature: &str = "0xasdasdsad";
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
                 assert_eq!(1, headers.len());
             } else {
                 assert!(false);
             }
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
                 assert_eq!(1, headers.len());
@@ -492,7 +493,7 @@ mod tests {
             }
             let payload: Vec<u8> = vec![1];
             let signature: &str = "0xasdasdsad";
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
             assert!(result.is_ok());
             let result = store.get_range_mutations(0, 1);
             if let Ok(r) = result {
@@ -522,7 +523,7 @@ mod tests {
         if let Ok(store) = result {
             let payload: Vec<u8> = vec![1];
             let signature: &str = "0xasdasdsad";
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO);
+            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
             assert!(result.is_ok());
             if let Ok((id, block, order)) = result {
                 if let Ok(Some(v)) = store.get_mutation_header(block, order) {

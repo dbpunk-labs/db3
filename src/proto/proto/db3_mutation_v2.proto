@@ -20,14 +20,14 @@ syntax = "proto3";
 package db3_mutation_v2_proto;
 
 import "db3_base.proto";
-import "db3_database.proto";
+import "db3_database_v2.proto";
 
 message DocumentDatabaseMutation {
   string db_desc = 1;
 }
 
 message CollectionMutation {
-  repeated db3_database_proto.Index index = 1;
+  repeated db3_database_v2_proto.Index index = 1;
   string collection_name = 2;
 }
 
@@ -75,6 +75,7 @@ message MutationHeader {
   uint64 time = 4;
   string id = 5;
   uint32 size = 6;
+  uint64 nonce = 7;
 }
 
 message MutationBody {

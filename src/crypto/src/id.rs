@@ -111,6 +111,16 @@ impl From<&[u8]> for TxId {
     }
 }
 
+impl From<(&[u8], &[u8])> for TxId {
+    fn from(pair: (&[u8], &[u8])) -> Self {
+        let mut hasher = Sha3_256::default();
+        hasher.update(pair.0);
+        hasher.update(pair.1);
+        let hash = hasher.finalize();
+        Self { data: hash.into() }
+    }
+}
+
 impl From<[u8; TX_ID_LENGTH]> for TxId {
     fn from(data: [u8; TX_ID_LENGTH]) -> Self {
         Self { data }

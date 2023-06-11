@@ -27,8 +27,7 @@ message DocumentDatabase {
   bytes address = 1;
   // the owner of the Database
   bytes sender = 2;
-  repeated Collection collections = 4;
-  string desc = 5;
+  string desc = 3;
 }
 
 message EventDatabase {
@@ -41,13 +40,7 @@ message EventDatabase {
   uint64 ttl = 7;
 }
 
-enum DatabaseType {
-  DocumentType = 0;
-  EventType = 1;
-}
-
 message DatabaseMessage {
-  DatabaseType dtype = 1;
   oneof database {
     DocumentDatabase doc_db = 2;
     EventDatabase event_db = 3;
@@ -62,6 +55,7 @@ message Collection {
   bytes id = 1;
   string name = 2;
   repeated Index index_list = 3;
+  bytes sender = 4;
 }
 
 message Document {
