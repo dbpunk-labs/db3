@@ -21,7 +21,7 @@ use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
-use db3_proto::db3_rollup_proto::RollupRecord;
+use db3_proto::db3_rollup_proto::{GcRecord as GCRecord, RollupRecord};
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
@@ -36,6 +36,7 @@ pub struct MutationStoreConfig {
     pub block_store_cf_name: String,
     pub tx_store_cf_name: String,
     pub rollup_store_cf_name: String,
+    pub gc_cf_name: String,
     pub message_max_buffer: usize,
     pub scan_max_limit: usize,
 }
@@ -47,6 +48,7 @@ impl Default for MutationStoreConfig {
             block_store_cf_name: "block_store_cf".to_string(),
             tx_store_cf_name: "tx_store_cf".to_string(),
             rollup_store_cf_name: "rollup_store_cf".to_string(),
+            gc_cf_name: "gc_store_cf".to_string(),
             message_max_buffer: 8 * 1024,
             scan_max_limit: 50,
         }
@@ -80,6 +82,7 @@ impl MutationStore {
                     config.block_store_cf_name.as_str(),
                     config.tx_store_cf_name.as_str(),
                     config.rollup_store_cf_name.as_str(),
+                    config.gc_cf_name.as_str(),
                 ],
             )
             .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
@@ -92,13 +95,61 @@ impl MutationStore {
         })
     }
 
+    pub fn add_gc_record(&self, record: &GCRecord) -> Result<()> {
+        let gc_cf_handle = self
+            .se
+            .cf_handle(self.config.gc_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let id = record.start_block.to_be_bytes();
+        let mut buf = BytesMut::with_capacity(1024);
+        record
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let buf = buf.freeze();
+        let mut batch = WriteBatch::default();
+        // store the rollup record
+        batch.put_cf(&gc_cf_handle, &id, buf.as_ref());
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
+    }
+
+    pub fn has_enough_round_left(&self, start_block: u64, min_rounds: u64) -> Result<bool> {
+        let cf_handle = self
+            .se
+            .cf_handle(self.config.rollup_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&cf_handle);
+        let id = start_block.to_be_bytes();
+        it.seek(id);
+        let mut count: u64 = 0;
+        while it.valid() {
+            count += 1;
+            if count >= min_rounds {
+                return Ok(true);
+            }
+            it.next();
+        }
+        return Ok(false);
+    }
+
+    pub fn get_last_gc_record(&self) -> Result<Option<GCRecord>> {
+        self.get_last_record::<GCRecord>(self.config.gc_cf_name.as_str())
+    }
+
+    pub fn get_next_rollup_record(&self, start_block: u64) -> Result<Option<RollupRecord>> {
+        let id = start_block.to_be_bytes();
+        self.get_next_record::<RollupRecord>(self.config.rollup_store_cf_name.as_str(), &id)
+    }
+
     pub fn add_rollup_record(&self, record: &RollupRecord) -> Result<()> {
         // validate the end block
         let rollup_cf_handle = self
             .se
             .cf_handle(self.config.rollup_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let id = record.end_block.to_be_bytes();
+        let id = record.start_block.to_be_bytes();
         let mut buf = BytesMut::with_capacity(1024);
         record
             .encode(&mut buf)
@@ -113,22 +164,51 @@ impl MutationStore {
         Ok(())
     }
 
-    pub fn get_last_rollup_record(&self) -> Result<Option<RollupRecord>> {
-        let rollup_cf_handle = self
+    fn get_next_record<T>(&self, cf: &str, id: &[u8]) -> Result<Option<T>>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
             .se
-            .cf_handle(self.config.rollup_store_cf_name.as_str())
+            .cf_handle(cf)
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let mut it = self.se.raw_iterator_cf(&rollup_cf_handle);
+        let mut it = self.se.raw_iterator_cf(&cf_handle);
+        it.seek(id);
+        it.next();
+        if it.valid() {
+            if let Some(v) = it.value() {
+                match T::decode(v) {
+                    Ok(r) => return Ok(Some(r)),
+                    Err(e) => return Err(DB3Error::ReadStoreError(format!("{e}"))),
+                }
+            }
+        }
+        return Ok(None);
+    }
+
+    fn get_last_record<T>(&self, cf: &str) -> Result<Option<T>>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
+            .se
+            .cf_handle(cf)
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&cf_handle);
         it.seek_to_last();
         if it.valid() {
             if let Some(v) = it.value() {
-                match RollupRecord::decode(v) {
+                match T::decode(v) {
                     Ok(r) => return Ok(Some(r)),
                     Err(e) => return Err(DB3Error::ReadStoreError(format!("{e}"))),
                 }
             }
         }
         Ok(None)
+    }
+
+    pub fn get_last_rollup_record(&self) -> Result<Option<RollupRecord>> {
+        self.get_last_record::<RollupRecord>(self.config.rollup_store_cf_name.as_str())
     }
 
     pub fn scan_rollup_records(&self, from: u32, limit: u32) -> Result<Vec<RollupRecord>> {
@@ -151,7 +231,6 @@ impl MutationStore {
             count += 1;
             it.prev();
         }
-
         while it.valid() && count < end {
             count += 1;
             if let Some(v) = it.value() {
@@ -170,6 +249,7 @@ impl MutationStore {
                 "reach the scan max limit".to_string(),
             ));
         }
+
         let block_cf_handle = self
             .se
             .cf_handle(self.config.block_store_cf_name.as_str())
@@ -223,6 +303,34 @@ impl MutationStore {
             }
             Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
         }
+    }
+
+    pub fn gc_range_mutation(&self, block_start: u64, block_end: u64) -> Result<()> {
+        if block_start >= block_end {
+            return Err(DB3Error::ReadStoreError("invalid block range".to_string()));
+        }
+        let tx_cf_handle = self
+            .se
+            .cf_handle(self.config.tx_store_cf_name.as_str())
+            .ok_or(DB3Error::WriteStoreError("cf is not found".to_string()))?;
+        let mutations = self.get_range_mutations(block_start, block_end)?;
+        let mut batch = WriteBatch::default();
+        mutations
+            .iter()
+            .for_each(|ref x| batch.delete_cf(&tx_cf_handle, x.0.id.as_str()));
+        let block_cf_handle = self
+            .se
+            .cf_handle(self.config.block_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        batch.delete_range_cf(
+            &block_cf_handle,
+            &block_start.to_be_bytes(),
+            &block_end.to_be_bytes(),
+        );
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
     }
 
     pub fn get_range_mutations(

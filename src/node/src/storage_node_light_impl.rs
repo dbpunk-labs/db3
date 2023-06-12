@@ -96,11 +96,12 @@ impl StorageNodeV2Impl {
         let local_running = self.running.clone();
         let local_storage = self.storage.clone();
         let rollup_config = self.config.rollup_config.clone();
+        let network_id = self.config.network_id;
         task::spawn(async move {
             info!("start the rollup thread");
             let rollup_interval = rollup_config.rollup_interval;
             //TODO handle err
-            let executor = RollupExecutor::new(rollup_config, local_storage).unwrap();
+            let executor = RollupExecutor::new(rollup_config, local_storage, network_id).unwrap();
             while local_running.load(Ordering::Relaxed) {
                 sleep(TokioDuration::from_millis(rollup_interval)).await;
                 match executor.process().await {

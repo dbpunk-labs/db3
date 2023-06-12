@@ -451,12 +451,15 @@ impl DB3Command {
             temp_data_path: rollup_data_path.to_string(),
             ar_node_url: ar_node_url.to_string(),
             ar_key_path: ar_key_path.to_string(),
+            min_rollup_size: 1024 * 1024,
+            min_gc_round_offset: 16,
         };
         let store_config = MutationStoreConfig {
             db_path: mutation_db_path.to_string(),
             block_store_cf_name: "block_store_cf".to_string(),
             tx_store_cf_name: "tx_store_cf".to_string(),
             rollup_store_cf_name: "rollup_store_cf".to_string(),
+            gc_cf_name: "gc_store_cf".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
