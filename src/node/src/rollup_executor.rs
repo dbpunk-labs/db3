@@ -241,7 +241,7 @@ impl RollupExecutor {
         };
 
         let current_block = self.storage.get_current_block()?;
-        if current_block <= last_end_block + 1 {
+        if current_block <= last_end_block {
             info!("no block to rollup");
             return Ok(());
         }
@@ -249,11 +249,11 @@ impl RollupExecutor {
         let now = Instant::now();
         info!(
             "the next rollup start block {} and the newest block {current_block}",
-            last_end_block + 1
+            last_end_block
         );
         let mutations = self
             .storage
-            .get_range_mutations(last_end_block + 1, current_block)?;
+            .get_range_mutations(last_end_block, current_block)?;
 
         if mutations.len() <= 0 {
             info!("no block to rollup");
@@ -274,18 +274,13 @@ impl RollupExecutor {
         let file_path = tmp_dir.path().join("rollup.gz.parquet");
         let (num_rows, size) = self.dump_recordbatch(&file_path, &recordbatch)?;
         let (id, reward) = self
-            .upload(
-                &file_path,
-                tx.as_str(),
-                last_end_block + 1,
-                current_block - 1,
-            )
+            .upload(&file_path, tx.as_str(), last_end_block, current_block)
             .await?;
         info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} cost {}", now.elapsed().as_secs(),
         id.as_str(), reward
         );
         let record = RollupRecord {
-            end_block: current_block - 1,
+            end_block: current_block,
             raw_data_size: memory_size as u64,
             compress_data_size: size,
             processed_time: now.elapsed().as_secs(),
@@ -293,7 +288,7 @@ impl RollupExecutor {
             time: times::get_current_time_in_secs(),
             mutation_count: num_rows,
             cost: reward,
-            start_block: last_end_block + 1,
+            start_block: last_end_block,
         };
         self.storage
             .add_rollup_record(&record)
