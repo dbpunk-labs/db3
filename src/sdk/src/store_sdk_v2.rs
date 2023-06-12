@@ -1,0 +1,104 @@
+//
+// bill_sdk.rs
+// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+use bytes::BytesMut;
+use chrono::Utc;
+use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
+use db3_proto::db3_storage_proto::{storage_node_client::StorageNodeClient as StorageNodeV2Client, SubscribeRequest};
+use db3_proto::db3_storage_proto::{EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2};
+
+use ethers::core::types::{
+    transaction::eip712::{EIP712Domain, TypedData, Types},
+    Bytes,
+};
+
+use hex;
+use num_traits::cast::FromPrimitive;
+use prost::Message;
+use std::collections::BTreeMap;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+use tonic::{Status, Streaming};
+
+pub struct StoreSDKV2 {
+    client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
+    signer: Db3MultiSchemeSigner,
+}
+
+impl StoreSDKV2 {
+    pub fn new(
+        client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
+        signer: Db3MultiSchemeSigner,
+    ) -> Self {
+        Self {
+            client,
+            signer,
+        }
+    }
+
+    pub async fn subscribe_event_message(
+        &mut self
+    ) -> Result<tonic::Response<Streaming<EventMessageV2>>, Status> {
+        let sub = SubscriptionV2 {
+            topics: vec![EventTypeV2::Block.into()],
+        };
+        let mut buf = BytesMut::with_capacity(1024 * 4);
+        sub
+            .encode(&mut buf)
+            .map_err(|e| Status::internal(format!("Fail to encode subscription {e}")))?;
+        let buf = buf.freeze();
+        let signature = self.signer.sign(buf.as_ref())
+            .map_err(|e| Status::internal(format!("Fail to sign subscription {e}")))?;
+        let req = SubscribeRequest {
+            signature: signature.as_ref().to_vec().to_owned(),
+            payload: buf.as_ref().to_vec().to_owned(),
+        };
+        let mut client = self.client.as_ref().clone();
+        client.subscribe(req).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::sdk_test;
+    use tonic::transport::Endpoint;
+
+
+    async fn subscribe_event_message_flow(
+        use_typed_format: bool,
+        client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
+        counter: i64,
+    ) {
+        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let mut sdk = StoreSDKV2::new(client, signer);
+        let res = sdk.subscribe_event_message().await;
+        println!("res {:?}", res);
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[tokio::test]
+    async fn subscribe_event_message_ut() {
+        let ep = "http://127.0.0.1:26619";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeV2Client::new(channel));
+
+        subscribe_event_message_flow(false, client.clone(), 300).await;
+    }
+}

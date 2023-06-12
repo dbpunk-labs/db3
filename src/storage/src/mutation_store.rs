@@ -197,12 +197,13 @@ impl MutationStore {
         Ok(mutation_headers)
     }
 
-    pub fn increase_block(&self) -> Result<()> {
+    pub fn increase_block(&self) -> Result<(u64, u32)> {
         match self.block_state.lock() {
             Ok(mut state) => {
+                let (block, order) = (state.block, state.order);
                 state.block += 1;
                 state.order = 0;
-                Ok(())
+                Ok((block, order))
             }
             Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
         }
