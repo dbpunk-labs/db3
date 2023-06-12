@@ -26,7 +26,7 @@ use arweave_rs::{
 use db3_base::times;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
-use db3_proto::db3_rollup_proto::{RollupRecord, GcRecord};
+use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
 use db3_storage::mutation_store::MutationStore;
 use parquet::arrow::arrow_writer::ArrowWriter;
 use parquet::basic::Compression;
@@ -192,7 +192,10 @@ impl RollupExecutor {
             Some(r) => (r.start_block, r.end_block),
             None => (0_u64, 0_u64),
         };
-        info!("last gc block range [{}, {})", last_start_block, last_end_block);
+        info!(
+            "last gc block range [{}, {})",
+            last_start_block, last_end_block
+        );
 
         let now = Instant::now();
         if self
@@ -205,21 +208,25 @@ impl RollupExecutor {
                     start_block: r.start_block,
                     end_block: r.end_block,
                     data_size: r.raw_data_size,
-                    time:times::get_current_time_in_secs(),
+                    time: times::get_current_time_in_secs(),
                     processed_time: now.elapsed().as_secs(),
                 };
                 self.storage.add_gc_record(&record)?;
-                info!("gc mutation from block range [{}, {}) done", r.start_block, r.end_block);
+                info!(
+                    "gc mutation from block range [{}, {}) done",
+                    r.start_block, r.end_block
+                );
                 Ok(())
-            }else {
+            } else {
                 // going here is not normal case
-                warn!("fail to get next rollup record with start block {}", last_start_block);
+                warn!(
+                    "fail to get next rollup record with start block {}",
+                    last_start_block
+                );
                 Ok(())
             }
-        }else {
-            info!(
-                "not enough round to run gc"
-            );
+        } else {
+            info!("not enough round to run gc");
             Ok(())
         }
     }
