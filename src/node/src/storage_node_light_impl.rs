@@ -15,35 +15,44 @@
 // limitations under the License.
 //
 
-use std::collections::{BTreeMap, HashSet};
 use crate::mutation_utils::MutationUtil;
 use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use db3_crypto::db3_address::DB3Address;
+use db3_crypto::db3_verifier::DB3Verifier;
 use db3_crypto::id::TxId;
 use db3_error::Result;
 use db3_proto::db3_mutation_v2_proto::{
     mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
-use db3_proto::db3_storage_proto::{storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse, GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanMutationHeaderRequest, ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse, SubscribeRequest};
-use db3_proto::db3_storage_proto::{EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2, BlockEvent as BlockEventV2};
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
+use db3_proto::db3_storage_proto::{
+    storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
+    GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
+    GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest,
+    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanMutationHeaderRequest,
+    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
+    SendMutationRequest, SendMutationResponse, SubscribeRequest,
+};
+use db3_proto::db3_storage_proto::{
+    BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
+    Subscription as SubscriptionV2,
+};
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
+use prost::Message;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::broadcast::Sender as BroadcastSender;
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::Sender as BroadcastSender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task;
 use tokio::time::{sleep, Duration as TokioDuration};
-use tonic::{Request, Response, Status};
-use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Request, Response, Status};
 use tracing::{info, warn};
-use db3_crypto::db3_verifier::DB3Verifier;
-use prost::Message;
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
@@ -68,11 +77,14 @@ pub struct StorageNodeV2Impl {
 }
 
 impl StorageNodeV2Impl {
-    pub fn new(config: StorageNodeV2Config, sender: Sender<(
-        DB3Address,
-        SubscriptionV2,
-        Sender<std::result::Result<EventMessageV2, Status>>,
-    )>) -> Result<Self> {
+    pub fn new(
+        config: StorageNodeV2Config,
+        sender: Sender<(
+            DB3Address,
+            SubscriptionV2,
+            Sender<std::result::Result<EventMessageV2, Status>>,
+        )>,
+    ) -> Result<Self> {
         let storage = MutationStore::new(config.store_config.clone())?;
         let state_store = StateStore::new(config.state_config.clone())?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
@@ -84,7 +96,7 @@ impl StorageNodeV2Impl {
             running: Arc::new(AtomicBool::new(true)),
             db_store,
             sender,
-            broadcast_sender
+            broadcast_sender,
         })
     }
 
@@ -96,32 +108,33 @@ impl StorageNodeV2Impl {
         task::spawn(async move {
             info!("start the block producer thread");
             while local_running.load(Ordering::Relaxed) {
-                while local_running.load(Ordering::Relaxed) {
-                    std::thread::sleep(Duration::from_millis(local_block_interval));
-                    info!("produce block {}", local_storage.get_current_block().unwrap_or(0));
-                    match local_storage.increase_block() {
-                        Ok((block_id, mutation_count)) => {
-                            // sender block event
-                            let e = BlockEventV2 {
-                                block_id,
-                                mutation_count,
-                            };
-                            let msg = EventMessageV2 {
-                                r#type: EventTypeV2::Block as i32,
-                                event: Some(EventV2::BlockEvent(e)),
-                            };
-                            match local_event_sender.send(msg) {
-                                Ok(_) => {
-                                    info!("broadcast block event {}, {}", block_id, mutation_count);
-                                }
-                                Err(e) => {
-                                    warn!("the broadcast channel error for {:?}", e);
-                                }
+                sleep(TokioDuration::from_millis(local_block_interval)).await;
+                info!(
+                    "produce block {}",
+                    local_storage.get_current_block().unwrap_or(0)
+                );
+                match local_storage.increase_block() {
+                    Ok((block_id, mutation_count)) => {
+                        // sender block event
+                        let e = BlockEventV2 {
+                            block_id,
+                            mutation_count,
+                        };
+                        let msg = EventMessageV2 {
+                            r#type: EventTypeV2::Block as i32,
+                            event: Some(EventV2::BlockEvent(e)),
+                        };
+                        match local_event_sender.send(msg) {
+                            Ok(_) => {
+                                info!("broadcast block event {}, {}", block_id, mutation_count);
+                            }
+                            Err(e) => {
+                                warn!("the broadcast channel error for {:?}", e);
                             }
                         }
-                        Err(e) => {
-                            warn!("fail to produce block for error {e}");
-                        }
+                    }
+                    Err(e) => {
+                        warn!("fail to produce block for error {e}");
                     }
                 }
             }
@@ -176,8 +189,12 @@ impl StorageNodeV2Impl {
                 let mut to_be_removed: HashSet<DB3Address> = HashSet::new();
                 let mut event_sub = local_broadcast_sender.subscribe();
                 while local_running.load(Ordering::Relaxed) {
-                    info!("wait select ...");
                     tokio::select! {
+                         Some((addr, sub, sender)) = receiver.recv() => {
+                            info!("add or update the subscriber with addr 0x{}", hex::encode(addr.as_ref()));
+                            //TODO limit the max address count
+                            subscribers.insert(addr, (sender, sub));
+                        }
                         Ok(event) = event_sub.recv() => {
                             println!("receive event {:?}", event);
                             println!("subscribers len : {}", subscribers.len());
@@ -211,15 +228,10 @@ impl StorageNodeV2Impl {
                                 }
                             }
                         },
-                        Some((addr, sub, sender)) = receiver.recv() => {
-                            info!("add or update the subscriber with addr 0x{}", hex::encode(addr.as_ref()));
-                            //TODO limit the max address count
-                            subscribers.insert(addr, (sender, sub));
-                        }
                         else => {
                             info!("unexpected channel update");
                             // reconnect in 5 seconds
-                            sleep(Duration::from_millis(1000 * 5)).await;
+                            sleep(TokioDuration::from_millis(1000 * 5)).await;
                             break;
                         }
 
@@ -253,7 +265,10 @@ impl StorageNode for StorageNodeV2Impl {
         let payload = SubscriptionV2::decode(r.payload.as_ref()).map_err(|e| {
             Status::internal(format!("fail to decode open session request for {e} "))
         })?;
-        info!("add subscriber for addr 0x{}", hex::encode(account_id.addr.as_ref()));
+        info!(
+            "add subscriber for addr 0x{}",
+            hex::encode(account_id.addr.as_ref())
+        );
         info!("payload {:?}", payload);
         info!("sender {:?}", sender);
         let (msg_sender, msg_receiver) =

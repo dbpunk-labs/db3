@@ -18,8 +18,13 @@
 use bytes::BytesMut;
 use chrono::Utc;
 use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
-use db3_proto::db3_storage_proto::{storage_node_client::StorageNodeClient as StorageNodeV2Client, SubscribeRequest};
-use db3_proto::db3_storage_proto::{EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2};
+use db3_proto::db3_storage_proto::event_message::Event as EventV2;
+use db3_proto::db3_storage_proto::{
+    storage_node_client::StorageNodeClient as StorageNodeV2Client, SubscribeRequest,
+};
+use db3_proto::db3_storage_proto::{
+    EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2,
+};
 
 use ethers::core::types::{
     transaction::eip712::{EIP712Domain, TypedData, Types},
@@ -44,24 +49,22 @@ impl StoreSDKV2 {
         client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
         signer: Db3MultiSchemeSigner,
     ) -> Self {
-        Self {
-            client,
-            signer,
-        }
+        Self { client, signer }
     }
 
     pub async fn subscribe_event_message(
-        &mut self
+        &mut self,
     ) -> Result<tonic::Response<Streaming<EventMessageV2>>, Status> {
         let sub = SubscriptionV2 {
             topics: vec![EventTypeV2::Block.into()],
         };
         let mut buf = BytesMut::with_capacity(1024 * 4);
-        sub
-            .encode(&mut buf)
+        sub.encode(&mut buf)
             .map_err(|e| Status::internal(format!("Fail to encode subscription {e}")))?;
         let buf = buf.freeze();
-        let signature = self.signer.sign(buf.as_ref())
+        let signature = self
+            .signer
+            .sign(buf.as_ref())
             .map_err(|e| Status::internal(format!("Fail to sign subscription {e}")))?;
         let req = SubscribeRequest {
             signature: signature.as_ref().to_vec().to_owned(),
@@ -74,11 +77,11 @@ impl StoreSDKV2 {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::sdk_test;
+    use std::fmt::format;
+    use std::time::Duration;
     use tonic::transport::Endpoint;
-
 
     async fn subscribe_event_message_flow(
         use_typed_format: bool,
@@ -87,9 +90,21 @@ mod tests {
     ) {
         let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
         let mut sdk = StoreSDKV2::new(client, signer);
-        let res = sdk.subscribe_event_message().await;
+        let res: Result<tonic::Response<Streaming<EventMessageV2>>, Status> =
+            sdk.subscribe_event_message().await;
         println!("res {:?}", res);
         assert!(res.is_ok(), "{:?}", res);
+        let two_second = Duration::from_millis(2000);
+        std::thread::sleep(two_second);
+        let mut stream = res.unwrap().into_inner();
+        if let Some(next_message) = stream.message().await.unwrap() {
+            let event_message: EventMessageV2 = next_message;
+            assert_eq!(EventTypeV2::Block as i32, event_message.r#type);
+            assert!(format!("{:?}", event_message)
+                .contains("r#type: Block, event: Some(BlockEvent(BlockEvent { block_id:"));
+        } else {
+            assert!(false);
+        }
     }
 
     #[tokio::test]

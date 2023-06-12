@@ -32,7 +32,9 @@ use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
-use db3_proto::db3_storage_proto::{EventMessage as EventMessageV2, Subscription as SubscriptionV2};
+use db3_proto::db3_storage_proto::{
+    EventMessage as EventMessageV2, Subscription as SubscriptionV2,
+};
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_storage::db_store_v2::DBStoreV2Config;
