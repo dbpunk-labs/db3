@@ -39,6 +39,7 @@ pub struct MutationStoreConfig {
     pub gc_cf_name: String,
     pub message_max_buffer: usize,
     pub scan_max_limit: usize,
+    pub block_state_cf_name: String,
 }
 
 impl Default for MutationStoreConfig {
@@ -51,6 +52,7 @@ impl Default for MutationStoreConfig {
             gc_cf_name: "gc_store_cf".to_string(),
             message_max_buffer: 8 * 1024,
             scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
         }
     }
 }
@@ -83,17 +85,43 @@ impl MutationStore {
                     config.tx_store_cf_name.as_str(),
                     config.rollup_store_cf_name.as_str(),
                     config.gc_cf_name.as_str(),
+                    config.block_state_cf_name.as_str(),
                 ],
             )
             .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
         );
-
         Ok(Self {
             config,
             se,
-            //TODO Recover from local storage or meta contract
             block_state: Arc::new(Mutex::new(BlockState { block: 0, order: 0 })),
         })
+    }
+
+    pub fn recover(&self) -> Result<()> {
+        let cf_handle = self
+            .se
+            .cf_handle(self.config.block_state_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let block_key: &str = "block_key";
+        let value = self
+            .se
+            .get_cf(&cf_handle, block_key.as_bytes())
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let Some(v) = value {
+            let data_array: [u8; 8] = v
+                .try_into()
+                .map_err(|_| DB3Error::KeyCodecError("invalid array length".to_string()))?;
+            let block = u64::from_be_bytes(data_array) + 1;
+            match self.block_state.lock() {
+                Ok(mut state) => {
+                    state.block = block;
+                    state.order = 0;
+                    info!("recover block {}", block);
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     pub fn add_gc_record(&self, record: &GCRecord) -> Result<()> {
@@ -289,8 +317,18 @@ impl MutationStore {
     pub fn increase_block(&self) -> Result<()> {
         match self.block_state.lock() {
             Ok(mut state) => {
+                let block_key: &str = "block_key";
                 state.block += 1;
                 state.order = 0;
+                let cf_handle = self
+                    .se
+                    .cf_handle(self.config.block_state_cf_name.as_str())
+                    .ok_or(DB3Error::WriteStoreError("cf is not found".to_string()))?;
+                let mut batch = WriteBatch::default();
+                batch.put_cf(&cf_handle, block_key.as_bytes(), state.block.to_be_bytes());
+                self.se
+                    .write(batch)
+                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                 Ok(())
             }
             Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
@@ -489,6 +527,7 @@ mod tests {
             gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
         };
         if let Err(e) = MutationStore::new(config) {
             println!("{:?}", e);
@@ -507,6 +546,7 @@ mod tests {
             gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
         };
         let result = MutationStore::new(config);
         assert!(result.is_ok());
@@ -544,6 +584,7 @@ mod tests {
             gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
         };
         let result = MutationStore::new(config);
         assert!(result.is_ok());
@@ -587,6 +628,7 @@ mod tests {
             gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
         };
         let result = MutationStore::new(config);
         assert!(result.is_ok());
@@ -624,6 +666,7 @@ mod tests {
             gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
         };
         let result = MutationStore::new(config);
         assert!(result.is_ok());

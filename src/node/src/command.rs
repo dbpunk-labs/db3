@@ -474,6 +474,7 @@ impl DB3Command {
             gc_cf_name: "gc_store_cf".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
         };
         let state_config = StateStoreConfig {
             db_path: state_db_path.to_string(),

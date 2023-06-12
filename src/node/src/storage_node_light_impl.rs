@@ -63,6 +63,7 @@ pub struct StorageNodeV2Impl {
 impl StorageNodeV2Impl {
     pub fn new(config: StorageNodeV2Config) -> Result<Self> {
         let storage = MutationStore::new(config.store_config.clone())?;
+        storage.recover()?;
         let state_store = StateStore::new(config.state_config.clone())?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         Ok(Self {
