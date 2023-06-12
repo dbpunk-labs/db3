@@ -101,6 +101,9 @@ pub enum DB3Command {
         /// The interval of rollup
         #[clap(long, default_value = "60000")]
         rollup_interval: u64,
+        /// The min data byte size for rollup
+        #[clap(long, default_value = "102400")]
+        rollup_min_data_size: u64,
         /// The data path of rollup
         #[clap(long, default_value = "./rollup_data")]
         rollup_data_path: String,
@@ -110,6 +113,9 @@ pub enum DB3Command {
         /// The Ar wallet path
         #[clap(long, default_value = "./wallet.json")]
         ar_key_path: String,
+        /// The min gc round offset
+        #[clap(long, default_value = "8")]
+        min_gc_round_offset: u64,
     },
 
     /// Start db3 network
@@ -241,9 +247,11 @@ impl DB3Command {
                 network_id,
                 block_interval,
                 rollup_interval,
+                rollup_min_data_size,
                 rollup_data_path,
                 ar_node_url,
                 ar_key_path,
+                min_gc_round_offset,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -261,9 +269,11 @@ impl DB3Command {
                     network_id,
                     block_interval,
                     rollup_interval,
+                    rollup_min_data_size,
                     rollup_data_path.as_str(),
                     ar_node_url.as_str(),
                     ar_key_path.as_str(),
+                    min_gc_round_offset,
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -441,9 +451,11 @@ impl DB3Command {
         network_id: u64,
         block_interval: u64,
         rollup_interval: u64,
+        rollup_min_data_size: u64,
         rollup_data_path: &str,
         ar_node_url: &str,
         ar_key_path: &str,
+        min_gc_round_offset: u64,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
         let rollup_config = RollupExecutorConfig {
@@ -451,8 +463,8 @@ impl DB3Command {
             temp_data_path: rollup_data_path.to_string(),
             ar_node_url: ar_node_url.to_string(),
             ar_key_path: ar_key_path.to_string(),
-            min_rollup_size: 1024 * 1024,
-            min_gc_round_offset: 16,
+            min_rollup_size: rollup_min_data_size,
+            min_gc_round_offset,
         };
         let store_config = MutationStoreConfig {
             db_path: mutation_db_path.to_string(),

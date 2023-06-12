@@ -261,8 +261,8 @@ impl RollupExecutor {
         let memory_size = recordbatch.get_array_memory_size();
         if memory_size < self.config.min_rollup_size as usize {
             info!(
-                "there not enough data to trigger rollup, the min_rollup_size {}",
-                self.config.min_rollup_size
+                "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
+                self.config.min_rollup_size, memory_size
             );
             return Ok(());
         }
