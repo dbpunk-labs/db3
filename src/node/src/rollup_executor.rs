@@ -150,8 +150,11 @@ impl RollupExecutor {
     ) -> Result<(String, u64)> {
         let app_tag: Tag<Base64> = Tag::from_utf8_strs("App-Name", "DB3 Network")
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let rollup_tx: Tag<Base64> = Tag::from_utf8_strs("Last-Rollup-Tx", last_ar_tx)
+        let value =
+            Base64::from_str(last_ar_tx).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        let name = Base64::from_utf8_str("Last-Rollup-Tx")
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        let last_rollup_tx = Tag::<Base64> { value, name };
         let block_start_tag: Tag<Base64> =
             Tag::from_utf8_strs("Start-Block", start_block.to_string().as_str())
                 .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
@@ -175,11 +178,11 @@ impl RollupExecutor {
                 path,
                 vec![
                     app_tag,
-                    rollup_tx,
                     block_start_tag,
                     block_end_tag,
                     file_tag,
                     network_tag,
+                    last_rollup_tx,
                 ],
                 fee,
             )
@@ -234,7 +237,7 @@ impl RollupExecutor {
     pub async fn process(&self) -> Result<()> {
         let (_last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
             Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
-            _ => (0_u64, 0_u64, "".to_string()),
+            _ => (0_u64, 0_u64, "Tg==".to_string()),
         };
 
         let current_block = self.storage.get_current_block()?;

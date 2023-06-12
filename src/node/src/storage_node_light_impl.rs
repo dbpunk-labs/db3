@@ -27,9 +27,9 @@ use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
     GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
     GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest,
-    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanMutationHeaderRequest,
-    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse,
+    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanGcRecordRequest,
+    ScanGcRecordResponse, ScanMutationHeaderRequest, ScanMutationHeaderResponse,
+    ScanRollupRecordRequest, ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
 };
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
@@ -117,6 +117,18 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn scan_gc_record(
+        &self,
+        request: Request<ScanGcRecordRequest>,
+    ) -> std::result::Result<Response<ScanGcRecordResponse>, Status> {
+        let r = request.into_inner();
+        let records = self
+            .storage
+            .scan_gc_records(r.start, r.limit)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(ScanGcRecordResponse { records }))
+    }
+
     async fn get_collection_of_database(
         &self,
         request: Request<GetCollectionOfDatabaseRequest>,

@@ -211,19 +211,22 @@ impl MutationStore {
         self.get_last_record::<RollupRecord>(self.config.rollup_store_cf_name.as_str())
     }
 
-    pub fn scan_rollup_records(&self, from: u32, limit: u32) -> Result<Vec<RollupRecord>> {
+    fn scan_records<T>(&self, cf: &str, from: u32, limit: u32) -> Result<Vec<T>>
+    where
+        T: Message + std::default::Default,
+    {
         if limit > self.config.scan_max_limit as u32 {
             return Err(DB3Error::ReadStoreError(
                 "reach the scan max limit".to_string(),
             ));
         }
-        let rollup_cf_handle = self
+        let cf_handle = self
             .se
-            .cf_handle(self.config.rollup_store_cf_name.as_str())
+            .cf_handle(cf)
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let mut it = self.se.raw_iterator_cf(&rollup_cf_handle);
+        let mut it = self.se.raw_iterator_cf(&cf_handle);
         it.seek_to_last();
-        let mut records: Vec<RollupRecord> = Vec::new();
+        let mut records: Vec<T> = Vec::new();
         let mut count: u32 = 0;
         let start: u32 = from;
         let end: u32 = from + limit;
@@ -234,7 +237,7 @@ impl MutationStore {
         while it.valid() && count < end {
             count += 1;
             if let Some(v) = it.value() {
-                if let Ok(m) = RollupRecord::decode(v) {
+                if let Ok(m) = T::decode(v) {
                     records.push(m);
                 }
             }
@@ -243,38 +246,16 @@ impl MutationStore {
         Ok(records)
     }
 
+    pub fn scan_rollup_records(&self, from: u32, limit: u32) -> Result<Vec<RollupRecord>> {
+        self.scan_records::<RollupRecord>(self.config.rollup_store_cf_name.as_str(), from, limit)
+    }
+
     pub fn scan_mutation_headers(&self, from: u32, limit: u32) -> Result<Vec<MutationHeader>> {
-        if limit > self.config.scan_max_limit as u32 {
-            return Err(DB3Error::ReadStoreError(
-                "reach the scan max limit".to_string(),
-            ));
-        }
+        self.scan_records::<MutationHeader>(self.config.block_store_cf_name.as_str(), from, limit)
+    }
 
-        let block_cf_handle = self
-            .se
-            .cf_handle(self.config.block_store_cf_name.as_str())
-            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let mut it = self.se.raw_iterator_cf(&block_cf_handle);
-        it.seek_to_last();
-        let mut mutation_headers: Vec<MutationHeader> = Vec::new();
-        let mut count: u32 = 0;
-        let start: u32 = from;
-        let end: u32 = from + limit;
-        while it.valid() && count < start {
-            count += 1;
-            it.prev();
-        }
-
-        while it.valid() && count < end {
-            count += 1;
-            if let Some(v) = it.value() {
-                if let Ok(m) = MutationHeader::decode(v) {
-                    mutation_headers.push(m);
-                }
-            }
-            it.prev();
-        }
-        Ok(mutation_headers)
+    pub fn scan_gc_records(&self, from: u32, limit: u32) -> Result<Vec<GCRecord>> {
+        self.scan_records::<GCRecord>(self.config.gc_cf_name.as_str(), from, limit)
     }
 
     pub fn increase_block(&self) -> Result<()> {

@@ -117,6 +117,15 @@ message GetCollectionOfDatabaseResponse {
   repeated db3_database_v2_proto.Collection collections = 1;
 }
 
+message ScanGcRecordRequest {
+  uint32 start = 1;
+  uint32 limit = 2;
+}
+
+message ScanGcRecordResponse {
+  repeated db3_rollup_proto.GcRecord records = 1;
+}
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
@@ -126,4 +135,5 @@ service StorageNode {
   rpc ScanRollupRecord(ScanRollupRecordRequest) returns (ScanRollupRecordResponse) {}
   rpc GetDatabaseOfOwner(GetDatabaseOfOwnerRequest) returns (GetDatabaseOfOwnerResponse) {}
   rpc GetCollectionOfDatabase(GetCollectionOfDatabaseRequest) returns (GetCollectionOfDatabaseResponse) {}
+  rpc ScanGcRecord(ScanGcRecordRequest) returns (ScanGcRecordResponse) {}
 }
