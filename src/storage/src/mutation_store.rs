@@ -87,6 +87,7 @@ impl MutationStore {
             )
             .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
         );
+
         Ok(Self {
             config,
             se,
@@ -485,6 +486,7 @@ mod tests {
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
             rollup_store_cf_name: "rf3".to_string(),
+            gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -502,6 +504,7 @@ mod tests {
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
             rollup_store_cf_name: "rf3".to_string(),
+            gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -538,6 +541,7 @@ mod tests {
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
             rollup_store_cf_name: "rf3".to_string(),
+            gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -580,6 +584,7 @@ mod tests {
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
             rollup_store_cf_name: "rf3".to_string(),
+            gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
@@ -616,6 +621,7 @@ mod tests {
             block_store_cf_name: "cf1".to_string(),
             tx_store_cf_name: "cf2".to_string(),
             rollup_store_cf_name: "rf3".to_string(),
+            gc_cf_name: "gc".to_string(),
             message_max_buffer: 4 * 1024,
             scan_max_limit: 50,
         };
