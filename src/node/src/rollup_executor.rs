@@ -191,10 +191,11 @@ impl RollupExecutor {
     }
 
     fn gc_mutation(&self) -> Result<()> {
-        let (last_start_block, last_end_block) = match self.storage.get_last_gc_record()? {
-            Some(r) => (r.start_block, r.end_block),
-            None => (0_u64, 0_u64),
+        let (last_start_block, last_end_block, first) = match self.storage.get_last_gc_record()? {
+            Some(r) => (r.start_block, r.end_block, false),
+            None => (0_u64, 0_u64, true),
         };
+
         info!(
             "last gc block range [{}, {})",
             last_start_block, last_end_block
@@ -205,28 +206,54 @@ impl RollupExecutor {
             .storage
             .has_enough_round_left(last_start_block, self.config.min_gc_round_offset)?
         {
-            if let Some(r) = self.storage.get_next_rollup_record(last_start_block)? {
-                self.storage.gc_range_mutation(r.start_block, r.end_block)?;
-                let record = GcRecord {
-                    start_block: r.start_block,
-                    end_block: r.end_block,
-                    data_size: r.raw_data_size,
-                    time: times::get_current_time_in_secs(),
-                    processed_time: now.elapsed().as_secs(),
-                };
-                self.storage.add_gc_record(&record)?;
-                info!(
-                    "gc mutation from block range [{}, {}) done",
-                    r.start_block, r.end_block
-                );
-                Ok(())
+            if first {
+                if let Some(r) = self.storage.get_rollup_record(last_start_block)? {
+                    self.storage.gc_range_mutation(r.start_block, r.end_block)?;
+                    let record = GcRecord {
+                        start_block: r.start_block,
+                        end_block: r.end_block,
+                        data_size: r.raw_data_size,
+                        time: times::get_current_time_in_secs(),
+                        processed_time: now.elapsed().as_secs(),
+                    };
+                    self.storage.add_gc_record(&record)?;
+                    info!(
+                        "gc mutation from block range [{}, {}) done",
+                        r.start_block, r.end_block
+                    );
+                    Ok(())
+                } else {
+                    // going here is not normal case
+                    warn!(
+                        "fail to get next rollup record with start block {}",
+                        last_start_block
+                    );
+                    Ok(())
+                }
             } else {
-                // going here is not normal case
-                warn!(
-                    "fail to get next rollup record with start block {}",
-                    last_start_block
-                );
-                Ok(())
+                if let Some(r) = self.storage.get_next_rollup_record(last_start_block)? {
+                    self.storage.gc_range_mutation(r.start_block, r.end_block)?;
+                    let record = GcRecord {
+                        start_block: r.start_block,
+                        end_block: r.end_block,
+                        data_size: r.raw_data_size,
+                        time: times::get_current_time_in_secs(),
+                        processed_time: now.elapsed().as_secs(),
+                    };
+                    self.storage.add_gc_record(&record)?;
+                    info!(
+                        "gc mutation from block range [{}, {}) done",
+                        r.start_block, r.end_block
+                    );
+                    Ok(())
+                } else {
+                    // going here is not normal case
+                    warn!(
+                        "fail to get next rollup record with start block {}",
+                        last_start_block
+                    );
+                    Ok(())
+                }
             }
         } else {
             info!("not enough round to run gc");
@@ -251,6 +278,7 @@ impl RollupExecutor {
             "the next rollup start block {} and the newest block {current_block}",
             last_end_block
         );
+
         let mutations = self
             .storage
             .get_range_mutations(last_end_block, current_block)?;

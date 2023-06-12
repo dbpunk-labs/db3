@@ -143,6 +143,11 @@ impl MutationStore {
         self.get_next_record::<RollupRecord>(self.config.rollup_store_cf_name.as_str(), &id)
     }
 
+    pub fn get_rollup_record(&self, start_block: u64) -> Result<Option<RollupRecord>> {
+        let id = start_block.to_be_bytes();
+        self.get_record::<RollupRecord>(self.config.rollup_store_cf_name.as_str(), &id)
+    }
+
     pub fn add_rollup_record(&self, record: &RollupRecord) -> Result<()> {
         // validate the end block
         let rollup_cf_handle = self
@@ -162,6 +167,28 @@ impl MutationStore {
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         Ok(())
+    }
+
+    fn get_record<T>(&self, cf: &str, id: &[u8]) -> Result<Option<T>>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
+            .se
+            .cf_handle(cf)
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let value = self
+            .se
+            .get_cf(&cf_handle, id)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let Some(v) = value {
+            match T::decode(v.as_ref()) {
+                Ok(m) => Ok(Some(m)),
+                Err(e) => Err(DB3Error::ReadStoreError(format!("{e}"))),
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_next_record<T>(&self, cf: &str, id: &[u8]) -> Result<Option<T>>
@@ -385,22 +412,7 @@ impl MutationStore {
     }
 
     pub fn get_mutation(&self, tx_id: &TxId) -> Result<Option<MutationBody>> {
-        let tx_cf_handle = self
-            .se
-            .cf_handle(self.config.tx_store_cf_name.as_str())
-            .ok_or(DB3Error::WriteStoreError("cf is not found".to_string()))?;
-        let value = self
-            .se
-            .get_cf(&tx_cf_handle, &tx_id)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        if let Some(v) = value {
-            match MutationBody::decode(v.as_ref()) {
-                Ok(m) => Ok(Some(m)),
-                Err(e) => Err(DB3Error::ReadStoreError(format!("{e}"))),
-            }
-        } else {
-            Ok(None)
-        }
+        self.get_record::<MutationBody>(self.config.tx_store_cf_name.as_str(), tx_id.as_ref())
     }
 
     pub fn add_mutation(
