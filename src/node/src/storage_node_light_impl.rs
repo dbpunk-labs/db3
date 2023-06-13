@@ -52,7 +52,7 @@ use tokio::task;
 use tokio::time::{sleep, Duration as TokioDuration};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
@@ -194,10 +194,10 @@ impl StorageNodeV2Impl {
                             info!("add or update the subscriber with addr 0x{}", hex::encode(addr.as_ref()));
                             //TODO limit the max address count
                             subscribers.insert(addr, (sender, sub));
+                            info!("subscribers len : {}", subscribers.len());
                         }
                         Ok(event) = event_sub.recv() => {
-                            println!("receive event {:?}", event);
-                            println!("subscribers len : {}", subscribers.len());
+                            info!("receive event {:?}", event);
                             for (key , (sender, sub)) in subscribers.iter() {
                                 if sender.is_closed() {
                                     to_be_removed.insert(key.clone());
