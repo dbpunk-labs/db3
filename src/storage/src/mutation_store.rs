@@ -329,7 +329,7 @@ impl MutationStore {
                 self.se
                     .write(batch)
                     .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                Ok(())
+                Ok((state.block, state.order))
             }
             Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
         }
@@ -604,6 +604,7 @@ mod tests {
                 time: 111,
                 mutation_count: 1,
                 cost: 11111,
+                start_block: 1,
             };
             let result = store.add_rollup_record(&record);
             assert!(result.is_ok());
