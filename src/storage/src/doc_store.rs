@@ -18,12 +18,11 @@
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::DbId;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_v2_proto::{Index, IndexType};
-use db3_proto::db3_mutation_v2_proto::{CollectionMutation, DocumentDatabaseMutation};
+use db3_proto::db3_mutation_v2_proto::CollectionMutation;
 use ejdb2::EJDB;
 use moka::sync::Cache;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tracing::{info, warn};
 
 const EJDB_INDEX: [u8; 4] = [0x01u8, 0x04u8, 0x08u8, 0x10u8];
@@ -35,7 +34,7 @@ pub struct DocStoreConfig {
 
 pub struct DocStore {
     config: DocStoreConfig,
-    dbs: Cache<Vec<u8>, Arc<Mutex<EJDB>>>,
+    dbs: Cache<Vec<u8>, Arc<EJDB>>,
 }
 
 impl DocStore {
@@ -92,24 +91,21 @@ impl DocStore {
             let db_root_path = self.config.db_root_path.to_string();
             let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
                 if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
-                    Some(Arc::new(Mutex::new(db)))
+                    Some(Arc::new(db))
                 } else {
                     None
                 }
             });
             if let Some(entry) = db_entry {
-                match entry.value().lock() {
-                    Ok(db) => {
-                        for field in &collection.index_fields {
-                            db.ensure_index(
-                                collection.collection_name.as_str(),
-                                field.path.as_str(),
-                                EJDB_INDEX[field.index_type as usize],
-                            )
-                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                        }
-                    }
-                    Err(_) => todo!(),
+                for field in &collection.index_fields {
+                    entry
+                        .value()
+                        .ensure_index(
+                            collection.collection_name.as_str(),
+                            field.path.as_str(),
+                            EJDB_INDEX[field.index_type as usize],
+                        )
+                        .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                 }
             }
         }
@@ -123,21 +119,17 @@ impl DocStore {
         let db_root_path = self.config.db_root_path.to_string();
         let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
             if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
-                Some(Arc::new(Mutex::new(db)))
+                Some(Arc::new(db))
             } else {
                 None
             }
         });
         if let Some(entry) = db_entry {
-            match entry.value().lock() {
-                Ok(db) => {
-                    let id = db
-                        .put_new(col_name, &doc)
-                        .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                    Ok(id)
-                }
-                Err(_) => todo!(),
-            }
+            let id = entry
+                .value()
+                .put_new(col_name, &doc)
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+            Ok(id)
         } else {
             Err(DB3Error::WriteStoreError(format!(
                 "no database found with addr {}",
@@ -150,8 +142,8 @@ impl DocStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use db3_proto::db3_database_v2_proto::{Index, IndexType};
     use tempdir::TempDir;
-
     #[test]
     fn test_create_ejdb_database() {
         let tmp_dir_path = TempDir::new("new_mutation_store_path").expect("create temp dir");
