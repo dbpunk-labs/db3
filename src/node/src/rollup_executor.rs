@@ -18,15 +18,11 @@
 use arrow::array::{ArrayRef, BinaryBuilder, StringBuilder, UInt32Builder, UInt64Builder};
 use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
-use arweave_rs::crypto::base64::Base64;
-use arweave_rs::{
-    transaction::tags::{FromUtf8Strs, Tag},
-    Arweave,
-};
 use db3_base::times;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
+use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::mutation_store::MutationStore;
 use parquet::arrow::arrow_writer::ArrowWriter;
 use parquet::basic::Compression;
@@ -34,7 +30,6 @@ use parquet::basic::GzipLevel;
 use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 use tempdir::TempDir;
@@ -55,8 +50,8 @@ pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
     schema: SchemaRef,
-    arweave: Arweave,
     network_id: u64,
+    ar_filesystem: ArFileSystem,
 }
 
 impl RollupExecutor {
@@ -71,22 +66,16 @@ impl RollupExecutor {
             Field::new("block", DataType::UInt64, true),
             Field::new("order", DataType::UInt32, true),
         ]));
-        let arweave_url = url::Url::from_str(config.ar_node_url.as_str())
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let path = Path::new(config.ar_key_path.as_str());
-        let arweave = Arweave::from_keypair_path(path, arweave_url)
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-
-        info!(
-            "start rollup executor with ar account {}",
-            arweave.get_wallet_address().as_str()
-        );
-
+        let ar_fs_config = ArFileSystemConfig {
+            wallet_path: config.ar_key_path.to_string(),
+            arweave_url: config.ar_node_url.to_string(),
+        };
+        let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
         Ok(Self {
             config,
             storage,
             schema,
-            arweave,
+            ar_filesystem,
             network_id,
         })
     }
@@ -139,55 +128,6 @@ impl RollupExecutor {
         let metadata =
             std::fs::metadata(path).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
         Ok((meta.num_rows as u64, metadata.len()))
-    }
-
-    async fn upload(
-        &self,
-        path: &Path,
-        last_ar_tx: &str,
-        start_block: u64,
-        end_block: u64,
-    ) -> Result<(String, u64)> {
-        let app_tag: Tag<Base64> = Tag::from_utf8_strs("App-Name", "DB3 Network")
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let value =
-            Base64::from_str(last_ar_tx).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let name = Base64::from_utf8_str("Last-Rollup-Tx")
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let last_rollup_tx = Tag::<Base64> { value, name };
-        let block_start_tag: Tag<Base64> =
-            Tag::from_utf8_strs("Start-Block", start_block.to_string().as_str())
-                .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let block_end_tag: Tag<Base64> =
-            Tag::from_utf8_strs("End-Block", end_block.to_string().as_str())
-                .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let file_tag: Tag<Base64> = Tag::from_utf8_strs("File-Type", "gz.parquet")
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let network_tag: Tag<Base64> =
-            Tag::from_utf8_strs("Network-Id", self.network_id.to_string().as_str())
-                .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let metadata =
-            std::fs::metadata(path).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let fee = self
-            .arweave
-            .get_fee_by_size(metadata.len())
-            .await
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        self.arweave
-            .upload_file_from_path(
-                path,
-                vec![
-                    app_tag,
-                    block_start_tag,
-                    block_end_tag,
-                    file_tag,
-                    network_tag,
-                    last_rollup_tx,
-                ],
-                fee,
-            )
-            .await
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))
     }
 
     fn gc_mutation(&self) -> Result<()> {
@@ -264,7 +204,7 @@ impl RollupExecutor {
     pub async fn process(&self) -> Result<()> {
         let (_last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
             Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
-            _ => (0_u64, 0_u64, "Tg==".to_string()),
+            _ => (0_u64, 0_u64, "".to_string()),
         };
 
         let current_block = self.storage.get_current_block()?;
@@ -290,6 +230,7 @@ impl RollupExecutor {
 
         let recordbatch = self.convert_to_recordbatch(&mutations)?;
         let memory_size = recordbatch.get_array_memory_size();
+
         if memory_size < self.config.min_rollup_size as usize {
             info!(
                 "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
@@ -297,12 +238,23 @@ impl RollupExecutor {
             );
             return Ok(());
         }
+
         let tmp_dir = TempDir::new_in(&self.config.temp_data_path, "compression")
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
         let file_path = tmp_dir.path().join("rollup.gz.parquet");
         let (num_rows, size) = self.dump_recordbatch(&file_path, &recordbatch)?;
+        let filename = format!("{}_{}.gz.parquet", last_end_block, current_block);
+        //TODO add tx status confirmation
         let (id, reward) = self
-            .upload(&file_path, tx.as_str(), last_end_block, current_block)
+            .ar_filesystem
+            .upload_file(
+                &file_path,
+                tx.as_str(),
+                last_end_block,
+                current_block,
+                self.network_id,
+                filename.as_str(),
+            )
             .await?;
         info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} cost {}", now.elapsed().as_secs(),
         id.as_str(), reward
