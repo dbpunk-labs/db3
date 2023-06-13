@@ -21,7 +21,6 @@ package db3_storage_proto;
 import "db3_database_v2.proto";
 import "db3_mutation_v2.proto";
 import "db3_rollup.proto";
-
 message SendMutationRequest {
   // a hex signature string
   string signature = 1;
@@ -54,15 +53,31 @@ message GetNonceResponse {
 }
 
 message SubscribeRequest {
-  string signature = 1;
+  // a hex signature string
+  bytes signature = 1;
+  // the payload of topic
   bytes payload = 2;
 }
 
+// the node will dispatch a block event when a new block has been proposed
 message BlockEvent {
   uint64 block_id = 1;
-  uint64 mutation_count = 2;
+  uint32 mutation_count = 2;
 }
-
+enum EventType {
+  Block = 0;
+  Mutation = 1;
+  Query = 2;
+}
+message Subscription {
+  repeated EventType topics = 1;
+}
+message EventMessage {
+  EventType type = 1;
+  oneof event {
+    BlockEvent block_event = 3;
+  }
+}
 message GetMutationHeaderRequest {
   uint64 block_id = 1;
   uint32 order_id = 2;
@@ -136,4 +151,5 @@ service StorageNode {
   rpc GetDatabaseOfOwner(GetDatabaseOfOwnerRequest) returns (GetDatabaseOfOwnerResponse) {}
   rpc GetCollectionOfDatabase(GetCollectionOfDatabaseRequest) returns (GetCollectionOfDatabaseResponse) {}
   rpc ScanGcRecord(ScanGcRecordRequest) returns (ScanGcRecordResponse) {}
+  rpc Subscribe(SubscribeRequest) returns (stream EventMessage) {}
 }

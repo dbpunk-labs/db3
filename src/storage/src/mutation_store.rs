@@ -314,7 +314,7 @@ impl MutationStore {
         self.scan_records::<GCRecord>(self.config.gc_cf_name.as_str(), from, limit)
     }
 
-    pub fn increase_block(&self) -> Result<()> {
+    pub fn increase_block(&self) -> Result<(u64, u32)> {
         match self.block_state.lock() {
             Ok(mut state) => {
                 let block_key: &str = "block_key";

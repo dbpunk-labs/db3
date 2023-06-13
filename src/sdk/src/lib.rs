@@ -20,3 +20,4 @@ pub mod mutation_sdk;
 #[cfg(test)]
 pub mod sdk_test;
 pub mod store_sdk;
+pub mod store_sdk_v2;

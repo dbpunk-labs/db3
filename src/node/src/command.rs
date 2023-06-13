@@ -32,6 +32,9 @@ use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
+use db3_proto::db3_storage_proto::{
+    EventMessage as EventMessageV2, Subscription as SubscriptionV2,
+};
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_storage::db_store_v2::DBStoreV2Config;
@@ -490,6 +493,11 @@ impl DB3Command {
             scan_max_limit: 1000,
         };
 
+        let (sender, receiver) = tokio::sync::mpsc::channel::<(
+            DB3Address,
+            SubscriptionV2,
+            Sender<std::result::Result<EventMessageV2, Status>>,
+        )>(1024);
         let config = StorageNodeV2Config {
             store_config,
             state_config,
@@ -498,13 +506,14 @@ impl DB3Command {
             network_id,
             block_interval,
         };
-        let storage_node = StorageNodeV2Impl::new(config).unwrap();
+        let storage_node = StorageNodeV2Impl::new(config, sender).unwrap();
         info!(
             "start db3 store node on public addr {} and network {}",
             addr, network_id
         );
         std::fs::create_dir_all(rollup_data_path).unwrap();
-        storage_node.start_to_produce_block();
+        storage_node.keep_subscription(receiver).await.unwrap();
+        storage_node.start_to_produce_block().await;
         storage_node.start_to_rollup().await;
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
@@ -559,6 +568,7 @@ impl DB3Command {
                 .await
                 .unwrap();
         }
+        info!("db3 storage node exit");
     }
 
     ///

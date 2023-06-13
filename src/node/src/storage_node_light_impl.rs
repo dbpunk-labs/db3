@@ -18,11 +18,13 @@
 use crate::mutation_utils::MutationUtil;
 use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use db3_crypto::db3_address::DB3Address;
+use db3_crypto::db3_verifier::DB3Verifier;
 use db3_crypto::id::TxId;
 use db3_error::Result;
 use db3_proto::db3_mutation_v2_proto::{
     mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
+use db3_proto::db3_storage_proto::event_message::Event as EventV2;
 use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
     GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
@@ -30,19 +32,30 @@ use db3_proto::db3_storage_proto::{
     GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanGcRecordRequest,
     ScanGcRecordResponse, ScanMutationHeaderRequest, ScanMutationHeaderResponse,
     ScanRollupRecordRequest, ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
+    SubscribeRequest,
 };
+
+use db3_proto::db3_storage_proto::{
+    BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
+    Subscription as SubscriptionV2,
+};
+
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
+use prost::Message;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration;
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::Sender as BroadcastSender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task;
 use tokio::time::{sleep, Duration as TokioDuration};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
-use tracing::{info, warn};
-
+use tracing::{debug, info, warn};
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
@@ -58,38 +71,78 @@ pub struct StorageNodeV2Impl {
     config: StorageNodeV2Config,
     running: Arc<AtomicBool>,
     db_store: DBStoreV2,
+    sender: Sender<(
+        DB3Address,
+        SubscriptionV2,
+        Sender<std::result::Result<EventMessageV2, Status>>,
+    )>,
+    broadcast_sender: BroadcastSender<EventMessageV2>,
 }
 
 impl StorageNodeV2Impl {
-    pub fn new(config: StorageNodeV2Config) -> Result<Self> {
+    pub fn new(
+        config: StorageNodeV2Config,
+        sender: Sender<(
+            DB3Address,
+            SubscriptionV2,
+            Sender<std::result::Result<EventMessageV2, Status>>,
+        )>,
+    ) -> Result<Self> {
         let storage = MutationStore::new(config.store_config.clone())?;
         storage.recover()?;
         let state_store = StateStore::new(config.state_config.clone())?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
+        let (broadcast_sender, _) = broadcast::channel(1024);
         Ok(Self {
             storage,
             state_store,
             config,
             running: Arc::new(AtomicBool::new(true)),
             db_store,
+            sender,
+            broadcast_sender,
         })
     }
 
-    pub fn start_to_produce_block(&self) {
+    pub async fn start_to_produce_block(&self) {
         let local_running = self.running.clone();
         let local_storage = self.storage.clone();
         let local_block_interval = self.config.block_interval;
-        task::spawn_blocking(move || {
+        let local_event_sender = self.broadcast_sender.clone();
+        task::spawn(async move {
             info!("start the block producer thread");
             while local_running.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_millis(local_block_interval));
+                sleep(TokioDuration::from_millis(local_block_interval)).await;
+                info!(
+                    "produce block {}",
+                    local_storage.get_current_block().unwrap_or(0)
+                );
                 match local_storage.increase_block() {
-                    Ok(()) => {}
+                    Ok((block_id, mutation_count)) => {
+                        // sender block event
+                        let e = BlockEventV2 {
+                            block_id,
+                            mutation_count,
+                        };
+                        let msg = EventMessageV2 {
+                            r#type: EventTypeV2::Block as i32,
+                            event: Some(EventV2::BlockEvent(e)),
+                        };
+                        match local_event_sender.send(msg) {
+                            Ok(_) => {
+                                info!("broadcast block event {}, {}", block_id, mutation_count);
+                            }
+                            Err(e) => {
+                                warn!("the broadcast channel error for {:?}", e);
+                            }
+                        }
+                    }
                     Err(e) => {
                         warn!("fail to produce block for error {e}");
                     }
                 }
             }
+            info!("exit the block producer thread");
         });
     }
 
@@ -112,7 +165,91 @@ impl StorageNodeV2Impl {
                     }
                 }
             }
+            info!("exit the rollup thread");
         });
+    }
+    pub async fn keep_subscription(
+        &self,
+        mut receiver: Receiver<(
+            DB3Address,
+            SubscriptionV2,
+            Sender<std::result::Result<EventMessageV2, Status>>,
+        )>,
+    ) -> std::result::Result<(), Status> {
+        info!("start to keep subscription");
+        let local_running = self.running.clone();
+        let local_broadcast_sender = self.broadcast_sender.clone();
+
+        tokio::spawn(async move {
+            info!("listen to subscription update event and event message broadcaster");
+            while local_running.load(Ordering::Relaxed) {
+                info!("keep subscription loop");
+                let mut subscribers: BTreeMap<
+                    DB3Address,
+                    (
+                        Sender<std::result::Result<EventMessageV2, Status>>,
+                        SubscriptionV2,
+                    ),
+                > = BTreeMap::new();
+                let mut to_be_removed: HashSet<DB3Address> = HashSet::new();
+                let mut event_sub = local_broadcast_sender.subscribe();
+                while local_running.load(Ordering::Relaxed) {
+                    tokio::select! {
+                         Some((addr, sub, sender)) = receiver.recv() => {
+                            info!("add or update the subscriber with addr 0x{}", hex::encode(addr.as_ref()));
+                            //TODO limit the max address count
+                            subscribers.insert(addr, (sender, sub));
+                            info!("subscribers len : {}", subscribers.len());
+                        }
+                        Ok(event) = event_sub.recv() => {
+                            info!("receive event {:?}", event);
+                            for (key , (sender, sub)) in subscribers.iter() {
+                                if sender.is_closed() {
+                                    to_be_removed.insert(key.clone());
+                                    warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
+                                    continue;
+                                }
+                                for idx in 0..sub.topics.len() {
+                                    if sub.topics[idx] != EventTypeV2::Block as i32 {
+                                        continue;
+                                    }
+                                    match sender.try_send(Ok(event.clone())) {
+                                        Ok(_) => {
+                                            info!("send event to addr 0x{}", hex::encode(key.as_ref()));
+                                            break;
+                                        }
+                                        Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                            // retry?
+                                            // TODO
+                                            warn!("the channel is full for addr 0x{}", hex::encode(key.as_ref()));
+                                        }
+                                        Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                                            // remove the address
+                                            to_be_removed.insert(key.clone());
+                                            warn!("the channel has been closed by client for addr 0x{}", hex::encode(key.as_ref()));
+                                        }
+
+                                    }
+                                }
+                            }
+                        },
+                        else => {
+                            info!("unexpected channel update");
+                            // reconnect in 5 seconds
+                            sleep(TokioDuration::from_millis(1000 * 5)).await;
+                            break;
+                        }
+
+                    }
+                    for k in to_be_removed.iter() {
+                        subscribers.remove(k);
+                    }
+                    to_be_removed.clear();
+                }
+            }
+            info!("exit the keep subscription thread");
+        });
+        Ok(())
     }
 }
 
@@ -128,6 +265,35 @@ impl StorageNode for StorageNodeV2Impl {
             .scan_gc_records(r.start, r.limit)
             .map_err(|e| Status::internal(format!("{e}")))?;
         Ok(Response::new(ScanGcRecordResponse { records }))
+    }
+
+    type SubscribeStream = ReceiverStream<std::result::Result<EventMessageV2, Status>>;
+    /// add subscription to the light node
+    async fn subscribe(
+        &self,
+        request: Request<SubscribeRequest>,
+    ) -> std::result::Result<Response<Self::SubscribeStream>, Status> {
+        info!("receive subscribe request");
+        let r = request.into_inner();
+        let sender = self.sender.clone();
+        info!("sender is close: {}", sender.is_closed());
+        let account_id = DB3Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
+            .map_err(|e| Status::internal(format!("bad signature for {e}")))?;
+        let payload = SubscriptionV2::decode(r.payload.as_ref()).map_err(|e| {
+            Status::internal(format!("fail to decode open session request for {e} "))
+        })?;
+        info!(
+            "add subscriber for addr 0x{}",
+            hex::encode(account_id.addr.as_ref())
+        );
+        info!("payload {:?}", payload);
+        info!("sender {:?}", sender);
+        let (msg_sender, msg_receiver) =
+            tokio::sync::mpsc::channel::<std::result::Result<EventMessageV2, Status>>(10);
+        sender
+            .try_send((account_id.addr, payload, msg_sender))
+            .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
+        Ok(Response::new(ReceiverStream::new(msg_receiver)))
     }
 
     async fn get_collection_of_database(
