@@ -219,7 +219,7 @@ impl DBStoreV2 {
         let col = Collection {
             id: id.as_ref().to_vec(),
             name: collection.collection_name.to_string(),
-            index_list: collection.index.to_vec(),
+            index_fields: collection.index_fields.to_vec(),
             sender: sender.as_ref().to_vec(),
         };
         let mut buf = BytesMut::with_capacity(1024);
@@ -338,7 +338,7 @@ mod tests {
             assert!(false);
         }
         let collection = CollectionMutation {
-            index: vec![],
+            index_fields: vec![],
             collection_name: "col1".to_string(),
         };
         let result =

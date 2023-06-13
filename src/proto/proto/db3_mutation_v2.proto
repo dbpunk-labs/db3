@@ -27,7 +27,7 @@ message DocumentDatabaseMutation {
 }
 
 message CollectionMutation {
-  repeated db3_database_v2_proto.Index index = 1;
+  repeated db3_database_v2_proto.Index index_fields = 1;
   string collection_name = 2;
 }
 

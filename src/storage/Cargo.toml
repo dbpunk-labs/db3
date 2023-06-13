@@ -35,3 +35,5 @@ timer = "0.2.0"
 arweave-rs = {workspace=true}
 url = "2.4.0"
 http = "0.2"
+moka = "0.11.2"
+ejdb2rs = {workspace=true}
