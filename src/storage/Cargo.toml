@@ -30,7 +30,7 @@ bson = "2.5.0"
 itertools = "0.10.5"
 ed = "0.3.0"
 libmdbx = "0.3.3"
-rocksdb = { version = "0.18.0"}
+rocksdb = { version = "0.21.0"}
 timer = "0.2.0"
 arweave-rs = {workspace=true}
 url = "2.4.0"
