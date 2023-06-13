@@ -16,9 +16,7 @@
 //
 
 use bytes::BytesMut;
-use chrono::Utc;
-use db3_crypto::{db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner};
-use db3_proto::db3_storage_proto::event_message::Event as EventV2;
+use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_proto::db3_storage_proto::{
     storage_node_client::StorageNodeClient as StorageNodeV2Client, SubscribeRequest,
 };
@@ -26,16 +24,7 @@ use db3_proto::db3_storage_proto::{
     EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2,
 };
 
-use ethers::core::types::{
-    transaction::eip712::{EIP712Domain, TypedData, Types},
-    Bytes,
-};
-
-use hex;
-use num_traits::cast::FromPrimitive;
 use prost::Message;
-use std::collections::BTreeMap;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tonic::{Status, Streaming};
 

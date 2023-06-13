@@ -16,6 +16,7 @@
 //
 #![feature(iter_intersperse)]
 pub mod account_store;
+pub mod ar_fs;
 pub mod bill_store;
 pub mod collection_key;
 pub mod commit_store;

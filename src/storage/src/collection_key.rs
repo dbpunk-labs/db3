@@ -33,7 +33,6 @@ pub fn build_collection_key(db_addr: &DB3Address, name: &str) -> Result<Vec<u8>>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn it_works() {}

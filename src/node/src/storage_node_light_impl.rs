@@ -29,14 +29,17 @@ use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
     GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
     GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest,
-    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanMutationHeaderRequest,
-    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse, SubscribeRequest,
+    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanGcRecordRequest,
+    ScanGcRecordResponse, ScanMutationHeaderRequest, ScanMutationHeaderResponse,
+    ScanRollupRecordRequest, ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
+    SubscribeRequest,
 };
+
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
     Subscription as SubscriptionV2,
 };
+
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
@@ -86,6 +89,7 @@ impl StorageNodeV2Impl {
         )>,
     ) -> Result<Self> {
         let storage = MutationStore::new(config.store_config.clone())?;
+        storage.recover()?;
         let state_store = StateStore::new(config.state_config.clone())?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
@@ -146,11 +150,12 @@ impl StorageNodeV2Impl {
         let local_running = self.running.clone();
         let local_storage = self.storage.clone();
         let rollup_config = self.config.rollup_config.clone();
+        let network_id = self.config.network_id;
         task::spawn(async move {
             info!("start the rollup thread");
             let rollup_interval = rollup_config.rollup_interval;
             //TODO handle err
-            let executor = RollupExecutor::new(rollup_config, local_storage).unwrap();
+            let executor = RollupExecutor::new(rollup_config, local_storage, network_id).unwrap();
             while local_running.load(Ordering::Relaxed) {
                 sleep(TokioDuration::from_millis(rollup_interval)).await;
                 match executor.process().await {
@@ -250,6 +255,18 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn scan_gc_record(
+        &self,
+        request: Request<ScanGcRecordRequest>,
+    ) -> std::result::Result<Response<ScanGcRecordResponse>, Status> {
+        let r = request.into_inner();
+        let records = self
+            .storage
+            .scan_gc_records(r.start, r.limit)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(ScanGcRecordResponse { records }))
+    }
+
     type SubscribeStream = ReceiverStream<std::result::Result<EventMessageV2, Status>>;
     /// add subscription to the light node
     async fn subscribe(
@@ -278,6 +295,7 @@ impl StorageNode for StorageNodeV2Impl {
             .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
         Ok(Response::new(ReceiverStream::new(msg_receiver)))
     }
+
     async fn get_collection_of_database(
         &self,
         request: Request<GetCollectionOfDatabaseRequest>,
