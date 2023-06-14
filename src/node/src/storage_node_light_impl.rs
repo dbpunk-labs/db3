@@ -24,15 +24,16 @@ use db3_error::Result;
 use db3_proto::db3_mutation_v2_proto::{
     mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
+use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
 use db3_proto::db3_storage_proto::{
-    storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
-    GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
-    GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest,
-    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanGcRecordRequest,
-    ScanGcRecordResponse, ScanMutationHeaderRequest, ScanMutationHeaderResponse,
-    ScanRollupRecordRequest, ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
-    SubscribeRequest,
+    storage_node_server::StorageNode, BlockRequest, BlockResponse, ExtraItem,
+    GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest,
+    GetDatabaseOfOwnerResponse, GetMutationBodyRequest, GetMutationBodyResponse,
+    GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
+    ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
+    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
+    SendMutationRequest, SendMutationResponse, SubscribeRequest,
 };
 
 use db3_proto::db3_storage_proto::{
@@ -55,7 +56,7 @@ use tokio::task;
 use tokio::time::{sleep, Duration as TokioDuration};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
@@ -294,6 +295,25 @@ impl StorageNode for StorageNodeV2Impl {
             .try_send((account_id.addr, payload, msg_sender))
             .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
         Ok(Response::new(ReceiverStream::new(msg_receiver)))
+    }
+
+    async fn get_block(
+        &self,
+        request: Request<BlockRequest>,
+    ) -> std::result::Result<Response<BlockResponse>, Status> {
+        let r = request.into_inner();
+        let mutation_header_bodys = self
+            .storage
+            .get_range_mutations(r.block_start, r.block_end)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let mutations = mutation_header_bodys
+            .iter()
+            .map(|(h, b)| block_response::MutationWrapper {
+                header: Some(h.to_owned()),
+                body: Some(b.to_owned()),
+            })
+            .collect();
+        Ok(Response::new(BlockResponse { mutations }))
     }
 
     async fn get_collection_of_database(
