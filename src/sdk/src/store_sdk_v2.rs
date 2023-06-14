@@ -21,8 +21,8 @@ use db3_proto::db3_storage_proto::{
     storage_node_client::StorageNodeClient as StorageNodeV2Client, SubscribeRequest,
 };
 use db3_proto::db3_storage_proto::{
-    EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2,
     BlockRequest as BlockRequestV2, BlockResponse as BlockResponseV2,
+    EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2,
 };
 
 use prost::Message;
@@ -64,8 +64,10 @@ impl StoreSDKV2 {
         client.subscribe(req).await
     }
 
-    pub async fn get_block_by_height(&mut self, height: u64)
-        -> Result<tonic::Response<BlockResponseV2>, Status> {
+    pub async fn get_block_by_height(
+        &mut self,
+        height: u64,
+    ) -> Result<tonic::Response<BlockResponseV2>, Status> {
         let req = BloclRequestV2 {
             block_start: height,
             block_end: height,
@@ -114,8 +116,7 @@ mod tests {
     ) {
         let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
         let mut sdk = StoreSDKV2::new(client, signer);
-        let res =
-            sdk.get_block_by_height(height).await;
+        let res = sdk.get_block_by_height(height).await;
         println!("res {:?}", res);
         assert!(res.is_ok(), "{:?}", res);
     }
@@ -137,7 +138,4 @@ mod tests {
         let client = Arc::new(StorageNodeV2Client::new(channel));
         get_block_by_height_flow(client.clone(), 301, 1).await;
     }
-
-
-
 }

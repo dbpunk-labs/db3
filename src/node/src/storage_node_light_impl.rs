@@ -24,17 +24,17 @@ use db3_error::Result;
 use db3_proto::db3_mutation_v2_proto::{
     mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
+use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
 use db3_proto::db3_storage_proto::{
-    storage_node_server::StorageNode, ExtraItem, GetCollectionOfDatabaseRequest,
-    GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
-    GetMutationBodyRequest, GetMutationBodyResponse, GetMutationHeaderRequest,
-    GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanGcRecordRequest,
-    ScanGcRecordResponse, ScanMutationHeaderRequest, ScanMutationHeaderResponse,
-    ScanRollupRecordRequest, ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
-    SubscribeRequest, BlockRequest, BlockResponse
+    storage_node_server::StorageNode, BlockRequest, BlockResponse, ExtraItem,
+    GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest,
+    GetDatabaseOfOwnerResponse, GetMutationBodyRequest, GetMutationBodyResponse,
+    GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
+    ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
+    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
+    SendMutationRequest, SendMutationResponse, SubscribeRequest,
 };
-use db3_proto::db3_storage_proto::block_response;
 
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
@@ -302,11 +302,17 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<BlockRequest>,
     ) -> std::result::Result<Response<BlockResponse>, Status> {
         let r = request.into_inner();
-        let mutation_header_bodys = self.storage.get_range_mutations(
-            r.block_start,
-            r.block_end
-        ).map_err(|e| Status::internal(format!("{e}")))?;
-        mutations = mutation_header_bodys.iter().map(|(h,b)| block_response::MutationWrapper {header: Some(h), body: Some(b)}).collect();
+        let mutation_header_bodys = self
+            .storage
+            .get_range_mutations(r.block_start, r.block_end)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        mutations = mutation_header_bodys
+            .iter()
+            .map(|(h, b)| block_response::MutationWrapper {
+                header: Some(h),
+                body: Some(b),
+            })
+            .collect();
         Ok(Response::new(BlockResponse { mutations }))
     }
 

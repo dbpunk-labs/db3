@@ -83,10 +83,6 @@ message MutationBody {
   string signature = 2;
 }
 
-message MutationHeaderBody {
-  MutationHeader header = 1;
-  MutationBody body = 2;
-}
 enum MutationAction {
   CreateDocumentDB = 0;
   AddCollection = 1;
