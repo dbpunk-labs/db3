@@ -56,7 +56,7 @@ use tokio::task;
 use tokio::time::{sleep, Duration as TokioDuration};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
@@ -306,11 +306,11 @@ impl StorageNode for StorageNodeV2Impl {
             .storage
             .get_range_mutations(r.block_start, r.block_end)
             .map_err(|e| Status::internal(format!("{e}")))?;
-        mutations = mutation_header_bodys
+        let mutations = mutation_header_bodys
             .iter()
             .map(|(h, b)| block_response::MutationWrapper {
-                header: Some(h),
-                body: Some(b),
+                header: Some(h.to_owned()),
+                body: Some(b.to_owned()),
             })
             .collect();
         Ok(Response::new(BlockResponse { mutations }))

@@ -68,9 +68,9 @@ impl StoreSDKV2 {
         &mut self,
         height: u64,
     ) -> Result<tonic::Response<BlockResponseV2>, Status> {
-        let req = BloclRequestV2 {
+        let req = BlockRequestV2 {
             block_start: height,
-            block_end: height,
+            block_end: height + 1,
         };
         let mut client = self.client.as_ref().clone();
         client.get_block(req).await
@@ -86,7 +86,6 @@ mod tests {
     use tonic::transport::Endpoint;
 
     async fn subscribe_event_message_flow(
-        use_typed_format: bool,
         client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
         counter: i64,
     ) {
@@ -128,7 +127,7 @@ mod tests {
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeV2Client::new(channel));
 
-        subscribe_event_message_flow(false, client.clone(), 300).await;
+        subscribe_event_message_flow(client.clone(), 300).await;
     }
     #[tokio::test]
     async fn get_block_by_height_ut() {
