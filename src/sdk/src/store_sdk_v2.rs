@@ -22,6 +22,7 @@ use db3_proto::db3_storage_proto::{
 };
 use db3_proto::db3_storage_proto::{
     EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2,
+    BlockRequest as BlockRequestV2, BlockResponse as BlockResponseV2,
 };
 
 use prost::Message;
@@ -62,6 +63,16 @@ impl StoreSDKV2 {
         let mut client = self.client.as_ref().clone();
         client.subscribe(req).await
     }
+
+    pub async fn get_block_by_height(&mut self, height: u64)
+        -> Result<tonic::Response<BlockResponseV2>, Status> {
+        let req = BloclRequestV2 {
+            block_start: height,
+            block_end: height,
+        };
+        let mut client = self.client.as_ref().clone();
+        client.get_block(req).await
+    }
 }
 
 #[cfg(test)]
@@ -96,6 +107,19 @@ mod tests {
         }
     }
 
+    async fn get_block_by_height_flow(
+        client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
+        counter: i64,
+        height: u64,
+    ) {
+        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+        let mut sdk = StoreSDKV2::new(client, signer);
+        let res =
+            sdk.get_block_by_height(height).await;
+        println!("res {:?}", res);
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
     #[tokio::test]
     async fn subscribe_event_message_ut() {
         let ep = "http://127.0.0.1:26619";
@@ -105,4 +129,15 @@ mod tests {
 
         subscribe_event_message_flow(false, client.clone(), 300).await;
     }
+    #[tokio::test]
+    async fn get_block_by_height_ut() {
+        let ep = "http://127.0.0.1:26619";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(StorageNodeV2Client::new(channel));
+        get_block_by_height_flow(client.clone(), 301, 1).await;
+    }
+
+
+
 }

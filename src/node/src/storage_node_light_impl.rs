@@ -32,8 +32,9 @@ use db3_proto::db3_storage_proto::{
     GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse, ScanGcRecordRequest,
     ScanGcRecordResponse, ScanMutationHeaderRequest, ScanMutationHeaderResponse,
     ScanRollupRecordRequest, ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse,
-    SubscribeRequest,
+    SubscribeRequest, BlockRequest, BlockResponse
 };
+use db3_proto::db3_storage_proto::block_response;
 
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
@@ -294,6 +295,19 @@ impl StorageNode for StorageNodeV2Impl {
             .try_send((account_id.addr, payload, msg_sender))
             .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
         Ok(Response::new(ReceiverStream::new(msg_receiver)))
+    }
+
+    async fn get_block(
+        &self,
+        request: Request<BlockRequest>,
+    ) -> std::result::Result<Response<BlockResponse>, Status> {
+        let r = request.into_inner();
+        let mutation_header_bodys = self.storage.get_range_mutations(
+            r.block_start,
+            r.block_end
+        ).map_err(|e| Status::internal(format!("{e}")))?;
+        mutations = mutation_header_bodys.iter().map(|(h,b)| block_response::MutationWrapper {header: Some(h), body: Some(b)}).collect();
+        Ok(Response::new(BlockResponse { mutations }))
     }
 
     async fn get_collection_of_database(
