@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IMetaStore} from './interfaces/IMetaStore.sol';
+import {IMetaStore} from "./interfaces/IMetaStore.sol";
 
 contract DB3MetaStore is IMetaStore {
     struct Network {

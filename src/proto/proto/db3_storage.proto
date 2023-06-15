@@ -140,10 +140,12 @@ message ScanGcRecordRequest {
 message ScanGcRecordResponse {
   repeated db3_rollup_proto.GcRecord records = 1;
 }
+
 message BlockRequest {
   uint64 block_start = 1;
   uint64 block_end = 2;
 }
+
 message BlockResponse {
   message MutationWrapper {
     db3_mutation_v2_proto.MutationHeader header = 1;
@@ -151,6 +153,7 @@ message BlockResponse {
   }
   repeated MutationWrapper mutations = 3;
 }
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}

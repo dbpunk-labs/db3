@@ -21,6 +21,7 @@ use db3_crypto::id::DbId;
 use db3_crypto::id_v2::OpEntryId;
 
 use crate::collection_key;
+use crate::doc_store::{DocStore, DocStoreConfig};
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
     database_message, Collection, DatabaseMessage, DocumentDatabase,
@@ -45,11 +46,14 @@ pub struct DBStoreV2Config {
     pub doc_owner_store_cf_name: String,
     pub db_owner_store_cf_name: String,
     pub scan_max_limit: usize,
+    pub enable_doc_store: bool,
+    pub doc_store_conf: DocStoreConfig,
 }
 
 pub struct DBStoreV2 {
     config: DBStoreV2Config,
     se: Arc<StorageEngine>,
+    doc_store: Arc<DocStore>,
 }
 
 impl DBStoreV2 {
@@ -231,6 +235,11 @@ impl DBStoreV2 {
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        if self.config.enable_doc_store {
+            self.doc_store
+                .create_collection(db_addr, collection)
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        }
         Ok(())
     }
 
@@ -281,6 +290,11 @@ impl DBStoreV2 {
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        if self.config.enable_doc_store {
+            self.doc_store
+                .create_database(db_addr.address())
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        }
         Ok(db_addr)
     }
 }

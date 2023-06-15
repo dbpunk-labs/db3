@@ -59,19 +59,11 @@ impl DocStore {
         None
     }
 
-    pub fn create_database(
-        &self,
-        sender: &DB3Address,
-        nonce: u64,
-        network_id: u64,
-    ) -> Result<DB3Address> {
-        let db_addr = DbId::from((sender, nonce, network_id));
+    pub fn create_database(&self, addr: &DB3Address) -> Result<()> {
         //ensure init the database
-        if let Some(_) = Self::open_db_internal(
-            self.config.db_root_path.to_string(),
-            db_addr.address().clone(),
-        ) {
-            Ok(db_addr.address().clone())
+        if let Some(_) = Self::open_db_internal(self.config.db_root_path.to_string(), addr.clone())
+        {
+            Ok(())
         } else {
             Err(DB3Error::WriteStoreError(
                 "fail to open database".to_string(),
@@ -137,6 +129,96 @@ impl DocStore {
             )))
         }
     }
+
+    pub fn delete_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<()> {
+        let key = db_addr.as_ref().to_vec();
+        let add_addr_clone = db_addr.clone();
+        let db_root_path = self.config.db_root_path.to_string();
+        let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
+            if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
+                Some(Arc::new(db))
+            } else {
+                None
+            }
+        });
+
+        if let Some(entry) = db_entry {
+            entry
+                .value()
+                .del(col_name, id)
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+            Ok(())
+        } else {
+            Err(DB3Error::WriteStoreError(format!(
+                "no database found with addr {}",
+                db_addr.to_hex()
+            )))
+        }
+    }
+
+    pub fn get_doc(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        id: i64,
+    ) -> Result<serde_json::Value> {
+        let key = db_addr.as_ref().to_vec();
+        let add_addr_clone = db_addr.clone();
+        let db_root_path = self.config.db_root_path.to_string();
+        let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
+            if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
+                Some(Arc::new(db))
+            } else {
+                None
+            }
+        });
+
+        if let Some(entry) = db_entry {
+            let opt = entry
+                .value()
+                .get::<serde_json::Value>(col_name, id)
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+            Ok(opt)
+        } else {
+            Err(DB3Error::WriteStoreError(format!(
+                "no database found with addr {}",
+                db_addr.to_hex()
+            )))
+        }
+    }
+
+    pub fn patch_doc(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        doc: &str,
+        id: i64,
+    ) -> Result<()> {
+        // validata the db and col
+        let key = db_addr.as_ref().to_vec();
+        let add_addr_clone = db_addr.clone();
+        let db_root_path = self.config.db_root_path.to_string();
+        let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
+            if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
+                Some(Arc::new(db))
+            } else {
+                None
+            }
+        });
+
+        if let Some(entry) = db_entry {
+            entry
+                .value()
+                .patch(col_name, &doc, id)
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+            Ok(())
+        } else {
+            Err(DB3Error::WriteStoreError(format!(
+                "no database found with addr {}",
+                db_addr.to_hex()
+            )))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -144,8 +226,9 @@ mod tests {
     use super::*;
     use db3_proto::db3_database_v2_proto::{Index, IndexType};
     use tempdir::TempDir;
+
     #[test]
-    fn test_create_ejdb_database() {
+    fn doc_get_test() {
         let tmp_dir_path = TempDir::new("new_mutation_store_path").expect("create temp dir");
         let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
         let config = DocStoreConfig {
@@ -153,9 +236,8 @@ mod tests {
             in_memory_db_handle_limit: 16,
         };
         let doc_store = DocStore::new(config).unwrap();
-        let db_id_ret = doc_store.create_database(&DB3Address::ZERO, 1, 1);
-        assert!(db_id_ret.is_ok());
-        let db_id = db_id_ret.unwrap();
+        let ret = doc_store.create_database(&DB3Address::ZERO);
+        assert!(ret.is_ok());
         let collection = CollectionMutation {
             index_fields: vec![Index {
                 path: "/f1".to_string(),
@@ -163,13 +245,56 @@ mod tests {
             }],
             collection_name: "col1".to_string(),
         };
-        let result = doc_store.create_collection(&db_id, &collection);
+        let result = doc_store.create_collection(&DB3Address::ZERO, &collection);
         assert!(result.is_ok());
-        let result = doc_store.create_collection(&db_id, &collection);
+        let result = doc_store.get_doc(&DB3Address::ZERO, "col1", 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn doc_store_smoke_test() {
+        let tmp_dir_path = TempDir::new("new_mutation_store_path").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = DocStoreConfig {
+            db_root_path: real_path,
+            in_memory_db_handle_limit: 16,
+        };
+        let doc_store = DocStore::new(config).unwrap();
+        let ret = doc_store.create_database(&DB3Address::ZERO, 1, 1);
+        assert!(ret.is_ok());
+        let collection = CollectionMutation {
+            index_fields: vec![Index {
+                path: "/f1".to_string(),
+                index_type: IndexType::StringKey.into(),
+            }],
+            collection_name: "col1".to_string(),
+        };
+        let db_id = DB3Address::ZERO;
+        let result = doc_store.create_collection(&DB3Address::ZERO, &collection);
+        assert!(result.is_ok());
+        let result = doc_store.create_collection(&DB3Address::ZERO, &collection);
         assert!(result.is_ok());
         let doc_str = r#"{"test":"v1", "f1":"f1"}"#;
         if let Ok(id) = doc_store.add_str_doc(&db_id, "col1", doc_str) {
-            println!("the doc id {id}");
+            if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
+                assert_eq!(value["test"].as_str(), Some("v1"));
+            } else {
+                assert!(false);
+            }
+            let doc_str = r#"{"test":"v2", "f1":"f1"}"#;
+            if let Err(_) = doc_store.patch_doc(&db_id, "col1", doc_str, id) {
+                assert!(false);
+            }
+            if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
+                assert_eq!(value["test"].as_str(), Some("v2"));
+            } else {
+                assert!(false);
+            }
+            if let Err(_) = doc_store.delete_doc(&db_id, "col1", id) {
+                assert!(false);
+            }
+            let result = doc_store.get_doc(&db_id, "col1", 1);
+            assert!(result.is_err());
         } else {
             assert!(false);
         }

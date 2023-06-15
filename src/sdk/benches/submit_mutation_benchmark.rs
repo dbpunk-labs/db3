@@ -47,6 +47,7 @@ async fn run_batch_get_key(keys: &Vec<Vec<u8>>) {
     }
     let res = sdk.close_session(&session_info.session_token).await;
 }
+
 async fn init_kv_store(kv_size: i32) {
     println!("start submit mutation");
     run_submit_mutation(1, kv_size).await;
