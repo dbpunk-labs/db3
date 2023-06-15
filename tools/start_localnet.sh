@@ -66,7 +66,7 @@ echo "start tendermint node..."
 sleep 1
 
 echo "start db3 store..."
-../target/${BUILD_MODE}/db3 store --rollup-interval 60000 >store.log 2>&1  &
+../target/${BUILD_MODE}/db3 store --rollup-interval 60000 --block-interval=500 >store.log 2>&1  &
 sleep 1
 
 echo "start db3 indexer..."
