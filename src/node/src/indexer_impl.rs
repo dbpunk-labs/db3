@@ -130,6 +130,7 @@ impl IndexerNodeImpl {
                         }
                     }
                 }
+
                 MutationAction::AddCollection => {
                     for (i, body) in dm.bodies.iter().enumerate() {
                         let db_address_ref: &[u8] = body.db_address.as_ref();
@@ -155,6 +156,65 @@ impl IndexerNodeImpl {
                         }
                     }
                 }
+                MutationAction::UpdateDocument => {
+                    for (_i, body) in dm.bodies.iter().enumerate() {
+                        let db_address_ref: &[u8] = body.db_address.as_ref();
+                        let db_addr = DB3Address::try_from(db_address_ref)
+                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                        if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                            let mut docs = Vec::<(String, i64)>::new();
+                            for (j, buf) in doc_mutation.documents.iter().enumerate() {
+                                let document = bytes_to_bson_document(buf.clone())
+                                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                                let doc_str = document.to_string();
+                                debug!("add document: {}", doc_str);
+                                if doc_mutation.ids.len() <= j {
+                                    warn!("no doc id for document {}", doc_str);
+                                    break;
+                                }
+                                docs.push((doc_str, doc_mutation.ids[j]));
+                            }
+                            self.db_store
+                                .update_docs(
+                                    &db_addr,
+                                    &address,
+                                    doc_mutation.collection_name.as_str(),
+                                    &docs,
+                                )
+                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                            info!(
+                                    "update documents with db_addr {}, collection_name: {}, from owner {}",
+                                    db_addr.to_hex().as_str(),
+                                    doc_mutation.collection_name.as_str(),
+                                    address.to_hex().as_str()
+                                );
+                        }
+                    }
+                }
+                MutationAction::DeleteDocument => {
+                    for (_i, body) in dm.bodies.iter().enumerate() {
+                        let db_address_ref: &[u8] = body.db_address.as_ref();
+                        let db_addr = DB3Address::try_from(db_address_ref)
+                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                        if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                            self.db_store
+                                .delete_docs(
+                                    &db_addr,
+                                    &address,
+                                    doc_mutation.collection_name.as_str(),
+                                    &doc_mutation.ids,
+                                )
+                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                            info!(
+                                    "delete documents with db_addr {}, collection_name: {}, from owner {}",
+                                    db_addr.to_hex().as_str(),
+                                    doc_mutation.collection_name.as_str(),
+                                    address.to_hex().as_str()
+                                );
+                        }
+                    }
+                }
+
                 MutationAction::AddDocument => {
                     for (_i, body) in dm.bodies.iter().enumerate() {
                         let db_address_ref: &[u8] = body.db_address.as_ref();

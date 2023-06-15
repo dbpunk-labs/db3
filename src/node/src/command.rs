@@ -191,7 +191,6 @@ pub enum DB3Command {
         doc_db_path: String,
         #[clap(long, default_value = "10")]
         network_id: u64,
-        #[clap(long, default_value = "16")]
         #[clap(short, long)]
         verbose: bool,
     },

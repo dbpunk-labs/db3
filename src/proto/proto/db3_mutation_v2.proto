@@ -34,7 +34,7 @@ message CollectionMutation {
 message DocumentMutation {
   string collection_name = 1;
   repeated bytes documents = 2;
-  repeated string ids = 3;
+  repeated int64 ids = 3;
   // The fields to update.
   // None of the field paths in the mask may contain a reserved name.
   //

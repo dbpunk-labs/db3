@@ -259,6 +259,69 @@ impl DBStoreV2 {
         self.get_entry::<DatabaseMessage>(self.config.db_store_cf_name.as_str(), db_addr.as_ref())
     }
 
+    pub fn update_docs(
+        &self,
+        db_addr: &DB3Address,
+        sender: &DB3Address,
+        col_name: &str,
+        docs: &[(String, i64)],
+    ) -> Result<()> {
+        let ck = collection_key::build_collection_key(db_addr, col_name)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let collection_store_cf_handle = self
+            .se
+            .cf_handle(self.config.collection_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let ck_ref: &[u8] = ck.as_ref();
+        let value = self
+            .se
+            .get_cf(&collection_store_cf_handle, ck_ref)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let None = value {
+            return Err(DB3Error::ReadStoreError(format!(
+                "collection with name {} does not exist",
+                col_name
+            )));
+        }
+        if self.config.enable_doc_store {
+            //TODO add id-> owner mapping to control the permissions
+            self.doc_store.patch_docs(db_addr, col_name, docs)
+        } else {
+            Ok(())
+        }
+    }
+    pub fn delete_docs(
+        &self,
+        db_addr: &DB3Address,
+        sender: &DB3Address,
+        col_name: &str,
+        ids: &[i64],
+    ) -> Result<()> {
+        let ck = collection_key::build_collection_key(db_addr, col_name)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let collection_store_cf_handle = self
+            .se
+            .cf_handle(self.config.collection_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let ck_ref: &[u8] = ck.as_ref();
+        let value = self
+            .se
+            .get_cf(&collection_store_cf_handle, ck_ref)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let None = value {
+            return Err(DB3Error::ReadStoreError(format!(
+                "collection with name {} does not exist",
+                col_name
+            )));
+        }
+        if self.config.enable_doc_store {
+            //TODO add id-> owner mapping to control the permissions
+            self.doc_store.delete_docs(db_addr, col_name, ids)
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn add_docs(
         &self,
         db_addr: &DB3Address,

@@ -139,6 +139,22 @@ impl DocStore {
         }
     }
 
+    pub fn delete_docs(&self, db_addr: &DB3Address, col_name: &str, ids: &[i64]) -> Result<()> {
+        let db_opt = self.get_db_ref(db_addr);
+        if let Some(db) = db_opt {
+            for id in ids {
+                db.del(col_name, *id)
+                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+            }
+            Ok(())
+        } else {
+            Err(DB3Error::WriteStoreError(format!(
+                "no database found with addr {}",
+                db_addr.to_hex()
+            )))
+        }
+    }
+
     pub fn delete_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<()> {
         let db_opt = self.get_db_ref(db_addr);
         if let Some(db) = db_opt {
@@ -235,6 +251,26 @@ impl DocStore {
         }
     }
 
+    pub fn patch_docs(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        pairs: &[(String, i64)],
+    ) -> Result<()> {
+        let db_opt = self.get_db_ref(db_addr);
+        if let Some(db) = db_opt {
+            for pair in pairs {
+                db.patch(col_name, &pair.0.as_str(), pair.1)
+                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+            }
+            Ok(())
+        } else {
+            Err(DB3Error::WriteStoreError(format!(
+                "no database found with addr {}",
+                db_addr.to_hex()
+            )))
+        }
+    }
     pub fn patch_doc(
         &self,
         db_addr: &DB3Address,
