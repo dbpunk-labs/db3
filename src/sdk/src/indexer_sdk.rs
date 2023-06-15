@@ -15,14 +15,14 @@
 // limitations under the License.
 //
 
-use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
-use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
-use db3_proto::db3_indexer_proto::{
-    indexer_node_client::IndexerNodeClient, GetDocumentRequest, IndexerStatus, RunQueryRequest,
-    RunQueryResponse, ShowDatabaseRequest, ShowIndexerStatusRequest,
-};
-use std::sync::Arc;
-use tonic::Status;
+//use db3_proto::db3_database_proto::structured_query::{Limit, Projection};
+//use db3_proto::db3_database_proto::{Database, Document, StructuredQuery};
+//use db3_proto::db3_indexer_proto::{
+//    indexer_node_client::IndexerNodeClient, GetDocumentRequest, IndexerStatus, RunQueryRequest,
+//    RunQueryResponse, ShowDatabaseRequest, ShowIndexerStatusRequest,
+//};
+//use std::sync::Arc;
+//use tonic::Status;
 //
 // pub struct IndexerSDK {
 //     client: Arc<IndexerNodeClient<tonic::transport::Channel>>,

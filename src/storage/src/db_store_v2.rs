@@ -24,7 +24,7 @@ use crate::collection_key;
 use crate::doc_store::{DocStore, DocStoreConfig};
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
-    database_message, Collection, DatabaseMessage, DocumentDatabase,
+    database_message, Collection, DatabaseMessage, Document, DocumentDatabase, Query,
 };
 use db3_proto::db3_mutation_v2_proto::{CollectionMutation, DocumentDatabaseMutation};
 use prost::Message;
@@ -262,7 +262,7 @@ impl DBStoreV2 {
     pub fn update_docs(
         &self,
         db_addr: &DB3Address,
-        sender: &DB3Address,
+        _sender: &DB3Address,
         col_name: &str,
         docs: &[(String, i64)],
     ) -> Result<()> {
@@ -290,10 +290,50 @@ impl DBStoreV2 {
             Ok(())
         }
     }
+
+    pub fn query_docs(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        query: &Query,
+    ) -> Result<Vec<Document>> {
+        let ck = collection_key::build_collection_key(db_addr, col_name)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let collection_store_cf_handle = self
+            .se
+            .cf_handle(self.config.collection_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let ck_ref: &[u8] = ck.as_ref();
+        let value = self
+            .se
+            .get_cf(&collection_store_cf_handle, ck_ref)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let None = value {
+            return Err(DB3Error::ReadStoreError(format!(
+                "collection with name {} does not exist",
+                col_name
+            )));
+        }
+        if self.config.enable_doc_store {
+            let docs = self.doc_store.execute_query(db_addr, col_name, query)?;
+            //TODO add owner
+            Ok(docs
+                .iter()
+                .map(|doc| Document {
+                    id: doc.0,
+                    doc: doc.1.to_string(),
+                    owner: "".to_string(),
+                })
+                .collect())
+        } else {
+            Ok(vec![])
+        }
+    }
+
     pub fn delete_docs(
         &self,
         db_addr: &DB3Address,
-        sender: &DB3Address,
+        _sender: &DB3Address,
         col_name: &str,
         ids: &[i64],
     ) -> Result<()> {
@@ -325,7 +365,7 @@ impl DBStoreV2 {
     pub fn add_docs(
         &self,
         db_addr: &DB3Address,
-        sender: &DB3Address,
+        _sender: &DB3Address,
         col_name: &str,
         docs: &Vec<String>,
     ) -> Result<Vec<i64>> {

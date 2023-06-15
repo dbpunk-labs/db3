@@ -18,7 +18,7 @@
 syntax = "proto3";
 package db3_indexer_proto;
 
-import "db3_database.proto";
+import "db3_database_v2.proto";
 
 message IndexerStatus {
   uint64 total_database_count = 1;
@@ -29,36 +29,13 @@ message IndexerStatus {
   uint64 total_storage_in_bytes = 7;
 }
 
-message ShowDatabaseRequest {
-  // the database address in hex format
-  string address = 2;
-  // the owner address in hex format
-  string owner_address = 3;
-}
-
-message ShowDatabaseResponse {
-  repeated db3_database_proto.Database dbs = 1;
-}
-
 message RunQueryRequest {
-  // a hex string
-  string address = 2;
-  db3_database_proto.StructuredQuery query = 3;
-  // TODO: support paging setting (e.g page_size, page_token)
-  // TODO: support document mask
+  string db = 1;
+  string col_name = 2;
+  db3_database_v2_proto.Query query = 3;
 }
-message GetDocumentRequest {
-  // a hex string
-  string id = 2;
-}
-
-message GetDocumentResponse {
-  db3_database_proto.Document document = 1;
-}
-
 message RunQueryResponse {
-  repeated db3_database_proto.Document documents = 2;
-  // TODO: support next_page_token for page loading
+  repeated db3_database_v2_proto.Document documents = 2;
 }
 
 message ShowIndexerStatusRequest {}
@@ -67,9 +44,9 @@ service IndexerNode {
   // method for show indexer status
   rpc ShowIndexerStatus(ShowIndexerStatusRequest) returns (IndexerStatus) {}
   // method for show database
-//  rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
-//  // method for query document
-//  rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
-//  // method for get document
-//  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
+  //  rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
+  //  // method for query document
+  rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
+  //  // method for get document
+  //  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
 }
