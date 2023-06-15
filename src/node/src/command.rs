@@ -18,7 +18,7 @@
 use crate::abci_impl::AbciImpl;
 use crate::auth_storage::AuthStorage;
 use crate::context::Context;
-use crate::indexer_impl::{IndexerBlockSyncer, IndexerNodeImpl};
+use crate::indexer_impl::IndexerNodeImpl;
 use crate::node_storage::NodeStorage;
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_impl::StorageNodeImpl;
@@ -40,14 +40,13 @@ use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::DBStoreV2Config;
-use db3_storage::doc_store::{DocStore, DocStoreConfig};
+use db3_storage::doc_store::DocStoreConfig;
 use db3_storage::mutation_store::MutationStoreConfig;
 use db3_storage::state_store::StateStoreConfig;
 use http::Uri;
 use merkdb::Merk;
 use std::boxed::Box;
 use std::io::{stderr, stdout};
-use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -57,10 +56,8 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
-use tokio::fs;
 use tokio::sync::mpsc::Sender;
 use tonic::codegen::http::Method;
-use tonic::codegen::Body;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 use tonic::Status;
 use tower_http::cors::{Any, CorsLayer};
@@ -188,15 +185,14 @@ pub enum DB3Command {
             default_value = "http://127.0.0.1:26619"
         )]
         db3_storage_grpc_url: String,
-        #[clap(short, long, default_value = "./indexer")]
-        db_path: String,
-        #[clap(long, default_value = "16")]
-        db_tree_level_in_memory: u8,
+        #[clap(short, long, default_value = "./index_meta_db")]
+        meta_db_path: String,
+        #[clap(short, long, default_value = "./index_doc_db")]
+        doc_db_path: String,
+        #[clap(long, default_value = "10")]
+        network_id: u64,
         #[clap(short, long)]
         verbose: bool,
-        /// Suppress all output logging (overrides --verbose).
-        #[clap(short, long)]
-        quiet: bool,
     },
 
     /// Run db3 client
@@ -340,35 +336,48 @@ impl DB3Command {
                 public_host,
                 public_grpc_port,
                 db3_storage_grpc_url,
-                db_path,
-                db_tree_level_in_memory,
+                meta_db_path,
+                doc_db_path,
+                network_id,
                 verbose,
-                quiet,
             } => {
-                let log_level = if quiet {
-                    LevelFilter::OFF
-                } else if verbose {
+                let log_level = if verbose {
                     LevelFilter::DEBUG
                 } else {
                     LevelFilter::INFO
                 };
+
                 tracing_subscriber::fmt().with_max_level(log_level).init();
                 info!("{ABOUT}");
 
                 let ctx = Self::build_context_v2(db3_storage_grpc_url.as_ref());
 
-                let config = DocStoreConfig {
-                    db_root_path: db_path.clone(),
+                let doc_store_conf = DocStoreConfig {
+                    db_root_path: doc_db_path,
                     in_memory_db_handle_limit: 16,
                 };
-                let doc_store = Arc::new(Mutex::new(Box::pin(DocStore::new(config))));
-                let indexer_node_impl = IndexerNodeImpl::new(db_path.as_str(), doc_store.clone());
+                let db_store_config = DBStoreV2Config {
+                    db_path: meta_db_path.to_string(),
+                    db_store_cf_name: "db_store_cf".to_string(),
+                    doc_store_cf_name: "doc_store_cf".to_string(),
+                    collection_store_cf_name: "col_store_cf".to_string(),
+                    index_store_cf_name: "idx_store_cf".to_string(),
+                    doc_owner_store_cf_name: "doc_owner_store_cf".to_string(),
+                    db_owner_store_cf_name: "db_owner_cf".to_string(),
+                    scan_max_limit: 1000,
+                    enable_doc_store: true,
+                    doc_store_conf,
+                };
+
+                let indexer = IndexerNodeImpl::new(db_store_config, network_id).unwrap();
                 let addr = format!("{public_host}:{public_grpc_port}");
+                let indexer_for_syncing = indexer.clone();
                 let listen = tokio::spawn(async move {
-                    info!("start db3 indexer listener ...");
-                    let mut indexer_block_syncer =
-                        IndexerBlockSyncer::new(ctx.store_sdk.unwrap(), doc_store.clone());
-                    indexer_block_syncer.start().await.unwrap();
+                    info!("start syncing data from storage node");
+                    indexer_for_syncing
+                        .start(ctx.store_sdk.unwrap())
+                        .await
+                        .unwrap();
                 });
                 info!("start db3 indexer node on public addr {}", addr);
                 let cors_layer = CorsLayer::new()
@@ -379,7 +388,7 @@ impl DB3Command {
                     .accept_http1(true)
                     .layer(cors_layer)
                     .layer(tonic_web::GrpcWebLayer::new())
-                    .add_service(IndexerNodeServer::new(indexer_node_impl))
+                    .add_service(IndexerNodeServer::new(indexer))
                     .serve(addr.parse().unwrap())
                     .await
                     .unwrap();
@@ -515,6 +524,8 @@ impl DB3Command {
             doc_owner_store_cf_name: "doc_owner_store_cf".to_string(),
             db_owner_store_cf_name: "db_owner_cf".to_string(),
             scan_max_limit: 1000,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
         };
 
         let (sender, receiver) = tokio::sync::mpsc::channel::<(

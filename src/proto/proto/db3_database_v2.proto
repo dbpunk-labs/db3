@@ -59,10 +59,10 @@ message Collection {
 }
 
 enum IndexType {
-    UniqueKey = 0;
-    StringKey = 1;
-    Int64Key = 2;
-    DoubleKey = 3;
+  UniqueKey = 0;
+  StringKey = 1;
+  Int64Key = 2;
+  DoubleKey = 3;
 }
 
 message Index {
@@ -75,6 +75,20 @@ message Document {
   bytes doc = 2;
   bytes owner = 3;
   bytes tx_id = 4;
+}
+
+message QueryParameter {
+  string name = 1;
+  oneof parameter {
+    int64 int64_value = 2;
+    bool bool_value = 3;
+    string str_value = 4;
+  }
+}
+
+message Query {
+  string query_str = 1;
+  repeated QueryParameter parameters = 2;
 }
 
 // A Firestore query.

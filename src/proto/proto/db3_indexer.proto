@@ -60,6 +60,7 @@ message RunQueryResponse {
   repeated db3_database_proto.Document documents = 2;
   // TODO: support next_page_token for page loading
 }
+
 message ShowIndexerStatusRequest {}
 
 service IndexerNode {

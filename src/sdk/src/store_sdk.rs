@@ -347,10 +347,10 @@ impl StoreSDK {
     }
 
     pub async fn subscribe_event_message(
-        &mut self,
+        &self,
         all: bool,
     ) -> Result<tonic::Response<Streaming<EventMessage>>, Status> {
-        let session_token = self.keep_session(true).await?;
+        let session_token = self.get_token().await?;
         let m_filter = match all {
             true => MutationEventFilter {
                 sender: "".to_string(),
@@ -433,6 +433,28 @@ impl StoreSDK {
             Ok(_) => Ok(response.clone()),
             Err(e) => Err(Status::internal(format!("Fail to open session {e}"))),
         }
+    }
+
+    async fn get_token(&self) -> std::result::Result<String, Status> {
+        let payload = OpenSessionPayload {
+            header: Uuid::new_v4().to_string(),
+            start_time: Utc::now().timestamp(),
+        };
+
+        let r = match self.use_typed_format {
+            true => {
+                let r = self.wrap_typed_open_session(&payload)?;
+                r
+            }
+            false => {
+                let r = self.wrap_proto_open_session(&payload)?;
+                r
+            }
+        };
+        let request = tonic::Request::new(r);
+        let mut client = self.client.as_ref().clone();
+        let response = client.open_query_session(request).await?.into_inner();
+        Ok(response.session_token)
     }
 
     fn wrap_proto_open_session(
