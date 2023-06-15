@@ -38,14 +38,18 @@ pub struct DocStore {
 }
 
 impl DocStore {
-    pub fn new(config: DocStoreConfig) -> Result<Self> {
+    pub fn new(config: DocStoreConfig) -> Self {
         let dbs = Cache::new(config.in_memory_db_handle_limit as u64);
-        Ok(Self { config, dbs })
+        Self { config, dbs }
     }
 
     fn open_db_internal(db_root_path: String, db_addr: DB3Address) -> Option<EJDB> {
         let db_addr_str = db_addr.to_hex();
-        info!("open database with address {}", db_addr_str.as_str());
+        info!(
+            "open database with address {} db path {}",
+            db_addr_str.as_str(),
+            db_root_path.as_str()
+        );
         let mut db = EJDB::new();
         let mut path = PathBuf::new();
         path.push(db_root_path.as_str());
@@ -113,6 +117,17 @@ impl DocStore {
     }
 
     pub fn add_str_doc(&self, db_addr: &DB3Address, col_name: &str, doc: &str) -> Result<i64> {
+        match self.add_str_docs(db_addr, col_name, &vec![doc.to_string()]) {
+            Ok(ids) => Ok(ids[0]),
+            Err(e) => Err(e),
+        }
+    }
+    pub fn add_str_docs(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        docs: &Vec<String>,
+    ) -> Result<Vec<i64>> {
         // validata the db and col
         let key = db_addr.as_ref().to_vec();
         let add_addr_clone = db_addr.clone();
@@ -125,11 +140,15 @@ impl DocStore {
             }
         });
         if let Some(entry) = db_entry {
-            let id = entry
-                .value()
-                .put_new(col_name, &doc)
-                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-            Ok(id)
+            let mut ids = Vec::new();
+            for doc in docs {
+                let id = entry
+                    .value()
+                    .put_new(col_name, doc)
+                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                ids.push(id);
+            }
+            Ok(ids)
         } else {
             Err(DB3Error::WriteStoreError(format!(
                 "no database found with addr {}",
@@ -152,7 +171,7 @@ mod tests {
             db_root_path: real_path,
             in_memory_db_handle_limit: 16,
         };
-        let doc_store = DocStore::new(config).unwrap();
+        let doc_store = DocStore::new(config);
         let db_id_ret = doc_store.create_database(&DB3Address::ZERO, 1, 1);
         assert!(db_id_ret.is_ok());
         let db_id = db_id_ret.unwrap();

@@ -314,10 +314,13 @@ impl MutationStore {
         self.scan_records::<GCRecord>(self.config.gc_cf_name.as_str(), from, limit)
     }
 
-    pub fn increase_block(&self) -> Result<(u64, u32)> {
+    /// increase the block number and reset the order to 0
+    /// return the last block state
+    pub fn increase_block_return_last_state(&self) -> Result<(u64, u32)> {
         match self.block_state.lock() {
             Ok(mut state) => {
                 let block_key: &str = "block_key";
+                let last_block_state = (state.block, state.order);
                 state.block += 1;
                 state.order = 0;
                 let cf_handle = self
@@ -329,7 +332,7 @@ impl MutationStore {
                 self.se
                     .write(batch)
                     .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                Ok((state.block, state.order))
+                Ok(last_block_state)
             }
             Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
         }
