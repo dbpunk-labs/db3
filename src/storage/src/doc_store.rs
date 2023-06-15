@@ -17,7 +17,7 @@
 
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_v2_proto::{query_parameter, Query, QueryParameter};
+use db3_proto::db3_database_v2_proto::{query_parameter, Query};
 use db3_proto::db3_mutation_v2_proto::CollectionMutation;
 use ejdb2::SetPlaceholder;
 use ejdb2::{EJDBQuery, EJDB};
@@ -154,7 +154,7 @@ impl DocStore {
         db_addr: &DB3Address,
         col_name: &str,
         query: &Query,
-    ) -> Result<Vec<serde_json::Value>> {
+    ) -> Result<Vec<(i64, serde_json::Value)>> {
         let mut prepared_statement = EJDBQuery::new(col_name, query.query_str.as_str());
         prepared_statement
             .init()
@@ -179,8 +179,18 @@ impl DocStore {
                 _ => {}
             }
         }
-
-        Ok(vec![])
+        let db_opt = self.get_db_ref(db_addr);
+        let mut result = Vec::<(i64, serde_json::Value)>::new();
+        if let Some(db) = db_opt {
+            db.exec::<serde_json::Value>(&prepared_statement, &mut result)
+                .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        } else {
+            return Err(DB3Error::WriteStoreError(format!(
+                "no database found with addr {}",
+                db_addr.to_hex()
+            )));
+        }
+        Ok(result)
     }
 
     fn get_db_ref(&self, db_addr: &DB3Address) -> Option<Arc<EJDB>> {
@@ -231,8 +241,7 @@ impl DocStore {
     ) -> Result<()> {
         let db_opt = self.get_db_ref(db_addr);
         if let Some(db) = db_opt {
-            db.value()
-                .patch(col_name, &doc, id)
+            db.patch(col_name, &doc, id)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
             Ok(())
         } else {
@@ -247,6 +256,7 @@ impl DocStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use db3_proto::db3_database_v2_proto::QueryParameter;
     use db3_proto::db3_database_v2_proto::{Index, IndexType};
     use tempdir::TempDir;
 
@@ -283,7 +293,7 @@ mod tests {
             in_memory_db_handle_limit: 16,
         };
         let doc_store = DocStore::new(config).unwrap();
-        let ret = doc_store.create_database(&DB3Address::ZERO, 1, 1);
+        let ret = doc_store.create_database(&DB3Address::ZERO);
         assert!(ret.is_ok());
         let collection = CollectionMutation {
             index_fields: vec![Index {
@@ -304,10 +314,54 @@ mod tests {
             } else {
                 assert!(false);
             }
+            let query = Query {
+                query_str: "/*".to_string(),
+                parameters: vec![],
+            };
+            if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
+                assert_eq!(1, result.len());
+                assert_eq!(id, result[0].0);
+            }
+            let query = Query {
+                query_str: "/[f1 eq ?]".to_string(),
+                parameters: vec![QueryParameter {
+                    name: "f1".to_string(),
+                    parameter: Some(query_parameter::Parameter::StrValue("f1".to_string())),
+                }],
+            };
+            if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
+                assert_eq!(1, result.len());
+                assert_eq!(id, result[0].0);
+            }
+            let query = Query {
+                query_str: "/[f1 eq ?]".to_string(),
+                parameters: vec![QueryParameter {
+                    name: "f1".to_string(),
+                    parameter: Some(query_parameter::Parameter::StrValue("f2".to_string())),
+                }],
+            };
+            if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
+                assert_eq!(0, result.len());
+            }
+
+            let query = Query {
+                query_str: "/[f1 eq ? and test eq 'v1'] ".to_string(),
+                parameters: vec![QueryParameter {
+                    name: "f1".to_string(),
+                    parameter: Some(query_parameter::Parameter::StrValue("f1".to_string())),
+                }],
+            };
+            if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
+                assert_eq!(1, result.len());
+            }
+
+
+
             let doc_str = r#"{"test":"v2", "f1":"f1"}"#;
             if let Err(_) = doc_store.patch_doc(&db_id, "col1", doc_str, id) {
                 assert!(false);
             }
+
             if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
                 assert_eq!(value["test"].as_str(), Some("v2"));
             } else {
