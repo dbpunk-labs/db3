@@ -59,10 +59,10 @@ message Collection {
 }
 
 enum IndexType {
-    UniqueKey = 0;
-    StringKey = 1;
-    Int64Key = 2;
-    DoubleKey = 3;
+  UniqueKey = 0;
+  StringKey = 1;
+  Int64Key = 2;
+  DoubleKey = 3;
 }
 
 message Index {
