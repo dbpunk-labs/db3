@@ -71,10 +71,9 @@ message Index {
 }
 
 message Document {
-  bytes id = 1;
-  bytes doc = 2;
-  bytes owner = 3;
-  bytes tx_id = 4;
+  int64 id = 1;
+  string doc = 2;
+  string owner = 3;
 }
 
 message QueryParameter {

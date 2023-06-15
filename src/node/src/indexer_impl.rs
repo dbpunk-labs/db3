@@ -20,7 +20,9 @@ use db3_base::bson_util::bytes_to_bson_document;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
-use db3_proto::db3_indexer_proto::{IndexerStatus, ShowIndexerStatusRequest};
+use db3_proto::db3_indexer_proto::{
+    IndexerStatus, RunQueryRequest, RunQueryResponse, ShowIndexerStatusRequest,
+};
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
@@ -73,7 +75,7 @@ impl IndexerNodeImpl {
         match event.event {
             Some(event_message::Event::BlockEvent(be)) => {
                 info!(
-                    "[IndexerBlockSyncer] Receive BlockEvent: Block\t{}MutationCount\t{}",
+                    "Receive BlockEvent: Block\t{}MutationCount\t{}",
                     be.block_id, be.mutation_count,
                 );
                 let response = store_sdk
@@ -264,6 +266,24 @@ impl IndexerNode for IndexerNodeImpl {
         _request: Request<ShowIndexerStatusRequest>,
     ) -> std::result::Result<Response<IndexerStatus>, Status> {
         Err(Status::internal("err".to_string()))
+    }
+
+    async fn run_query(
+        &self,
+        request: Request<RunQueryRequest>,
+    ) -> std::result::Result<Response<RunQueryResponse>, Status> {
+        let r = request.into_inner();
+        let addr =
+            DB3Address::from_hex(r.db.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
+        if let Some(q) = &r.query {
+            let documents = self
+                .db_store
+                .query_docs(&addr, r.col_name.as_str(), q)
+                .map_err(|e| Status::internal(format!("{e}")))?;
+            Ok(Response::new(RunQueryResponse { documents }))
+        } else {
+            Err(Status::internal("no query provided".to_string()))
+        }
     }
 }
 #[cfg(test)]
