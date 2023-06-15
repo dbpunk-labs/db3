@@ -295,9 +295,8 @@ mod tests {
             in_memory_db_handle_limit: 16,
         };
         let doc_store = DocStore::new(config);
-        let db_id_ret = doc_store.create_database(&DB3Address::ZERO, 1, 1);
+        let db_id_ret = doc_store.create_database(&DB3Address::ZERO);
         assert!(db_id_ret.is_ok());
-        let db_id = db_id_ret.unwrap();
         let collection = CollectionMutation {
             index_fields: vec![Index {
                 path: "/f1".to_string(),
@@ -319,7 +318,7 @@ mod tests {
             db_root_path: real_path,
             in_memory_db_handle_limit: 16,
         };
-        let doc_store = DocStore::new(config).unwrap();
+        let doc_store = DocStore::new(config);
         let ret = doc_store.create_database(&DB3Address::ZERO);
         assert!(ret.is_ok());
         let collection = CollectionMutation {

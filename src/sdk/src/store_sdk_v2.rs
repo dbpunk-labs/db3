@@ -81,7 +81,6 @@ impl StoreSDKV2 {
 mod tests {
     use super::*;
     use crate::sdk_test;
-    use std::fmt::format;
     use std::time::Duration;
     use tonic::transport::Endpoint;
 
@@ -90,7 +89,7 @@ mod tests {
         counter: i64,
     ) {
         let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut sdk = StoreSDKV2::new(client, signer);
+        let sdk = StoreSDKV2::new(client, signer);
         let res: Result<tonic::Response<Streaming<EventMessageV2>>, Status> =
             sdk.subscribe_event_message().await;
         println!("res {:?}", res);
@@ -114,7 +113,7 @@ mod tests {
         height: u64,
     ) {
         let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut sdk = StoreSDKV2::new(client, signer);
+        let sdk = StoreSDKV2::new(client, signer);
         let res = sdk.get_block_by_height(height).await;
         println!("res {:?}", res);
         assert!(res.is_ok(), "{:?}", res);
