@@ -179,21 +179,21 @@ impl DocStore {
         prepared_statement
             .init()
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        for (i, param) in query.parameters.iter().enumerate() {
+        for param in query.parameters.iter() {
             match &param.parameter {
                 Some(query_parameter::Parameter::Int64Value(v)) => {
                     prepared_statement
-                        .set_placeholder(param.name.as_str(), i as i32, *v)
+                        .set_placeholder(param.name.as_str(), param.idx, *v)
                         .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
                 }
                 Some(query_parameter::Parameter::BoolValue(v)) => {
                     prepared_statement
-                        .set_placeholder(param.name.as_str(), i as i32, *v)
+                        .set_placeholder(param.name.as_str(), param.idx, *v)
                         .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
                 }
                 Some(query_parameter::Parameter::StrValue(v)) => {
                     prepared_statement
-                        .set_placeholder(param.name.as_str(), i as i32, v.as_str())
+                        .set_placeholder(param.name.as_str(), param.idx, v.as_str())
                         .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
                 }
                 _ => {}
@@ -389,6 +389,7 @@ mod tests {
                 parameters: vec![QueryParameter {
                     name: "f1".to_string(),
                     parameter: Some(query_parameter::Parameter::StrValue("f1".to_string())),
+                    idx:0
                 }],
             };
             if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
@@ -400,6 +401,7 @@ mod tests {
                 parameters: vec![QueryParameter {
                     name: "f1".to_string(),
                     parameter: Some(query_parameter::Parameter::StrValue("f2".to_string())),
+                    idx:0
                 }],
             };
             if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
@@ -411,6 +413,7 @@ mod tests {
                 parameters: vec![QueryParameter {
                     name: "f1".to_string(),
                     parameter: Some(query_parameter::Parameter::StrValue("f1".to_string())),
+                    idx:0
                 }],
             };
             if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {

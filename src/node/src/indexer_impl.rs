@@ -276,17 +276,19 @@ impl IndexerNode for IndexerNodeImpl {
         let addr =
             DB3Address::from_hex(r.db.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
         if let Some(q) = &r.query {
-            debug!("query str {}", q.query_str);
+            info!("query str {} q {:?}", q.query_str, q);
             let documents = self
                 .db_store
                 .query_docs(&addr, r.col_name.as_str(), q)
                 .map_err(|e| Status::internal(format!("{e}")))?;
-            debug!(
-                "query str {} from collection {} in db {} with result len {}",
+
+            info!(
+                "query str {} from collection {} in db {} with result len {}, parameters len {}",
                 q.query_str,
                 r.col_name.as_str(),
                 r.db.as_str(),
-                documents.len()
+                documents.len(),
+                q.parameters.len()
             );
             Ok(Response::new(RunQueryResponse { documents }))
         } else {

@@ -83,6 +83,7 @@ message QueryParameter {
     bool bool_value = 3;
     string str_value = 4;
   }
+  int32 idx = 5;
 }
 
 message Query {
