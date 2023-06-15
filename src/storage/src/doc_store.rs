@@ -389,7 +389,7 @@ mod tests {
                 parameters: vec![QueryParameter {
                     name: "f1".to_string(),
                     parameter: Some(query_parameter::Parameter::StrValue("f1".to_string())),
-                    idx:0
+                    idx: 0,
                 }],
             };
             if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
@@ -401,7 +401,7 @@ mod tests {
                 parameters: vec![QueryParameter {
                     name: "f1".to_string(),
                     parameter: Some(query_parameter::Parameter::StrValue("f2".to_string())),
-                    idx:0
+                    idx: 0,
                 }],
             };
             if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
@@ -413,7 +413,7 @@ mod tests {
                 parameters: vec![QueryParameter {
                     name: "f1".to_string(),
                     parameter: Some(query_parameter::Parameter::StrValue("f1".to_string())),
-                    idx:0
+                    idx: 0,
                 }],
             };
             if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
