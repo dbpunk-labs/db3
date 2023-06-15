@@ -118,7 +118,7 @@ impl StorageNodeV2Impl {
                     "produce block {}",
                     local_storage.get_current_block().unwrap_or(0)
                 );
-                match local_storage.increase_block() {
+                match local_storage.increase_block_return_last_state() {
                     Ok((block_id, mutation_count)) => {
                         // sender block event
                         let e = BlockEventV2 {
@@ -508,6 +508,12 @@ impl StorageNode for StorageNodeV2Impl {
                                         i as u16,
                                     )
                                     .map_err(|e| Status::internal(format!("{e}")))?;
+                                info!(
+                                    "add collection with db_addr {}, collection_name: {}, from owner {}",
+                                    db_addr.to_hex().as_str(),
+                                    col_mutation.collection_name.as_str(),
+                                    address.to_hex().as_str()
+                                );
                                 let item = ExtraItem {
                                     key: "collection".to_string(),
                                     value: col_mutation.collection_name.to_string(),

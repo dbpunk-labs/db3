@@ -24,26 +24,30 @@ use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_impl::StorageNodeImpl;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use clap::Parser;
-use db3_cmd::command::{DB3ClientCommand, DB3ClientContext};
+use db3_cmd::command::{DB3ClientCommand, DB3ClientContext, DB3ClientContextV2};
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_proto::db3_event_proto::{EventMessage, Subscription};
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
+use db3_proto::db3_storage_proto::storage_node_client::StorageNodeClient as StorageNodeV2Client;
 use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
 use db3_proto::db3_storage_proto::{
     EventMessage as EventMessageV2, Subscription as SubscriptionV2,
 };
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
+use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::DBStoreV2Config;
+use db3_storage::doc_store::{DocStore, DocStoreConfig};
 use db3_storage::mutation_store::MutationStoreConfig;
 use db3_storage::state_store::StateStoreConfig;
 use http::Uri;
 use merkdb::Merk;
 use std::boxed::Box;
 use std::io::{stderr, stdout};
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -53,8 +57,10 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use tendermint_abci::ServerBuilder;
 use tendermint_rpc::HttpClient;
+use tokio::fs;
 use tokio::sync::mpsc::Sender;
 use tonic::codegen::http::Method;
+use tonic::codegen::Body;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 use tonic::Status;
 use tower_http::cors::{Any, CorsLayer};
@@ -176,10 +182,10 @@ pub enum DB3Command {
         /// The port of grpc api
         #[clap(long, default_value = "26639")]
         public_grpc_port: u16,
-        /// the db3 storage chain grpc url
+        /// the store grpc url
         #[clap(
             long = "db3_storage_grpc_url",
-            default_value = "http://127.0.0.1:26659"
+            default_value = "http://127.0.0.1:26619"
         )]
         db3_storage_grpc_url: String,
         #[clap(short, long, default_value = "./indexer")]
@@ -234,6 +240,33 @@ impl DB3Command {
         let store_sdk = StoreSDK::new(node, signer, true);
         DB3ClientContext {
             mutation_sdk: Some(mutation_sdk),
+            store_sdk: Some(store_sdk),
+        }
+    }
+    fn build_context_v2(public_grpc_url: &str) -> DB3ClientContextV2 {
+        let uri = public_grpc_url.parse::<Uri>().unwrap();
+        let endpoint = match uri.scheme_str() == Some("https") {
+            true => {
+                let rpc_endpoint = Endpoint::new(public_grpc_url.to_string())
+                    .unwrap()
+                    .tls_config(ClientTlsConfig::new())
+                    .unwrap();
+                rpc_endpoint
+            }
+            false => {
+                let rpc_endpoint = Endpoint::new(public_grpc_url.to_string()).unwrap();
+                rpc_endpoint
+            }
+        };
+        let channel = endpoint.connect_lazy();
+        let node = Arc::new(StorageNodeV2Client::new(channel));
+        if !db3_cmd::keystore::KeyStore::has_key(None) {
+            db3_cmd::keystore::KeyStore::recover_keypair(None).unwrap();
+        }
+        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
+        let signer = Db3MultiSchemeSigner::new(kp);
+        let store_sdk = StoreSDKV2::new(node, signer);
+        DB3ClientContextV2 {
             store_sdk: Some(store_sdk),
         }
     }
@@ -322,28 +355,19 @@ impl DB3Command {
                 tracing_subscriber::fmt().with_max_level(log_level).init();
                 info!("{ABOUT}");
 
-                let ctx = Self::build_context(db3_storage_grpc_url.as_ref());
+                let ctx = Self::build_context_v2(db3_storage_grpc_url.as_ref());
 
-                let opts = Merk::default_db_opts();
-                let merk = Merk::open_opt(&db_path, opts, db_tree_level_in_memory).unwrap();
-                let node_store = Arc::new(Mutex::new(Box::pin(NodeStorage::new(
-                    AuthStorage::new(merk),
-                ))));
-                match node_store.lock() {
-                    Ok(mut store) => {
-                        if store.get_auth_store().init().is_err() {
-                            warn!("Fail to init auth storage!");
-                            return;
-                        }
-                    }
-                    _ => todo!(),
-                }
-                let indexer_node_impl = IndexerNodeImpl::new(node_store.clone());
+                let config = DocStoreConfig {
+                    db_root_path: db_path.clone(),
+                    in_memory_db_handle_limit: 16,
+                };
+                let doc_store = Arc::new(Mutex::new(Box::pin(DocStore::new(config))));
+                let indexer_node_impl = IndexerNodeImpl::new(db_path.as_str(), doc_store.clone());
                 let addr = format!("{public_host}:{public_grpc_port}");
                 let listen = tokio::spawn(async move {
                     info!("start db3 indexer listener ...");
                     let mut indexer_block_syncer =
-                        IndexerBlockSyncer::new(ctx.store_sdk.unwrap(), node_store.clone());
+                        IndexerBlockSyncer::new(ctx.store_sdk.unwrap(), doc_store.clone());
                     indexer_block_syncer.start().await.unwrap();
                 });
                 info!("start db3 indexer node on public addr {}", addr);
