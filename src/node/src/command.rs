@@ -38,6 +38,7 @@ use db3_proto::db3_storage_proto::{
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
 use db3_storage::db_store_v2::DBStoreV2Config;
+use db3_storage::doc_store::DocStoreConfig;
 use db3_storage::mutation_store::MutationStoreConfig;
 use db3_storage::state_store::StateStoreConfig;
 use http::Uri;
@@ -491,6 +492,8 @@ impl DB3Command {
             doc_owner_store_cf_name: "doc_owner_store_cf".to_string(),
             db_owner_store_cf_name: "db_owner_cf".to_string(),
             scan_max_limit: 1000,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
         };
 
         let (sender, receiver) = tokio::sync::mpsc::channel::<(

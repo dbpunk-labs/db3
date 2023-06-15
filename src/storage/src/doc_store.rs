@@ -16,10 +16,11 @@
 //
 
 use db3_crypto::db3_address::DB3Address;
-use db3_crypto::id::DbId;
 use db3_error::{DB3Error, Result};
+use db3_proto::db3_database_v2_proto::{query_parameter, Query, QueryParameter};
 use db3_proto::db3_mutation_v2_proto::CollectionMutation;
-use ejdb2::EJDB;
+use ejdb2::SetPlaceholder;
+use ejdb2::{EJDBQuery, EJDB};
 use moka::sync::Cache;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -32,12 +33,27 @@ pub struct DocStoreConfig {
     pub in_memory_db_handle_limit: u32,
 }
 
+impl Default for DocStoreConfig {
+    fn default() -> DocStoreConfig {
+        DocStoreConfig {
+            db_root_path: "".to_string(),
+            in_memory_db_handle_limit: 0,
+        }
+    }
+}
+
 pub struct DocStore {
     config: DocStoreConfig,
     dbs: Cache<Vec<u8>, Arc<EJDB>>,
 }
 
 impl DocStore {
+    pub fn mock() -> Self {
+        let config = DocStoreConfig::default();
+        let dbs = Cache::new(config.in_memory_db_handle_limit as u64);
+        Self { config, dbs }
+    }
+
     pub fn new(config: DocStoreConfig) -> Result<Self> {
         let dbs = Cache::new(config.in_memory_db_handle_limit as u64);
         Ok(Self { config, dbs })
@@ -105,20 +121,9 @@ impl DocStore {
     }
 
     pub fn add_str_doc(&self, db_addr: &DB3Address, col_name: &str, doc: &str) -> Result<i64> {
-        // validata the db and col
-        let key = db_addr.as_ref().to_vec();
-        let add_addr_clone = db_addr.clone();
-        let db_root_path = self.config.db_root_path.to_string();
-        let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
-            if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
-                Some(Arc::new(db))
-            } else {
-                None
-            }
-        });
-        if let Some(entry) = db_entry {
-            let id = entry
-                .value()
+        let db_opt = self.get_db_ref(db_addr);
+        if let Some(db) = db_opt {
+            let id = db
                 .put_new(col_name, &doc)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
             Ok(id)
@@ -131,21 +136,9 @@ impl DocStore {
     }
 
     pub fn delete_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<()> {
-        let key = db_addr.as_ref().to_vec();
-        let add_addr_clone = db_addr.clone();
-        let db_root_path = self.config.db_root_path.to_string();
-        let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
-            if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
-                Some(Arc::new(db))
-            } else {
-                None
-            }
-        });
-
-        if let Some(entry) = db_entry {
-            entry
-                .value()
-                .del(col_name, id)
+        let db_opt = self.get_db_ref(db_addr);
+        if let Some(db) = db_opt {
+            db.del(col_name, id)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
             Ok(())
         } else {
@@ -156,12 +149,41 @@ impl DocStore {
         }
     }
 
-    pub fn get_doc(
+    pub fn execute_query(
         &self,
         db_addr: &DB3Address,
         col_name: &str,
-        id: i64,
-    ) -> Result<serde_json::Value> {
+        query: &Query,
+    ) -> Result<Vec<serde_json::Value>> {
+        let mut prepared_statement = EJDBQuery::new(col_name, query.query_str.as_str());
+        prepared_statement
+            .init()
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        for (i, param) in query.parameters.iter().enumerate() {
+            match &param.parameter {
+                Some(query_parameter::Parameter::Int64Value(v)) => {
+                    prepared_statement
+                        .set_placeholder(param.name.as_str(), i as i32, *v)
+                        .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+                }
+                Some(query_parameter::Parameter::BoolValue(v)) => {
+                    prepared_statement
+                        .set_placeholder(param.name.as_str(), i as i32, *v)
+                        .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+                }
+                Some(query_parameter::Parameter::StrValue(v)) => {
+                    prepared_statement
+                        .set_placeholder(param.name.as_str(), i as i32, v.as_str())
+                        .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(vec![])
+    }
+
+    fn get_db_ref(&self, db_addr: &DB3Address) -> Option<Arc<EJDB>> {
         let key = db_addr.as_ref().to_vec();
         let add_addr_clone = db_addr.clone();
         let db_root_path = self.config.db_root_path.to_string();
@@ -174,8 +196,21 @@ impl DocStore {
         });
 
         if let Some(entry) = db_entry {
-            let opt = entry
-                .value()
+            Some(entry.value().clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_doc(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        id: i64,
+    ) -> Result<serde_json::Value> {
+        let db_opt = self.get_db_ref(db_addr);
+        if let Some(db) = db_opt {
+            let opt = db
                 .get::<serde_json::Value>(col_name, id)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
             Ok(opt)
@@ -194,21 +229,9 @@ impl DocStore {
         doc: &str,
         id: i64,
     ) -> Result<()> {
-        // validata the db and col
-        let key = db_addr.as_ref().to_vec();
-        let add_addr_clone = db_addr.clone();
-        let db_root_path = self.config.db_root_path.to_string();
-        let db_entry = self.dbs.entry(key).or_optionally_insert_with(|| {
-            if let Some(db) = Self::open_db_internal(db_root_path, add_addr_clone) {
-                Some(Arc::new(db))
-            } else {
-                None
-            }
-        });
-
-        if let Some(entry) = db_entry {
-            entry
-                .value()
+        let db_opt = self.get_db_ref(db_addr);
+        if let Some(db) = db_opt {
+            db.value()
                 .patch(col_name, &doc, id)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
             Ok(())

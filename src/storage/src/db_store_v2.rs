@@ -63,6 +63,7 @@ impl DBStoreV2 {
         cf_opts.create_missing_column_families(true);
         info!("open db store with path {}", config.db_path.as_str());
         let path = Path::new(config.db_path.as_str());
+
         let se = Arc::new(
             StorageEngine::open_cf(
                 &cf_opts,
@@ -78,7 +79,22 @@ impl DBStoreV2 {
             )
             .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
         );
-        Ok(Self { config, se })
+
+        let doc_store = match config.enable_doc_store {
+            false => Arc::new(DocStore::mock()),
+            true => Arc::new(DocStore::new(config.doc_store_conf.clone()).map_err(|e| {
+                DB3Error::OpenStoreError(
+                    config.doc_store_conf.db_root_path.to_string(),
+                    format!("{e}"),
+                )
+            })?),
+        };
+
+        Ok(Self {
+            config,
+            se,
+            doc_store,
+        })
     }
 
     pub fn get_collection_of_database(&self, db_addr: &DB3Address) -> Result<Vec<Collection>> {
@@ -317,6 +333,8 @@ mod tests {
             doc_owner_store_cf_name: "doc_owner".to_string(),
             db_owner_store_cf_name: "db_owner".to_string(),
             scan_max_limit: 50,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
         };
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
@@ -334,6 +352,8 @@ mod tests {
             doc_owner_store_cf_name: "doc_owner".to_string(),
             db_owner_store_cf_name: "db_owner".to_string(),
             scan_max_limit: 50,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
         };
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
@@ -384,6 +404,8 @@ mod tests {
             doc_owner_store_cf_name: "doc_owner".to_string(),
             db_owner_store_cf_name: "db_owner".to_string(),
             scan_max_limit: 50,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
         };
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
