@@ -54,14 +54,18 @@ impl DocStore {
         Self { config, dbs }
     }
 
-    pub fn new(config: DocStoreConfig) -> Result<Self> {
+    pub fn new(config: DocStoreConfig) -> Self {
         let dbs = Cache::new(config.in_memory_db_handle_limit as u64);
-        Ok(Self { config, dbs })
+        Self { config, dbs }
     }
 
     fn open_db_internal(db_root_path: String, db_addr: DB3Address) -> Option<EJDB> {
         let db_addr_str = db_addr.to_hex();
-        info!("open database with address {}", db_addr_str.as_str());
+        info!(
+            "open database with address {} db path {}",
+            db_addr_str.as_str(),
+            db_root_path.as_str()
+        );
         let mut db = EJDB::new();
         let mut path = PathBuf::new();
         path.push(db_root_path.as_str());
@@ -204,7 +208,6 @@ impl DocStore {
                 None
             }
         });
-
         if let Some(entry) = db_entry {
             Some(entry.value().clone())
         } else {
@@ -251,6 +254,29 @@ impl DocStore {
             )))
         }
     }
+    pub fn add_str_docs(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        docs: &Vec<String>,
+    ) -> Result<Vec<i64>> {
+        let db_opt = self.get_db_ref(db_addr);
+        if let Some(db) = db_opt {
+            let mut ids = Vec::new();
+            for doc in docs {
+                let id = db
+                    .put_new(col_name, doc)
+                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                ids.push(id);
+            }
+            Ok(ids)
+        } else {
+            Err(DB3Error::WriteStoreError(format!(
+                "no database found with addr {}",
+                db_addr.to_hex()
+            )))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -268,9 +294,10 @@ mod tests {
             db_root_path: real_path,
             in_memory_db_handle_limit: 16,
         };
-        let doc_store = DocStore::new(config).unwrap();
-        let ret = doc_store.create_database(&DB3Address::ZERO);
-        assert!(ret.is_ok());
+        let doc_store = DocStore::new(config);
+        let db_id_ret = doc_store.create_database(&DB3Address::ZERO, 1, 1);
+        assert!(db_id_ret.is_ok());
+        let db_id = db_id_ret.unwrap();
         let collection = CollectionMutation {
             index_fields: vec![Index {
                 path: "/f1".to_string(),
@@ -354,8 +381,6 @@ mod tests {
             if let Ok(result) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
                 assert_eq!(1, result.len());
             }
-
-
 
             let doc_str = r#"{"test":"v2", "f1":"f1"}"#;
             if let Err(_) = doc_store.patch_doc(&db_id, "col1", doc_str, id) {

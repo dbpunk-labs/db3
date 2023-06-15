@@ -67,9 +67,9 @@ service IndexerNode {
   // method for show indexer status
   rpc ShowIndexerStatus(ShowIndexerStatusRequest) returns (IndexerStatus) {}
   // method for show database
-  rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
-  // method for query document
-  rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
-  // method for get document
-  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
+//  rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
+//  // method for query document
+//  rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
+//  // method for get document
+//  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
 }

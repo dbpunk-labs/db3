@@ -43,7 +43,7 @@ impl StoreSDKV2 {
     }
 
     pub async fn subscribe_event_message(
-        &mut self,
+        &self,
     ) -> Result<tonic::Response<Streaming<EventMessageV2>>, Status> {
         let sub = SubscriptionV2 {
             topics: vec![EventTypeV2::Block.into()],
@@ -65,7 +65,7 @@ impl StoreSDKV2 {
     }
 
     pub async fn get_block_by_height(
-        &mut self,
+        &self,
         height: u64,
     ) -> Result<tonic::Response<BlockResponseV2>, Status> {
         let req = BlockRequestV2 {

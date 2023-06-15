@@ -50,6 +50,7 @@ pub struct DBStoreV2Config {
     pub doc_store_conf: DocStoreConfig,
 }
 
+#[derive(Clone)]
 pub struct DBStoreV2 {
     config: DBStoreV2Config,
     se: Arc<StorageEngine>,
@@ -82,12 +83,7 @@ impl DBStoreV2 {
 
         let doc_store = match config.enable_doc_store {
             false => Arc::new(DocStore::mock()),
-            true => Arc::new(DocStore::new(config.doc_store_conf.clone()).map_err(|e| {
-                DB3Error::OpenStoreError(
-                    config.doc_store_conf.db_root_path.to_string(),
-                    format!("{e}"),
-                )
-            })?),
+            true => Arc::new(DocStore::new(config.doc_store_conf.clone())),
         };
 
         Ok(Self {
@@ -261,6 +257,38 @@ impl DBStoreV2 {
 
     pub fn get_database(&self, db_addr: &DB3Address) -> Result<Option<DatabaseMessage>> {
         self.get_entry::<DatabaseMessage>(self.config.db_store_cf_name.as_str(), db_addr.as_ref())
+    }
+
+    pub fn add_docs(
+        &self,
+        db_addr: &DB3Address,
+        sender: &DB3Address,
+        col_name: &str,
+        docs: &Vec<String>,
+    ) -> Result<Vec<i64>> {
+        let ck = collection_key::build_collection_key(db_addr, col_name)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let collection_store_cf_handle = self
+            .se
+            .cf_handle(self.config.collection_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let ck_ref: &[u8] = ck.as_ref();
+        let value = self
+            .se
+            .get_cf(&collection_store_cf_handle, ck_ref)
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        if let None = value {
+            return Err(DB3Error::ReadStoreError(format!(
+                "collection with name {} does not exist",
+                col_name
+            )));
+        }
+        if self.config.enable_doc_store {
+            //TODO add id-> owner mapping to control the permissions
+            self.doc_store.add_str_docs(db_addr, col_name, docs)
+        } else {
+            Ok(vec![])
+        }
     }
 
     pub fn create_doc_database(
