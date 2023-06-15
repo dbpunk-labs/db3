@@ -321,7 +321,7 @@ impl DBStoreV2 {
                 .iter()
                 .map(|doc| Document {
                     id: doc.0,
-                    doc: doc.0.to_string(),
+                    doc: doc.1.to_string(),
                     owner: "".to_string(),
                 })
                 .collect())

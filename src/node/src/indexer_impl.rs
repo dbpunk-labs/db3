@@ -75,7 +75,7 @@ impl IndexerNodeImpl {
         match event.event {
             Some(event_message::Event::BlockEvent(be)) => {
                 info!(
-                    "Receive BlockEvent: Block\t{}MutationCount\t{}",
+                    "Receive BlockEvent: Block\t{}\tMutationCount\t{}",
                     be.block_id, be.mutation_count,
                 );
                 let response = store_sdk
@@ -276,10 +276,18 @@ impl IndexerNode for IndexerNodeImpl {
         let addr =
             DB3Address::from_hex(r.db.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
         if let Some(q) = &r.query {
+            debug!("query str {}", q.query_str);
             let documents = self
                 .db_store
                 .query_docs(&addr, r.col_name.as_str(), q)
                 .map_err(|e| Status::internal(format!("{e}")))?;
+            debug!(
+                "query str {} from collection {} in db {} with result len {}",
+                q.query_str,
+                r.col_name.as_str(),
+                r.db.as_str(),
+                documents.len()
+            );
             Ok(Response::new(RunQueryResponse { documents }))
         } else {
             Err(Status::internal("no query provided".to_string()))
