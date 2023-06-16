@@ -19,9 +19,13 @@ db3.log
 
 /java/target/
 /src/db3js/src/pkg/
-/bridge/node_modules/
-/bridge/cache/
-/bridge/artifacts/
+/metadata/node_modules/
+/metadata/.bin/
+/metadata/.yarn/
+/metadata/cache/
+/metadata/typechain/
+metadata/typechain-types/
+/metadata/artifacts/
 indexer.db
 indexer
 tools/mutation_db
