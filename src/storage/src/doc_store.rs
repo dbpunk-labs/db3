@@ -22,7 +22,8 @@ use db3_proto::db3_mutation_v2_proto::CollectionMutation;
 use ejdb2::SetPlaceholder;
 use ejdb2::{EJDBQuery, EJDB};
 use moka::sync::Cache;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -54,9 +55,19 @@ impl DocStore {
         Self { config, dbs }
     }
 
-    pub fn new(config: DocStoreConfig) -> Self {
+    pub fn new(config: DocStoreConfig) -> Result<Self> {
+        info!(
+            "open indexer store with path {}",
+            config.db_root_path.as_str()
+        );
+        let path = Path::new(config.db_root_path.as_str());
+        if !path.exists() {
+            fs::create_dir(path).map_err(|e| {
+                DB3Error::OpenStoreError(config.db_root_path.to_string(), format!("{e}"))
+            })?;
+        }
         let dbs = Cache::new(config.in_memory_db_handle_limit as u64);
-        Self { config, dbs }
+        Ok(Self { config, dbs })
     }
 
     fn open_db_internal(db_root_path: String, db_addr: DB3Address) -> Option<EJDB> {
@@ -330,7 +341,7 @@ mod tests {
             db_root_path: real_path,
             in_memory_db_handle_limit: 16,
         };
-        let doc_store = DocStore::new(config);
+        let doc_store = DocStore::new(config).unwrap();
         let db_id_ret = doc_store.create_database(&DB3Address::ZERO);
         assert!(db_id_ret.is_ok());
         let collection = CollectionMutation {
@@ -354,7 +365,7 @@ mod tests {
             db_root_path: real_path,
             in_memory_db_handle_limit: 16,
         };
-        let doc_store = DocStore::new(config);
+        let doc_store = DocStore::new(config).unwrap();
         let ret = doc_store.create_database(&DB3Address::ZERO);
         assert!(ret.is_ok());
         let collection = CollectionMutation {
