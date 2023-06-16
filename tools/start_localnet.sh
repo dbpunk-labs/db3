@@ -49,9 +49,14 @@ then
 fi
 
 # clean indexer
-if [ -e ./indexer ]
+if [ -e ./indexer_doc_db ]
 then
-    rm -rf indexer
+    rm -rf indexer_doc_db
+fi
+
+if [ -e ./indexer_meta_db ]
+then
+    rm -rf indexer_meta_db
 fi
 
 echo "start ar miner..."

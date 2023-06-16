@@ -83,7 +83,7 @@ impl DBStoreV2 {
 
         let doc_store = match config.enable_doc_store {
             false => Arc::new(DocStore::mock()),
-            true => Arc::new(DocStore::new(config.doc_store_conf.clone())),
+            true => Arc::new(DocStore::new(config.doc_store_conf.clone())?),
         };
 
         Ok(Self {
