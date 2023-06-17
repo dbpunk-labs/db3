@@ -601,7 +601,7 @@ impl StorageNode for StorageNodeV2Impl {
                                         warn!("no doc id for document {}", doc_str);
                                         break;
                                     }
-                                    let doc_key = DocOwnerKeyV2::from_str(id.as_str())
+                                    let doc_key = DocOwnerKeyV2::from_str(doc_mutation.ids[j].as_str())
                                         .map_err(|e| Status::internal(format!("{e}")))?;
                                     doc_keys.push(doc_key);
                                     docs.push(doc_str);
@@ -640,8 +640,8 @@ impl StorageNode for StorageNodeV2Impl {
                                 .map_err(|e| Status::internal(format!("{e}")))?;
                             if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
                                 let mut doc_keys = vec![];
-                                for id in doc_mutation.ids.iter() {
-                                    let doc_key = DocOwnerKeyV2::from_str(id.as_str())
+                                for doc_key_str in doc_mutation.ids.iter() {
+                                    let doc_key = DocOwnerKeyV2::from_str(doc_key_str.as_str())
                                         .map_err(|e| Status::internal(format!("{e}")))?;
                                     doc_keys.push(doc_key);
                                 }

@@ -73,6 +73,11 @@ impl DocOwnerKeyV2 {
     /// decode the document key from string
     pub fn from_str(doc_key_str: &str) -> Result<Self> {
         let tokens: Vec<_> = doc_key_str.split("/").collect();
+        if tokens.len() != 6 {
+            return Err(DB3Error::KeyCodecError(
+                "the length of key is invalid".to_string(),
+            ));
+        }
         let (_, prefix, owner_hex, block_id_str, order_id_str, entry_id_str) = (
             tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5],
         );
