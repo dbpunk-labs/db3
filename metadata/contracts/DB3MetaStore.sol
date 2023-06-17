@@ -15,13 +15,15 @@ contract DB3MetaStore is IDB3MetaStore{
     function registerNetwork(
         uint64 networkId,
         string memory rollupNodeUrl,
-        string[] memory indexNodeUrls,
-        bytes memory latestArweaveTx
+        address  rollupNodeAddress,
+        string[] memory indexNodeUrls
+       
     ) public {
         // Check if Rollup node address, Index node addresses and sender address are valid
         require(bytes(rollupNodeUrl).length > 0, "Invalid Rollup node URL");
        // require(indexNodeUrls.length > 0, "At least one Index node URL required");
         require(msg.sender != address(0), "Invalid sender address");
+        require(rollupNodeAddress != address(0), "Invalid rollupNodeAddress address");
 
         // Check if network is already registered
         NetworkRegistration storage registration = networkRegistrations[networkId];
@@ -32,20 +34,20 @@ contract DB3MetaStore is IDB3MetaStore{
         registration.indexNodeUrls = indexNodeUrls;
         registration.networkId = networkId;
         registration.sender = msg.sender;
-        registration.latestArweaveTx = latestArweaveTx;
+        registration.rollupNodeAddress = rollupNodeAddress;
 
         // Increment registered network counter
         numNetworks++;
     }
 
     // Get registration info for a specific network ID
-    function getNetworkRegistration(uint64 networkId) public view returns (string memory rollupNodeUrl, string[] memory indexNodeUrls, uint64 registrationNetworkId, address sender, bytes memory latestArweaveTx) {
+    function getNetworkRegistration(uint64 networkId) public view returns (string memory rollupNodeUrl,address rollupNodeAddress, string[] memory indexNodeUrls, uint64 registrationNetworkId, address sender, bytes memory latestArweaveTx) {
         // Get network registration struct and ensure it exists
         NetworkRegistration storage registration = networkRegistrations[networkId];
         require(bytes(registration.rollupNodeUrl).length > 0, "Network not registered");
 
         // Return registration info
-        return (registration.rollupNodeUrl, registration.indexNodeUrls, registration.networkId, registration.sender, registration.latestArweaveTx);
+        return (registration.rollupNodeUrl, registration.rollupNodeAddress,registration.indexNodeUrls, registration.networkId, registration.sender, registration.latestArweaveTx);
     }
 
     // Get registration info for all networks (with pagination)
@@ -77,13 +79,14 @@ contract DB3MetaStore is IDB3MetaStore{
     }
 
     // Register a new Rollup node for a specific network ID
-    function registerRollupNode(uint64 networkId, string memory rollupNodeUrl) public returns (bool success) {
+    function registerRollupNode(uint64 networkId, string memory rollupNodeUrl,address  rollupNodeAddress) public returns (bool success) {
         // Check if network is registered
         NetworkRegistration storage registration = networkRegistrations[networkId];
         require(bytes(registration.rollupNodeUrl).length > 0, "Network not registered");
 
         // Update Rollup node in registration struct
         registration.rollupNodeUrl = rollupNodeUrl;
+        registration.rollupNodeAddress = rollupNodeAddress;
         return true;
     }
 
