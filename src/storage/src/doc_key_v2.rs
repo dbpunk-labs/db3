@@ -17,7 +17,7 @@
 use db3_crypto::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
 use db3_error::{DB3Error, Result};
 use std::fmt;
-const DOC: &str = "/doc/";
+const DOC: &str = "/doc";
 /// DocOwnerKey with owner address, block id, order id, entry id
 pub struct DocOwnerKeyV2(pub DB3Address, pub u64, pub u32, pub u32);
 
@@ -72,10 +72,11 @@ impl DocOwnerKeyV2 {
     }
     /// decode the document key from string
     pub fn from_str(doc_key_str: &str) -> Result<Self> {
-        let tokens: Vec<_> = doc_key_str.split("|").collect();
-        let (prefix, owner_hex, block_id_str, order_id_str, entry_id_str) =
-            (tokens[0], tokens[1], tokens[2], tokens[3], tokens[4]);
-        if prefix != "DOC" {
+        let tokens: Vec<_> = doc_key_str.split("/").collect();
+        let (_, prefix, owner_hex, block_id_str, order_id_str, entry_id_str) = (
+            tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5],
+        );
+        if prefix != "doc" {
             return Err(DB3Error::KeyCodecError(
                 "the prefix of key is invalid".to_string(),
             ));
@@ -108,7 +109,8 @@ impl fmt::Display for DocOwnerKeyV2 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "DOC|{}|{}|{}|{}",
+            "{}/{}/{}/{}/{}",
+            DOC,
             self.0.to_hex(),
             self.1,
             self.2,
@@ -145,6 +147,10 @@ mod tests {
     fn from_str_ut() {
         let key = DocOwnerKeyV2(DB3Address::default(), 1, 2, 3);
         let key_str = key.to_string();
+        assert_eq!(
+            "/doc/0x0000000000000000000000000000000000000000/1/2/3",
+            key_str
+        );
         let decoded = DocOwnerKeyV2::from_str(&key_str).unwrap();
         assert_eq!(key.0.to_hex(), decoded.0.to_hex());
         assert_eq!(key.1, decoded.1);

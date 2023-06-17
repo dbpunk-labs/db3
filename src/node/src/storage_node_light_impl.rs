@@ -565,15 +565,13 @@ impl StorageNode for StorageNodeV2Impl {
                                     ids.len()
                                 );
                                 // return document keys
-                                let item = ExtraItem {
-                                    key: "documents".to_string(),
-                                    value: ids
-                                        .iter()
-                                        .map(|id| id.to_string())
-                                        .collect::<Vec<String>>()
-                                        .join(","),
-                                };
-                                items.push(item);
+                                for id in ids {
+                                    let item = ExtraItem {
+                                        key: "document".to_string(),
+                                        value: id.to_string(),
+                                    };
+                                    items.push(item);
+                                }
                             }
                         }
                         Ok(Response::new(SendMutationResponse {
