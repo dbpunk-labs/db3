@@ -33,6 +33,8 @@ pub enum DB3Error {
     InvalidSignature(String),
     #[error("fail to codec key with error {0}")]
     KeyCodecError(String),
+    #[error("fail to verify the owner with error {0}")]
+    OwnerVerifyFailed(String),
     #[error("fail to apply mutation with error {0}")]
     ApplyMutationError(String),
     #[error("fail to submit mutation session with error {0}")]

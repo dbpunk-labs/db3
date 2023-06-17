@@ -21,6 +21,7 @@ use db3_crypto::id::DbId;
 use db3_crypto::id_v2::OpEntryId;
 
 use crate::collection_key;
+use crate::doc_key_v2::DocOwnerKeyV2;
 use crate::doc_store::{DocStore, DocStoreConfig};
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
@@ -262,10 +263,12 @@ impl DBStoreV2 {
     pub fn update_docs(
         &self,
         db_addr: &DB3Address,
-        _sender: &DB3Address,
+        sender: &DB3Address,
         col_name: &str,
-        docs: &[(String, i64)],
+        docs: &Vec<String>,
+        doc_keys: &Vec<DocOwnerKeyV2>,
     ) -> Result<()> {
+        let doc_ids = self.verify_docs_ownership(sender, doc_keys)?;
         let ck = collection_key::build_collection_key(db_addr, col_name)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         let collection_store_cf_handle = self
@@ -285,7 +288,7 @@ impl DBStoreV2 {
         }
         if self.config.enable_doc_store {
             //TODO add id-> owner mapping to control the permissions
-            self.doc_store.patch_docs(db_addr, col_name, docs)
+            self.doc_store.patch_docs(db_addr, col_name, docs, &doc_ids)
         } else {
             Ok(())
         }
@@ -315,16 +318,19 @@ impl DBStoreV2 {
             )));
         }
         if self.config.enable_doc_store {
-            let docs = self.doc_store.execute_query(db_addr, col_name, query)?;
-            //TODO add owner
-            Ok(docs
-                .iter()
-                .map(|doc| Document {
-                    id: doc.0,
-                    doc: doc.1.to_string(),
-                    owner: "".to_string(),
+            let result = self.doc_store.execute_query(db_addr, col_name, query)?;
+            let mut documents = vec![];
+
+            for (id, doc) in result {
+                let doc_owner = self.get_doc_key_from_doc_id(id)?;
+                let doc_owner_key = DocOwnerKeyV2::decode(doc_owner.as_ref())
+                    .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+                documents.push(Document {
+                    id: doc_owner_key.to_string(),
+                    doc: doc.to_string(),
                 })
-                .collect())
+            }
+            Ok(documents)
         } else {
             Ok(vec![])
         }
@@ -333,10 +339,11 @@ impl DBStoreV2 {
     pub fn delete_docs(
         &self,
         db_addr: &DB3Address,
-        _sender: &DB3Address,
+        sender: &DB3Address,
         col_name: &str,
-        ids: &[i64],
+        doc_keys: &Vec<DocOwnerKeyV2>,
     ) -> Result<()> {
+        let ids = self.verify_docs_ownership(sender, doc_keys)?;
         let ck = collection_key::build_collection_key(db_addr, col_name)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         let collection_store_cf_handle = self
@@ -356,7 +363,7 @@ impl DBStoreV2 {
         }
         if self.config.enable_doc_store {
             //TODO add id-> owner mapping to control the permissions
-            self.doc_store.delete_docs(db_addr, col_name, ids)
+            self.doc_store.delete_docs(db_addr, col_name, &ids)
         } else {
             Ok(())
         }
@@ -365,10 +372,12 @@ impl DBStoreV2 {
     pub fn add_docs(
         &self,
         db_addr: &DB3Address,
-        _sender: &DB3Address,
+        sender: &DB3Address,
+        block: u64,
+        order: u32,
         col_name: &str,
         docs: &Vec<String>,
-    ) -> Result<Vec<i64>> {
+    ) -> Result<Vec<DocOwnerKeyV2>> {
         let ck = collection_key::build_collection_key(db_addr, col_name)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         let collection_store_cf_handle = self
@@ -386,14 +395,105 @@ impl DBStoreV2 {
                 col_name
             )));
         }
-        if self.config.enable_doc_store {
-            //TODO add id-> owner mapping to control the permissions
-            self.doc_store.add_str_docs(db_addr, col_name, docs)
-        } else {
-            Ok(vec![])
+        let mut doc_owner_keys: Vec<DocOwnerKeyV2> = vec![];
+        for entry_id in 0..docs.len() {
+            let doc_owner_key = DocOwnerKeyV2(sender.clone(), block, order, entry_id as u32);
+            doc_owner_keys.push(doc_owner_key);
         }
+        if self.config.enable_doc_store {
+            let ids = self.doc_store.add_str_docs(db_addr, col_name, docs)?;
+            // add id-> doc_owner_key mapping to control the permissions
+            self.create_doc_ownership(&doc_owner_keys, &ids)?;
+        } else {
+            self.create_doc_ownership(&doc_owner_keys, &vec![-1; doc_owner_keys.len()])?;
+        }
+        Ok(doc_owner_keys)
     }
 
+    /// verify the ownership of the docs and return the doc ids
+    pub fn verify_docs_ownership(
+        &self,
+        sender: &DB3Address,
+        doc_keys: &Vec<DocOwnerKeyV2>,
+    ) -> Result<Vec<i64>> {
+        let doc_owner_store_cf_handle = self
+            .se
+            .cf_handle(self.config.doc_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut doc_ids = vec![];
+        for doc_key in doc_keys {
+            doc_key.verify_owner(sender)?;
+            let value = self
+                .se
+                .get_cf(&doc_owner_store_cf_handle, doc_key.encode())
+                .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+            match value {
+                Some(v) => {
+                    let data_array: [u8; 8] = v
+                        .try_into()
+                        .map_err(|_| DB3Error::KeyCodecError("invalid array length".to_string()))?;
+                    let id = i64::from_be_bytes(data_array);
+                    doc_ids.push(id);
+                }
+                None => {
+                    return Err(DB3Error::ReadStoreError(format!(
+                        "doc owner key  not found"
+                    )))
+                }
+            }
+        }
+        Ok(doc_ids)
+    }
+
+    pub fn get_doc_key_from_doc_id(&self, doc_id: i64) -> Result<Vec<u8>> {
+        let doc_owner_store_cf_handle = self
+            .se
+            .cf_handle(self.config.doc_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let value = self
+            .se
+            .get_cf(&doc_owner_store_cf_handle, doc_id.to_be_bytes().as_ref())
+            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        match value {
+            Some(v) => Ok(v),
+            None => {
+                return Err(DB3Error::ReadStoreError(format!(
+                    "doc owner key not found for doc id {}",
+                    doc_id
+                )))
+            }
+        }
+    }
+    pub fn create_doc_ownership(
+        &self,
+        doc_keys: &Vec<DocOwnerKeyV2>,
+        doc_ids: &Vec<i64>,
+    ) -> Result<()> {
+        let doc_owner_store_cf_handle = self
+            .se
+            .cf_handle(self.config.doc_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut batch = WriteBatch::default();
+        for i in 0..doc_keys.len() {
+            let doc_owner_encoded_key = doc_keys[i].encode();
+            batch.put_cf(
+                &doc_owner_store_cf_handle,
+                &doc_owner_encoded_key,
+                doc_ids[i].to_be_bytes().as_ref(),
+            );
+            if doc_ids[i] >= 0 {
+                batch.put_cf(
+                    &doc_owner_store_cf_handle,
+                    doc_ids[i].to_be_bytes(),
+                    &doc_owner_encoded_key,
+                );
+            }
+        }
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
+    }
     pub fn create_doc_database(
         &self,
         sender: &DB3Address,

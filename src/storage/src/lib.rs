@@ -26,6 +26,7 @@ pub mod db_owner_key;
 pub mod db_owner_key_v2;
 pub mod db_store;
 pub mod db_store_v2;
+pub mod doc_key_v2;
 pub mod doc_store;
 pub mod key;
 pub mod mutation_store;
