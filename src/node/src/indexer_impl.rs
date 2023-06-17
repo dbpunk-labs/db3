@@ -75,7 +75,7 @@ impl IndexerNodeImpl {
     async fn handle_event(&self, event: EventMessageV2, store_sdk: &StoreSDKV2) -> Result<()> {
         match event.event {
             Some(event_message::Event::BlockEvent(be)) => {
-                info!(
+                debug!(
                     "Receive BlockEvent: Block\t{}\tMutationCount\t{}",
                     be.block_id, be.mutation_count,
                 );

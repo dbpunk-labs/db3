@@ -117,7 +117,7 @@ impl StorageNodeV2Impl {
             info!("start the block producer thread");
             while local_running.load(Ordering::Relaxed) {
                 sleep(TokioDuration::from_millis(local_block_interval)).await;
-                info!(
+                debug!(
                     "produce block {}",
                     local_storage.get_current_block().unwrap_or(0)
                 );
@@ -134,7 +134,7 @@ impl StorageNodeV2Impl {
                         };
                         match local_event_sender.send(msg) {
                             Ok(_) => {
-                                info!("broadcast block event {}, {}", block_id, mutation_count);
+                                debug!("broadcast block event {}, {}", block_id, mutation_count);
                             }
                             Err(e) => {
                                 warn!("the broadcast channel error for {:?}", e);
@@ -206,7 +206,7 @@ impl StorageNodeV2Impl {
                             info!("subscribers len : {}", subscribers.len());
                         }
                         Ok(event) = event_sub.recv() => {
-                            info!("receive event {:?}", event);
+                            debug!("receive event {:?}", event);
                             for (key , (sender, sub)) in subscribers.iter() {
                                 if sender.is_closed() {
                                     to_be_removed.insert(key.clone());
@@ -219,7 +219,7 @@ impl StorageNodeV2Impl {
                                     }
                                     match sender.try_send(Ok(event.clone())) {
                                         Ok(_) => {
-                                            info!("send event to addr 0x{}", hex::encode(key.as_ref()));
+                                            debug!("send event to addr 0x{}", hex::encode(key.as_ref()));
                                             break;
                                         }
                                         Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
