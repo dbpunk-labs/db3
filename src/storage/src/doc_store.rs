@@ -307,17 +307,15 @@ impl DocStore {
         db_addr: &DB3Address,
         col_name: &str,
         docs: &Vec<String>,
-    ) -> Result<Vec<i64>> {
+        ids: &Vec<i64>,
+    ) -> Result<()> {
         let db_opt = self.get_db_ref(db_addr);
         if let Some(db) = db_opt {
-            let mut ids = Vec::new();
-            for doc in docs {
-                let id = db
-                    .put_new(col_name, doc)
+            for (i, doc) in docs.iter().enumerate() {
+                db.put(col_name, doc, ids[i])
                     .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                ids.push(id);
             }
-            Ok(ids)
+            Ok(())
         } else {
             Err(DB3Error::WriteStoreError(format!(
                 "no database found with addr {}",

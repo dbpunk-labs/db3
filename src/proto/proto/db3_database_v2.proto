@@ -71,8 +71,8 @@ message Index {
 }
 
 message Document {
+  int64 id = 1;
   string doc = 2;
-  string id = 3;
 }
 
 message QueryParameter {

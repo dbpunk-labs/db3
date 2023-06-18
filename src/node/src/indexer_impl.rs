@@ -30,7 +30,6 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::doc_key_v2::DocOwnerKeyV2;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
 
@@ -165,19 +164,21 @@ impl IndexerNodeImpl {
                         let db_addr = DB3Address::try_from(db_address_ref)
                             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                         if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                            if doc_mutation.documents.len() != doc_mutation.ids.len() {
+                                let msg = format!(
+                                    "doc ids size {} not equal to documents size {}",
+                                    doc_mutation.ids.len(),
+                                    doc_mutation.documents.len()
+                                );
+                                warn!("{}", msg.as_str());
+                                return Err(DB3Error::InvalidMutationError(msg));
+                            }
                             let mut docs = Vec::<String>::new();
-                            let mut doc_keys = vec![];
-                            for (j, buf) in doc_mutation.documents.iter().enumerate() {
+                            for buf in doc_mutation.documents.iter() {
                                 let document = bytes_to_bson_document(buf.clone())
                                     .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                                 let doc_str = document.to_string();
                                 debug!("add document: {}", doc_str);
-                                if doc_mutation.ids.len() <= j {
-                                    warn!("no doc id for document {}", doc_str);
-                                    break;
-                                }
-                                doc_keys
-                                    .push(DocOwnerKeyV2::from_str(doc_mutation.ids[j].as_str())?);
                                 docs.push(doc_str);
                             }
                             self.db_store
@@ -186,7 +187,7 @@ impl IndexerNodeImpl {
                                     &address,
                                     doc_mutation.collection_name.as_str(),
                                     &docs,
-                                    &doc_keys,
+                                    &doc_mutation.ids,
                                 )
                                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                             info!(
@@ -204,16 +205,12 @@ impl IndexerNodeImpl {
                         let db_addr = DB3Address::try_from(db_address_ref)
                             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                         if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
-                            let mut doc_keys = vec![];
-                            for id in doc_mutation.ids.iter() {
-                                doc_keys.push(DocOwnerKeyV2::from_str(id.as_str())?);
-                            }
                             self.db_store
                                 .delete_docs(
                                     &db_addr,
                                     &address,
                                     doc_mutation.collection_name.as_str(),
-                                    &doc_keys,
+                                    &doc_mutation.ids,
                                 )
                                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                             info!(
@@ -245,18 +242,16 @@ impl IndexerNodeImpl {
                                 .add_docs(
                                     &db_addr,
                                     &address,
-                                    block,
-                                    order,
                                     doc_mutation.collection_name.as_str(),
                                     &docs,
                                 )
                                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                             info!(
-                                    "add documents with db_addr {}, collection_name: {}, from owner {}, ids: {}",
+                                    "add documents with db_addr {}, collection_name: {}, from owner {}, ids: {:?}",
                                     db_addr.to_hex().as_str(),
                                     doc_mutation.collection_name.as_str(),
                                     address.to_hex().as_str(),
-                                    ids.iter().map(|id| id.to_string()).collect::<Vec<String>>().join(",")
+                                    ids
                                 );
                         }
                     }

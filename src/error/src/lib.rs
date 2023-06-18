@@ -73,8 +73,10 @@ pub enum DB3Error {
     QueryDatabaseError(String),
     #[error("database with addr {0} was not found")]
     DatabaseNotFound(String),
-    #[error("collection with name {0} was not found")]
-    CollectionNotFound(String),
+    #[error("collection with name {0} was not found in db {1}")]
+    CollectionNotFound(String, String),
+    #[error("collection {0} already exist in db {1}")]
+    CollectionAlreadyExist(String, String),
     #[error("the address does not match the public key")]
     InvalidSigner,
     #[error("fail to generate key for {0}")]
@@ -129,6 +131,8 @@ pub enum DB3Error {
     RollupError(String),
     #[error("invalid collection name for error {0}")]
     InvalidCollectionNameError(String),
+    #[error("invalid mutation for error {0}")]
+    InvalidMutationError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

@@ -26,7 +26,7 @@ use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, info};
+use tracing::info;
 
 type StorageEngine = DBWithThreadMode<MultiThreaded>;
 

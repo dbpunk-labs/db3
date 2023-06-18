@@ -37,6 +37,7 @@ pub struct DB3Address(
 
 impl DB3Address {
     pub const ZERO: Self = Self([0u8; DB3_ADDRESS_LENGTH]);
+    pub const ONE: Self = Self([1u8; DB3_ADDRESS_LENGTH]);
 
     pub fn to_vec(&self) -> Vec<u8> {
         self.0.to_vec()

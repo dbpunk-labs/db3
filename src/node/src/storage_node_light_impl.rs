@@ -43,7 +43,6 @@ use db3_proto::db3_storage_proto::{
 
 use db3_base::bson_util::bytes_to_bson_document;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::doc_key_v2::DocOwnerKeyV2;
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use prost::Message;
@@ -535,7 +534,7 @@ impl StorageNode for StorageNodeV2Impl {
                     }
                     MutationAction::AddDocument => {
                         let mut items: Vec<ExtraItem> = Vec::new();
-                        for (i, body) in dm.bodies.iter().enumerate() {
+                        for (_i, body) in dm.bodies.iter().enumerate() {
                             let db_address_ref: &[u8] = body.db_address.as_ref();
                             let db_addr = DB3Address::try_from(db_address_ref)
                                 .map_err(|e| Status::internal(format!("{e}")))?;
@@ -551,8 +550,6 @@ impl StorageNode for StorageNodeV2Impl {
                                     .add_docs(
                                         &db_addr,
                                         &address,
-                                        block,
-                                        order,
                                         doc_mutation.collection_name.as_str(),
                                         &docs,
                                     )
@@ -590,21 +587,21 @@ impl StorageNode for StorageNodeV2Impl {
                             let db_addr = DB3Address::try_from(db_address_ref)
                                 .map_err(|e| Status::internal(format!("{e}")))?;
                             if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                                if doc_mutation.documents.len() != doc_mutation.ids.len() {
+                                    let msg = format!(
+                                        "doc ids size {} not equal to documents size {}",
+                                        doc_mutation.ids.len(),
+                                        doc_mutation.documents.len()
+                                    );
+                                    warn!("{}", msg.as_str());
+                                    return Err(Status::internal(msg));
+                                }
                                 let mut docs = Vec::<String>::new();
-                                let mut doc_keys = vec![];
-                                for (j, buf) in doc_mutation.documents.iter().enumerate() {
+                                for buf in doc_mutation.documents.iter() {
                                     let document = bytes_to_bson_document(buf.clone())
                                         .map_err(|e| Status::internal(format!("{e}")))?;
                                     let doc_str = document.to_string();
                                     debug!("update document: {}", doc_str);
-                                    if doc_mutation.ids.len() <= j {
-                                        warn!("no doc id for document {}", doc_str);
-                                        break;
-                                    }
-                                    let doc_key =
-                                        DocOwnerKeyV2::from_str(doc_mutation.ids[j].as_str())
-                                            .map_err(|e| Status::internal(format!("{e}")))?;
-                                    doc_keys.push(doc_key);
                                     docs.push(doc_str);
                                 }
                                 self.db_store
@@ -613,7 +610,7 @@ impl StorageNode for StorageNodeV2Impl {
                                         &address,
                                         doc_mutation.collection_name.as_str(),
                                         &docs,
-                                        &doc_keys,
+                                        &doc_mutation.ids,
                                     )
                                     .map_err(|e| Status::internal(format!("{e}")))?;
                                 info!(
@@ -640,18 +637,12 @@ impl StorageNode for StorageNodeV2Impl {
                             let db_addr = DB3Address::try_from(db_address_ref)
                                 .map_err(|e| Status::internal(format!("{e}")))?;
                             if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
-                                let mut doc_keys = vec![];
-                                for doc_key_str in doc_mutation.ids.iter() {
-                                    let doc_key = DocOwnerKeyV2::from_str(doc_key_str.as_str())
-                                        .map_err(|e| Status::internal(format!("{e}")))?;
-                                    doc_keys.push(doc_key);
-                                }
                                 self.db_store
                                     .delete_docs(
                                         &db_addr,
                                         &address,
                                         doc_mutation.collection_name.as_str(),
-                                        &doc_keys,
+                                        &doc_mutation.ids,
                                     )
                                     .map_err(|e| Status::internal(format!("{e}")))?;
                                 info!(
