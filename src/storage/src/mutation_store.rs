@@ -457,17 +457,28 @@ impl MutationStore {
         self.get_record::<MutationBody>(self.config.tx_store_cf_name.as_str(), tx_id.as_ref())
     }
 
+    pub fn generate_mutation_block_and_order(
+        &self,
+        payload: &[u8],
+        signature: &str,
+    ) -> Result<(String, u64, u32)> {
+        let tx_id = TxId::from((payload, signature.as_bytes()));
+        let hex_id = tx_id.to_hex();
+        let (block, order) = self.increase_order()?;
+        Ok((hex_id, block, order))
+    }
+
     pub fn add_mutation(
         &self,
         payload: &[u8],
         signature: &str,
         sender: &DB3Address,
         nonce: u64,
+        block: u64,
+        order: u32,
     ) -> Result<(String, u64, u32)> {
         let tx_id = TxId::from((payload, signature.as_bytes()));
         let hex_id = tx_id.to_hex();
-        debug!("the tx id is {}", hex_id);
-        let (block, order) = self.increase_order()?;
         let mut encoded_id: Vec<u8> = Vec::new();
         encoded_id.extend_from_slice(&block.to_be_bytes());
         encoded_id.extend_from_slice(&order.to_be_bytes());
@@ -556,14 +567,34 @@ mod tests {
         if let Ok(store) = result {
             let payload: Vec<u8> = vec![1];
             let signature: &str = "0xasdasdsad";
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
+            let (_id, block, order) = store
+                .generate_mutation_block_and_order(payload.as_ref(), signature)
+                .unwrap();
+            let result = store.add_mutation(
+                payload.as_ref(),
+                signature,
+                &DB3Address::ZERO,
+                1,
+                block,
+                order,
+            );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
                 assert_eq!(1, headers.len());
             } else {
                 assert!(false);
             }
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
+            let (_id, block, order) = store
+                .generate_mutation_block_and_order(payload.as_ref(), signature)
+                .unwrap();
+            let result = store.add_mutation(
+                payload.as_ref(),
+                signature,
+                &DB3Address::ZERO,
+                1,
+                block,
+                order,
+            );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
                 assert_eq!(1, headers.len());
@@ -645,7 +676,17 @@ mod tests {
             }
             let payload: Vec<u8> = vec![1];
             let signature: &str = "0xasdasdsad";
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
+            let (_id, block, order) = store
+                .generate_mutation_block_and_order(payload.as_ref(), signature)
+                .unwrap();
+            let result = store.add_mutation(
+                payload.as_ref(),
+                signature,
+                &DB3Address::ZERO,
+                1,
+                block,
+                order,
+            );
             assert!(result.is_ok());
             let result = store.get_range_mutations(0, 1);
             if let Ok(r) = result {
@@ -677,7 +718,17 @@ mod tests {
         if let Ok(store) = result {
             let payload: Vec<u8> = vec![1];
             let signature: &str = "0xasdasdsad";
-            let result = store.add_mutation(payload.as_ref(), signature, &DB3Address::ZERO, 1);
+            let (_id, block, order) = store
+                .generate_mutation_block_and_order(payload.as_ref(), signature)
+                .unwrap();
+            let result = store.add_mutation(
+                payload.as_ref(),
+                signature,
+                &DB3Address::ZERO,
+                1,
+                block,
+                order,
+            );
             assert!(result.is_ok());
             if let Ok((id, block, order)) = result {
                 if let Ok(Some(v)) = store.get_mutation_header(block, order) {

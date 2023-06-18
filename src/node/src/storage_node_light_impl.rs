@@ -452,9 +452,9 @@ impl StorageNode for StorageNodeV2Impl {
                 // mutation id
                 let (id, block, order) = self
                     .storage
-                    .add_mutation(&r.payload, r.signature.as_str(), &address, nonce)
+                    .generate_mutation_block_and_order(&r.payload, r.signature.as_str())
                     .map_err(|e| Status::internal(format!("{e}")))?;
-                match action {
+                let response = match action {
                     MutationAction::CreateDocumentDb => {
                         let mut items: Vec<ExtraItem> = Vec::new();
                         for body in dm.bodies {
@@ -485,14 +485,14 @@ impl StorageNode for StorageNodeV2Impl {
                                 break;
                             }
                         }
-                        Ok(Response::new(SendMutationResponse {
+                        Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items,
                             block,
                             order,
-                        }))
+                        })
                     }
                     MutationAction::AddCollection => {
                         let mut items: Vec<ExtraItem> = Vec::new();
@@ -524,14 +524,14 @@ impl StorageNode for StorageNodeV2Impl {
                                 items.push(item);
                             }
                         }
-                        Ok(Response::new(SendMutationResponse {
+                        Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items,
                             block,
                             order,
-                        }))
+                        })
                     }
                     MutationAction::AddDocument => {
                         let mut items: Vec<ExtraItem> = Vec::new();
@@ -574,14 +574,14 @@ impl StorageNode for StorageNodeV2Impl {
                                 }
                             }
                         }
-                        Ok(Response::new(SendMutationResponse {
+                        Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items,
                             block,
                             order,
-                        }))
+                        })
                     }
                     MutationAction::UpdateDocument => {
                         let mut items: Vec<ExtraItem> = Vec::new();
@@ -601,8 +601,9 @@ impl StorageNode for StorageNodeV2Impl {
                                         warn!("no doc id for document {}", doc_str);
                                         break;
                                     }
-                                    let doc_key = DocOwnerKeyV2::from_str(doc_mutation.ids[j].as_str())
-                                        .map_err(|e| Status::internal(format!("{e}")))?;
+                                    let doc_key =
+                                        DocOwnerKeyV2::from_str(doc_mutation.ids[j].as_str())
+                                            .map_err(|e| Status::internal(format!("{e}")))?;
                                     doc_keys.push(doc_key);
                                     docs.push(doc_str);
                                 }
@@ -623,14 +624,14 @@ impl StorageNode for StorageNodeV2Impl {
                                 );
                             }
                         }
-                        Ok(Response::new(SendMutationResponse {
+                        Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items,
                             block,
                             order,
-                        }))
+                        })
                     }
                     MutationAction::DeleteDocument => {
                         let mut items: Vec<ExtraItem> = Vec::new();
@@ -661,24 +662,35 @@ impl StorageNode for StorageNodeV2Impl {
                                 );
                             }
                         }
-                        Ok(Response::new(SendMutationResponse {
+                        Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items,
                             block,
                             order,
-                        }))
+                        })
                     }
-                    _ => Ok(Response::new(SendMutationResponse {
+                    _ => Response::new(SendMutationResponse {
                         id,
                         code: 0,
                         msg: "ok".to_string(),
                         items: vec![],
                         block,
                         order,
-                    })),
-                }
+                    }),
+                };
+                self.storage
+                    .add_mutation(
+                        &r.payload,
+                        r.signature.as_str(),
+                        &address,
+                        nonce,
+                        block,
+                        order,
+                    )
+                    .map_err(|e| Status::internal(format!("{e}")))?;
+                Ok(response)
             }
             Err(_e) => Ok(Response::new(SendMutationResponse {
                 id: "".to_string(),
