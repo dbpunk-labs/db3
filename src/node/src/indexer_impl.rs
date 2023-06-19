@@ -30,6 +30,7 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
+use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
 
@@ -52,22 +53,27 @@ impl IndexerNodeImpl {
     /// 1. subscribe db3 event
     /// 2. handle event to sync db3 node block
     pub async fn start(&self, store_sdk: StoreSDKV2) -> Result<()> {
-        info!("start indexer node ...");
-        let mut stream = store_sdk
-            .subscribe_event_message()
-            .await
-            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?
-            .into_inner();
-        info!("listen and handle event message");
-        while let Some(event) = stream.message().await.unwrap() {
-            match self.handle_event(event, &store_sdk).await {
-                Err(e) => {
-                    warn!("[IndexerBlockSyncer] handle event error: {:?}", e);
+        info!("start subscribe...");
+        loop {
+            match store_sdk.subscribe_event_message().await {
+                Ok(handle) => {
+                    info!("listen and handle event message");
+                    let mut stream = handle.into_inner();
+                    while let Some(event) = stream.message().await.unwrap() {
+                        match self.handle_event(event, &store_sdk).await {
+                            Err(e) => {
+                                warn!("[IndexerBlockSyncer] handle event error: {:?}", e);
+                            }
+                            _ => {}
+                        }
+                    }
                 }
-                _ => {}
+                Err(e) => {
+                    warn!("fail to subscribe block event for {e} and retry in 5 seconds");
+                    sleep(Duration::from_millis(1000 * 5)).await;
+                }
             }
         }
-        Ok(())
     }
 
     /// handle event message

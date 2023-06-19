@@ -88,7 +88,7 @@ impl KeyStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ethers::prelude::LocalWallet;
+    use ethers::prelude::{LocalWallet, Signer};
     use std::ops::Deref;
     use tempdir::TempDir;
 
@@ -107,6 +107,8 @@ mod tests {
         assert!(result.is_ok());
         if let Ok(d) = key_store.get_key("evm_account") {
             assert_eq!(&d, data.deref());
+            let wallet2 = LocalWallet::from_bytes(&d).unwrap();
+            assert_eq!(wallet.address(), wallet2.address());
         }
     }
 }

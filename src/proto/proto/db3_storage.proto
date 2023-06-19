@@ -154,7 +154,6 @@ message BlockResponse {
   repeated MutationWrapper mutations = 3;
 }
 
-
 message GetSystemStatusRequest {}
 
 message SystemStatus {
@@ -163,8 +162,18 @@ message SystemStatus {
   string ar_account = 3;
   string ar_balance = 4;
   string node_url = 5;
+  uint64 min_rollup_size = 6;
+  uint64 rollup_interval = 7;
 }
 
+message SetupRollupRequest {
+  //TODO check the permissions
+  uint64 min_rollup_size = 1;
+  uint64 rollup_interval = 2;
+}
+
+message SetupRollupResponse {
+}
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
@@ -179,4 +188,5 @@ service StorageNode {
   // method for get block
   rpc GetBlock(BlockRequest) returns (BlockResponse) {}
   rpc GetSystemStatus(GetSystemStatusRequest) returns (SystemStatus) {}
+  rpc SetupRollup(SetupRollupRequest) returns (SetupRollupResponse) {}
 }

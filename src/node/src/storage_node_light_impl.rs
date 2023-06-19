@@ -33,7 +33,8 @@ use db3_proto::db3_storage_proto::{
     GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
     GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
     ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse, SubscribeRequest, SystemStatus,
+    SendMutationRequest, SendMutationResponse, SetupRollupRequest, SetupRollupResponse,
+    SubscribeRequest, SystemStatus,
 };
 
 use db3_proto::db3_storage_proto::{
@@ -48,12 +49,13 @@ use db3_storage::state_store::{StateStore, StateStoreConfig};
 use prost::Message;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender as BroadcastSender;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task;
+
 use tokio::time::{sleep, Duration as TokioDuration};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -82,6 +84,7 @@ pub struct StorageNodeV2Impl {
     )>,
     broadcast_sender: BroadcastSender<EventMessageV2>,
     rollup_executor: Arc<RollupExecutor>,
+    rollup_interval: Arc<AtomicU64>,
 }
 
 impl StorageNodeV2Impl {
@@ -103,6 +106,7 @@ impl StorageNodeV2Impl {
             storage.clone(),
             config.network_id,
         )?);
+        let rollup_interval = config.rollup_config.rollup_interval;
 
         Ok(Self {
             storage,
@@ -113,6 +117,7 @@ impl StorageNodeV2Impl {
             sender,
             broadcast_sender,
             rollup_executor,
+            rollup_interval: Arc::new(AtomicU64::new(rollup_interval)),
         })
     }
 
@@ -161,11 +166,14 @@ impl StorageNodeV2Impl {
     pub async fn start_to_rollup(&self) {
         let local_running = self.running.clone();
         let executor = self.rollup_executor.clone();
-        let rollup_interval = self.config.rollup_config.rollup_interval;
+        let rollup_interval = self.rollup_interval.clone();
         task::spawn(async move {
             info!("start the rollup thread");
             while local_running.load(Ordering::Relaxed) {
-                sleep(TokioDuration::from_millis(rollup_interval)).await;
+                sleep(TokioDuration::from_millis(
+                    rollup_interval.load(Ordering::Relaxed),
+                ))
+                .await;
                 match executor.process().await {
                     Ok(()) => {}
                     Err(e) => {
@@ -264,6 +272,19 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn setup_rollup(
+        &self,
+        request: Request<SetupRollupRequest>,
+    ) -> std::result::Result<Response<SetupRollupResponse>, Status> {
+        let r = request.into_inner();
+        //TODO check the permissions
+        self.rollup_executor
+            .update_min_rollup_size(r.min_rollup_size);
+        self.rollup_interval
+            .store(r.rollup_interval, Ordering::Relaxed);
+        Ok(Response::new(SetupRollupResponse {}))
+    }
+
     async fn get_system_status(
         &self,
         _request: Request<GetSystemStatusRequest>,
@@ -273,12 +294,19 @@ impl StorageNode for StorageNodeV2Impl {
             .get_ar_account()
             .await
             .map_err(|e| Status::internal(format!("{e}")))?;
+        let evm_addr = self
+            .rollup_executor
+            .get_evm_account()
+            .await
+            .map_err(|e| Status::internal(format!("{e}")))?;
         Ok(Response::new(SystemStatus {
-            evm_account: "".to_string(),
+            evm_account: evm_addr,
             evm_balance: "".to_string(),
             ar_account: addr,
             ar_balance: balance,
             node_url: self.config.node_url.to_string(),
+            min_rollup_size: self.rollup_executor.get_min_rollup_size(),
+            rollup_interval: self.rollup_interval.load(Ordering::Relaxed),
         }))
     }
 
