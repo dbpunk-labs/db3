@@ -581,7 +581,6 @@ impl StorageNode for StorageNodeV2Impl {
                         })
                     }
                     MutationAction::UpdateDocument => {
-                        let mut items: Vec<ExtraItem> = Vec::new();
                         for (_i, body) in dm.bodies.iter().enumerate() {
                             let db_address_ref: &[u8] = body.db_address.as_ref();
                             let db_addr = DB3Address::try_from(db_address_ref)
@@ -625,13 +624,12 @@ impl StorageNode for StorageNodeV2Impl {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
-                            items,
+                            items: vec![],
                             block,
                             order,
                         })
                     }
                     MutationAction::DeleteDocument => {
-                        let mut items: Vec<ExtraItem> = Vec::new();
                         for (_i, body) in dm.bodies.iter().enumerate() {
                             let db_address_ref: &[u8] = body.db_address.as_ref();
                             let db_addr = DB3Address::try_from(db_address_ref)
@@ -657,7 +655,7 @@ impl StorageNode for StorageNodeV2Impl {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
-                            items,
+                            items: vec![],
                             block,
                             order,
                         })
