@@ -7,7 +7,7 @@ interface IDB3MetaStore {
         string rollupNodeUrl;
         string[] indexNodeUrls;
         address[] indexNodeAddresses;
-        address sender;
+        address admin;
         address rollupNodeAddress;
         bytes latestArweaveTx;
     }

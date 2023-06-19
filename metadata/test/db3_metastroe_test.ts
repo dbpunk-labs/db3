@@ -31,7 +31,7 @@ describe("DB3MetaStore", function () {
             expect(registration.indexNodeUrls[0]).to.equal("https://index-node-1.com");
             expect(registration.indexNodeUrls[1]).to.equal("https://index-node-2.com");
             expect(registration.networkId).to.equal(1);
-            expect(registration.sender).to.equal(deployer.address);
+            expect(registration.admin).to.equal(deployer.address);
             expect(registration.rollupNodeAddress).to.equal(deployer.address);
             expect(registration.latestArweaveTx).to.equal("0x");
         });
@@ -288,7 +288,7 @@ describe("DB3MetaStore", function () {
                 'https://index-node-2.com'
               );
               expect(registration.networkId).to.equal(1);
-              expect(registration.sender).to.equal(deployer.address);
+              expect(registration.admin).to.equal(deployer.address);
               expect(registration.rollupNodeAddress).to.equal(deployer.address);
               expect(registration.latestArweaveTx).to.equal('0x');
             });
@@ -336,7 +336,7 @@ describe("DB3MetaStore", function () {
                 'https://index-node-1.com'
               );
               expect(allRegistrations[0].networkId).to.equal(1);
-              expect(allRegistrations[0].sender).to.equal(deployer.address);
+              expect(allRegistrations[0].admin).to.equal(deployer.address);
               expect(allRegistrations[0].rollupNodeAddress).to.equal(deployer.address);
               expect(allRegistrations[0].latestArweaveTx).to.equal('0x');
         
@@ -347,7 +347,7 @@ describe("DB3MetaStore", function () {
                 'https://index-node-2.com'
               );
               expect(allRegistrations[1].networkId).to.equal(2);
-              expect(allRegistrations[1].sender).to.equal(deployer.address);
+              expect(allRegistrations[1].admin).to.equal(deployer.address);
               expect(allRegistrations[1].rollupNodeAddress).to.equal(sender.address);
               expect(allRegistrations[1].latestArweaveTx).to.equal('0x');
             });
@@ -387,7 +387,7 @@ describe("DB3MetaStore", function () {
               );
               expect(pageRegistrations[0].indexNodeUrls[0]).to.equal('https://index-node-2.com');
               expect(pageRegistrations[0].networkId).to.equal(2);
-              expect(pageRegistrations[0].sender).to.equal(deployer.address);
+              expect(pageRegistrations[0].admin).to.equal(deployer.address);
               expect(pageRegistrations[0].rollupNodeAddress).to.equal(sender.address);
               expect(pageRegistrations[0].latestArweaveTx).to.equal('0x');
               });
