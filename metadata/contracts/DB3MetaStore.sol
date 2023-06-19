@@ -65,7 +65,7 @@ contract DB3MetaStore is IDB3MetaStore {
         // Check if sender is the same as rollupNodeAddress or one of the index node addresses
         require(
             msg.sender == registration.admin,
-            "msg.sender must be the same as  registration.sender "
+            "msg.sender must be the same as  registration.admin "
         );
 
         // Update  Index node URLs in registration struct
