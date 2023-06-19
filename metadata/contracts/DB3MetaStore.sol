@@ -62,7 +62,7 @@ contract DB3MetaStore is IDB3MetaStore {
             "Network not registered"
         );
 
-        // Check if sender is the same as rollupNodeAddress or one of the index node addresses
+        // Check if sender is the same as admin or one of the index node addresses
         require(
             msg.sender == registration.admin,
             "msg.sender must be the same as  registration.admin "
