@@ -41,6 +41,7 @@ use db3_proto::db3_storage_proto::{
     Subscription as SubscriptionV2,
 };
 
+use db3_base::bson_util::bytes_to_bson_document;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
@@ -56,7 +57,8 @@ use tokio::task;
 use tokio::time::{sleep, Duration as TokioDuration};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
+
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
@@ -114,7 +116,7 @@ impl StorageNodeV2Impl {
             info!("start the block producer thread");
             while local_running.load(Ordering::Relaxed) {
                 sleep(TokioDuration::from_millis(local_block_interval)).await;
-                info!(
+                debug!(
                     "produce block {}",
                     local_storage.get_current_block().unwrap_or(0)
                 );
@@ -131,7 +133,7 @@ impl StorageNodeV2Impl {
                         };
                         match local_event_sender.send(msg) {
                             Ok(_) => {
-                                info!("broadcast block event {}, {}", block_id, mutation_count);
+                                debug!("broadcast block event {}, {}", block_id, mutation_count);
                             }
                             Err(e) => {
                                 warn!("the broadcast channel error for {:?}", e);
@@ -203,7 +205,7 @@ impl StorageNodeV2Impl {
                             info!("subscribers len : {}", subscribers.len());
                         }
                         Ok(event) = event_sub.recv() => {
-                            info!("receive event {:?}", event);
+                            debug!("receive event {:?}", event);
                             for (key , (sender, sub)) in subscribers.iter() {
                                 if sender.is_closed() {
                                     to_be_removed.insert(key.clone());
@@ -216,7 +218,7 @@ impl StorageNodeV2Impl {
                                     }
                                     match sender.try_send(Ok(event.clone())) {
                                         Ok(_) => {
-                                            info!("send event to addr 0x{}", hex::encode(key.as_ref()));
+                                            debug!("send event to addr 0x{}", hex::encode(key.as_ref()));
                                             break;
                                         }
                                         Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -449,9 +451,9 @@ impl StorageNode for StorageNodeV2Impl {
                 // mutation id
                 let (id, block, order) = self
                     .storage
-                    .add_mutation(&r.payload, r.signature.as_str(), &address, nonce)
+                    .generate_mutation_block_and_order(&r.payload, r.signature.as_str())
                     .map_err(|e| Status::internal(format!("{e}")))?;
-                match action {
+                let response = match action {
                     MutationAction::CreateDocumentDb => {
                         let mut items: Vec<ExtraItem> = Vec::new();
                         for body in dm.bodies {
@@ -482,14 +484,14 @@ impl StorageNode for StorageNodeV2Impl {
                                 break;
                             }
                         }
-                        Ok(Response::new(SendMutationResponse {
+                        Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items,
                             block,
                             order,
-                        }))
+                        })
                     }
                     MutationAction::AddCollection => {
                         let mut items: Vec<ExtraItem> = Vec::new();
@@ -521,24 +523,163 @@ impl StorageNode for StorageNodeV2Impl {
                                 items.push(item);
                             }
                         }
-                        Ok(Response::new(SendMutationResponse {
+                        Response::new(SendMutationResponse {
                             id,
                             code: 0,
                             msg: "ok".to_string(),
                             items,
                             block,
                             order,
-                        }))
+                        })
                     }
-                    _ => Ok(Response::new(SendMutationResponse {
+                    MutationAction::AddDocument => {
+                        let mut items: Vec<ExtraItem> = Vec::new();
+                        for (_i, body) in dm.bodies.iter().enumerate() {
+                            let db_address_ref: &[u8] = body.db_address.as_ref();
+                            let db_addr = DB3Address::try_from(db_address_ref)
+                                .map_err(|e| Status::internal(format!("{e}")))?;
+                            if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                                let mut docs = Vec::<String>::new();
+                                for buf in doc_mutation.documents.iter() {
+                                    let document = bytes_to_bson_document(buf.clone())
+                                        .map_err(|e| Status::internal(format!("{e}")))?;
+                                    docs.push(document.to_string());
+                                }
+                                let ids = self
+                                    .db_store
+                                    .add_docs(
+                                        &db_addr,
+                                        &address,
+                                        doc_mutation.collection_name.as_str(),
+                                        &docs,
+                                    )
+                                    .map_err(|e| Status::internal(format!("{e}")))?;
+                                info!(
+                                    "add documents with db_addr {}, collection_name: {}, from owner {}, document size: {}",
+                                    db_addr.to_hex().as_str(),
+                                    doc_mutation.collection_name.as_str(),
+                                    address.to_hex().as_str(),
+                                    ids.len()
+                                );
+                                // return document keys
+                                for id in ids {
+                                    let item = ExtraItem {
+                                        key: "document".to_string(),
+                                        value: id.to_string(),
+                                    };
+                                    items.push(item);
+                                }
+                            }
+                        }
+                        Response::new(SendMutationResponse {
+                            id,
+                            code: 0,
+                            msg: "ok".to_string(),
+                            items,
+                            block,
+                            order,
+                        })
+                    }
+                    MutationAction::UpdateDocument => {
+                        for (_i, body) in dm.bodies.iter().enumerate() {
+                            let db_address_ref: &[u8] = body.db_address.as_ref();
+                            let db_addr = DB3Address::try_from(db_address_ref)
+                                .map_err(|e| Status::internal(format!("{e}")))?;
+                            if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                                if doc_mutation.documents.len() != doc_mutation.ids.len() {
+                                    let msg = format!(
+                                        "doc ids size {} not equal to documents size {}",
+                                        doc_mutation.ids.len(),
+                                        doc_mutation.documents.len()
+                                    );
+                                    warn!("{}", msg.as_str());
+                                    return Err(Status::internal(msg));
+                                }
+                                let mut docs = Vec::<String>::new();
+                                for buf in doc_mutation.documents.iter() {
+                                    let document = bytes_to_bson_document(buf.clone())
+                                        .map_err(|e| Status::internal(format!("{e}")))?;
+                                    let doc_str = document.to_string();
+                                    debug!("update document: {}", doc_str);
+                                    docs.push(doc_str);
+                                }
+                                self.db_store
+                                    .update_docs(
+                                        &db_addr,
+                                        &address,
+                                        doc_mutation.collection_name.as_str(),
+                                        &docs,
+                                        &doc_mutation.ids,
+                                    )
+                                    .map_err(|e| Status::internal(format!("{e}")))?;
+                                info!(
+                                    "update documents with db_addr {}, collection_name: {}, from owner {}",
+                                    db_addr.to_hex().as_str(),
+                                    doc_mutation.collection_name.as_str(),
+                                    address.to_hex().as_str()
+                                );
+                            }
+                        }
+                        Response::new(SendMutationResponse {
+                            id,
+                            code: 0,
+                            msg: "ok".to_string(),
+                            items: vec![],
+                            block,
+                            order,
+                        })
+                    }
+                    MutationAction::DeleteDocument => {
+                        for (_i, body) in dm.bodies.iter().enumerate() {
+                            let db_address_ref: &[u8] = body.db_address.as_ref();
+                            let db_addr = DB3Address::try_from(db_address_ref)
+                                .map_err(|e| Status::internal(format!("{e}")))?;
+                            if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                                self.db_store
+                                    .delete_docs(
+                                        &db_addr,
+                                        &address,
+                                        doc_mutation.collection_name.as_str(),
+                                        &doc_mutation.ids,
+                                    )
+                                    .map_err(|e| Status::internal(format!("{e}")))?;
+                                info!(
+                                    "delete documents with db_addr {}, collection_name: {}, from owner {}",
+                                    db_addr.to_hex().as_str(),
+                                    doc_mutation.collection_name.as_str(),
+                                    address.to_hex().as_str()
+                                );
+                            }
+                        }
+                        Response::new(SendMutationResponse {
+                            id,
+                            code: 0,
+                            msg: "ok".to_string(),
+                            items: vec![],
+                            block,
+                            order,
+                        })
+                    }
+                    _ => Response::new(SendMutationResponse {
                         id,
                         code: 0,
                         msg: "ok".to_string(),
                         items: vec![],
                         block,
                         order,
-                    })),
-                }
+                    }),
+                };
+                self.storage
+                    .add_mutation(
+                        &r.payload,
+                        r.signature.as_str(),
+                        &address,
+                        nonce,
+                        block,
+                        order,
+                    )
+                    .map_err(|e| Status::internal(format!("{e}")))?;
+                Ok(response)
             }
             Err(_e) => Ok(Response::new(SendMutationResponse {
                 id: "".to_string(),
