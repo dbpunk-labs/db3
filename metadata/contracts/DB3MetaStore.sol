@@ -47,6 +47,38 @@ contract DB3MetaStore is IDB3MetaStore {
         numNetworks++;
     }
 
+    // Update an existing network's information
+    function updateNetworkIndexNodes(
+        uint64 networkId,
+        string[] memory indexNodeUrls,
+        address[] memory indexNodeAddresses
+    ) public {
+        // Check if network is registered
+        NetworkRegistration storage registration = networkRegistrations[
+            networkId
+        ];
+        require(
+            bytes(registration.rollupNodeUrl).length > 0,
+            "Network not registered"
+        );
+
+        // Check if sender is the same as rollupNodeAddress or one of the index node addresses
+        require(
+            msg.sender == registration.rollupNodeAddress,
+            "msg.sender must be the same as RollupNodeAddress "
+        );
+
+        // Update  Index node URLs in registration struct
+
+        if (indexNodeUrls.length > 0) {
+            registration.indexNodeUrls = indexNodeUrls;
+        }
+
+        if (indexNodeAddresses.length > 0) {
+            registration.indexNodeAddresses = indexNodeAddresses;
+        }
+    }
+
     // Get registration info for a specific network ID
     function getNetworkRegistration(
         uint64 networkId
@@ -118,7 +150,7 @@ contract DB3MetaStore is IDB3MetaStore {
             "Network not registered"
         );
 
-         // Check if sender is the same as rollupNodeAddress
+        // Check if sender is the same as rollupNodeAddress
         require(
             msg.sender == registration.rollupNodeAddress,
             "msg.sender must be the same as RollupNodeAddress"
@@ -132,8 +164,7 @@ contract DB3MetaStore is IDB3MetaStore {
     // Register a new Index node for a specific network ID
     function registerIndexNode(
         uint64 networkId,
-        string memory indexNodeUrl,
-        address indexNodeAddress
+        string memory indexNodeUrl
     ) public returns (bool success) {
         // Check if network is registered
         NetworkRegistration storage registration = networkRegistrations[
@@ -144,20 +175,33 @@ contract DB3MetaStore is IDB3MetaStore {
             "Network not registered"
         );
 
-          // Check if sender is the same as rollupNodeAddress
+        // Check if sender is in the list of index node addresses
+        bool senderIsRegistered = false;
+        for (uint i = 0; i < registration.indexNodeAddresses.length; i++) {
+            if (registration.indexNodeAddresses[i] == msg.sender) {
+                senderIsRegistered = true;
+                break;
+            }
+        }
         require(
-            msg.sender == registration.rollupNodeAddress,
-            "msg.sender must be the same as RollupNodeAddress"
+            senderIsRegistered,
+            "Sender address is not a registered Index node"
         );
 
-        // Check if index node URL and address are not empty
+        // Check if index node URL is not empty
         require(bytes(indexNodeUrl).length > 0, "Empty index node URL");
-        require(indexNodeAddress != address(0), "Empty index node address");
 
-        // Add new Index node URL and address to arrays in registration struct
-        registration.indexNodeUrls.push(indexNodeUrl);
-        registration.indexNodeAddresses.push(indexNodeAddress);
-        return true;
+        // Update or add Index node URL to array in registration struct
+        bool indexNodeUpdated = false;
+        for (uint i = 0; i < registration.indexNodeUrls.length; i++) {
+            if (registration.indexNodeAddresses[i] == msg.sender) {
+                registration.indexNodeUrls[i] = indexNodeUrl;
+                indexNodeUpdated = true;
+                break;
+            }
+        }
+
+        return indexNodeUpdated;
     }
 
     // Update network information for a specific network ID
@@ -174,7 +218,7 @@ contract DB3MetaStore is IDB3MetaStore {
             "Network not registered"
         );
 
-          // Check if sender is the same as rollupNodeAddress
+        // Check if sender is the same as rollupNodeAddress
         require(
             msg.sender == registration.rollupNodeAddress,
             "msg.sender must be the same as RollupNodeAddress"

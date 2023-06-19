@@ -5,11 +5,11 @@ interface IDB3MetaStore {
     struct NetworkRegistration {
         uint64 networkId;
         string rollupNodeUrl;
-        address[] indexNodeAddresses;
         string[] indexNodeUrls;
-        bytes latestArweaveTx;
+        address[] indexNodeAddresses;
         address sender;
         address rollupNodeAddress;
+        bytes latestArweaveTx;
     }
 
     function registerNetwork(
@@ -20,14 +20,20 @@ interface IDB3MetaStore {
         address[] memory indexNodeAddresses
     ) external;
 
+    function updateNetworkIndexNodes(
+        uint64 networkId,
+        string[] memory indexNodeUrls,
+        address[] memory indexNodeAddresses
+    ) external;
+
     function getNetworkRegistration(
         uint64 networkId
-    ) external view returns (NetworkRegistration memory registration);
+    ) external view returns (NetworkRegistration memory);
 
     function getAllNetworkRegistrations(
         uint64 page,
         uint64 pageSize
-    ) external view returns (NetworkRegistration[] memory registrations);
+    ) external view returns (NetworkRegistration[] memory);
 
     function registerRollupNode(
         uint64 networkId,
@@ -36,8 +42,7 @@ interface IDB3MetaStore {
 
     function registerIndexNode(
         uint64 networkId,
-        string memory indexNodeUrl,
-        address indexNodeAddress
+        string memory indexNodeUrl
     ) external returns (bool success);
 
     function updateRollupSteps(

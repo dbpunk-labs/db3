@@ -149,54 +149,74 @@ describe("DB3MetaStore", function () {
                 ).to.be.revertedWith("msg.sender must be the same as RollupNodeAddress");
             });
         });
+
         describe("#registerIndexNode()", function () {
-            it("adds Index node correctly", async function () {
-                await registry
-                    .connect(deployer)
-                    .registerNetwork(
-                        1,
-                        "https://rollup-node.com",
-                        deployer.address,
-                        ["https://index-node-1.com"],
-                        [sender.address]
-                    );
+            it("registers a new index node correctly", async function () {
+              // Register a new network
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  1,
+                  "https://rollup-node.com",
+                  deployer.address,
+                  ["https://index-node-1.com"],
+                  [sender.address]
+                );
         
-                await registry
-                    .connect(deployer)
-                    .registerIndexNode(1, "https://index-node-2.com", sender.address);
+              // Register a new index node for the network
+              await registry.connect(sender).registerIndexNode(1, "https://index-node-2.com");
         
-                const registration = await registry.getNetworkRegistration(1);
-        
-                expect(registration.indexNodeUrls[1]).to.equal("https://index-node-2.com");
-                expect(registration.indexNodeAddresses[1]).to.equal(sender.address);
+              // Verify that the registration was successful
+              const registration = await registry.getNetworkRegistration(1);
+             
+              expect(registration.indexNodeUrls[0]).to.equal("https://index-node-2.com");
             });
         
-            it("throws an error if network is not registered", async function () {
-                await expect(
-                    registry
-                        .connect(deployer)
-                        .registerIndexNode(1, "https://index-node-2.com", sender.address)
-                ).to.be.revertedWith("Network not registered");
+            it("throws an error if the network is not registered", async function () {
+              // Try to register an index node for a non-existent network
+              await expect(registry.connect(sender).registerIndexNode(1, "https://index-node-1.com")).to.be.revertedWith(
+                "Network not registered"
+              );
             });
         
-            it("throws an error if sender is not the Rollup node address", async function () {
-                await registry
-                    .connect(deployer)
-                    .registerNetwork(
-                        1,
-                        "https://rollup-node.com",
-                        deployer.address,
-                        ["https://index-node-1.com"],
-                        [sender.address]
-                    );
+            it("throws an error if the sender is not an index node for the network", async function () {
+              // Register a new network
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  1,
+                  "https://rollup-node.com",
+                  deployer.address,
+                  ["https://index-node-1.com"],
+                  [deployer.address]
+                );
         
-                await expect(
-                    registry
-                        .connect(sender)
-                        .registerIndexNode(1, "https://index-node-2.com", sender.address)
-                ).to.be.revertedWith("msg.sender must be the same as RollupNodeAddress");
+              // Try to register an index node with an invalid sender address
+              await expect(registry.connect(sender).registerIndexNode(1, "https://index-node-2.com")).to.be.revertedWith(
+                "Sender address is not a registered Index node"
+              );
+            });
+        
+            it("throws an error if the index node URL is empty", async function () {
+              // Register a new network
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  1,
+                  "https://rollup-node.com",
+                  deployer.address,
+                  ["https://index-node-1.com"],
+                  [sender.address]
+                );
+        
+              // Try to register an index node with an empty URL
+              await expect(registry.connect(sender).registerIndexNode(1, "")).to.be.revertedWith(
+                "Empty index node URL"
+              );
             });
         });
+       
+      
         
         describe("#updateRollupSteps()", function () {
             it("updates latest Arweave transaction correctly", async function () {
@@ -382,6 +402,35 @@ describe("DB3MetaStore", function () {
             //   });
 
               });
+
+              describe("#updateNetworkIndexNodes()", function () {
+                it("updates the index nodes correctly", async function () {
+                await registry
+                .connect(deployer)
+                .registerNetwork(
+                1,
+                "https://rollup-node.com",
+                deployer.address,
+                ["https://index-node-1.com", "https://index-node-2.com"],
+                [sender.address, deployer.address]
+                );
+                
+                    await registry
+                        .connect(deployer)
+                        .updateNetworkIndexNodes(
+                            1,
+                            ["https://index-node-3.com"],
+                            [deployer.address]
+                        );
+                
+                    const registration = await registry.getNetworkRegistration(1);
+                    // console.log(registration);
+                    expect(registration.indexNodeUrls[0]).to.equal("https://index-node-3.com");
+                    expect(registration.indexNodeAddresses[0]).to.equal(deployer.address);
+                });
+                });
+                
+                
 
         });
         
