@@ -49,9 +49,14 @@ then
 fi
 
 # clean indexer
-if [ -e ./indexer ]
+if [ -e ./indexer_doc_db ]
 then
-    rm -rf indexer
+    rm -rf indexer_doc_db
+fi
+
+if [ -e ./indexer_meta_db ]
+then
+    rm -rf indexer_meta_db
 fi
 
 echo "start ar miner..."
@@ -66,7 +71,7 @@ echo "start tendermint node..."
 sleep 1
 
 echo "start db3 store..."
-../target/${BUILD_MODE}/db3 store --rollup-interval 60000 >store.log 2>&1  &
+../target/${BUILD_MODE}/db3 store --rollup-interval 60000 --block-interval=500 >store.log 2>&1  &
 sleep 1
 
 echo "start db3 indexer..."

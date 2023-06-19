@@ -352,6 +352,7 @@ impl DbStore {
                     } else {
                         return Err(DB3Error::CollectionNotFound(
                             document_mutation.collection_name.to_string(),
+                            db_id.to_hex(),
                         ));
                     }
                 }

@@ -31,12 +31,16 @@ use db3_proto::db3_mutation_proto::{
 use db3_proto::db3_node_proto::NetworkStatus;
 use db3_sdk::mutation_sdk::MutationSDK;
 use db3_sdk::store_sdk::StoreSDK;
+use db3_sdk::store_sdk_v2::StoreSDKV2;
 use prettytable::{format, Table};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct DB3ClientContext {
     pub mutation_sdk: Option<MutationSDK>,
     pub store_sdk: Option<StoreSDK>,
+}
+pub struct DB3ClientContextV2 {
+    pub store_sdk: Option<StoreSDKV2>,
 }
 
 #[derive(Debug, Parser)]
