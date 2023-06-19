@@ -40,10 +40,10 @@ pub struct RollupExecutorConfig {
     // the interval in ms
     pub rollup_interval: u64,
     pub temp_data_path: String,
-    pub ar_key_path: String,
     pub ar_node_url: String,
     pub min_rollup_size: u64,
     pub min_gc_round_offset: u64,
+    pub key_root_path: String,
 }
 
 pub struct RollupExecutor {
@@ -54,6 +54,8 @@ pub struct RollupExecutor {
     ar_filesystem: ArFileSystem,
 }
 
+unsafe impl Sync for RollupExecutor {}
+unsafe impl Send for RollupExecutor {}
 impl RollupExecutor {
     pub fn new(
         config: RollupExecutorConfig,
@@ -66,10 +68,12 @@ impl RollupExecutor {
             Field::new("block", DataType::UInt64, true),
             Field::new("order", DataType::UInt32, true),
         ]));
+
         let ar_fs_config = ArFileSystemConfig {
-            wallet_path: config.ar_key_path.to_string(),
+            key_root_path: config.key_root_path.to_string(),
             arweave_url: config.ar_node_url.to_string(),
         };
+
         let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
         Ok(Self {
             config,
@@ -199,6 +203,12 @@ impl RollupExecutor {
             info!("not enough round to run gc");
             Ok(())
         }
+    }
+
+    pub async fn get_ar_account(&self) -> Result<(String, String)> {
+        let addr = self.ar_filesystem.get_address();
+        let balance = self.ar_filesystem.get_balance().await?;
+        Ok((addr, balance.to_string()))
     }
 
     pub async fn process(&self) -> Result<()> {

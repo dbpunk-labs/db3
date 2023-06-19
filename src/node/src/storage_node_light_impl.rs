@@ -31,9 +31,9 @@ use db3_proto::db3_storage_proto::{
     GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest,
     GetDatabaseOfOwnerResponse, GetMutationBodyRequest, GetMutationBodyResponse,
     GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
-    ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
+    GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
     ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse, SubscribeRequest,
+    SendMutationRequest, SendMutationResponse, SubscribeRequest, SystemStatus,
 };
 
 use db3_proto::db3_storage_proto::{
@@ -66,6 +66,7 @@ pub struct StorageNodeV2Config {
     pub db_store_config: DBStoreV2Config,
     pub network_id: u64,
     pub block_interval: u64,
+    pub node_url: String,
 }
 
 pub struct StorageNodeV2Impl {
@@ -80,6 +81,7 @@ pub struct StorageNodeV2Impl {
         Sender<std::result::Result<EventMessageV2, Status>>,
     )>,
     broadcast_sender: BroadcastSender<EventMessageV2>,
+    rollup_executor: Arc<RollupExecutor>,
 }
 
 impl StorageNodeV2Impl {
@@ -96,6 +98,12 @@ impl StorageNodeV2Impl {
         let state_store = StateStore::new(config.state_config.clone())?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
+        let rollup_executor = Arc::new(RollupExecutor::new(
+            config.rollup_config.clone(),
+            storage.clone(),
+            config.network_id,
+        )?);
+
         Ok(Self {
             storage,
             state_store,
@@ -104,6 +112,7 @@ impl StorageNodeV2Impl {
             db_store,
             sender,
             broadcast_sender,
+            rollup_executor,
         })
     }
 
@@ -151,14 +160,10 @@ impl StorageNodeV2Impl {
 
     pub async fn start_to_rollup(&self) {
         let local_running = self.running.clone();
-        let local_storage = self.storage.clone();
-        let rollup_config = self.config.rollup_config.clone();
-        let network_id = self.config.network_id;
+        let executor = self.rollup_executor.clone();
+        let rollup_interval = self.config.rollup_config.rollup_interval;
         task::spawn(async move {
             info!("start the rollup thread");
-            let rollup_interval = rollup_config.rollup_interval;
-            //TODO handle err
-            let executor = RollupExecutor::new(rollup_config, local_storage, network_id).unwrap();
             while local_running.load(Ordering::Relaxed) {
                 sleep(TokioDuration::from_millis(rollup_interval)).await;
                 match executor.process().await {
@@ -171,6 +176,7 @@ impl StorageNodeV2Impl {
             info!("exit the rollup thread");
         });
     }
+
     pub async fn keep_subscription(
         &self,
         mut receiver: Receiver<(
@@ -258,6 +264,24 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn get_system_status(
+        &self,
+        _request: Request<GetSystemStatusRequest>,
+    ) -> std::result::Result<Response<SystemStatus>, Status> {
+        let (addr, balance) = self
+            .rollup_executor
+            .get_ar_account()
+            .await
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(SystemStatus {
+            evm_account: "".to_string(),
+            evm_balance: "".to_string(),
+            ar_account: addr,
+            ar_balance: balance,
+            node_url: self.config.node_url.to_string(),
+        }))
+    }
+
     async fn scan_gc_record(
         &self,
         request: Request<ScanGcRecordRequest>,

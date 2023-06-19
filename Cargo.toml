@@ -18,6 +18,6 @@ fastcrypto = {git = "https://github.com/MystenLabs/fastcrypto", rev = "306465d4f
 ethers = {git="https://github.com/imotai/ethers-rs", rev="d526191b7972e8cf4412fee8b71cbf42e0ce7995"}
 tonic = {git="https://github.com/hyperium/tonic", rev="ae7580160431cd25c1eecda4c85014ef6ce8d93f"}
 tonic-web = {git="https://github.com/hyperium/tonic", rev="ae7580160431cd25c1eecda4c85014ef6ce8d93f"}
-arweave-rs = {git="https://github.com/imotai/arweave-rs", rev="7ac5027305db833e4d9b62c967309d5df8fba4f2"}
+arweave-rs = {git="https://github.com/imotai/arweave-rs", rev="4bdb736c565dbce0f3ff698f0265e7e781cca1d6"}
 ejdb2rs = {git="https://github.com/imotai/ejdb2rs", rev="c937a085eda043bd854a0ef4d3e7bb63650610d1"}
 serde_json= "1.0"

@@ -58,7 +58,7 @@ if [ -e ./indexer_meta_db ]
 then
     rm -rf indexer_meta_db
 fi
-
+mkdir -p ./keys
 echo "start ar miner..."
 bash ./ar_miner.sh > miner.log 2>&1 &
 echo "start db3 node..."

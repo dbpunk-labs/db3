@@ -154,6 +154,17 @@ message BlockResponse {
   repeated MutationWrapper mutations = 3;
 }
 
+
+message GetSystemStatusRequest {}
+
+message SystemStatus {
+  string evm_account = 1;
+  string evm_balance = 2;
+  string ar_account = 3;
+  string ar_balance = 4;
+  string node_url = 5;
+}
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
@@ -167,4 +178,5 @@ service StorageNode {
   rpc Subscribe(SubscribeRequest) returns (stream EventMessage) {}
   // method for get block
   rpc GetBlock(BlockRequest) returns (BlockResponse) {}
+  rpc GetSystemStatus(GetSystemStatusRequest) returns (SystemStatus) {}
 }
