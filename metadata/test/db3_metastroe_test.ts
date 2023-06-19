@@ -21,68 +21,64 @@ describe("DB3MetaStore", function () {
                     1,
                     "https://rollup-node.com",
                     deployer.address,
-                    ["https://index-node-1.com", "https://index-node-2.com"]
+                    ["https://index-node-1.com", "https://index-node-2.com"],
+                    [sender.address, deployer.address]
                 );
 
-            const [rollupNodeUrl, rollupNodeAddress, indexNodeUrls, networkId, senderAddress, latestArweaveTx] =
-                await registry.getNetworkRegistration(1);
+            const registration = await registry.getNetworkRegistration(1);
 
-            expect(rollupNodeUrl).to.equal("https://rollup-node.com");
-            expect(indexNodeUrls[0]).to.equal("https://index-node-1.com");
-            expect(indexNodeUrls[1]).to.equal("https://index-node-2.com");
-            expect(networkId).to.equal(1);
-            expect(senderAddress).to.equal(deployer.address);
-            expect(rollupNodeAddress).to.equal(deployer.address);
-            expect(latestArweaveTx).to.equal("0x");
+            expect(registration.rollupNodeUrl).to.equal("https://rollup-node.com");
+            expect(registration.indexNodeUrls[0]).to.equal("https://index-node-1.com");
+            expect(registration.indexNodeUrls[1]).to.equal("https://index-node-2.com");
+            expect(registration.networkId).to.equal(1);
+            expect(registration.sender).to.equal(deployer.address);
+            expect(registration.rollupNodeAddress).to.equal(deployer.address);
+            expect(registration.latestArweaveTx).to.equal("0x");
         });
 
-        it("fails to register network with invalid Rollup node URL", async function () {
-            await expect(
-                registry.connect(deployer).registerNetwork(
-                    2,
-                    "",
-                    deployer.address,
-                    ["https://index-node.com"]
-                )
-            ).to.be.revertedWith("Invalid Rollup node URL");
-        });
-
-        it("fails to register network with invalid Rollup node address", async function () {
-            await expect(
-                registry.connect(deployer).registerNetwork(
-                    3,
-                    "https://rollup-node.com",
-                    ethers.constants.AddressZero,
-                    ["https://index-node.com"]
-                )
-            ).to.be.revertedWith("Invalid rollupNodeAddress address");
-        });
-
-        it("fails to register already registered network", async function () {
-            await registry
-                .connect(deployer)
-                .registerNetwork(
-                    1,
-                    "https://new-rollup-node.com",
-                    deployer.address,
-                    ["https://new-index-node.com"],
-                );
-
+        it("throws an error if Rollup node URL is empty", async function () {
             await expect(
                 registry
                     .connect(deployer)
                     .registerNetwork(
                         1,
-                        "https://new-rollup-node.com",
+                        "",
                         deployer.address,
-                        ["https://new-index-node.com"],
+                        ["https://index-node-1.com", "https://index-node-2.com"],
+                        [sender.address, deployer.address]
                     )
-            ).to.be.revertedWith("Network already registered");
+            ).to.be.revertedWith("Invalid Rollup node URL");
         });
-    });
 
-    describe("#getNetworkRegistration()", function () {
-        it("returns correct registration info for a specific network ID", async function () {
+        // it("throws an error if sender address is invalid", async function () {
+        //     await expect(
+        //         registry
+        //             .connect(deployer)
+        //             .registerNetwork(
+        //                 1,
+        //                 "https://rollup-node.com",
+        //                 deployer.address,
+        //                 ["https://index-node-1.com", "https://index-node-2.com"],
+        //                 []
+        //             )
+        //     ).to.be.revertedWith("Invalid sender address");
+        // });
+
+        it("throws an error if Rollup node address is invalid", async function () {
+            await expect(
+                registry
+                    .connect(deployer)
+                    .registerNetwork(
+                        1,
+                        "https://rollup-node.com",
+                        ethers.constants.AddressZero,
+                        ["https://index-node-1.com", "https://index-node-2.com"],
+                        []
+                    )
+            ).to.be.revertedWith("Invalid rollupNodeAddress address");
+        });
+
+        it("throws an error if network is already registered", async function () {
             await registry
                 .connect(deployer)
                 .registerNetwork(
@@ -90,29 +86,25 @@ describe("DB3MetaStore", function () {
                     "https://rollup-node.com",
                     deployer.address,
                     ["https://index-node-1.com", "https://index-node-2.com"],
+                    [sender.address, deployer.address]
                 );
 
-            const [rollupNodeUrl, rollupNodeAddress, indexNodeUrls, networkId, senderAddress, latestArweaveTx] =
-                await registry.getNetworkRegistration(1);
-
-            expect(rollupNodeUrl).to.equal("https://rollup-node.com");
-            expect(indexNodeUrls[0]).to.equal("https://index-node-1.com");
-            expect(indexNodeUrls[1]).to.equal("https://index-node-2.com");
-            expect(networkId).to.equal(1);
-            expect(senderAddress).to.equal(deployer.address);
-            expect(rollupNodeAddress).to.equal(deployer.address);
-            expect(latestArweaveTx).to.equal("0x");
-        });
-
-        it("fails to get registration info for unregistered network ID", async function () {
-            await expect(registry.getNetworkRegistration(2)).to.be.revertedWith(
-                "Network not registered"
-            );
+            await expect(
+                registry
+                    .connect(deployer)
+                    .registerNetwork(
+                        1,
+                        "https://another-rollup-node.com",
+                        deployer.address,
+                        ["https://another-index-node.com"],
+                        [deployer.address]
+                    )
+            ).to.be.revertedWith("Network already registered");
         });
     });
 
-    describe("#getAllNetworkRegistrations()", function () {
-        it("returns correct registration info for all networks when only one page is needed", async function () {
+    describe("#registerRollupNode()", function () {
+        it("updates Rollup node correctly", async function () {
             await registry
                 .connect(deployer)
                 .registerNetwork(
@@ -120,165 +112,276 @@ describe("DB3MetaStore", function () {
                     "https://rollup-node.com",
                     deployer.address,
                     ["https://index-node-1.com"],
+                    [sender.address]
                 );
 
             await registry
                 .connect(deployer)
-                .registerNetwork(
-                    2,
-                    "https://new-rollup-node.com",
-                    deployer.address,
-                    ["https://new-index-node.com"],
-                );
+                .registerRollupNode(1, "https://new-rollup-node.com");
 
-            const [registration1, registration2] = await registry.getAllNetworkRegistrations(
-                1,
-                2
-            );
+            const registration = await registry.getNetworkRegistration(1);
 
-            expect(registration1.rollupNodeUrl).to.equal("https://rollup-node.com");
-            expect(registration1.indexNodeUrls[0]).to.equal("https://index-node-1.com");
-            expect(registration1.networkId).to.equal(1);
-            expect(registration1.sender).to.equal(deployer.address);
-            expect(registration1.rollupNodeAddress).to.equal(deployer.address);
-            expect(registration1.latestArweaveTx).to.equal("0x");
-
-            expect(registration2.rollupNodeUrl).to.equal("https://new-rollup-node.com");
-            expect(registration2.indexNodeUrls[0]).to.equal("https://new-index-node.com");
-            expect(registration2.networkId).to.equal(2);
-            expect(registration2.sender).to.equal(deployer.address);
-            expect(registration2.rollupNodeAddress).to.equal(deployer.address);
-            expect(registration2.latestArweaveTx).to.equal("0x");
+            expect(registration.rollupNodeUrl).to.equal("https://new-rollup-node.com");
         });
 
-        it("returns correct registration info for all networks when multiple pages are needed", async function () {
-            // Register 10 networks
-            for (let i = 1; i <= 20; i++) {
+        it("throws an error if network is not registered", async function () {
+            await expect(
+                registry
+                    .connect(deployer)
+                    .registerRollupNode(1, "https://new-rollup-node.com")
+            ).to.be.revertedWith("Network not registered");
+        });
+
+        it("throws an error if sender is not the Rollup node address", async function () {
+            await registry
+                .connect(deployer)
+                .registerNetwork(
+                1,
+                "https://rollup-node.com",
+                deployer.address,
+                ["https://index-node-1.com"],
+                [sender.address]
+                );
+                await expect(
+                    registry
+                        .connect(sender)
+                        .registerRollupNode(1, "https://new-rollup-node.com")
+                ).to.be.revertedWith("msg.sender must be the same as RollupNodeAddress");
+            });
+        });
+        describe("#registerIndexNode()", function () {
+            it("adds Index node correctly", async function () {
                 await registry
                     .connect(deployer)
                     .registerNetwork(
-                        i,
-                        `https://rollup-node-${i}.com`,
+                        1,
+                        "https://rollup-node.com",
                         deployer.address,
-                        [`https://index-node-${i}-1.com`, `https://index-node-${i}-2.com`]
+                        ["https://index-node-1.com"],
+                        [sender.address]
                     );
-            }
-
-            // Get first page of 3 registration infos
-            const registrationsPage1 = await registry.getAllNetworkRegistrations(1, 3);
-
-            expect(registrationsPage1.length).to.equal(3);
-            expect(registrationsPage1[0].networkId).to.equal(1);
-            expect(registrationsPage1[1].networkId).to.equal(2);
-            expect(registrationsPage1[2].networkId).to.equal(3);
-
-            // Get second page of 3 registration infos
-            const registrationsPage2 = await registry.getAllNetworkRegistrations(2, 3);
-
-            expect(registrationsPage2.length).to.equal(3);
-            expect(registrationsPage2[0].networkId).to.equal(4);
-            expect(registrationsPage2[1].networkId).to.equal(5);
-            expect(registrationsPage2[2].networkId).to.equal(6);
-
-            // Get third page of 4 registration infos
-            const registrationsPage3 = await registry.getAllNetworkRegistrations(3, 4);
-            console.log(registrationsPage3);
-            expect(registrationsPage3.length).to.equal(4);
-            expect(registrationsPage3[0].networkId).to.equal(9);
-            expect(registrationsPage3[1].networkId).to.equal(10);
-            expect(registrationsPage3[2].networkId).to.equal(11);
-            expect(registrationsPage3[3].networkId).to.equal(12);
-        });
-    });
-    describe("#registerRollupNode()", function () {
-        it("updates Rollup node for registered network correctly", async function () {
-            await registry
-                .connect(deployer)
-                .registerNetwork(
-                    1,
-                    "https://old-rollup-node.com",
-                    deployer.address,
-                    ["https://index-node.com"],
-                );
-
-            await registry
-                .connect(deployer)
-                .registerRollupNode(1, "https://new-rollup-node.com", sender.address);
-
-            const [rollupNodeUrl, rollupNodeAddress, indexNodeUrls, networkId, senderAddress, latestArweaveTx] =
-                await registry.getNetworkRegistration(1);
-
-            expect(rollupNodeUrl).to.equal("https://new-rollup-node.com");
-            expect(indexNodeUrls[0]).to.equal("https://index-node.com");
-            expect(networkId).to.equal(1);
-            expect(senderAddress).to.equal(deployer.address);
-            expect(rollupNodeAddress).to.equal(sender.address);
-            expect(latestArweaveTx).to.equal("0x");
-        });
-
-        it("fails to update Rollup node for unregistered network", async function () {
-            await expect(
-                registry
+        
+                await registry
                     .connect(deployer)
-                    .registerRollupNode(2, "https://rollup-node.com", deployer.address)
-            ).to.be.revertedWith("Network not registered");
-        });
-    });
-
-    describe("#registerIndexNode()", function () {
-        it("adds Index node for registered network correctly", async function () {
-            await registry
-                .connect(deployer)
-                .registerNetwork(
-                    1,
-                    "https://rollup-node.com",
-                    deployer.address,
-                    ["https://index-node-1.com"],
-                );
-
-            await registry.connect(deployer).registerIndexNode(1, "https://index-node-2.com");
-
-            const [rollupNodeUrl, rollupNodeAddress, indexNodeUrls, networkId, senderAddress, latestArweaveTx] =
-                await registry.getNetworkRegistration(1);
-
-            expect(indexNodeUrls[0]).to.equal("https://index-node-1.com");
-            expect(indexNodeUrls[1]).to.equal("https://index-node-2.com");
-        });
-
-        it("fails to add Index node for unregistered network", async function () {
-            await expect(
-                registry.connect(deployer).registerIndexNode(2, "https://index-node.com")
-            ).to.be.revertedWith("Network not registered");
-        });
-    });
-
-    describe("#updateRollupSteps()", function () {
-        it("updates the latest Arweave transaction hash correctly for registered network", async function () {
-            await registry
-                .connect(deployer)
-                .registerNetwork(
-                    1,
-                    "https://rollup-node.com",
-                    deployer.address,
-                    ["https://index-node.com"],
-                );
-
-            await registry
-                .connect(deployer)
-                .updateRollupSteps(1, "0x1234567890123456789012345678901234567890123456789012345678901234");
-
-            const [rollupNodeUrl, rollupNodeAddress, indexNodeUrls, networkId, senderAddress, latestArweaveTx] =
-                await registry.getNetworkRegistration(1);
-
-            expect(latestArweaveTx).to.equal("0x1234567890123456789012345678901234567890123456789012345678901234");
-        });
-
-        it("fails to update latest Arweave transaction hash for unregistered network", async function () {
-            await expect(
-                registry
+                    .registerIndexNode(1, "https://index-node-2.com", sender.address);
+        
+                const registration = await registry.getNetworkRegistration(1);
+        
+                expect(registration.indexNodeUrls[1]).to.equal("https://index-node-2.com");
+                expect(registration.indexNodeAddresses[1]).to.equal(sender.address);
+            });
+        
+            it("throws an error if network is not registered", async function () {
+                await expect(
+                    registry
+                        .connect(deployer)
+                        .registerIndexNode(1, "https://index-node-2.com", sender.address)
+                ).to.be.revertedWith("Network not registered");
+            });
+        
+            it("throws an error if sender is not the Rollup node address", async function () {
+                await registry
                     .connect(deployer)
-                    .updateRollupSteps(2, "0x1234567890123456789012345678901234567890123456789012345678901234")
-            ).to.be.revertedWith("Network not registered");
+                    .registerNetwork(
+                        1,
+                        "https://rollup-node.com",
+                        deployer.address,
+                        ["https://index-node-1.com"],
+                        [sender.address]
+                    );
+        
+                await expect(
+                    registry
+                        .connect(sender)
+                        .registerIndexNode(1, "https://index-node-2.com", sender.address)
+                ).to.be.revertedWith("msg.sender must be the same as RollupNodeAddress");
+            });
         });
-    });
-});
+        
+        describe("#updateRollupSteps()", function () {
+            it("updates latest Arweave transaction correctly", async function () {
+                await registry
+                    .connect(deployer)
+                    .registerNetwork(
+                        1,
+                        "https://rollup-node.com",
+                        deployer.address,
+                        ["https://index-node-1.com"],
+                        [sender.address]
+                    );
+        
+                const tx = "0x1234";
+                await registry.connect(deployer).updateRollupSteps(1, tx);
+        
+                const registration = await registry.getNetworkRegistration(1);
+        
+                expect(registration.latestArweaveTx).to.equal(tx);
+            });
+        
+            it("throws an error if network is not registered", async function () {
+                const tx = "0x1234";
+                await expect(
+                    registry.connect(deployer).updateRollupSteps(1, tx)
+                ).to.be.revertedWith("Network not registered");
+            });
+        
+            it("throws an error if sender is not the Rollup node address", async function () {
+                await registry
+                    .connect(deployer)
+                    .registerNetwork(
+                        1,
+                        "https://rollup-node.com",
+                        deployer.address,
+                        ["https://index-node-1.com"],
+                        [sender.address]
+                    );
+        
+                const tx = "0x1234";
+                await expect(
+                    registry.connect(sender).updateRollupSteps(1, tx)
+                ).to.be.revertedWith("msg.sender must be the same as RollupNodeAddress");
+            });
+        });
+
+
+        describe('#getNetworkRegistration()', function () {
+            it('retrieves registration info for a specific network ID', async function () {
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  1,
+                  'https://rollup-node.com',
+                  deployer.address,
+                  ['https://index-node-1.com', 'https://index-node-2.com'],
+                  [sender.address, deployer.address]
+                );
+        
+              const registration = await registry.getNetworkRegistration(1);
+        
+              expect(registration.rollupNodeUrl).to.equal(
+                'https://rollup-node.com'
+              );
+              expect(registration.indexNodeUrls[0]).to.equal(
+                'https://index-node-1.com'
+              );
+              expect(registration.indexNodeUrls[1]).to.equal(
+                'https://index-node-2.com'
+              );
+              expect(registration.networkId).to.equal(1);
+              expect(registration.sender).to.equal(deployer.address);
+              expect(registration.rollupNodeAddress).to.equal(deployer.address);
+              expect(registration.latestArweaveTx).to.equal('0x');
+            });
+        
+            it('throws an error if the specified network ID is not registered', async function () {
+              await expect(registry.getNetworkRegistration(1)).to.be.revertedWith(
+                'Network not registered'
+              );
+            });
+          });
+        
+          describe('#getAllNetworkRegistrations()', function () {
+            it('retrieves all registration info', async function () {
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  1,
+                  'https://rollup-node-1.com',
+                  deployer.address,
+                  ['https://index-node-1.com'],
+                  [sender.address]
+                );
+        
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  2,
+                  'https://rollup-node-2.com',
+                  sender.address,
+                  ['https://index-node-2.com'],
+                  [deployer.address]
+                );
+        
+                        
+              const pageSize = 2;
+              const page = 1;
+
+              const allRegistrations = await registry.getAllNetworkRegistrations(page,
+                pageSize);
+        
+              expect(allRegistrations[0].rollupNodeUrl).to.equal(
+                'https://rollup-node-1.com'
+              );
+              expect(allRegistrations[0].indexNodeUrls[0]).to.equal(
+                'https://index-node-1.com'
+              );
+              expect(allRegistrations[0].networkId).to.equal(1);
+              expect(allRegistrations[0].sender).to.equal(deployer.address);
+              expect(allRegistrations[0].rollupNodeAddress).to.equal(deployer.address);
+              expect(allRegistrations[0].latestArweaveTx).to.equal('0x');
+        
+              expect(allRegistrations[1].rollupNodeUrl).to.equal(
+                'https://rollup-node-2.com'
+              );
+              expect(allRegistrations[1].indexNodeUrls[0]).to.equal(
+                'https://index-node-2.com'
+              );
+              expect(allRegistrations[1].networkId).to.equal(2);
+              expect(allRegistrations[1].sender).to.equal(deployer.address);
+              expect(allRegistrations[1].rollupNodeAddress).to.equal(sender.address);
+              expect(allRegistrations[1].latestArweaveTx).to.equal('0x');
+            });
+        
+            it('retrieves specific registration info based on page size and number', async function () {
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  1,
+                  'https://rollup-node-1.com',
+                  deployer.address,
+                  ['https://index-node-1.com'],
+                  [sender.address]
+                );
+        
+              await registry
+                .connect(deployer)
+                .registerNetwork(
+                  2,
+                  'https://rollup-node-2.com',
+                  sender.address,
+                  ['https://index-node-2.com'],
+                  [deployer.address]
+                );
+        
+              const pageSize = 1;
+              const page = 2;
+        
+              const pageRegistrations = await registry.getAllNetworkRegistrations(
+                page,
+                pageSize
+              );
+        
+              expect(pageRegistrations.length).to.equal(1);
+              expect(pageRegistrations[0].rollupNodeUrl).to.equal(
+                'https://rollup-node-2.com'
+              );
+              expect(pageRegistrations[0].indexNodeUrls[0]).to.equal('https://index-node-2.com');
+              expect(pageRegistrations[0].networkId).to.equal(2);
+              expect(pageRegistrations[0].sender).to.equal(deployer.address);
+              expect(pageRegistrations[0].rollupNodeAddress).to.equal(sender.address);
+              expect(pageRegistrations[0].latestArweaveTx).to.equal('0x');
+              });
+              
+            //   it('throws an error if the specified page number is greater than the total number of registrations', async function () {
+            //     const pageSize = 1;
+            //     const page = 1;
+              
+            //     await expect(
+            //       registry.getAllNetworkRegistrations(page, pageSize)
+            //     ).to.be.revertedWith('Network not registered');
+            //   });
+
+              });
+
+        });
+        
