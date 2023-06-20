@@ -41,3 +41,5 @@ ethers = { workspace = true }
 rsa = "0.6.1"
 rand = "0.8.5"
 
+[dev-dependencies]
+tokio = { version = "1.17.0", features = ["full"] }

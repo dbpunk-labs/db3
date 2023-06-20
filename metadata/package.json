@@ -19,6 +19,7 @@
     "chai": "^4.2.0",
     "ethers": "^5.4.7",
     "hardhat": "^2.12.7",
+    "hardhat-abi-exporter": "^2.10.1",
     "hardhat-gas-reporter": "^1.0.8",
     "prettier": "^2.8.4",
     "prettier-plugin-solidity": "^1.1.2",

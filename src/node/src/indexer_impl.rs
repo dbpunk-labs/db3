@@ -21,7 +21,8 @@ use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
-    SystemStatus, RunQueryRequest, RunQueryResponse, GetSystemStatusRequest,
+    GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
+    SystemStatus,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::MutationAction;
@@ -31,30 +32,42 @@ use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
+use db3_storage::meta_store_client::MetaStoreClient;
+use ethers::prelude::{LocalWallet, Signer};
+use std::ops::Deref;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
-use ethers::prelude::{LocalWallet, Signer};
-use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
-    network_id: u64,
+    network_id: Arc<AtomicU64>,
     node_url: String,
-    key_root_path: String
+    key_root_path: String,
+    contract_addr: String,
+    evm_node_url: String,
 }
 
 impl IndexerNodeImpl {
-    pub fn new(config: DBStoreV2Config, network_id: u64,
-               node_url: String,
-               key_root_path: String) -> Result<Self> {
+    pub fn new(
+        config: DBStoreV2Config,
+        network_id: u64,
+        node_url: String,
+        key_root_path: String,
+        contract_addr: String,
+        evm_node_url: String,
+    ) -> Result<Self> {
         let db_store = DBStoreV2::new(config)?;
         Ok(Self {
             db_store,
-            network_id,
+            network_id: Arc::new(AtomicU64::new(network_id)),
             node_url,
-            key_root_path
+            key_root_path,
+            contract_addr,
+            evm_node_url,
         })
     }
 
@@ -157,7 +170,7 @@ impl IndexerNodeImpl {
                                     &address,
                                     doc_db_mutation,
                                     nonce,
-                                    self.network_id,
+                                    self.network_id.load(Ordering::Relaxed),
                                     block,
                                     order,
                                 )
@@ -306,21 +319,47 @@ impl IndexerNodeImpl {
 
 #[tonic::async_trait]
 impl IndexerNode for IndexerNodeImpl {
+    async fn setup(
+        &self,
+        request: Request<SetupRequest>,
+    ) -> std::result::Result<Response<SetupResponse>, Status> {
+        let r = request.into_inner();
+        let (addr, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let _rollup_interval = MutationUtil::get_u64_field(&data, "rollupInterval", 0);
+        let _min_rollup_size = MutationUtil::get_u64_field(&data, "minRollupSize", 0);
+        let evm_node_rpc =
+            MutationUtil::get_str_field(&data, "evmNodeRpc", self.evm_node_url.as_str());
+        let network = MutationUtil::get_u64_field(&data, "network", 0_u64);
+        let admin_addr =
+            MetaStoreClient::get_admin(self.contract_addr.as_str(), evm_node_rpc, network)
+                .await
+                .map_err(|e| Status::internal(format!("{e}")))?;
+        if admin_addr != addr {
+            return Ok(Response::new(SetupResponse {
+                code: -1,
+                msg: "you are not the admin".to_string(),
+            }));
+        }
+        self.network_id.store(network, Ordering::Relaxed);
+        return Ok(Response::new(SetupResponse {
+            code: 0,
+            msg: "ok".to_string(),
+        }));
+    }
+
     async fn get_system_status(
         &self,
         _request: Request<GetSystemStatusRequest>,
     ) -> std::result::Result<Response<SystemStatus>, Status> {
         let wallet = Self::build_wallet(self.key_root_path.as_str())
-                .map_err(|e| Status::internal(format!("{e}")))?;
-
-        let addr = format!(
-            "0x{}",
-            hex::encode(wallet.address().as_bytes())
-        );
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let addr = format!("0x{}", hex::encode(wallet.address().as_bytes()));
         Ok(Response::new(SystemStatus {
-            evm_account:addr,
-            evm_balance:"0".to_string(),
-            node_url:self.node_url.to_string()
+            evm_account: addr,
+            evm_balance: "0".to_string(),
+            node_url: self.node_url.to_string(),
+            config: None,
         }))
     }
 

@@ -25,7 +25,6 @@ contract DB3MetaStore is IDB3MetaStore {
             rollupNodeAddress != address(0),
             "Invalid rollupNodeAddress address"
         );
-
         // Check if network is already registered
         NetworkRegistration storage registration = networkRegistrations[
             networkId
@@ -34,7 +33,6 @@ contract DB3MetaStore is IDB3MetaStore {
             bytes(registration.rollupNodeUrl).length == 0,
             "Network already registered"
         );
-
         // Add new network info to struct and update mapping
         registration.rollupNodeUrl = rollupNodeUrl;
         registration.indexNodeUrls = indexNodeUrls;
@@ -42,7 +40,6 @@ contract DB3MetaStore is IDB3MetaStore {
         registration.networkId = networkId;
         registration.admin = msg.sender;
         registration.rollupNodeAddress = rollupNodeAddress;
-
         // Increment registered network counter
         numNetworks++;
     }

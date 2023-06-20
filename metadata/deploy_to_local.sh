@@ -2,5 +2,5 @@
 #
 # deploy_to_scoll.sh
 
-export PRIVATE_KEY=0xe3cd3444d4c05cb2bb39fceb578c27a92ab457d3dfb2b209015867a75ecb9d3c
-npx hardhat run --network mumbai scripts/deploy.ts
+export PRIVATE_KEY=0xad689d9b7751da07b0fb39c5091672cbfe50f59131db015f8a0e76c9790a6fcc
+npx hardhat run --network localhost scripts/deploy.ts

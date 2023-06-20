@@ -33,17 +33,18 @@ use db3_proto::db3_storage_proto::{
     GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
     GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
     ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse, SetupRollupRequest, SetupRollupResponse,
-    SubscribeRequest, SystemStatus,
+    SendMutationRequest, SendMutationResponse, SetupRequest, SetupResponse, SubscribeRequest,
+    SystemStatus,
 };
 
+use db3_base::bson_util::bytes_to_bson_document;
+use db3_proto::db3_base_proto::SystemConfig;
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
     Subscription as SubscriptionV2,
 };
-
-use db3_base::bson_util::bytes_to_bson_document;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
+use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use prost::Message;
@@ -68,6 +69,8 @@ pub struct StorageNodeV2Config {
     pub network_id: u64,
     pub block_interval: u64,
     pub node_url: String,
+    pub evm_node_url: String,
+    pub contract_addr: String,
 }
 
 pub struct StorageNodeV2Impl {
@@ -84,6 +87,7 @@ pub struct StorageNodeV2Impl {
     broadcast_sender: BroadcastSender<EventMessageV2>,
     rollup_executor: Arc<RollupExecutor>,
     rollup_interval: Arc<AtomicU64>,
+    network_id: Arc<AtomicU64>,
 }
 
 impl StorageNodeV2Impl {
@@ -100,13 +104,13 @@ impl StorageNodeV2Impl {
         let state_store = StateStore::new(config.state_config.clone())?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
+        let network_id = Arc::new(AtomicU64::new(config.network_id));
         let rollup_executor = Arc::new(RollupExecutor::new(
             config.rollup_config.clone(),
             storage.clone(),
-            config.network_id,
+            network_id.clone(),
         )?);
         let rollup_interval = config.rollup_config.rollup_interval;
-
         Ok(Self {
             storage,
             state_store,
@@ -117,6 +121,7 @@ impl StorageNodeV2Impl {
             broadcast_sender,
             rollup_executor,
             rollup_interval: Arc::new(AtomicU64::new(rollup_interval)),
+            network_id,
         })
     }
 
@@ -271,17 +276,54 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
-    async fn setup_rollup(
+    async fn setup(
         &self,
-        request: Request<SetupRollupRequest>,
-    ) -> std::result::Result<Response<SetupRollupResponse>, Status> {
+        request: Request<SetupRequest>,
+    ) -> std::result::Result<Response<SetupResponse>, Status> {
         let r = request.into_inner();
-        //TODO check the permissions
-        self.rollup_executor
-            .update_min_rollup_size(r.min_rollup_size);
+        let (addr, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        let rollup_interval = MutationUtil::get_u64_field(
+            &data,
+            "rollupInterval",
+            self.rollup_interval.load(Ordering::Relaxed),
+        );
+        let min_rollup_size = MutationUtil::get_u64_field(
+            &data,
+            "minRollupSize",
+            self.rollup_executor.get_min_rollup_size(),
+        );
+        let evm_node_rpc =
+            MutationUtil::get_str_field(&data, "evmNodeRpc", self.config.evm_node_url.as_str());
+        let network = MutationUtil::get_u64_field(&data, "network", 0_u64);
+        let admin_addr =
+            MetaStoreClient::get_admin(self.config.contract_addr.as_str(), evm_node_rpc, network)
+                .await
+                .map_err(|e| Status::internal(format!("{e}")))?;
+        if admin_addr != addr {
+            return Ok(Response::new(SetupResponse {
+                code: -1,
+                msg: "you are not the admin".to_string(),
+            }));
+        }
+        self.rollup_executor.update_min_rollup_size(min_rollup_size);
         self.rollup_interval
-            .store(r.rollup_interval, Ordering::Relaxed);
-        Ok(Response::new(SetupRollupResponse {}))
+            .store(rollup_interval, Ordering::Relaxed);
+        self.network_id.store(network, Ordering::Relaxed);
+        let system_config = SystemConfig {
+            min_rollup_size,
+            rollup_interval,
+            network_id: network,
+            evm_node_url: evm_node_rpc.to_string(),
+            ar_node_url: "".to_string(),
+        };
+        self.state_store
+            .store_node_config("storage", &system_config)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        return Ok(Response::new(SetupResponse {
+            code: 0,
+            msg: "ok".to_string(),
+        }));
     }
 
     async fn get_system_status(
@@ -298,14 +340,19 @@ impl StorageNode for StorageNodeV2Impl {
             .get_evm_account()
             .await
             .map_err(|e| Status::internal(format!("{e}")))?;
+
+        let system_config = self
+            .state_store
+            .get_node_config("storage")
+            .map_err(|e| Status::internal(format!("{e}")))?;
+
         Ok(Response::new(SystemStatus {
             evm_account: evm_addr,
             evm_balance: "".to_string(),
             ar_account: addr,
             ar_balance: balance,
             node_url: self.config.node_url.to_string(),
-            min_rollup_size: self.rollup_executor.get_min_rollup_size(),
-            rollup_interval: self.rollup_interval.load(Ordering::Relaxed),
+            config: system_config,
         }))
     }
 
@@ -516,7 +563,7 @@ impl StorageNode for StorageNodeV2Impl {
                                         &address,
                                         doc_db_mutation,
                                         nonce,
-                                        self.config.network_id,
+                                        self.network_id.load(Ordering::Relaxed),
                                         block,
                                         order,
                                     )

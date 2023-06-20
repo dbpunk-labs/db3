@@ -54,7 +54,7 @@ pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
     schema: SchemaRef,
-    network_id: u64,
+    network_id: Arc<AtomicU64>,
     ar_filesystem: ArFileSystem,
     wallet: LocalWallet,
     min_rollup_size: Arc<AtomicU64>,
@@ -67,7 +67,7 @@ impl RollupExecutor {
     pub fn new(
         config: RollupExecutorConfig,
         storage: MutationStore,
-        network_id: u64,
+        network_id: Arc<AtomicU64>,
     ) -> Result<Self> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("payload", DataType::Binary, true),
@@ -312,7 +312,7 @@ impl RollupExecutor {
                 tx.as_str(),
                 last_end_block,
                 current_block,
-                self.network_id,
+                self.network_id.load(Ordering::Relaxed),
                 filename.as_str(),
             )
             .await?;
