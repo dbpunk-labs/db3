@@ -295,7 +295,9 @@ impl StorageNode for StorageNodeV2Impl {
         );
         let evm_node_rpc =
             MutationUtil::get_str_field(&data, "evmNodeRpc", self.config.evm_node_url.as_str());
-        let network = MutationUtil::get_u64_field(&data, "network", 0_u64);
+        let network = MutationUtil::get_str_field(&data, "network", "0")
+            .parse::<u64>()
+            .map_err(|e| Status::internal(format!("{e}")))?;
         let admin_addr =
             MetaStoreClient::get_admin(self.config.contract_addr.as_str(), evm_node_rpc, network)
                 .await
