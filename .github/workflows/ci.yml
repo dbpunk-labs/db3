@@ -52,6 +52,7 @@ jobs:
           sudo apt-get install protobuf-compiler 
           protoc --version
           cargo build
+          cp target/debug/db3 docker/
           cd tools
           wget https://github.com/tendermint/tendermint/releases/download/v0.37.0-rc2/tendermint_0.37.0-rc2_linux_amd64.tar.gz
           tar -zxf tendermint_0.37.0-rc2_linux_amd64.tar.gz
@@ -60,6 +61,16 @@ jobs:
           ../target/debug/db3 client new-db
           sleep 1
           ../target/debug/db3 client show-state
+      - name: docker login
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        run: |
+          cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:latest
+          docker push ghcr.io/dbpunk-labs/db3:latest
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
@@ -68,3 +79,4 @@ jobs:
           token: ${{secrets.COV_TOKEN}}
           directory: .
           flags: rust
+
