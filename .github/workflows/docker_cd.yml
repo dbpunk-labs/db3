@@ -8,29 +8,8 @@ on:
 
 jobs:
 
-  rustfmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
-      - name: Check formatting
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-  coverage:
-    name: test
+  docker_image:
+    name: build_pr_image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
