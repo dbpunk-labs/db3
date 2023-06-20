@@ -189,6 +189,8 @@ pub enum DB3Command {
         meta_db_path: String,
         #[clap(short, long, default_value = "./index_doc_db")]
         doc_db_path: String,
+        #[clap(short, long, default_value = "./keys")]
+        key_root_path: String,
         #[clap(long, default_value = "10")]
         network_id: u64,
         #[clap(short, long)]
@@ -338,6 +340,7 @@ impl DB3Command {
                 db3_storage_grpc_url,
                 meta_db_path,
                 doc_db_path,
+                key_root_path,
                 network_id,
                 verbose,
             } => {
@@ -368,9 +371,11 @@ impl DB3Command {
                     enable_doc_store: true,
                     doc_store_conf,
                 };
-
-                let indexer = IndexerNodeImpl::new(db_store_config, network_id).unwrap();
                 let addr = format!("{public_host}:{public_grpc_port}");
+                let indexer = IndexerNodeImpl::new(db_store_config, network_id,
+                                                   addr.to_string(),
+                                                   key_root_path
+                                                   ).unwrap();
                 let indexer_for_syncing = indexer.clone();
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");

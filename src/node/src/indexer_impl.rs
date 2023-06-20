@@ -21,7 +21,7 @@ use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
-    IndexerStatus, RunQueryRequest, RunQueryResponse, ShowIndexerStatusRequest,
+    SystemStatus, RunQueryRequest, RunQueryResponse, GetSystemStatusRequest,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::MutationAction;
@@ -30,22 +30,31 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
+use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
+use ethers::prelude::{LocalWallet, Signer};
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
     network_id: u64,
+    node_url: String,
+    key_root_path: String
 }
 
 impl IndexerNodeImpl {
-    pub fn new(config: DBStoreV2Config, network_id: u64) -> Result<Self> {
+    pub fn new(config: DBStoreV2Config, network_id: u64,
+               node_url: String,
+               key_root_path: String) -> Result<Self> {
         let db_store = DBStoreV2::new(config)?;
         Ok(Self {
             db_store,
             network_id,
+            node_url,
+            key_root_path
         })
     }
 
@@ -98,6 +107,30 @@ impl IndexerNodeImpl {
         }
         Ok(())
     }
+    fn build_wallet(key_root_path: &str) -> Result<LocalWallet> {
+        let config = KeyStoreConfig {
+            key_root_path: key_root_path.to_string(),
+        };
+        let key_store = KeyStore::new(config);
+        match key_store.has_key("evm") {
+            true => {
+                let data = key_store.get_key("evm")?;
+                let data_ref: &[u8] = &data;
+                let wallet = LocalWallet::from_bytes(data_ref)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                Ok(wallet)
+            }
+
+            false => {
+                let mut rng = rand::thread_rng();
+                let wallet = LocalWallet::new(&mut rng);
+                let data = wallet.signer().to_bytes();
+                key_store.write_key("evm", data.deref())?;
+                Ok(wallet)
+            }
+        }
+    }
+
     fn parse_and_apply_mutations(&self, mutations: &Vec<MutationWrapper>) -> Result<()> {
         for mutation in mutations.iter() {
             let body = mutation.body.as_ref().unwrap();
@@ -273,12 +306,22 @@ impl IndexerNodeImpl {
 
 #[tonic::async_trait]
 impl IndexerNode for IndexerNodeImpl {
-    /// show indexer statuc
-    async fn show_indexer_status(
+    async fn get_system_status(
         &self,
-        _request: Request<ShowIndexerStatusRequest>,
-    ) -> std::result::Result<Response<IndexerStatus>, Status> {
-        Err(Status::internal("err".to_string()))
+        _request: Request<GetSystemStatusRequest>,
+    ) -> std::result::Result<Response<SystemStatus>, Status> {
+        let wallet = Self::build_wallet(self.key_root_path.as_str())
+                .map_err(|e| Status::internal(format!("{e}")))?;
+
+        let addr = format!(
+            "0x{}",
+            hex::encode(wallet.address().as_bytes())
+        );
+        Ok(Response::new(SystemStatus {
+            evm_account:addr,
+            evm_balance:"0".to_string(),
+            node_url:self.node_url.to_string()
+        }))
     }
 
     async fn run_query(
