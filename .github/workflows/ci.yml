@@ -69,8 +69,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Docker image
         run: |
-          cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:latest
-          docker push ghcr.io/dbpunk-labs/db3:latest
+          cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:test_latest
+          docker push ghcr.io/dbpunk-labs/db3:test_latest
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
