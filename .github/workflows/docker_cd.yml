@@ -26,6 +26,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
+      - name: Run MetaStore test
+        run: |
+          cd metadata
+          yarn install
+          npx hardhat compile
       - name: Setup test env
         run: |
           sudo apt-get install protobuf-compiler 

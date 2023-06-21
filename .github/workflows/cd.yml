@@ -35,6 +35,11 @@ jobs:
                   profile: minimal
                   override: true
 
+            - name: Build Contract
+              run: |
+                  cd metadata
+                  yarn install
+                  npx hardhat compile
             - uses: Swatinem/rust-cache@v2
             - name: Setup test env
               run: |

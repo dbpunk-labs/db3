@@ -47,6 +47,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
+      - name: Run MetaStore test
+        run: |
+          cd metadata
+          yarn install
+          npx hardhat test
       - name: Setup test env
         run: |
           sudo apt-get install protobuf-compiler 
@@ -57,9 +62,6 @@ jobs:
           tar -zxf tendermint_0.37.0-rc2_linux_amd64.tar.gz
           sh start_localnet.sh >tm.log 2>&1 &
           sleep 3
-          ../target/debug/db3 client new-db
-          sleep 1
-          ../target/debug/db3 client show-state
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
