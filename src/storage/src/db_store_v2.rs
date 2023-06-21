@@ -532,7 +532,6 @@ impl DBStoreV2 {
         let database = EventDatabase {
             address: db_addr.as_ref().to_vec(),
             sender: sender.as_ref().to_vec(),
-            chain_id: mutation.chain_id,
             desc: mutation.desc.to_string(),
             contract_address: mutation.contract_address.to_string(),
             ttl: mutation.ttl,

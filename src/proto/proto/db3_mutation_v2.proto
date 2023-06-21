@@ -46,13 +46,12 @@ message DocumentMutation {
 }
 
 message EventDatabaseMutation {
-  uint64 chain_id = 1;
-  string contract_address = 2;
-  uint64 ttl = 3;
-  string desc = 4;
-  repeated CollectionMutation tables = 5;
-  string events_json_abi = 6;
-  string evm_node_url = 7;
+  string contract_address = 1;
+  uint64 ttl = 2;
+  string desc = 3;
+  repeated CollectionMutation tables = 4;
+  string events_json_abi = 5;
+  string evm_node_url = 6;
 }
 
 message DocumentMask {

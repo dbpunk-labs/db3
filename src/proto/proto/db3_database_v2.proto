@@ -33,12 +33,11 @@ message DocumentDatabase {
 message EventDatabase {
   bytes address = 1;
   bytes sender = 2;
-  uint64 chain_id = 3;
-  string contract_address = 4;
-  string desc = 5;
-  uint64 ttl = 6;
-  string events_json_abi = 7;
-  string evm_node_url = 8;
+  string contract_address = 3;
+  string desc = 4;
+  uint64 ttl = 5;
+  string events_json_abi = 6;
+  string evm_node_url = 7;
 }
 
 message DatabaseMessage {
