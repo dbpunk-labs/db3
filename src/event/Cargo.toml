@@ -1,0 +1,16 @@
+[package]
+name = "db3-event"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ethers = { workspace = true , features=["ws"]}
+tracing = "0.1"
+db3-error={path="../error", version="0.1.0"}
+db3-crypto={path="../crypto", version="0.1.0"}
+serde_json = { workspace=true}
+db3-storage={path="../storage", version="0.1.0"}
+ethabi = { version = "18.0.0", default-features = false, features = ["full-serde", "rlp"] }
+hex = "0.4.3"
+[dev-dependencies]
+tokio = { version = "1.17.0", features = ["full"] }

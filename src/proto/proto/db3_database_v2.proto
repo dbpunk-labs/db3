@@ -34,10 +34,11 @@ message EventDatabase {
   bytes address = 1;
   bytes sender = 2;
   uint64 chain_id = 3;
-  bytes contract_address = 4;
+  string contract_address = 4;
   string desc = 5;
-  repeated EventTable tables = 6;
-  uint64 ttl = 7;
+  uint64 ttl = 6;
+  string events_json_abi = 7;
+  string evm_node_url = 8;
 }
 
 message DatabaseMessage {
@@ -49,6 +50,7 @@ message DatabaseMessage {
 
 message EventTable {
   string name = 1;
+  repeated Index index_fields = 2;
 }
 
 message Collection {

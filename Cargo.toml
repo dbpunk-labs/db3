@@ -10,6 +10,7 @@ members = [
     "src/storage",
     "src/node",
     "src/sdk",
+    "src/event",
     "src/cmd"
 ]
 

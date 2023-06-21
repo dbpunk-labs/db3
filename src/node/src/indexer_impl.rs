@@ -19,12 +19,15 @@ use crate::mutation_utils::MutationUtil;
 use db3_base::bson_util::bytes_to_bson_document;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
+use db3_event::event_processor::EventProcessor;
+use db3_event::event_processor::EventProcessorConfig;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
     SystemStatus,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
+use db3_proto::db3_mutation_v2_proto::EventDatabaseMutation;
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
 use db3_proto::db3_storage_proto::event_message;
@@ -34,9 +37,11 @@ use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
 use ethers::prelude::{LocalWallet, Signer};
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use tokio::task;
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
@@ -49,6 +54,7 @@ pub struct IndexerNodeImpl {
     key_root_path: String,
     contract_addr: String,
     evm_node_url: String,
+    processor_mapping: Arc<Mutex<HashMap<String, Arc<EventProcessor>>>>,
 }
 
 impl IndexerNodeImpl {
@@ -68,6 +74,8 @@ impl IndexerNodeImpl {
             key_root_path,
             contract_addr,
             evm_node_url,
+            //TODO recover from the database
+            processor_mapping: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -114,7 +122,7 @@ impl IndexerNodeImpl {
 
                 let mutations = response.mutations;
                 debug!("Block mutations size: {:?}", mutations.len());
-                self.parse_and_apply_mutations(&mutations)?;
+                self.parse_and_apply_mutations(&mutations).await?;
             }
             _ => {}
         }
@@ -144,7 +152,55 @@ impl IndexerNodeImpl {
         }
     }
 
-    fn parse_and_apply_mutations(&self, mutations: &Vec<MutationWrapper>) -> Result<()> {
+    async fn start_an_event_task(
+        &self,
+        db: &DB3Address,
+        mutation: &EventDatabaseMutation,
+    ) -> Result<()> {
+        let config = EventProcessorConfig {
+            evm_node_url: mutation.evm_node_url.to_string(),
+            db_addr: db.to_hex(),
+            abi: mutation.events_json_abi.to_string(),
+            target_events: mutation
+                .tables
+                .iter()
+                .map(|t| t.collection_name.to_string())
+                .collect(),
+            contract_addr: mutation.contract_address.to_string(),
+        };
+        let processor = Arc::new(
+            EventProcessor::new(config, self.db_store.clone())
+                .await
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?,
+        );
+        match self.processor_mapping.lock() {
+            Ok(mut mapping) => {
+                //TODO limit the total count
+                if mapping.contains_key(mutation.contract_address.as_str()) {
+                    warn!("contract addr {} exist", mutation.contract_address.as_str());
+                    return Err(DB3Error::WriteStoreError(format!(
+                        "contract_addr {} exist",
+                        mutation.contract_address.as_str()
+                    )));
+                }
+                mapping.insert(mutation.contract_address.to_string(), processor.clone());
+            }
+            _ => todo!(),
+        }
+
+        task::spawn(async move {
+            if let Err(e) = processor
+                .start()
+                .await
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))
+            {
+                warn!("fail to start event processor for {e}");
+            }
+        });
+        Ok(())
+    }
+
+    async fn parse_and_apply_mutations(&self, mutations: &Vec<MutationWrapper>) -> Result<()> {
         for mutation in mutations.iter() {
             let body = mutation.body.as_ref().unwrap();
             // validate the signature
@@ -161,6 +217,33 @@ impl IndexerNodeImpl {
                 )),
             }?;
             match action {
+                MutationAction::CreateEventDb => {
+                    for body in dm.bodies {
+                        if let Some(Body::EventDatabaseMutation(ref mutation)) = &body.body {
+                            let db_id = self
+                                .db_store
+                                .create_event_database(
+                                    &address,
+                                    mutation,
+                                    nonce,
+                                    self.network_id.load(Ordering::Relaxed),
+                                    block,
+                                    order,
+                                )
+                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                            self.start_an_event_task(db_id.address(), mutation)
+                                .await
+                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                            let db_id_hex = db_id.to_hex();
+                            info!(
+                                "add event database with addr {} from owner {}",
+                                db_id_hex.as_str(),
+                                address.to_hex().as_str()
+                            );
+                            break;
+                        }
+                    }
+                }
                 MutationAction::CreateDocumentDb => {
                     for body in dm.bodies {
                         if let Some(Body::DocDatabaseMutation(ref doc_db_mutation)) = &body.body {
@@ -307,9 +390,6 @@ impl IndexerNodeImpl {
                                 );
                         }
                     }
-                }
-                _ => {
-                    warn!("unsupported mutation action: {:?}", action);
                 }
             }
         }

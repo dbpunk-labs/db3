@@ -26,9 +26,11 @@ use crate::db_doc_key_v2::DbDocKeyV2;
 use crate::doc_store::{DocStore, DocStoreConfig};
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
-    database_message, Collection, DatabaseMessage, Document, DocumentDatabase, Query,
+    database_message, Collection, DatabaseMessage, Document, DocumentDatabase, EventDatabase, Query,
 };
-use db3_proto::db3_mutation_v2_proto::{CollectionMutation, DocumentDatabaseMutation};
+use db3_proto::db3_mutation_v2_proto::{
+    CollectionMutation, DocumentDatabaseMutation, EventDatabaseMutation,
+};
 use prost::Message;
 use rocksdb::{DBRawIteratorWithThreadMode, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
@@ -505,6 +507,70 @@ impl DBStoreV2 {
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         Ok(())
     }
+
+    pub fn create_event_database(
+        &self,
+        sender: &DB3Address,
+        mutation: &EventDatabaseMutation,
+        nonce: u64,
+        network_id: u64,
+        block: u64,
+        order: u32,
+    ) -> Result<DbId> {
+        let db_addr = DbId::from((sender, nonce, network_id));
+        let db_store_cf_handle = self
+            .se
+            .cf_handle(self.config.db_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let db_owner_store_cf_handle = self
+            .se
+            .cf_handle(self.config.db_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let db_owner = DbOwnerKey(sender, block, order);
+        let db_owner_encoded_key = db_owner.encode()?;
+        //TODO check the name
+        let database = EventDatabase {
+            address: db_addr.as_ref().to_vec(),
+            sender: sender.as_ref().to_vec(),
+            chain_id: mutation.chain_id,
+            desc: mutation.desc.to_string(),
+            contract_address: mutation.contract_address.to_string(),
+            ttl: mutation.ttl,
+            events_json_abi: mutation.events_json_abi.to_string(),
+            evm_node_url: mutation.evm_node_url.to_string(),
+        };
+        let database_msg = DatabaseMessage {
+            database: Some(database_message::Database::EventDb(database)),
+        };
+        let mut buf = BytesMut::with_capacity(1024);
+        database_msg
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let buf = buf.freeze();
+        let mut batch = WriteBatch::default();
+        batch.put_cf(&db_store_cf_handle, db_addr.as_ref(), buf.as_ref());
+        batch.put_cf(
+            &db_owner_store_cf_handle,
+            &db_owner_encoded_key,
+            db_addr.as_ref(),
+        );
+
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+
+        for (idx, cm) in mutation.tables.iter().enumerate() {
+            self.create_collection(sender, db_addr.address(), cm, block, order, idx as u16)?;
+        }
+
+        if self.config.enable_doc_store {
+            self.doc_store
+                .create_database(db_addr.address())
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        }
+        Ok(db_addr)
+    }
+
     pub fn create_doc_database(
         &self,
         sender: &DB3Address,
