@@ -126,7 +126,6 @@ mod tests {
             key_derive::derive_key_pair_from_path(&seed, None, &SignatureScheme::ED25519).unwrap();
         address
     }
-
     #[test]
     fn it_account_smoke_test() {
         let tmp_dir_path = TempDir::new("apply_account").expect("create temp dir");

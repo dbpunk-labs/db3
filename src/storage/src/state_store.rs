@@ -18,7 +18,7 @@
 use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_v2_proto::DatabaseMessage;
+use db3_proto::db3_base_proto::SystemConfig;
 use libmdbx::{Database, NoWriteMap, TableFlags, WriteFlags};
 use prost::Message;
 use std::path::Path;
@@ -26,7 +26,7 @@ use std::sync::Arc;
 use tracing::info;
 
 const ACCOUNT_META_TABLE: &str = "ACCOUNT_META_TABLE";
-const DATABASE_META_TABLE: &str = "DATABASE_META_TABLE";
+const CONFIG_META_TABLE: &str = "CONFIG_META_TABLE";
 
 type DB = Database<NoWriteMap>;
 
@@ -53,7 +53,7 @@ impl StateStore {
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
         txn.create_table(Some(ACCOUNT_META_TABLE), TableFlags::CREATE)
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
-        txn.create_table(Some(DATABASE_META_TABLE), TableFlags::CREATE)
+        txn.create_table(Some(CONFIG_META_TABLE), TableFlags::CREATE)
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
         txn.commit()
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
@@ -62,58 +62,6 @@ impl StateStore {
             config.db_path.as_str()
         );
         Ok(Self { db })
-    }
-
-    pub fn add_database(&self, id: &DB3Address, db: &DatabaseMessage) -> Result<()> {
-        let txn = self
-            .db
-            .begin_rw_txn()
-            .map_err(|e| DB3Error::WriteStoreError(format!("open tx {e}")))?;
-        let table = txn
-            .open_table(Some(DATABASE_META_TABLE))
-            .map_err(|e| DB3Error::WriteStoreError(format!("open table {e}")))?;
-        let value = txn
-            .get::<Vec<u8>>(&table, id.as_ref())
-            .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
-        if let Some(_) = value {
-            Err(DB3Error::WriteStoreError(format!(
-                "database with address {} exist",
-                id.to_hex()
-            )))
-        } else {
-            let mut buf = BytesMut::with_capacity(8 * 1024);
-            db.encode(&mut buf)
-                .map_err(|e| DB3Error::WriteStoreError(format!("{}", e)))?;
-            let buf = buf.freeze();
-            txn.put(&table, id.as_ref(), &buf, WriteFlags::UPSERT)
-                .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
-            txn.commit()
-                .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
-            Ok(())
-        }
-    }
-
-    pub fn get_database(&self, id: &DB3Address) -> Result<Option<DatabaseMessage>> {
-        let tx = self
-            .db
-            .begin_ro_txn()
-            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
-        let table = tx
-            .open_table(Some(DATABASE_META_TABLE))
-            .map_err(|e| DB3Error::ReadStoreError(format!("open table {e}")))?;
-        let value = tx
-            .get::<Vec<u8>>(&table, id.as_ref())
-            .map_err(|e| DB3Error::ReadStoreError(format!("get value with key {e}")))?;
-        if let Some(v) = value {
-            match DatabaseMessage::decode(v.as_ref()) {
-                Ok(db) => Ok(Some(db)),
-                Err(e) => Err(DB3Error::ReadStoreError(format!(
-                    "fail to decode database message {e}"
-                ))),
-            }
-        } else {
-            Ok(None)
-        }
     }
 
     pub fn get_nonce(&self, id: &DB3Address) -> Result<u64> {
@@ -131,6 +79,49 @@ impl StateStore {
             Ok(u64::from_be_bytes(v))
         } else {
             Ok(0)
+        }
+    }
+
+    pub fn store_node_config(&self, key: &str, config: &SystemConfig) -> Result<()> {
+        let txn = self
+            .db
+            .begin_rw_txn()
+            .map_err(|e| DB3Error::WriteStoreError(format!("open tx {e}")))?;
+        let table = txn
+            .open_table(Some(CONFIG_META_TABLE))
+            .map_err(|e| DB3Error::WriteStoreError(format!("open table {e}")))?;
+        let mut buf = BytesMut::with_capacity(8 * 1024);
+        config
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{}", e)))?;
+        let buf = buf.freeze();
+        txn.put(&table, key.as_bytes(), &buf, WriteFlags::UPSERT)
+            .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+        txn.commit()
+            .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+        Ok(())
+    }
+
+    pub fn get_node_config(&self, key: &str) -> Result<Option<SystemConfig>> {
+        let tx = self
+            .db
+            .begin_ro_txn()
+            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+        let table = tx
+            .open_table(Some(CONFIG_META_TABLE))
+            .map_err(|e| DB3Error::ReadStoreError(format!("open table {e}")))?;
+        let value = tx
+            .get::<Vec<u8>>(&table, key.as_bytes())
+            .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+        if let Some(v) = value {
+            match SystemConfig::decode(v.as_ref()) {
+                Ok(config) => Ok(Some(config)),
+                Err(e) => Err(DB3Error::ReadStoreError(format!(
+                    "fail to decode database message {e}"
+                ))),
+            }
+        } else {
+            Ok(None)
         }
     }
 
@@ -214,36 +205,6 @@ mod tests {
             assert_eq!(false, result.is_ok());
             let nonce = store.incr_nonce(&DB3Address::ZERO, 2).unwrap();
             assert_eq!(2, nonce);
-        } else {
-            assert!(false)
-        }
-    }
-
-    #[test]
-    fn test_add_database() {
-        let tmp_dir_path = TempDir::new("database").expect("create temp dir");
-        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
-        let config = StateStoreConfig { db_path: real_path };
-        if let Ok(store) = StateStore::new(config) {
-            if let Ok(Some(_db)) = store.get_database(&DB3Address::ZERO) {
-                assert!(false);
-            }
-            let dd = DocumentDatabase {
-                address: DB3Address::ZERO.as_ref().to_vec(),
-                sender: DB3Address::ZERO.as_ref().to_vec(),
-                desc: "".to_string(),
-            };
-            let dm = DatabaseMessage {
-                database: Some(database_message::Database::DocDb(dd)),
-            };
-            if let Err(_) = store.add_database(&DB3Address::ZERO, &dm) {
-                assert!(false);
-            }
-            if let Ok(Some(_db)) = store.get_database(&DB3Address::ZERO) {
-                assert!(true);
-            } else {
-                assert!(false);
-            }
         } else {
             assert!(false)
         }

@@ -30,6 +30,7 @@ fi
 # clean db3
 killall  db3 ganache
 ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+
 if [ -e ./db ]
 then
     rm -rf db
@@ -58,9 +59,14 @@ if [ -e ./indexer_meta_db ]
 then
     rm -rf indexer_meta_db
 fi
-
+mkdir -p ./keys
+echo "start db3 store..."
+../target/${BUILD_MODE}/db3 store --rollup-interval 60000 --block-interval=500 --contract-addr=0xb9709ce5e749b80978182db1bedfb8c7340039a9 --evm-node-url=https://polygon-mumbai.g.alchemy.com/v2/kiuid-hlfzpnletzqdvwo38iqn0giefr>store.log 2>&1  &
+sleep 1
+AR_ADDRESS=`less store.log | grep filestore | awk '{print $NF}'`
+echo "the ar address parsed ${AR_ADDRESS}"
 echo "start ar miner..."
-bash ./ar_miner.sh > miner.log 2>&1 &
+bash ./ar_miner.sh ${AR_ADDRESS}> miner.log 2>&1 &
 echo "start db3 node..."
 ./tendermint init > tm.log 2>&1 
 export RUST_BACKTRACE=1
@@ -70,12 +76,8 @@ echo "start tendermint node..."
 ./tendermint unsafe_reset_all >> tm.log 2>&1  && ./tendermint start >> tm.log 2>&1 &
 sleep 1
 
-echo "start db3 store..."
-../target/${BUILD_MODE}/db3 store --rollup-interval 60000 --block-interval=500 >store.log 2>&1  &
-sleep 1
-
 echo "start db3 indexer..."
-../target/${BUILD_MODE}/db3 indexer >indexer.log 2>&1  &
+../target/${BUILD_MODE}/db3 indexer  --contract-addr=0xb9709ce5e749b80978182db1bedfb8c7340039a9 --evm-node-url=https://polygon-mumbai.g.alchemy.com/v2/kiuid-hlfzpnletzqdvwo38iqn0giefr> indexer.log 2>&1  &
 sleep 1
 
 while true; do sleep 1 ; done

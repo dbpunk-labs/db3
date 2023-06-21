@@ -18,6 +18,7 @@ syntax = "proto3";
 
 package db3_storage_proto;
 
+import "db3_base.proto";
 import "db3_database_v2.proto";
 import "db3_mutation_v2.proto";
 import "db3_rollup.proto";
@@ -154,6 +155,27 @@ message BlockResponse {
   repeated MutationWrapper mutations = 3;
 }
 
+message GetSystemStatusRequest {}
+
+message SystemStatus {
+  string evm_account = 1;
+  string evm_balance = 2;
+  string ar_account = 3;
+  string ar_balance = 4;
+  string node_url = 5;
+  db3_base_proto.SystemConfig config = 6;
+}
+
+message SetupRequest {
+  string signature = 1;
+  bytes payload = 2;
+}
+
+message SetupResponse {
+  int64 code = 1;
+  string msg = 2;
+}
+
 service StorageNode {
   rpc SendMutation(SendMutationRequest) returns (SendMutationResponse) {}
   rpc GetNonce(GetNonceRequest) returns (GetNonceResponse) {}
@@ -167,4 +189,6 @@ service StorageNode {
   rpc Subscribe(SubscribeRequest) returns (stream EventMessage) {}
   // method for get block
   rpc GetBlock(BlockRequest) returns (BlockResponse) {}
+  rpc GetSystemStatus(GetSystemStatusRequest) returns (SystemStatus) {}
+  rpc Setup(SetupRequest) returns (SetupResponse) {}
 }

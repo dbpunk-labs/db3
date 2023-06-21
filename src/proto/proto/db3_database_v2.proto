@@ -90,7 +90,6 @@ message Query {
   repeated QueryParameter parameters = 2;
 }
 
-
 // A Firestore query.
 message StructuredQuery {
   // A filter.

@@ -18,6 +18,7 @@
 syntax = "proto3";
 package db3_indexer_proto;
 
+import "db3_base.proto";
 import "db3_database_v2.proto";
 
 message IndexerStatus {
@@ -38,15 +39,27 @@ message RunQueryResponse {
   repeated db3_database_v2_proto.Document documents = 2;
 }
 
-message ShowIndexerStatusRequest {}
+message GetSystemStatusRequest {}
+message SystemStatus {
+  string evm_account = 1;
+  string evm_balance = 2;
+  string node_url = 3;
+  db3_base_proto.SystemConfig config = 4;
+}
+
+message SetupRequest {
+  string signature = 1;
+  bytes payload = 2;
+}
+
+message SetupResponse {
+  int64 code = 1;
+  string msg = 2;
+}
 
 service IndexerNode {
-  // method for show indexer status
-  rpc ShowIndexerStatus(ShowIndexerStatusRequest) returns (IndexerStatus) {}
-  // method for show database
-  //  rpc ShowDatabase(ShowDatabaseRequest) returns (ShowDatabaseResponse) {}
+  rpc GetSystemStatus(GetSystemStatusRequest) returns (SystemStatus) {}
   //  // method for query document
   rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
-  //  // method for get document
-  //  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse) {}
+  rpc Setup(SetupRequest) returns (SetupResponse) {}
 }

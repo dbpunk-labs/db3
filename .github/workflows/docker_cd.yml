@@ -1,0 +1,49 @@
+name: CI # Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+
+  docker_image:
+    name: build_pr_image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: taiki-e/install-action@nextest
+      - name: Setup build env
+        run: |
+          sudo apt-get install protobuf-compiler 
+          protoc --version
+          ROOT_DIR=`pwd`
+          cd ${ROOT_DIR}/metadata && yarn install && npx hardhat compile
+          ls ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/
+          cd ${ROOT_DIR} && cargo build
+          cp ${ROOT_DIR}/target/debug/db3 ${ROOT_DIR}/docker/
+      - name: docker login
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:${git_hash}
+          docker push ghcr.io/dbpunk-labs/db3:${git_hash}
+          echo "the image is ghcr.io/dbpunk-labs/db3:${git_hash}"

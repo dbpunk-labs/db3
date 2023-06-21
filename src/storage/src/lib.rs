@@ -30,5 +30,7 @@ pub mod db_store_v2;
 pub mod doc_key_v2;
 pub mod doc_store;
 pub mod key;
+pub mod key_store;
+pub mod meta_store_client;
 pub mod mutation_store;
 pub mod state_store;
