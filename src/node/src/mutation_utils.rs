@@ -11,7 +11,7 @@ use db3_proto::db3_session_proto::QuerySession;
 use ethers::core::types::Bytes as EthersBytes;
 use ethers::types::{
     transaction::eip712::{Eip712, TypedData},
-    Signature,
+    Address, Signature,
 };
 use prost::Message;
 use std::str::FromStr;
@@ -47,6 +47,47 @@ impl MutationUtil {
     parse_mutation!(parse_database_mutation, DatabaseMutation);
     parse_mutation!(parse_mint_credits_mutation, MintCreditsMutation);
     parse_mutation!(parse_query_session, QuerySession);
+
+    pub fn get_str_field<'a>(data: &'a TypedData, name: &'a str, default_val: &'a str) -> &'a str {
+        if let Some(v) = data.message.get(name) {
+            if let Some(t) = v.as_str() {
+                t
+            } else {
+                default_val
+            }
+        } else {
+            default_val
+        }
+    }
+
+    pub fn get_u64_field(data: &TypedData, name: &str, default_val: u64) -> u64 {
+        if let Some(v) = data.message.get(name) {
+            if let Some(t) = v.as_u64() {
+                t
+            } else {
+                default_val
+            }
+        } else {
+            default_val
+        }
+    }
+
+    pub fn verify_setup(payload: &[u8], sig: &str) -> Result<(Address, TypedData), DB3Error> {
+        match serde_json::from_slice::<TypedData>(payload) {
+            Ok(data) => {
+                let signature = Signature::from_str(sig).map_err(|e| {
+                    DB3Error::ApplyMutationError(format!("invalid signature for err {e}"))
+                })?;
+                let address = signature.recover_typed_data(&data).map_err(|e| {
+                    DB3Error::ApplyMutationError(format!("invalid typed data for err {e}"))
+                })?;
+                Ok((address, data))
+            }
+            Err(e) => Err(DB3Error::ApplyMutationError(format!(
+                "bad typed data for err {e}"
+            ))),
+        }
+    }
     /// unwrap and verify write request
     pub fn unwrap_and_light_verify(
         payload: &[u8],

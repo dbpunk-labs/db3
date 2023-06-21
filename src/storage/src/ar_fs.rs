@@ -15,6 +15,7 @@
 // limitations under the License.
 //
 
+use crate::key_store::{KeyStore, KeyStoreConfig};
 use arweave_rs::crypto::base64::Base64;
 use arweave_rs::currency::Currency;
 use arweave_rs::{
@@ -23,9 +24,9 @@ use arweave_rs::{
     wallet::WalletInfoClient,
     Arweave,
 };
-
 use db3_error::{DB3Error, Result};
 use http::StatusCode;
+use rsa::{pkcs8::DecodePrivateKey, pkcs8::EncodePrivateKey, RsaPrivateKey};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -34,8 +35,8 @@ use tracing::info;
 
 #[derive(Clone)]
 pub struct ArFileSystemConfig {
-    pub wallet_path: String,
     pub arweave_url: String,
+    pub key_root_path: String,
 }
 
 pub struct ArFileSystem {
@@ -45,19 +46,53 @@ pub struct ArFileSystem {
 
 impl ArFileSystem {
     pub fn new(config: ArFileSystemConfig) -> Result<Self> {
-        let arweave_url = url::Url::from_str(config.arweave_url.as_str())
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let path = Path::new(config.wallet_path.as_str());
-        let arweave = Arweave::from_keypair_path(&path, arweave_url.clone())
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        let arweave =
+            Self::build_arweave(config.key_root_path.as_str(), config.arweave_url.as_str())?;
         let addr = arweave.get_wallet_address();
         info!(
-            "new ar filestore with url {} and adr {}",
+            "new ar filestore with url {} and addr {}",
             config.arweave_url.as_str(),
             addr.as_str()
         );
+        let arweave_url = url::Url::from_str(config.arweave_url.as_str())
+            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+
         let wallet = WalletInfoClient::new(arweave_url);
         Ok(Self { arweave, wallet })
+    }
+
+    fn build_arweave(key_root_path: &str, url: &str) -> Result<Arweave> {
+        let arweave_url =
+            url::Url::from_str(url).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        info!("recover ar key store from {}", key_root_path);
+        let key_store_config = KeyStoreConfig {
+            key_root_path: key_root_path.to_string(),
+        };
+        let key_store = KeyStore::new(key_store_config);
+        match key_store.has_key("ar") {
+            true => {
+                let data = key_store.get_key("ar")?;
+                let data_ref: &[u8] = &data;
+                let priv_key: RsaPrivateKey = RsaPrivateKey::from_pkcs8_der(data_ref)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                Arweave::from_private_key(priv_key, arweave_url)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))
+            }
+            false => {
+                let mut rng = rand::thread_rng();
+                let bits = 2048;
+                let priv_key = RsaPrivateKey::new(&mut rng, bits)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                let doc = priv_key
+                    .to_pkcs8_der()
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                key_store
+                    .write_key("ar", doc.as_ref())
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                Arweave::from_private_key(priv_key, arweave_url)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))
+            }
+        }
     }
 
     pub fn get_address(&self) -> String {

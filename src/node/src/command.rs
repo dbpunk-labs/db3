@@ -117,11 +117,15 @@ pub enum DB3Command {
         #[clap(long, default_value = "http://127.0.0.1:1984/")]
         ar_node_url: String,
         /// The Ar wallet path
-        #[clap(long, default_value = "./wallet.json")]
-        ar_key_path: String,
+        #[clap(long, default_value = "./keys")]
+        key_root_path: String,
         /// The min gc round offset
         #[clap(long, default_value = "8")]
         min_gc_round_offset: u64,
+        #[clap(long, default_value = "0x7b68E10c80474DD93bD8C1ad53D4463c60a3AB7c")]
+        contract_addr: String,
+        #[clap(long, default_value = "http://127.0.0.1:8545")]
+        evm_node_url: String,
     },
 
     /// Start db3 network
@@ -189,6 +193,16 @@ pub enum DB3Command {
         meta_db_path: String,
         #[clap(short, long, default_value = "./index_doc_db")]
         doc_db_path: String,
+        #[clap(short, long, default_value = "./keys")]
+        key_root_path: String,
+        #[clap(
+            short,
+            long,
+            default_value = "0x7b68E10c80474DD93bD8C1ad53D4463c60a3AB7c"
+        )]
+        contract_addr: String,
+        #[clap(long, default_value = "http://127.0.0.1:8545")]
+        evm_node_url: String,
         #[clap(long, default_value = "10")]
         network_id: u64,
         #[clap(short, long)]
@@ -282,8 +296,10 @@ impl DB3Command {
                 rollup_min_data_size,
                 rollup_data_path,
                 ar_node_url,
-                ar_key_path,
+                key_root_path,
                 min_gc_round_offset,
+                contract_addr,
+                evm_node_url,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -304,8 +320,10 @@ impl DB3Command {
                     rollup_min_data_size,
                     rollup_data_path.as_str(),
                     ar_node_url.as_str(),
-                    ar_key_path.as_str(),
+                    key_root_path.as_str(),
                     min_gc_round_offset,
+                    contract_addr.as_str(),
+                    evm_node_url.as_str(),
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -338,6 +356,9 @@ impl DB3Command {
                 db3_storage_grpc_url,
                 meta_db_path,
                 doc_db_path,
+                key_root_path,
+                contract_addr,
+                evm_node_url,
                 network_id,
                 verbose,
             } => {
@@ -368,9 +389,16 @@ impl DB3Command {
                     enable_doc_store: true,
                     doc_store_conf,
                 };
-
-                let indexer = IndexerNodeImpl::new(db_store_config, network_id).unwrap();
                 let addr = format!("{public_host}:{public_grpc_port}");
+                let indexer = IndexerNodeImpl::new(
+                    db_store_config,
+                    network_id,
+                    addr.to_string(),
+                    key_root_path,
+                    contract_addr,
+                    evm_node_url,
+                )
+                .unwrap();
                 let indexer_for_syncing = indexer.clone();
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
@@ -490,15 +518,17 @@ impl DB3Command {
         rollup_min_data_size: u64,
         rollup_data_path: &str,
         ar_node_url: &str,
-        ar_key_path: &str,
+        key_root_path: &str,
         min_gc_round_offset: u64,
+        contract_addr: &str,
+        evm_node_url: &str,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
         let rollup_config = RollupExecutorConfig {
             rollup_interval,
             temp_data_path: rollup_data_path.to_string(),
             ar_node_url: ar_node_url.to_string(),
-            ar_key_path: ar_key_path.to_string(),
+            key_root_path: key_root_path.to_string(),
             min_rollup_size: rollup_min_data_size,
             min_gc_round_offset,
         };
@@ -540,6 +570,9 @@ impl DB3Command {
             db_store_config,
             network_id,
             block_interval,
+            node_url: addr.to_string(),
+            contract_addr: contract_addr.to_string(),
+            evm_node_url: evm_node_url.to_string(),
         };
         let storage_node = StorageNodeV2Impl::new(config, sender).unwrap();
         info!(

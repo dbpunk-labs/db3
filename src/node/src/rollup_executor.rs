@@ -23,13 +23,17 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
+use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::mutation_store::MutationStore;
+use ethers::prelude::{LocalWallet, Signer};
 use parquet::arrow::arrow_writer::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::basic::GzipLevel;
 use parquet::file::properties::WriterProperties;
 use std::fs::File;
+use std::ops::Deref;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tempdir::TempDir;
@@ -40,25 +44,30 @@ pub struct RollupExecutorConfig {
     // the interval in ms
     pub rollup_interval: u64,
     pub temp_data_path: String,
-    pub ar_key_path: String,
     pub ar_node_url: String,
     pub min_rollup_size: u64,
     pub min_gc_round_offset: u64,
+    pub key_root_path: String,
 }
 
 pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
     schema: SchemaRef,
-    network_id: u64,
+    network_id: Arc<AtomicU64>,
     ar_filesystem: ArFileSystem,
+    wallet: LocalWallet,
+    min_rollup_size: Arc<AtomicU64>,
 }
+
+unsafe impl Sync for RollupExecutor {}
+unsafe impl Send for RollupExecutor {}
 
 impl RollupExecutor {
     pub fn new(
         config: RollupExecutorConfig,
         storage: MutationStore,
-        network_id: u64,
+        network_id: Arc<AtomicU64>,
     ) -> Result<Self> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("payload", DataType::Binary, true),
@@ -66,18 +75,47 @@ impl RollupExecutor {
             Field::new("block", DataType::UInt64, true),
             Field::new("order", DataType::UInt32, true),
         ]));
+
         let ar_fs_config = ArFileSystemConfig {
-            wallet_path: config.ar_key_path.to_string(),
+            key_root_path: config.key_root_path.to_string(),
             arweave_url: config.ar_node_url.to_string(),
         };
+        let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
+        let min_rollup_size = config.min_rollup_size;
         Ok(Self {
             config,
             storage,
             schema,
             ar_filesystem,
             network_id,
+            wallet,
+            min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
         })
+    }
+
+    fn build_wallet(key_root_path: &str) -> Result<LocalWallet> {
+        let config = KeyStoreConfig {
+            key_root_path: key_root_path.to_string(),
+        };
+        let key_store = KeyStore::new(config);
+        match key_store.has_key("evm") {
+            true => {
+                let data = key_store.get_key("evm")?;
+                let data_ref: &[u8] = &data;
+                let wallet = LocalWallet::from_bytes(data_ref)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                Ok(wallet)
+            }
+
+            false => {
+                let mut rng = rand::thread_rng();
+                let wallet = LocalWallet::new(&mut rng);
+                let data = wallet.signer().to_bytes();
+                key_store.write_key("evm", data.deref())?;
+                Ok(wallet)
+            }
+        }
     }
 
     fn convert_to_recordbatch(
@@ -201,6 +239,28 @@ impl RollupExecutor {
         }
     }
 
+    pub async fn get_ar_account(&self) -> Result<(String, String)> {
+        let addr = self.ar_filesystem.get_address();
+        let balance = self.ar_filesystem.get_balance().await?;
+        Ok((addr, balance.to_string()))
+    }
+
+    pub async fn get_evm_account(&self) -> Result<String> {
+        Ok(format!(
+            "0x{}",
+            hex::encode(self.wallet.address().as_bytes())
+        ))
+    }
+
+    pub fn update_min_rollup_size(&self, min_rollup_data_size: u64) {
+        self.min_rollup_size
+            .store(min_rollup_data_size, Ordering::Relaxed)
+    }
+
+    pub fn get_min_rollup_size(&self) -> u64 {
+        self.min_rollup_size.load(Ordering::Relaxed)
+    }
+
     pub async fn process(&self) -> Result<()> {
         let (_last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
             Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
@@ -231,7 +291,7 @@ impl RollupExecutor {
         let recordbatch = self.convert_to_recordbatch(&mutations)?;
         let memory_size = recordbatch.get_array_memory_size();
 
-        if memory_size < self.config.min_rollup_size as usize {
+        if memory_size < self.min_rollup_size.load(Ordering::Relaxed) as usize {
             info!(
                 "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
                 self.config.min_rollup_size, memory_size
@@ -252,7 +312,7 @@ impl RollupExecutor {
                 tx.as_str(),
                 last_end_block,
                 current_block,
-                self.network_id,
+                self.network_id.load(Ordering::Relaxed),
                 filename.as_str(),
             )
             .await?;
