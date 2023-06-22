@@ -24,6 +24,7 @@ db3-error={path="../error", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
 db3-sdk={path="../sdk", version="0.1.0"}
 db3-session={path="../session", version="0.1.0"}
+db3-event={path="../event", version="0.1.0"}
 ethers = { workspace = true }
 tonic = { workspace = true }
 tonic-web = { workspace = true }

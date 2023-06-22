@@ -29,12 +29,12 @@ use db3_proto::db3_storage_proto::event_message::Event as EventV2;
 use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, BlockRequest, BlockResponse, ExtraItem,
     GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest,
-    GetDatabaseOfOwnerResponse, GetMutationBodyRequest, GetMutationBodyResponse,
-    GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
-    GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
-    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse, SetupRequest, SetupResponse, SubscribeRequest,
-    SystemStatus,
+    GetDatabaseOfOwnerResponse, GetDatabaseRequest, GetDatabaseResponse, GetMutationBodyRequest,
+    GetMutationBodyResponse, GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest,
+    GetNonceResponse, GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse,
+    ScanMutationHeaderRequest, ScanMutationHeaderResponse, ScanRollupRecordRequest,
+    ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse, SetupRequest,
+    SetupResponse, SubscribeRequest, SystemStatus,
 };
 
 use db3_base::bson_util::bytes_to_bson_document;
@@ -418,6 +418,20 @@ impl StorageNode for StorageNodeV2Impl {
         Ok(Response::new(BlockResponse { mutations }))
     }
 
+    async fn get_database(
+        &self,
+        request: Request<GetDatabaseRequest>,
+    ) -> std::result::Result<Response<GetDatabaseResponse>, Status> {
+        let r = request.into_inner();
+        let addr =
+            DB3Address::from_hex(r.addr.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
+
+        let database = self
+            .db_store
+            .get_database(&addr)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(GetDatabaseResponse { database }))
+    }
     async fn get_collection_of_database(
         &self,
         request: Request<GetCollectionOfDatabaseRequest>,
@@ -554,6 +568,44 @@ impl StorageNode for StorageNodeV2Impl {
                     .generate_mutation_block_and_order(&r.payload, r.signature.as_str())
                     .map_err(|e| Status::internal(format!("{e}")))?;
                 let response = match action {
+                    MutationAction::CreateEventDb => {
+                        let mut items: Vec<ExtraItem> = Vec::new();
+                        for body in dm.bodies {
+                            if let Some(Body::EventDatabaseMutation(ref mutation)) = &body.body {
+                                let db_id = self
+                                    .db_store
+                                    .create_event_database(
+                                        &address,
+                                        mutation,
+                                        nonce,
+                                        self.network_id.load(Ordering::Relaxed),
+                                        block,
+                                        order,
+                                    )
+                                    .map_err(|e| Status::internal(format!("{e}")))?;
+                                let db_id_hex = db_id.to_hex();
+                                info!(
+                                    "add database with addr {} from owner {}",
+                                    db_id_hex.as_str(),
+                                    address.to_hex().as_str()
+                                );
+                                let item = ExtraItem {
+                                    key: "db_addr".to_string(),
+                                    value: db_id_hex,
+                                };
+                                items.push(item);
+                                break;
+                            }
+                        }
+                        Response::new(SendMutationResponse {
+                            id,
+                            code: 0,
+                            msg: "ok".to_string(),
+                            items,
+                            block,
+                            order,
+                        })
+                    }
                     MutationAction::CreateDocumentDb => {
                         let mut items: Vec<ExtraItem> = Vec::new();
                         for body in dm.bodies {
@@ -760,14 +812,6 @@ impl StorageNode for StorageNodeV2Impl {
                             order,
                         })
                     }
-                    _ => Response::new(SendMutationResponse {
-                        id,
-                        code: 0,
-                        msg: "ok".to_string(),
-                        items: vec![],
-                        block,
-                        order,
-                    }),
                 };
                 self.storage
                     .add_mutation(
