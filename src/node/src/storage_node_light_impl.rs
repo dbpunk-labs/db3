@@ -29,12 +29,12 @@ use db3_proto::db3_storage_proto::event_message::Event as EventV2;
 use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, BlockRequest, BlockResponse, ExtraItem,
     GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest,
-    GetDatabaseOfOwnerResponse, GetMutationBodyRequest, GetMutationBodyResponse,
-    GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest, GetNonceResponse,
-    GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
-    ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse, SetupRequest, SetupResponse, SubscribeRequest,
-    SystemStatus,
+    GetDatabaseOfOwnerResponse, GetDatabaseRequest, GetDatabaseResponse, GetMutationBodyRequest,
+    GetMutationBodyResponse, GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest,
+    GetNonceResponse, GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse,
+    ScanMutationHeaderRequest, ScanMutationHeaderResponse, ScanRollupRecordRequest,
+    ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse, SetupRequest,
+    SetupResponse, SubscribeRequest, SystemStatus,
 };
 
 use db3_base::bson_util::bytes_to_bson_document;
@@ -418,6 +418,17 @@ impl StorageNode for StorageNodeV2Impl {
         Ok(Response::new(BlockResponse { mutations }))
     }
 
+    async fn get_database(
+        &self,
+        request: Request<GetDatabaseRequest>,
+    ) -> std::result::Result<Response<GetDatabaseResponse>, Status> {
+        let r = request.into_inner();
+        let addr = DB3Address::from_hex(r.db_addr.as_str())
+            .map_err(|e| Status::internal(format!("{e}")))?;
+
+        let database = self.db_store.get_database(&addr)?;
+        Ok(Response::new(GetDatabaseResponse { database }))
+    }
     async fn get_collection_of_database(
         &self,
         request: Request<GetCollectionOfDatabaseRequest>,
