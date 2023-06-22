@@ -423,10 +423,13 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<GetDatabaseRequest>,
     ) -> std::result::Result<Response<GetDatabaseResponse>, Status> {
         let r = request.into_inner();
-        let addr = DB3Address::from_hex(r.db_addr.as_str())
-            .map_err(|e| Status::internal(format!("{e}")))?;
+        let addr =
+            DB3Address::from_hex(r.addr.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
 
-        let database = self.db_store.get_database(&addr)?;
+        let database = self
+            .db_store
+            .get_database(&addr)
+            .map_err(|e| Status::internal(format!("{e}")))?;
         Ok(Response::new(GetDatabaseResponse { database }))
     }
     async fn get_collection_of_database(
