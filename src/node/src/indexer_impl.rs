@@ -404,7 +404,7 @@ impl IndexerNode for IndexerNodeImpl {
         &self,
         _request: Request<GetContractSyncStatusRequest>,
     ) -> std::result::Result<Response<GetContractSyncStatusResponse>, Status> {
-        let status_list = match self.processor_mapping.lock() {
+        let status_list: Vec<ContractSyncStatus> = match self.processor_mapping.lock() {
             Ok(mapping) => mapping
                 .iter()
                 .map(|ref processor| ContractSyncStatus {
@@ -416,6 +416,7 @@ impl IndexerNode for IndexerNodeImpl {
                 .collect(),
             _ => todo!(),
         };
+        info!("status count {}", status_list.len());
         Ok(Response::new(GetContractSyncStatusResponse { status_list }))
     }
 
