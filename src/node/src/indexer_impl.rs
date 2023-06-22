@@ -23,6 +23,7 @@ use db3_event::event_processor::EventProcessor;
 use db3_event::event_processor::EventProcessorConfig;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
+    ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
     GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
     SystemStatus,
 };
@@ -399,6 +400,25 @@ impl IndexerNodeImpl {
 
 #[tonic::async_trait]
 impl IndexerNode for IndexerNodeImpl {
+    async fn get_contract_sync_status(
+        &self,
+        _request: Request<GetContractSyncStatusRequest>,
+    ) -> std::result::Result<Response<GetContractSyncStatusResponse>, Status> {
+        let status_list = match self.processor_mapping.lock() {
+            Ok(mapping) => mapping
+                .iter()
+                .map(|ref processor| ContractSyncStatus {
+                    addr: processor.1.get_config().contract_addr.to_string(),
+                    evm_node_url: processor.1.get_config().evm_node_url.to_string(),
+                    block_number: processor.1.get_block_number(),
+                    event_number: processor.1.get_event_number(),
+                })
+                .collect(),
+            _ => todo!(),
+        };
+        Ok(Response::new(GetContractSyncStatusResponse { status_list }))
+    }
+
     async fn setup(
         &self,
         request: Request<SetupRequest>,

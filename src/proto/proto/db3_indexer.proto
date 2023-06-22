@@ -57,8 +57,21 @@ message SetupResponse {
   string msg = 2;
 }
 
+message ContractSyncStatus {
+  string addr = 1;
+  string evm_node_url = 2;
+  uint64 block_number = 3;
+  uint64 event_number = 4;
+}
+
+message GetContractSyncStatusResponse {
+  repeated ContractSyncStatus status_list = 1;
+}
+message GetContractSyncStatusRequest {}
+
 service IndexerNode {
   rpc GetSystemStatus(GetSystemStatusRequest) returns (SystemStatus) {}
+  rpc GetContractSyncStatus(GetContractSyncStatusRequest) returns (GetContractSyncStatusResponse) {}
   //  // method for query document
   rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
   rpc Setup(SetupRequest) returns (SetupResponse) {}

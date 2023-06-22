@@ -26,16 +26,17 @@ use ethers::{
     core::abi::Abi,
     providers::{Middleware, Provider, StreamExt, Ws},
 };
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Debug)]
 pub struct EventProcessorConfig {
     pub evm_node_url: String,
     pub db_addr: String,
     pub abi: String,
-    pub target_events: Vec<String>,
+    pub target_events: HashSet<String>,
     pub contract_addr: String,
 }
 
@@ -44,7 +45,10 @@ pub struct EventProcessor {
     provider: Arc<Provider<Ws>>,
     running: Arc<AtomicBool>,
     db_store: DBStoreV2,
+    block_number: Arc<AtomicU64>,
+    event_number: Arc<AtomicU64>,
 }
+
 unsafe impl Sync for EventProcessor {}
 unsafe impl Send for EventProcessor {}
 impl EventProcessor {
@@ -59,6 +63,8 @@ impl EventProcessor {
             provider: provider_arc,
             running: Arc::new(AtomicBool::new(false)),
             db_store,
+            block_number: Arc::new(AtomicU64::new(0)),
+            event_number: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -68,6 +74,18 @@ impl EventProcessor {
             "stop the event processor for db {}",
             self.config.db_addr.as_str()
         );
+    }
+
+    pub fn get_config<'a>(&'a self) -> &'a EventProcessorConfig {
+        &self.config
+    }
+
+    pub fn get_block_number(&self) -> u64 {
+        self.block_number.load(Ordering::Relaxed)
+    }
+
+    pub fn get_event_number(&self) -> u64 {
+        self.event_number.load(Ordering::Relaxed)
     }
 
     pub async fn start(&self) -> Result<()> {
@@ -95,7 +113,14 @@ impl EventProcessor {
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         while let Some(log) = stream.next().await {
             if !self.running.load(Ordering::Relaxed) {
+                info!(
+                    "stop event processor for contract {}",
+                    self.config.contract_addr.as_str()
+                );
                 break;
+            }
+            if let Some(number) = log.block_number {
+                self.block_number.store(number.as_u64(), Ordering::Relaxed)
             }
             for e in abi.events() {
                 // verify
@@ -107,21 +132,33 @@ impl EventProcessor {
                 if event_signature != &e.signature() {
                     continue;
                 }
+                if !self.config.target_events.contains(e.name.as_str()) {
+                    continue;
+                }
                 let raw_log = RawLog {
                     topics: log.topics.clone(),
                     data: log.data.to_vec(),
                 };
                 if let Ok(log_entry) = e.parse_log(raw_log) {
                     let json_value = Self::log_to_doc(&log_entry);
-                    //TODO handle error
-                    let json_str = vec![serde_json::to_string(&json_value)
-                        .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?];
-                    self.db_store.add_docs(
-                        &db_addr,
-                        &DB3Address::ZERO,
-                        e.name.as_str(),
-                        &json_str,
-                    )?;
+                    match serde_json::to_string(&json_value) {
+                        Ok(value) => {
+                            let values = vec![value.to_string()];
+                            if let Err(e) = self.db_store.add_docs(
+                                &db_addr,
+                                &DB3Address::ZERO,
+                                e.name.as_str(),
+                                &values,
+                            ) {
+                                warn!("fail to write json doc {} for {e}", value.as_str());
+                            } else {
+                                self.event_number.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                        Err(e) => {
+                            warn!("fail to convert to json for {e}");
+                        }
+                    }
                     break;
                 }
             }
@@ -166,7 +203,6 @@ mod tests {
             db_addr: "0xaaaaa".to_string(),
             abi: contract_abi.to_string(),
             target_events: vec![],
-            sender: "0xaaa".to_string(),
             contract_addr: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270".to_string(),
         };
     }
