@@ -116,6 +116,12 @@ message ScanRollupRecordResponse {
   repeated db3_rollup_proto.RollupRecord records = 1;
 }
 
+message GetDatabaseRequest {
+    string addr = 1;
+}
+message GetDatabaseResponse {
+  db3_database_v2_proto.DatabaseMessage database = 1;
+}
 message GetDatabaseOfOwnerRequest {
   // a hex string
   string owner = 1;
@@ -184,6 +190,7 @@ service StorageNode {
   rpc GetMutationBody(GetMutationBodyRequest) returns (GetMutationBodyResponse) {}
   rpc ScanRollupRecord(ScanRollupRecordRequest) returns (ScanRollupRecordResponse) {}
   rpc GetDatabaseOfOwner(GetDatabaseOfOwnerRequest) returns (GetDatabaseOfOwnerResponse) {}
+  rpc GetDatabase(GetDatabaseRequest) returns (GetDatabaseResponse) {}
   rpc GetCollectionOfDatabase(GetCollectionOfDatabaseRequest) returns (GetCollectionOfDatabaseResponse) {}
   rpc ScanGcRecord(ScanGcRecordRequest) returns (ScanGcRecordResponse) {}
   rpc Subscribe(SubscribeRequest) returns (stream EventMessage) {}

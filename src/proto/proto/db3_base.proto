@@ -42,7 +42,7 @@ message BroadcastMeta {
 message SystemConfig {
   uint64 min_rollup_size = 1;
   uint64 rollup_interval = 2;
-  uint64 network_id =3;
+  uint64 network_id = 3;
   string evm_node_url = 4;
   string ar_node_url = 5;
 }
