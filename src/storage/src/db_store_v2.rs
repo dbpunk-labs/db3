@@ -553,15 +553,12 @@ impl DBStoreV2 {
             &db_owner_encoded_key,
             db_addr.as_ref(),
         );
-
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-
         for (idx, cm) in mutation.tables.iter().enumerate() {
             self.create_collection(sender, db_addr.address(), cm, block, order, idx as u16)?;
         }
-
         if self.config.enable_doc_store {
             self.doc_store
                 .create_database(db_addr.address())
