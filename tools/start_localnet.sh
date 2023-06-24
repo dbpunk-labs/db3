@@ -51,14 +51,14 @@ then
 fi
 
 # clean indexer
-if [ -e ./indexer_doc_db ]
+if [ -e ./index_doc_db ]
 then
-    rm -rf indexer_doc_db
+    rm -rf index_doc_db
 fi
 
-if [ -e ./indexer_meta_db ]
+if [ -e ./index_meta_db ]
 then
-    rm -rf indexer_meta_db
+    rm -rf index_meta_db
 fi
 mkdir -p ./keys
 
