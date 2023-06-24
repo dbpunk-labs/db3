@@ -117,7 +117,7 @@ message ScanRollupRecordResponse {
 }
 
 message GetDatabaseRequest {
-    string addr = 1;
+  string addr = 1;
 }
 message GetDatabaseResponse {
   db3_database_v2_proto.DatabaseMessage database = 1;

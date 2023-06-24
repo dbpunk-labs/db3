@@ -44,9 +44,8 @@ describe('test db3.js provider module', () => {
         try {
             const response = await provider.setup('1111', '1000000', '11000000')
             expect(1).toBe(0)
-        }catch (e) {
+        } catch (e) {
             expect(1).toBe(1)
-
         }
     })
 
