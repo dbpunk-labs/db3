@@ -368,10 +368,9 @@ impl DBStoreV2 {
         self.verify_docs_ownership(sender, db_addr, doc_ids)?;
         if self.config.enable_doc_store {
             //TODO add id-> owner mapping to control the permissions
-            self.doc_store.delete_docs(db_addr, col_name, doc_ids)
-        } else {
-            Ok(())
+            self.doc_store.delete_docs(db_addr, col_name, doc_ids)?;
         }
+        self.delete_doc_ids_from_owner_store(db_addr, doc_ids)
     }
 
     pub fn add_docs(
@@ -428,6 +427,25 @@ impl DBStoreV2 {
             .get_cf(&collection_store_cf_handle, ck_ref)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         Ok(value.is_some())
+    }
+
+    /// clean doc ids that are not in the collection
+    pub fn delete_doc_ids_from_owner_store(
+        &self,
+        db_addr: &DB3Address,
+        doc_ids: &Vec<i64>,
+    ) -> Result<()> {
+        let doc_owner_store_cf_handle = self
+            .se
+            .cf_handle(self.config.doc_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        for id in doc_ids {
+            let db_doc_key = DbDocKeyV2(db_addr, *id).encode().unwrap();
+            self.se
+                .delete_cf(&doc_owner_store_cf_handle, db_doc_key)
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        }
+        Ok(())
     }
 
     /// verify the ownership of the doc ids
