@@ -63,6 +63,16 @@ describe('test db3.js client module', () => {
         return client
     }
 
+    test('test get storage system status', async () => {
+        const client = await createTestClient()
+        const response = await getStorageNodeStatus(client)
+        console.log(response)
+    })
+    test('test get index system status', async () => {
+        const client = await createTestClient()
+        const response = await getIndexNodeStatus(client)
+        console.log(response)
+    })
     test('create event db smoke test', async () => {
         const client = await createTestClient()
         expect(1).toBe(client.nonce)

@@ -357,7 +357,7 @@ impl StorageNode for StorageNodeV2Impl {
             .state_store
             .get_node_config("storage")
             .map_err(|e| Status::internal(format!("{e}")))?;
-        let has_inited = system_config.is_none();
+        let has_inited = !system_config.is_none();
         Ok(Response::new(SystemStatus {
             evm_account: evm_addr,
             evm_balance: "".to_string(),

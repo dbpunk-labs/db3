@@ -14,6 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
 //@ts-nocheck
 import {
     GrpcWebFetchTransport,
@@ -29,7 +30,7 @@ import {
     ScanMutationHeaderRequest,
     ScanRollupRecordRequest,
     GetDatabaseOfOwnerRequest,
-    GetCollectionOfDatabase,
+    GetCollectionOfDatabaseRequest,
     ScanGcRecordRequest,
     GetSystemStatusRequest,
     SetupRequest,
@@ -39,14 +40,18 @@ import { fromHEX, toHEX } from '../crypto/crypto_utils'
 import { DB3Account } from '../account/types'
 import { signTypedData } from '../account/db3_account'
 import { DB3Error } from './error'
+import type {
+    SignTypedDataParameters,
+} from 'viem'
+
 
 export class StorageProviderV2 {
     readonly client: StorageNodeClient
-    readonly account: DB3Account
+    readonly account: DB3Account | undefined
     /**
      * new a storage provider with db3 storage grpc url
      */
-    constructor(url: string, account: DB3Account) {
+    constructor(url: string, account: DB3Account | undefined) {
         const goptions: GrpcWebOptions = {
             baseUrl: url,
             // simple example for how to add auth headers to each request
@@ -91,7 +96,6 @@ export class StorageProviderV2 {
         const request: GetNonceRequest = {
             address: this.account.address,
         }
-
         try {
             const { response } = await this.client.getNonce(request)
             return response.nonce
@@ -253,7 +257,6 @@ export class StorageProviderV2 {
 
     async getSystemStatus() {
         const request: GetSystemStatusRequest = {}
-
         try {
             const { response } = await this.client.getSystemStatus(request)
             return response

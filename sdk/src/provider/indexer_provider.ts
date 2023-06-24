@@ -26,6 +26,7 @@ import {
 } from '../proto/db3_indexer'
 import { Query } from '../proto/db3_database_v2'
 import { DB3Error } from './error'
+import { RpcError } from '@protobuf-ts/runtime-rpc'
 
 export class IndexerProvider {
     readonly client: IndexerNodeClient
@@ -52,7 +53,7 @@ export class IndexerProvider {
             const { response } = await this.client.runQuery(request)
             return response
         } catch (e) {
-            throw new DB3Error(e)
+            throw new DB3Error(e as RpcError)
         }
     }
 
@@ -62,7 +63,7 @@ export class IndexerProvider {
             const { response } = await this.client.getSystemStatus(request)
             return response
         } catch (e) {
-            throw new DB3Error(e)
+            throw new DB3Error(e as RpcError)
         }
     }
 
@@ -75,7 +76,7 @@ export class IndexerProvider {
             )
             return response
         } catch (e) {
-            throw new DB3Error(e)
+            throw new DB3Error(e as RpcError)
         }
     }
 }

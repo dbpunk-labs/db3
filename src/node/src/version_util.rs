@@ -21,7 +21,7 @@ shadow!(build);
 
 pub fn build_version() -> Version {
     Version {
-        version_label: build::VERSION.to_string(),
+        version_label: build::PKG_VERSION.to_string(),
         git_hash: build::SHORT_COMMIT.to_string(),
         build_time: build::COMMIT_DATE.to_string(),
     }
