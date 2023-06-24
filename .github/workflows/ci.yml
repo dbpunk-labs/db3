@@ -66,7 +66,7 @@ jobs:
       - name: Run sdk test
         run: |
           ROOT_DIR=`pwd`
-          cd $ROOT_DIR/sdk && yarn
+          cd $ROOT_DIR/sdk && make && yarn
           cd $ROOT_DIR/sdk && yarn test --coverage
       - uses: codecov/codecov-action@v3
         with:
