@@ -86,7 +86,6 @@ contract DB3MetaStore is IDB3MetaStore {
             bytes(registration.rollupNodeUrl).length > 0,
             "Network not registered"
         );
-
         // Return registration info
         return registration;
     }
@@ -210,17 +209,12 @@ contract DB3MetaStore is IDB3MetaStore {
         NetworkRegistration storage registration = networkRegistrations[
             networkId
         ];
-        require(
-            bytes(registration.rollupNodeUrl).length > 0,
-            "Network not registered"
-        );
 
         // Check if sender is the same as rollupNodeAddress
         require(
             msg.sender == registration.rollupNodeAddress,
             "msg.sender must be the same as RollupNodeAddress"
         );
-
         // Update latest Arweave transaction in registration struct
         registration.latestArweaveTx = latestArweaveTx;
         return true;

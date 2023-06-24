@@ -329,6 +329,8 @@ impl RollupExecutor {
             mutation_count: num_rows,
             cost: reward,
             start_block: last_end_block,
+            evm_tx: "".to_string(),
+            evm_cost: 0,
         };
         self.storage
             .add_rollup_record(&record)

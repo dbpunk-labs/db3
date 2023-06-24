@@ -1,5 +1,5 @@
 //
-// db3_rullup.proto
+// readable.ts
 // Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,28 +15,21 @@
 // limitations under the License.
 //
 
-syntax = "proto3";
-
-package db3_rollup_proto;
-
-message GcRecord {
-  uint64 start_block = 1;
-  uint64 end_block = 2;
-  uint64 data_size = 3;
-  uint64 time = 4;
-  uint64 processed_time = 5;
+export function bytesToReadableNum(bytes_size: number): string {
+    const STORAGE_LABELS: string[] = [' ', 'K', 'M', 'G', 'T', 'P', 'E']
+    const max_shift = 7
+    var shift = 0
+    var local_bytes_size = bytes_size
+    var value = bytes_size
+    local_bytes_size >>= 10
+    while (local_bytes_size > 0 && shift < max_shift) {
+        value /= 1024.0
+        shift += 1
+        local_bytes_size >>= 10
+    }
+    return value.toFixed(2) + STORAGE_LABELS[shift]
 }
 
-message RollupRecord {
-  uint64 end_block = 1;
-  uint64 raw_data_size = 2;
-  uint64 compress_data_size = 3;
-  uint64 processed_time = 4;
-  string arweave_tx = 5;
-  uint64 time = 6;
-  uint64 mutation_count = 7;
-  uint64 cost = 8;
-  uint64 start_block = 9;
-  string evm_tx = 10;
-  uint64 evm_cost = 11;
+export function unitsToReadableNum(units: number): string {
+    return (units / 1000_000_000.0).toFixed(6)
 }

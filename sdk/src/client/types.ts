@@ -1,6 +1,6 @@
 //
-// lib.rs
-// Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
+// types.ts
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,16 +14,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#![feature(iter_intersperse)]
-pub mod abci_impl;
-pub mod auth_storage;
-pub mod command;
-pub mod context;
-pub mod indexer_impl;
-mod mutation_utils;
-pub mod node_key;
-pub mod node_storage;
-pub mod rollup_executor;
-pub mod storage_node_impl;
-pub mod storage_node_light_impl;
-pub mod version_util;
+
+import type { DB3Account } from '../account/types'
+
+import { StorageProviderV2 } from '../provider/storage_provider_v2'
+import { IndexerProvider } from '../provider/indexer_provider'
+
+export type Client = {
+    provider: StorageProviderV2
+    indexer: IndexerProvider
+    account: DB3Account
+    nonce: number
+}

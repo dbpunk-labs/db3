@@ -16,16 +16,19 @@
 //
 
 use crate::mutation_utils::MutationUtil;
+use crate::version_util;
+use ethers::abi::Address;
+
 use db3_base::bson_util::bytes_to_bson_document;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
 use db3_event::event_processor::EventProcessorConfig;
+use db3_proto::db3_base_proto::SystemStatus;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
     GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
-    SystemStatus,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::EventDatabaseMutation;
@@ -36,7 +39,6 @@ use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
-use db3_storage::meta_store_client::MetaStoreClient;
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -56,6 +58,7 @@ pub struct IndexerNodeImpl {
     contract_addr: String,
     evm_node_url: String,
     processor_mapping: Arc<Mutex<HashMap<String, Arc<EventProcessor>>>>,
+    admin_addr: String,
 }
 
 impl IndexerNodeImpl {
@@ -66,6 +69,7 @@ impl IndexerNodeImpl {
         key_root_path: String,
         contract_addr: String,
         evm_node_url: String,
+        admin_addr: String,
     ) -> Result<Self> {
         let db_store = DBStoreV2::new(config)?;
         Ok(Self {
@@ -77,6 +81,7 @@ impl IndexerNodeImpl {
             evm_node_url,
             //TODO recover from the database
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
+            admin_addr,
         })
     }
 
@@ -425,23 +430,20 @@ impl IndexerNode for IndexerNodeImpl {
         request: Request<SetupRequest>,
     ) -> std::result::Result<Response<SetupResponse>, Status> {
         let r = request.into_inner();
-        let (addr, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
+        let (addr, data) =
+            MutationUtil::verify_setup(&r.payload, r.signature.as_str()).map_err(|e| {
+                Status::invalid_argument(format!("fail to parse the payload and signature {e}"))
+            })?;
+        let admin_addr = self
+            .admin_addr
+            .parse::<Address>()
             .map_err(|e| Status::internal(format!("{e}")))?;
-        let _rollup_interval = MutationUtil::get_u64_field(&data, "rollupInterval", 0);
-        let _min_rollup_size = MutationUtil::get_u64_field(&data, "minRollupSize", 0);
-        let evm_node_rpc =
-            MutationUtil::get_str_field(&data, "evmNodeRpc", self.evm_node_url.as_str());
-        let network = MutationUtil::get_u64_field(&data, "network", 0_u64);
-        let admin_addr =
-            MetaStoreClient::get_admin(self.contract_addr.as_str(), evm_node_rpc, network)
-                .await
-                .map_err(|e| Status::internal(format!("{e}")))?;
         if admin_addr != addr {
-            return Ok(Response::new(SetupResponse {
-                code: -1,
-                msg: "you are not the admin".to_string(),
-            }));
+            return Err(Status::permission_denied(
+                "You are not the admin".to_string(),
+            ));
         }
+        let network = MutationUtil::get_u64_field(&data, "network", 0_u64);
         self.network_id.store(network, Ordering::Relaxed);
         return Ok(Response::new(SetupResponse {
             code: 0,
@@ -459,8 +461,13 @@ impl IndexerNode for IndexerNodeImpl {
         Ok(Response::new(SystemStatus {
             evm_account: addr,
             evm_balance: "0".to_string(),
+            ar_account: "".to_string(),
+            ar_balance: "".to_string(),
             node_url: self.node_url.to_string(),
             config: None,
+            has_inited: false,
+            admin_addr: self.admin_addr.to_string(),
+            version: Some(version_util::build_version()),
         }))
     }
 
@@ -469,8 +476,9 @@ impl IndexerNode for IndexerNodeImpl {
         request: Request<RunQueryRequest>,
     ) -> std::result::Result<Response<RunQueryResponse>, Status> {
         let r = request.into_inner();
-        let addr =
-            DB3Address::from_hex(r.db.as_str()).map_err(|e| Status::internal(format!("{e}")))?;
+        let addr = DB3Address::from_hex(r.db.as_str()).map_err(|e| {
+            Status::invalid_argument(format!("fail to parse the db address for {e}"))
+        })?;
         if let Some(q) = &r.query {
             info!("query str {} q {:?}", q.query_str, q);
             let documents = self
@@ -488,7 +496,7 @@ impl IndexerNode for IndexerNodeImpl {
             );
             Ok(Response::new(RunQueryResponse { documents }))
         } else {
-            Err(Status::internal("no query provided".to_string()))
+            Err(Status::invalid_argument("no query provided".to_string()))
         }
     }
 }

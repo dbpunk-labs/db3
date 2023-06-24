@@ -63,9 +63,13 @@ jobs:
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
+      - name: Run sdk test
+        run: |
+          ROOT_DIR=`pwd`
+          cd $ROOT_DIR/sdk && yarn
+          cd $ROOT_DIR/sdk && yarn test --coverage
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}
           directory: .
           flags: rust
-

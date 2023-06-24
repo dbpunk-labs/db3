@@ -31,3 +31,10 @@ indexer
 tools/mutation_db
 tools/doc_db
 tools/state_db
+/sdk/node_modules/
+/sdk/.bin/
+/sdk/.yarn/
+/sdk/cache/
+/sdk/typechain/
+/sdk/src/proto/*.ts
+
