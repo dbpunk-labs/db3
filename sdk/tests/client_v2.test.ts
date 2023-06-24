@@ -343,7 +343,7 @@ describe('test db3.js client module', () => {
     test('test add large mutations', async () => {
         const client = await createTestClient()
         try {
-            for (var i = 0; i < 2; i++) {
+            for (var i = 0; i < 10000000; i++) {
                 const { db, result } = await createDocumentDatabase(
                     client,
                     'desc'

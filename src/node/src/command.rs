@@ -546,6 +546,8 @@ impl DB3Command {
             key_root_path: key_root_path.to_string(),
             min_rollup_size: rollup_min_data_size,
             min_gc_round_offset,
+            evm_node_url: evm_node_url.to_string(),
+            contract_addr: contract_addr.to_string(),
         };
 
         let store_config = MutationStoreConfig {
@@ -591,7 +593,7 @@ impl DB3Command {
             evm_node_url: evm_node_url.to_string(),
             admin_addr: admin_addr.to_string(),
         };
-        let storage_node = StorageNodeV2Impl::new(config, sender).unwrap();
+        let storage_node = StorageNodeV2Impl::new(config, sender).await.unwrap();
         info!(
             "start db3 store node on public addr {} and network {}",
             addr, network_id

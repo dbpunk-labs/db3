@@ -93,7 +93,7 @@ pub struct StorageNodeV2Impl {
 }
 
 impl StorageNodeV2Impl {
-    pub fn new(
+    pub async fn new(
         config: StorageNodeV2Config,
         sender: Sender<(
             DB3Address,
@@ -107,11 +107,14 @@ impl StorageNodeV2Impl {
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
         let network_id = Arc::new(AtomicU64::new(config.network_id));
-        let rollup_executor = Arc::new(RollupExecutor::new(
-            config.rollup_config.clone(),
-            storage.clone(),
-            network_id.clone(),
-        )?);
+        let rollup_executor = Arc::new(
+            RollupExecutor::new(
+                config.rollup_config.clone(),
+                storage.clone(),
+                network_id.clone(),
+            )
+            .await?,
+        );
         let rollup_interval = config.rollup_config.rollup_interval;
         Ok(Self {
             storage,
@@ -282,7 +285,6 @@ impl StorageNode for StorageNodeV2Impl {
         &self,
         request: Request<SetupRequest>,
     ) -> std::result::Result<Response<SetupResponse>, Status> {
-        info!("setup request");
         let r = request.into_inner();
         let (addr, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
             .map_err(|e| Status::internal(format!("{e}")))?;

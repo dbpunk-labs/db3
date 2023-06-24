@@ -24,6 +24,7 @@ use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
+use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::mutation_store::MutationStore;
 use ethers::prelude::{LocalWallet, Signer};
 use parquet::arrow::arrow_writer::ArrowWriter;
@@ -48,6 +49,8 @@ pub struct RollupExecutorConfig {
     pub min_rollup_size: u64,
     pub min_gc_round_offset: u64,
     pub key_root_path: String,
+    pub evm_node_url: String,
+    pub contract_addr: String,
 }
 
 pub struct RollupExecutor {
@@ -58,13 +61,14 @@ pub struct RollupExecutor {
     ar_filesystem: ArFileSystem,
     wallet: LocalWallet,
     min_rollup_size: Arc<AtomicU64>,
+    meta_store: Arc<MetaStoreClient>,
 }
 
 unsafe impl Sync for RollupExecutor {}
 unsafe impl Send for RollupExecutor {}
 
 impl RollupExecutor {
-    pub fn new(
+    pub async fn new(
         config: RollupExecutorConfig,
         storage: MutationStore,
         network_id: Arc<AtomicU64>,
@@ -81,8 +85,19 @@ impl RollupExecutor {
             arweave_url: config.ar_node_url.to_string(),
         };
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
+        let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
+        let wallet2 = wallet2.with_chain_id(80001_u32);
         let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
         let min_rollup_size = config.min_rollup_size;
+        let meta_store = Arc::new(
+            MetaStoreClient::new(
+                config.contract_addr.as_str(),
+                config.evm_node_url.as_str(),
+                network_id.clone(),
+                wallet2,
+            )
+            .await?,
+        );
         Ok(Self {
             config,
             storage,
@@ -91,6 +106,7 @@ impl RollupExecutor {
             network_id,
             wallet,
             min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
+            meta_store,
         })
     }
 
@@ -316,9 +332,14 @@ impl RollupExecutor {
                 filename.as_str(),
             )
             .await?;
-        info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} cost {}", now.elapsed().as_secs(),
-        id.as_str(), reward
+        let (evm_cost, tx_hash) = self.meta_store.update_rollup_step(id.as_str()).await?;
+        let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
+        info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} ar cost {} and evm tx {} and cost {}", now.elapsed().as_secs(),
+        id.as_str(), reward,
+        tx_str.as_str(),
+        evm_cost.as_u64()
         );
+
         let record = RollupRecord {
             end_block: current_block,
             raw_data_size: memory_size as u64,
@@ -329,8 +350,8 @@ impl RollupExecutor {
             mutation_count: num_rows,
             cost: reward,
             start_block: last_end_block,
-            evm_tx: "".to_string(),
-            evm_cost: 0,
+            evm_tx: tx_str,
+            evm_cost: evm_cost.as_u64(),
         };
         self.storage
             .add_rollup_record(&record)
