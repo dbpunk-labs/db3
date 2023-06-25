@@ -120,23 +120,17 @@ describe('test db3.js client module', () => {
                     [index]
                 )
                 await new Promise((r) => setTimeout(r, 3000))
-                const [txId2, block2, order2, docId2] = await addDoc(
-                    collection,
-                    {
-                        city: 'beijing',
-                        author: 'imotai',
-                        age: 10,
-                    }
-                )
+                await addDoc(collection, {
+                    city: 'beijing',
+                    author: 'imotai',
+                    age: 10,
+                })
 
-                const [txId3, block3, order3, docId3] = await addDoc(
-                    collection,
-                    {
-                        city: 'beijing2',
-                        author: 'imotai1',
-                        age: 1,
-                    }
-                )
+                await addDoc(collection, {
+                    city: 'beijing2',
+                    author: 'imotai1',
+                    age: 1,
+                })
                 await new Promise((r) => setTimeout(r, 3000))
                 {
                     const queryStr = '/[city = beijing]'
@@ -215,23 +209,17 @@ describe('test db3.js client module', () => {
                     [index]
                 )
                 await new Promise((r) => setTimeout(r, 1000))
-                const [txId2, block2, order2, docId2] = await addDoc(
-                    collection,
-                    {
-                        city: 'beijing',
-                        author: 'imotai',
-                        age: 10,
-                    }
-                )
+                const doc1Ret = await addDoc(collection, {
+                    city: 'beijing',
+                    author: 'imotai',
+                    age: 10,
+                })
 
-                const [txId3, block3, order3, docId3] = await addDoc(
-                    collection,
-                    {
-                        city: 'beijing2',
-                        author: 'imotai1',
-                        age: 1,
-                    }
-                )
+                const doc2Ret = await addDoc(collection, {
+                    city: 'beijing2',
+                    author: 'imotai1',
+                    age: 1,
+                })
                 await new Promise((r) => setTimeout(r, 1000))
                 {
                     const queryStr = '/[city = beijing]'
@@ -243,7 +231,7 @@ describe('test db3.js client module', () => {
                     expect(resultSet.docs[0].doc.city).toBe('beijing')
                     expect(resultSet.docs[0].doc.author).toBe('imotai')
                     expect(resultSet.docs[0].doc.age).toBe(10)
-                    expect(resultSet.docs[0].id).toBe(docId2)
+                    expect(resultSet.docs[0].id).toBe(doc1Ret.id)
                 }
                 {
                     const queryStr = '/[city = beijing2]'
@@ -255,11 +243,11 @@ describe('test db3.js client module', () => {
                     expect(resultSet.docs[0].doc.city).toBe('beijing2')
                     expect(resultSet.docs[0].doc.author).toBe('imotai1')
                     expect(resultSet.docs[0].doc.age).toBe(1)
-                    expect(resultSet.docs[0].id).toBe(docId3)
+                    expect(resultSet.docs[0].id).toBe(doc2Ret.id)
                 }
-                const [txId4, block4, order4] = await updateDoc(
+                await updateDoc(
                     collection,
-                    docId2,
+                    doc1Ret.id,
                     {
                         city: 'beijing3',
                         author: 'imotai3',
@@ -286,11 +274,9 @@ describe('test db3.js client module', () => {
                     expect(resultSet.docs[0].doc.city).toBe('beijing3')
                     expect(resultSet.docs[0].doc.author).toBe('imotai3')
                     expect(resultSet.docs[0].doc.age).toBe(3)
-                    expect(resultSet.docs[0].id).toBe(docId2)
+                    expect(resultSet.docs[0].id).toBe(doc1Ret.id)
                 }
-                const [txId, block, order] = await deleteDoc(collection, [
-                    docId2,
-                ])
+                await deleteDoc(collection, [doc1Ret.id])
                 await new Promise((r) => setTimeout(r, 1000))
                 {
                     const queryStr = '/[city = beijing3]'
@@ -358,7 +344,7 @@ describe('test db3.js client module', () => {
                         'col',
                         [index]
                     )
-                    const [txId2, block2, order2] = await addDoc(collection, {
+                    await addDoc(collection, {
                         name: 'book1',
                         author: 'db3 developers',
                         id: '0x10b1b560b2fd9a66ae5bce29e5050ffcef6bcc9663d5d116e9877b6a4dda13aa',

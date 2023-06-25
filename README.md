@@ -22,6 +22,17 @@ DB3 Network is a lightweight, permanent JSON document database for Web3. It is d
 
 # Have a try
 
+## Set up self-hosted Node
+
+```shell
+
+sudo docker run -p 26639:26639 \ 
+                -p 26619:26619 \
+                -p 26620:26620 \
+                -e ADMIN_ADDR=0xA...5 # your wallet address
+                -it ghcr.io/dbpunk-labs/db3:4e8398b
+```
+
 ## Build
 
 ```shell
@@ -34,16 +45,22 @@ If you encounter any problems, you can check the environment by referring to [BU
 ## Write And Query the Document
 
 ```typescript
+// create a account
 const account = createRandomAccount()
+// create the client
 const client = createClient('http://127.0.0.1:26619',
                             'http://127.0.0.1:26639', 
                              account)
+
+// get the collection
 const collection = await getCollection("0xF7..79", "book", client)
-const [mutation, block, order, id] = await addDoc(collection, {
-                                             name:"The Three-Body Problem"，
-                                             author:"Cixin-Liu",
-                                             rate:"4.8"
-                                             } as Book)
+
+// add a document
+const {id} = await addDoc(collection, {
+                name:"The Three-Body Problem"，
+                author:"Cixin-Liu",
+                rate:"4.8"} as Book)
+// query the document
 const resultSet = await queryDoc<Book>(collection, "/[author=Cixin-Liu]")
 ```
 you can go to [sdk](https://dbpunk-labs.github.io/db3.js/) for more

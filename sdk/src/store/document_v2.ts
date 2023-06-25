@@ -108,7 +108,11 @@ export async function deleteDoc(col: Collection, ids: string[]) {
 
     if (response.code == 0) {
         col.db.client.nonce += 1
-        return [response.id, response.block, response.order]
+        return {
+            mid: response.id,
+            block: response.block,
+            order: response.order,
+        }
     } else {
         throw new Error('fail to create collection')
     }
@@ -147,7 +151,11 @@ export async function updateDoc(
     )
     if (response.code == 0) {
         col.db.client.nonce += 1
-        return [response.id, response.block, response.order]
+        return {
+            mid: response.id,
+            block: response.block,
+            order: response.order,
+        }
     } else {
         throw new Error('fail to create collection')
     }
@@ -179,12 +187,12 @@ export async function addDoc(col: Collection, doc: DocumentData) {
     )
     if (response.code == 0 && response.items.length > 0) {
         col.db.client.nonce += 1
-        return [
-            response.id,
-            response.block,
-            response.order,
-            response.items[0].value,
-        ]
+        return {
+            mid: response.id,
+            block: response.block,
+            order: response.order,
+            id: response.items[0].value,
+        }
     } else {
         throw new Error('fail to create collection')
     }
