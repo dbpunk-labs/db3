@@ -16,68 +16,22 @@ yarn add db3.js
 
 ## Use db3.js in action
 
-```ts
-
+```typescript
+// create a account
 const account = createRandomAccount()
-const client = createClient('http://127.0.0.1:26619', '', account)
-const nonce = await syncAccountNonce(client)
-// create a database
-const { db, result } = await createDocumentDatabase(client, 'desc')
-const index: Index = {
-      path: '/name',
-      indexType: IndexType.StringKey,
-}
-// create a collection
-const { collection, result } = await createCollection(
-       db,
-      'col',
-      [index]
-)
+// create the client
+const client = createClient('http://127.0.0.1:26619',
+                            'http://127.0.0.1:26639', 
+                             account)
+
+// get the collection
+const collection = await getCollection("0xF7..79", "book", client)
+
 // add a document
-const [txId, block, order] = await addDoc(collection, {
-    name: 'book1',
-    author: 'db3 developers',
-    tag:'web3',
-    time: 1686285013,
-})
-// query document
-const query = '/[name = book1]'
-const resultSet = await queryDoc<Book>(
-                      collection,
-                      query)   
-```
-
-## Show Your Support
-Please ⭐️ this repository if this project helped you!
-
-
-# Contribution
-
-## 1. Checkout
-
-```shell
-git clone https://github.com/dbpunk-labs/db3.js.git
-git submodule update --recursive
-```
-
-## 2. Run DB3 Localnet
-
-```shell
-cd tools && bash start_localnet.sh
-```
-
-## 3. Run Testcase
-
-```shell
-git submodule update
-# install the dependency
-yarn
-# generate the protobuf
-make
-# run test
-yarn test
-# format the code
-yarn prettier --write src
-# run benchmark
-yarn benny-sdk
+const {id} = await addDoc(collection, {
+                name:"The Three-Body Problem"，
+                author:"Cixin-Liu",
+                rate:"4.8"} as Book)
+// query the document
+const resultSet = await queryDoc<Book>(collection, "/[author=Cixin-Liu]")
 ```
