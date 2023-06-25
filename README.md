@@ -60,7 +60,7 @@ const {id} = await addDoc(collection, {
 // query the document
 const resultSet = await queryDoc<Book>(collection, "/[author=Cixin-Liu]")
 ```
-you can go to [sdk](https://dbpunk-labs.github.io/db3.js/) for more
+you can go to [sdk](https://docs.db3.network/) for more
 
 # How it works
 
