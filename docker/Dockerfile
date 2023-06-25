@@ -7,4 +7,5 @@ ADD db3 /usr/bin/db3
 RUN chmod +x /usr/bin/db3
 ADD ar_miner.sh /usr/bin/ar_miner.sh
 ADD start_localnet.sh /usr/bin/start_localnet.sh
+ADD pages /pages
 CMD ["/bin/bash", "/usr/bin/start_localnet.sh"]

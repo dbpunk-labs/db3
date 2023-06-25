@@ -37,4 +37,6 @@ message RollupRecord {
   uint64 mutation_count = 7;
   uint64 cost = 8;
   uint64 start_block = 9;
+  string evm_tx = 10;
+  uint64 evm_cost = 11;
 }

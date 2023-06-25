@@ -639,6 +639,8 @@ mod tests {
                 mutation_count: 1,
                 cost: 11111,
                 start_block: 1,
+                evm_cost: 1,
+                evm_tx: "".to_string(),
             };
             let result = store.add_rollup_record(&record);
             assert!(result.is_ok());

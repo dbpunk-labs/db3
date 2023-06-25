@@ -40,12 +40,6 @@ message RunQueryResponse {
 }
 
 message GetSystemStatusRequest {}
-message SystemStatus {
-  string evm_account = 1;
-  string evm_balance = 2;
-  string node_url = 3;
-  db3_base_proto.SystemConfig config = 4;
-}
 
 message SetupRequest {
   string signature = 1;
@@ -70,7 +64,7 @@ message GetContractSyncStatusResponse {
 message GetContractSyncStatusRequest {}
 
 service IndexerNode {
-  rpc GetSystemStatus(GetSystemStatusRequest) returns (SystemStatus) {}
+  rpc GetSystemStatus(GetSystemStatusRequest) returns (db3_base_proto.SystemStatus) {}
   rpc GetContractSyncStatus(GetContractSyncStatusRequest) returns (GetContractSyncStatusResponse) {}
   //  // method for query document
   rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}

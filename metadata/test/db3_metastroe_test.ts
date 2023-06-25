@@ -241,7 +241,7 @@ describe("DB3MetaStore", function () {
             it("throws an error if network is not registered", async function () {
                 const tx = "0x1234";
                 await expect(
-                    registry.connect(deployer).updateRollupSteps(1, tx)
+                    registry.connect(deployer).updateRollupSteps(100000, tx)
                 ).to.be.revertedWith("Network not registered");
             });
         
@@ -255,7 +255,6 @@ describe("DB3MetaStore", function () {
                         ["https://index-node-1.com"],
                         [sender.address]
                     );
-        
                 const tx = "0x1234";
                 await expect(
                     registry.connect(sender).updateRollupSteps(1, tx)

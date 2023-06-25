@@ -368,10 +368,9 @@ impl DBStoreV2 {
         self.verify_docs_ownership(sender, db_addr, doc_ids)?;
         if self.config.enable_doc_store {
             //TODO add id-> owner mapping to control the permissions
-            self.doc_store.delete_docs(db_addr, col_name, doc_ids)
-        } else {
-            Ok(())
+            self.doc_store.delete_docs(db_addr, col_name, doc_ids)?;
         }
+        self.delete_doc_ids_from_owner_store(db_addr, doc_ids)
     }
 
     pub fn add_docs(
@@ -430,6 +429,27 @@ impl DBStoreV2 {
         Ok(value.is_some())
     }
 
+    /// clean doc ids that are not in the collection
+    pub fn delete_doc_ids_from_owner_store(
+        &self,
+        db_addr: &DB3Address,
+        doc_ids: &Vec<i64>,
+    ) -> Result<()> {
+        let doc_owner_store_cf_handle = self
+            .se
+            .cf_handle(self.config.doc_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut batch = WriteBatch::default();
+        for id in doc_ids {
+            let db_doc_key = DbDocKeyV2(db_addr, *id).encode()?;
+            batch.delete_cf(&doc_owner_store_cf_handle, &db_doc_key);
+        }
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
+    }
+
     /// verify the ownership of the doc ids
     pub fn verify_docs_ownership(
         &self,
@@ -454,9 +474,7 @@ impl DBStoreV2 {
                     )));
                 }
             } else {
-                return Err(DB3Error::OwnerVerifyFailed(format!(
-                    "doc owner key not found"
-                )));
+                return Err(DB3Error::OwnerVerifyFailed(format!("doc id is not found")));
             }
         }
         Ok(())
@@ -553,15 +571,12 @@ impl DBStoreV2 {
             &db_owner_encoded_key,
             db_addr.as_ref(),
         );
-
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-
         for (idx, cm) in mutation.tables.iter().enumerate() {
             self.create_collection(sender, db_addr.address(), cm, block, order, idx as u16)?;
         }
-
         if self.config.enable_doc_store {
             self.doc_store
                 .create_database(db_addr.address())

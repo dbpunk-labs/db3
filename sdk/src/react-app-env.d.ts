@@ -1,5 +1,5 @@
 //
-// db3_token_test.ts
+// react-app-env.d.ts
 // Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,18 +15,6 @@
 // limitations under the License.
 //
 
-
-import { expect } from "chai";
-import hre from "hardhat";
-
-describe("DB3 Token test", function () {
-  it("get current total apply", async function () {
-    const total_apply = 10_000_000_000_000;
-    // deploy a lock contract where funds can be withdrawn
-    // one year in the future
-    const Token = await hre.ethers.getContractFactory("Db3Token");
-    const token = await Token.deploy();
-    // assert that the value is correct
-    expect(await token.totalSupply()).to.equal(total_apply);
-  });
-});
+interface Window {
+    ethereum: any
+}

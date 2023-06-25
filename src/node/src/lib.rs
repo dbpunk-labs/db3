@@ -26,3 +26,4 @@ pub mod node_storage;
 pub mod rollup_executor;
 pub mod storage_node_impl;
 pub mod storage_node_light_impl;
+pub mod version_util;
