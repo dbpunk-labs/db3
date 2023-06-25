@@ -126,6 +126,9 @@ pub enum DB3Command {
         contract_addr: String,
         #[clap(long, default_value = "http://127.0.0.1:8545")]
         evm_node_url: String,
+        /// the admin address which can change the configuration this node
+        #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
+        admin_addr: String,
     },
 
     /// Start db3 network
@@ -201,6 +204,12 @@ pub enum DB3Command {
             default_value = "0x7b68E10c80474DD93bD8C1ad53D4463c60a3AB7c"
         )]
         contract_addr: String,
+        #[clap(
+            short,
+            long,
+            default_value = "0x0000000000000000000000000000000000000000"
+        )]
+        admin_addr: String,
         #[clap(long, default_value = "http://127.0.0.1:8545")]
         evm_node_url: String,
         #[clap(long, default_value = "10")]
@@ -300,6 +309,7 @@ impl DB3Command {
                 min_gc_round_offset,
                 contract_addr,
                 evm_node_url,
+                admin_addr,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -324,6 +334,7 @@ impl DB3Command {
                     min_gc_round_offset,
                     contract_addr.as_str(),
                     evm_node_url.as_str(),
+                    admin_addr.as_str(),
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -361,6 +372,7 @@ impl DB3Command {
                 evm_node_url,
                 network_id,
                 verbose,
+                admin_addr,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -397,6 +409,7 @@ impl DB3Command {
                     key_root_path,
                     contract_addr,
                     evm_node_url,
+                    admin_addr,
                 )
                 .unwrap();
                 let indexer_for_syncing = indexer.clone();
@@ -522,8 +535,10 @@ impl DB3Command {
         min_gc_round_offset: u64,
         contract_addr: &str,
         evm_node_url: &str,
+        admin_addr: &str,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
+
         let rollup_config = RollupExecutorConfig {
             rollup_interval,
             temp_data_path: rollup_data_path.to_string(),
@@ -531,7 +546,10 @@ impl DB3Command {
             key_root_path: key_root_path.to_string(),
             min_rollup_size: rollup_min_data_size,
             min_gc_round_offset,
+            evm_node_url: evm_node_url.to_string(),
+            contract_addr: contract_addr.to_string(),
         };
+
         let store_config = MutationStoreConfig {
             db_path: mutation_db_path.to_string(),
             block_store_cf_name: "block_store_cf".to_string(),
@@ -573,8 +591,9 @@ impl DB3Command {
             node_url: addr.to_string(),
             contract_addr: contract_addr.to_string(),
             evm_node_url: evm_node_url.to_string(),
+            admin_addr: admin_addr.to_string(),
         };
-        let storage_node = StorageNodeV2Impl::new(config, sender).unwrap();
+        let storage_node = StorageNodeV2Impl::new(config, sender).await.unwrap();
         info!(
             "start db3 store node on public addr {} and network {}",
             addr, network_id

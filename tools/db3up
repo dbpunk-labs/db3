@@ -9,9 +9,7 @@ USAGE:
 FLAGS:
   -h  Prints help information
 SUBCOMMANDS:
-  install     install db3
-  localnet    start a localnet for testing
-  join_devnet join the devnet
+  install  install db3 network
 help_message
   return 0
 }
@@ -20,9 +18,6 @@ function install_db3() {
     mkdir -p ~/.db3/bin
     mkdir -p ~/.db3/data
     mkdir -p ~/.db3/logs
-    mkdir -p ~/.db3/devnet
-    mkdir -p ~/.db3/devnet/data
-    mkdir -p ~/.db3/devnet/logs
     VERSION=`curl -s https://api.github.com/repos/dbpunk-labs/db3/releases/latest | python3  -c 'import sys, json; print(json.load(sys.stdin)["name"])'`
     echo "install db3 with version ${VERSION} at path ~/.db3"
     if [ ! -f ~/.db3/bin/db3 ]
@@ -42,53 +37,22 @@ function install_db3() {
             exit 1
         fi
         export PATH=~/.db3/bin:$PATH
-        tendermint init >/dev/null 2>&1  && tendermint unsafe_reset_all >/dev/null 2>&1
-        # generate the devnet node key
-        tendermint gen-node-key --home ~/.db3/devnet/node >/dev/null 2>&1
-        # download the devnet genesis.json
-        curl -L --max-redirs 10 https://github.com/dbpunk-labs/db3/releases/download/${VERSION}/genesis.json -o ~/.db3/devnet/node/config/genesis.json
-
     fi
+    echo "please input the admin address to manage the db3 network"
+    read -p 'address: ' adminAddress
+    echo $adminAddress > ~/.db3/admin
     echo "nice jobs, you have installed db3 network! and you can do the following actions"
-    echo "1. run db3up localnet to start localnet"
-    echo "2. run db3up devnet to join the devnet"
-
+    echo "1. run db3up start to start a onebox environment for development"
 }
 
-function join_devnet() {
-    echo "joining db3 network .."
-    test -f ~/.db3/devnet/node/config/genesis.json || echo "genesis.json was not found"
+function start_onebox() {
     killall db3 > /dev/null 2>&1
     export PATH=~/.db3/bin:$PATH
-    db3 start --disable-query-session -d ~/.db3/devnet/data >~/.db3/devnet/logs/db3.log 2>&1 &
-    sleep 2
-    tendermint start --home ~/.db3/devnet/node --p2p.persistent_peers "4cc9ce402e5ca4459d99c6040fa5042178a8a220@18.162.230.6:26656,28819b72f4f059a19b8f16f654aa49a3524eb0cd@16.163.108.68:26656,1a629ebba7b115a53a2c99b815ad56a9a9fdfe20@18.162.114.26:26656" >~/.db3/devnet/logs/tm.log 2>&1 &
-    sleep 2
-    echo "you can see more log at ~/.db3/devnet/logs/tm.log"
-    echo "use db3 console to connect to your local node the http://127.0.0.1:26659"
+    echo "you can see more log in the following path"
+    echo "1. ~/.db3/logs/store.log"
+    echo "2. ~/.db3/logs/indexer.log"
     echo "ctrl-c to kill the node"
-    trap_ctrlc() {
-        killall db3
-        echo "kill db3 network"
-    }
-    trap trap_ctrlc INT
-    wait
-}
 
-function start_localnet() {
-    export PATH=~/.db3/bin:$PATH
-    killall db3 > /dev/null 2>&1 
-    echo "we will reset the localnet before starting it"
-    echo "start db3 network in single node mode..."
-    test -d ~/.db3/data && rm ~/.db3/data/*
-    db3 start -d ~/.db3/data >~/.db3/logs/db3.log 2>&1 &
-    sleep 2
-    tendermint unsafe_reset_all >/dev/null 2>&1
-    tendermint start >~/.db3/logs/tm.log 2>&1 &
-    sleep 2
-    echo "start db3 network ok .."
-    echo "use db3 console to connect to the http://127.0.0.1:26659"
-    echo "ctrl-c to kill the localnet"
     trap_ctrlc() {
         killall db3
         echo "kill db3 network"

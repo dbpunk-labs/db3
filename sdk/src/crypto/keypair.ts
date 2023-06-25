@@ -1,5 +1,5 @@
 //
-// db3_token_test.ts
+// keypair.ts
 // Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,18 +15,31 @@
 // limitations under the License.
 //
 
+import { PublicKey, SignatureScheme } from './publickey'
 
-import { expect } from "chai";
-import hre from "hardhat";
+export type ExportedKeypair = {
+    schema: SignatureScheme
+    privateKey: string
+}
 
-describe("DB3 Token test", function () {
-  it("get current total apply", async function () {
-    const total_apply = 10_000_000_000_000;
-    // deploy a lock contract where funds can be withdrawn
-    // one year in the future
-    const Token = await hre.ethers.getContractFactory("Db3Token");
-    const token = await Token.deploy();
-    // assert that the value is correct
-    expect(await token.totalSupply()).to.equal(total_apply);
-  });
-});
+/**
+ * A keypair used for signing transactions.
+ */
+export interface Keypair {
+    /**
+     * The public key for this keypair
+     */
+    getPublicKey(): PublicKey
+
+    /**
+     * Return the signature for the data
+     */
+    signData(data: Uint8Array): Uint8Array
+
+    /**
+     * Get the key scheme of the keypair: Secp256k1 or ED25519
+     */
+    getKeyScheme(): SignatureScheme
+
+    export(): ExportedKeypair
+}

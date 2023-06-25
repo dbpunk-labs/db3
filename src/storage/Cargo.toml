@@ -40,6 +40,6 @@ ejdb2rs = {workspace=true}
 ethers = { workspace = true }
 rsa = "0.6.1"
 rand = "0.8.5"
-
+tokio = { version = "1.17.0", features = ["full"] }
 [dev-dependencies]
 tokio = { version = "1.17.0", features = ["full"] }
