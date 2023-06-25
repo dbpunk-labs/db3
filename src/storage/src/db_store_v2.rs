@@ -439,12 +439,14 @@ impl DBStoreV2 {
             .se
             .cf_handle(self.config.doc_owner_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut batch = WriteBatch::default();
         for id in doc_ids {
-            let db_doc_key = DbDocKeyV2(db_addr, *id).encode().unwrap();
-            self.se
-                .delete_cf(&doc_owner_store_cf_handle, db_doc_key)
-                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+            let db_doc_key = DbDocKeyV2(db_addr, *id).encode()?;
+            batch.delete_cf(&doc_owner_store_cf_handle, &db_doc_key);
         }
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         Ok(())
     }
 
@@ -472,9 +474,7 @@ impl DBStoreV2 {
                     )));
                 }
             } else {
-                return Err(DB3Error::OwnerVerifyFailed(format!(
-                    "doc owner key not found"
-                )));
+                return Err(DB3Error::OwnerVerifyFailed(format!("doc id is not found")));
             }
         }
         Ok(())
