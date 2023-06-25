@@ -27,7 +27,7 @@ DB3 Network is a lightweight, permanent JSON document database for Web3. It is d
 ```shell
 sudo docker run -p 26639:26639 -p 26619:26619 -p 26629:26629 \
                 -e ADMIN_ADDR=0xF78c...29679 \ 
-                -it imotai/db3:v0.3.13
+                -it imotai/db3:v0.3.14
 ```
 
 ## Build
