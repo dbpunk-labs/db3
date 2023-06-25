@@ -91,10 +91,6 @@ impl EventProcessor {
     pub async fn start(&self) -> Result<()> {
         let abi: Abi = serde_json::from_str(self.config.abi.as_str())
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        info!(
-            "event processor for contract {}",
-            self.config.contract_addr.as_str()
-        );
         self.running
             .store(true, std::sync::atomic::Ordering::Relaxed);
         let address = self
@@ -104,13 +100,16 @@ impl EventProcessor {
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         let db_addr = DB3Address::from_hex(self.config.db_addr.as_str())
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-
         let filter = Filter::new().address(address);
         let mut stream = self
             .provider
             .subscribe_logs(&filter)
             .await
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        info!(
+            "event processor for contract {}",
+            self.config.contract_addr.as_str()
+        );
         while let Some(log) = stream.next().await {
             if !self.running.load(Ordering::Relaxed) {
                 info!(
@@ -120,6 +119,14 @@ impl EventProcessor {
                 break;
             }
             if let Some(number) = log.block_number {
+                if number.as_u64() % 10 == 0 {
+                    info!(
+                        "contract {} sync status block {} event number {}",
+                        self.config.contract_addr.as_str(),
+                        self.block_number.load(Ordering::Relaxed),
+                        self.event_number.load(Ordering::Relaxed)
+                    );
+                }
                 self.block_number.store(number.as_u64(), Ordering::Relaxed)
             }
             for e in abi.events() {
@@ -156,7 +163,7 @@ impl EventProcessor {
                             }
                         }
                         Err(e) => {
-                            warn!("fail to convert to json for {e}");
+                            warn!("fail to convert to json for {e} ");
                         }
                     }
                     break;
