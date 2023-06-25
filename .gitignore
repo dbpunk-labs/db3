@@ -37,4 +37,3 @@ tools/state_db
 /sdk/cache/
 /sdk/typechain/
 /sdk/src/proto/*.ts
-

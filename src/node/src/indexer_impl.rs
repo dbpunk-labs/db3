@@ -421,7 +421,6 @@ impl IndexerNode for IndexerNodeImpl {
                 .collect(),
             _ => todo!(),
         };
-        info!("status count {}", status_list.len());
         Ok(Response::new(GetContractSyncStatusResponse { status_list }))
     }
 
