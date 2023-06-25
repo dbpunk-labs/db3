@@ -111,7 +111,7 @@ export async function deleteDoc(col: Collection, ids: string[]) {
         return {
             mid: response.id,
             block: response.block,
-            order: response.order
+            order: response.order,
         }
     } else {
         throw new Error('fail to create collection')
@@ -154,7 +154,7 @@ export async function updateDoc(
         return {
             mid: response.id,
             block: response.block,
-            order: response.order
+            order: response.order,
         }
     } else {
         throw new Error('fail to create collection')
@@ -191,7 +191,7 @@ export async function addDoc(col: Collection, doc: DocumentData) {
             mid: response.id,
             block: response.block,
             order: response.order,
-            id: response.items[0].value
+            id: response.items[0].value,
         }
     } else {
         throw new Error('fail to create collection')

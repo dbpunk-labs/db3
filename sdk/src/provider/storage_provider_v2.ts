@@ -40,10 +40,7 @@ import { fromHEX, toHEX } from '../crypto/crypto_utils'
 import { DB3Account } from '../account/types'
 import { signTypedData } from '../account/db3_account'
 import { DB3Error } from './error'
-import type {
-    SignTypedDataParameters,
-} from 'viem'
-
+import type { SignTypedDataParameters } from 'viem'
 
 export class StorageProviderV2 {
     readonly client: StorageNodeClient
