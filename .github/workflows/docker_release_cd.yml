@@ -1,11 +1,8 @@
-name: CI # Continuous Integration
-
+name: Docker Release CD
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-
+    push:
+        tags:
+            - "[v]?[0-9]+.[0-9]+.[0-9]+"
 jobs:
 
   docker_image:
@@ -33,8 +30,8 @@ jobs:
           ROOT_DIR=`pwd`
           cd ${ROOT_DIR}/metadata && yarn install && npx hardhat test
           ls ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/
-          cd ${ROOT_DIR} && cargo build
-          cp ${ROOT_DIR}/target/debug/db3 ${ROOT_DIR}/docker/
+          cd ${ROOT_DIR} && cargo build --release
+          cp ${ROOT_DIR}/target/release/db3 ${ROOT_DIR}/docker/
       - name: docker login
         uses: docker/login-action@v1
         with:
@@ -43,7 +40,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Docker image
         run: |
-          git_hash=$(git rev-parse --short "$GITHUB_SHA")
-          cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:${git_hash}
-          docker push ghcr.io/dbpunk-labs/db3:${git_hash}
-          echo "the image is ghcr.io/dbpunk-labs/db3:${git_hash}"
+          RELEASE_NAME=${GITHUB_REF/refs\/tags\//}
+          cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:$RELEASE_NAME
+          docker push ghcr.io/dbpunk-labs/db3:$RELEASE_NAME
+          echo "the image is ghcr.io/dbpunk-labs/db3:$RELEASE_NAME"
