@@ -114,7 +114,7 @@ export async function deleteDoc(col: Collection, ids: string[]) {
             order: response.order,
         }
     } else {
-        throw new Error('fail to create collection')
+        throw new Error('fail to delete doc')
     }
 }
 
@@ -157,7 +157,7 @@ export async function updateDoc(
             order: response.order,
         }
     } else {
-        throw new Error('fail to create collection')
+        throw new Error('fail to update doc')
     }
 }
 export async function addDoc(col: Collection, doc: DocumentData) {

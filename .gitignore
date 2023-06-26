@@ -37,3 +37,6 @@ tools/state_db
 /sdk/cache/
 /sdk/typechain/
 /sdk/src/proto/*.ts
+tools/index_doc_db
+tools/index_meta_db
+bridge
