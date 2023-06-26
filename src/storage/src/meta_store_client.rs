@@ -23,7 +23,7 @@ use ethers::{
     providers::{Http, Middleware, Provider, ProviderExt},
 };
 
-use ethers::prelude::{LocalWallet};
+use ethers::prelude::LocalWallet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};

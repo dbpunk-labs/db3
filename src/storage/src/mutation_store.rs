@@ -579,7 +579,7 @@ mod tests {
                 1,
                 block,
                 order,
-                1
+                1,
             );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
@@ -597,7 +597,7 @@ mod tests {
                 1,
                 block,
                 order,
-                1
+                1,
             );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
@@ -692,7 +692,7 @@ mod tests {
                 1,
                 block,
                 order,
-                1
+                1,
             );
             assert!(result.is_ok());
             let result = store.get_range_mutations(0, 1);
@@ -735,7 +735,7 @@ mod tests {
                 1,
                 block,
                 order,
-                1
+                1,
             );
             assert!(result.is_ok());
             if let Ok((id, block, order)) = result {
