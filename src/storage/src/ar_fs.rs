@@ -164,8 +164,8 @@ impl ArFileSystem {
         };
 
         if !last_ar_tx.is_empty() {
-            let value =
-                Base64::from_str(last_ar_tx).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+            let value = Base64::from_utf8_str(last_ar_tx)
+                .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
             let name = Base64::from_utf8_str("Last-Rollup-Tx")
                 .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
             let last_rollup_tx = Tag::<Base64> { value, name };
