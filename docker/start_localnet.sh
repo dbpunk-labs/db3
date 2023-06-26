@@ -20,5 +20,6 @@ curl http://127.0.0.1:1984/mint/${AR_ADDRESS}/10000000000000
 echo "Start the local db3 nodes successfully"
 echo "The storage node url: http://127.0.0.1:26619"
 echo "The index node url: http://127.0.0.1:26639"
-echo "The console node url: http://127.0.0.1:26629"
+echo "The console node url: http://127.0.0.1:26629/console"
+echo "The setup url: http://127.0.0.1:26629/welcome"
 while true; do sleep 10 ; done
