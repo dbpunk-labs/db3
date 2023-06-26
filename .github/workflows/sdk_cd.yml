@@ -18,7 +18,7 @@ jobs:
             - uses: CultureHQ/actions-yarn@v1.0.1
             - run: |
                 cd sdk && yarn && make &&  yarn build
-            - uses: JS-DevTools/npm-publish@v1
+            - uses: JS-DevTools/npm-publish@v2
               with:
                   token: ${{ secrets.NMP_TOKEN }}
                   package: ./sdk/package.json
