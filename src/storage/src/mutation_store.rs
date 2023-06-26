@@ -476,6 +476,7 @@ impl MutationStore {
         nonce: u64,
         block: u64,
         order: u32,
+        network: u64,
     ) -> Result<(String, u64, u32)> {
         let tx_id = TxId::from((payload, signature.as_bytes()));
         let hex_id = tx_id.to_hex();
@@ -499,6 +500,7 @@ impl MutationStore {
             id: hex_id.to_string(),
             size: buf.len() as u32,
             nonce,
+            network,
         };
         let mut header_buf = BytesMut::with_capacity(1024);
         mutation_header
@@ -577,6 +579,7 @@ mod tests {
                 1,
                 block,
                 order,
+                1,
             );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
@@ -594,6 +597,7 @@ mod tests {
                 1,
                 block,
                 order,
+                1,
             );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
@@ -688,6 +692,7 @@ mod tests {
                 1,
                 block,
                 order,
+                1,
             );
             assert!(result.is_ok());
             let result = store.get_range_mutations(0, 1);
@@ -730,6 +735,7 @@ mod tests {
                 1,
                 block,
                 order,
+                1,
             );
             assert!(result.is_ok());
             if let Ok((id, block, order)) = result {

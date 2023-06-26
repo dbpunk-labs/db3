@@ -288,6 +288,7 @@ impl StorageNode for StorageNodeV2Impl {
         let r = request.into_inner();
         let (addr, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
             .map_err(|e| Status::internal(format!("{e}")))?;
+        info!("setup the storage node with config {:?}", data);
         let admin_addr = self
             .config
             .admin_addr
@@ -308,7 +309,6 @@ impl StorageNode for StorageNodeV2Impl {
             "minRollupSize",
             self.rollup_executor.get_min_rollup_size(),
         );
-
         let evm_node_rpc =
             MutationUtil::get_str_field(&data, "evmNodeRpc", self.config.evm_node_url.as_str());
         let ar_node_url = MutationUtil::get_str_field(
@@ -320,6 +320,7 @@ impl StorageNode for StorageNodeV2Impl {
         let network = MutationUtil::get_str_field(&data, "network", "0")
             .parse::<u64>()
             .map_err(|e| Status::internal(format!("{e}")))?;
+
         self.rollup_executor.update_min_rollup_size(min_rollup_size);
         self.rollup_interval
             .store(rollup_interval, Ordering::Relaxed);
@@ -329,7 +330,6 @@ impl StorageNode for StorageNodeV2Impl {
             rollup_interval,
             network_id: network,
             evm_node_url: evm_node_rpc.to_string(),
-            //TODO update the ar_fs
             ar_node_url: ar_node_url.to_string(),
         };
         self.state_store
@@ -578,6 +578,7 @@ impl StorageNode for StorageNodeV2Impl {
         })?;
         let action = MutationAction::from_i32(dm.action)
             .ok_or(Status::internal("fail to convert action type".to_string()))?;
+        let network = self.network_id.load(Ordering::Relaxed);
         // TODO validate the database mutation
         match self.state_store.incr_nonce(&address, nonce) {
             Ok(_) => {
@@ -594,12 +595,7 @@ impl StorageNode for StorageNodeV2Impl {
                                 let db_id = self
                                     .db_store
                                     .create_event_database(
-                                        &address,
-                                        mutation,
-                                        nonce,
-                                        self.network_id.load(Ordering::Relaxed),
-                                        block,
-                                        order,
+                                        &address, mutation, nonce, network, block, order,
                                     )
                                     .map_err(|e| Status::internal(format!("{e}")))?;
                                 let db_id_hex = db_id.to_hex();
@@ -636,7 +632,7 @@ impl StorageNode for StorageNodeV2Impl {
                                         &address,
                                         doc_db_mutation,
                                         nonce,
-                                        self.network_id.load(Ordering::Relaxed),
+                                        network,
                                         block,
                                         order,
                                     )
@@ -840,6 +836,7 @@ impl StorageNode for StorageNodeV2Impl {
                         nonce,
                         block,
                         order,
+                        network,
                     )
                     .map_err(|e| Status::internal(format!("{e}")))?;
                 Ok(response)

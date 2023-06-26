@@ -125,7 +125,6 @@ impl IndexerNodeImpl {
                     .await
                     .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?
                     .into_inner();
-
                 let mutations = response.mutations;
                 debug!("Block mutations size: {:?}", mutations.len());
                 self.parse_and_apply_mutations(&mutations).await?;

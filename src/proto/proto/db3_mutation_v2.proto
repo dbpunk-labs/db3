@@ -66,6 +66,7 @@ message MutationHeader {
   string id = 5;
   uint32 size = 6;
   uint64 nonce = 7;
+  uint64 network = 8;
 }
 
 message MutationBody {

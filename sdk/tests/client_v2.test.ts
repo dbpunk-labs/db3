@@ -39,8 +39,8 @@ import {
     createDocumentDatabase,
     createEventDatabase,
     showDatabase,
-    createCollection,
-} from '../src/store/database_v2'
+    createCollection, getDatabase, getCollection
+} from '../src/store/database_v2';
 import { Index, IndexType } from '../src/proto/db3_database_v2'
 
 interface Profile {
@@ -285,6 +285,275 @@ describe('test db3.js client module', () => {
                         queryStr
                     )
                     expect(0).toBe(resultSet.docs.length)
+                }
+            }
+        } catch (e) {
+            console.log(e)
+            expect(1).toBe(0)
+        }
+    })
+    test('test delete doc id not found', async () => {
+        const client = await createTestClient()
+        try {
+            const { db, result } = await createDocumentDatabase(
+                client,
+                'db_for_update_delete'
+            )
+            const index: Index = {
+                path: '/city',
+                indexType: IndexType.StringKey,
+            }
+            {
+                const { collection, result } = await createCollection(
+                    db,
+                    'col',
+                    [index]
+                )
+                await new Promise((r) => setTimeout(r, 2000))
+                const docId2 = await addDoc(
+                    collection,
+                    {
+                        city: 'beijing',
+                        author: 'imotai',
+                        age: 10,
+                    }
+                )
+                await new Promise((r) => setTimeout(r, 2000))
+                {
+                    const queryStr = '/[city = beijing]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(1).toBe(resultSet.docs.length)
+                    expect(resultSet.docs[0].doc.city).toBe('beijing')
+                    expect(resultSet.docs[0].doc.author).toBe('imotai')
+                    expect(resultSet.docs[0].doc.age).toBe(10)
+                    expect(resultSet.docs[0].id).toBe(docId2.id)
+                }
+
+                await deleteDoc(collection, [
+                    docId2.id,
+                ])
+                await new Promise((r) => setTimeout(r, 2000))
+                {
+                    const queryStr = '/[city = beijing3]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(0).toBe(resultSet.docs.length)
+                }
+                try {
+                    await deleteDoc(collection, [
+                        docId2.id,
+                    ])
+                    fail('should not reach here')
+                } catch (e) {
+                    expect(decodeURI(e.message)).toBe('fail to verify the owner with error doc id is not found')
+                }
+
+            }
+        } catch (e) {
+            console.log(e)
+            expect(1).toBe(0)
+        }
+    })
+    test('test update doc id not found', async () => {
+        const client = await createTestClient()
+        try {
+            const { db, result } = await createDocumentDatabase(
+                client,
+                'db_for_update_delete'
+            )
+            const index: Index = {
+                path: '/city',
+                indexType: IndexType.StringKey,
+            }
+            {
+                const { collection, result } = await createCollection(
+                    db,
+                    'col',
+                    [index]
+                )
+                await new Promise((r) => setTimeout(r, 3000))
+                const docId2 = await addDoc(
+                    collection,
+                    {
+                        city: 'beijing',
+                        author: 'imotai',
+                        age: 10,
+                    }
+                )
+                await new Promise((r) => setTimeout(r, 2000))
+                {
+                    const queryStr = '/[city = beijing]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(1).toBe(resultSet.docs.length)
+                    expect(resultSet.docs[0].doc.city).toBe('beijing')
+                    expect(resultSet.docs[0].doc.author).toBe('imotai')
+                    expect(resultSet.docs[0].doc.age).toBe(10)
+                    expect(resultSet.docs[0].id).toBe(docId2.id)
+                }
+
+                await deleteDoc(collection, [
+                    docId2.id,
+                ])
+                await new Promise((r) => setTimeout(r, 2000))
+                {
+                    const queryStr = '/[city = beijing3]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(0).toBe(resultSet.docs.length)
+                }
+                try {
+                    await updateDoc(
+                        collection,
+                        docId2.id,
+                        {
+                            city: 'beijing3',
+                            author: 'imotai3',
+                            age: 3,
+                        },
+                        []
+                    )
+                    fail('should not reach here')
+                } catch (e) {
+                    expect(decodeURI(e.message)).toBe('fail to verify the owner with error doc id is not found')
+                }
+
+            }
+        } catch (e) {
+            console.log(e)
+            expect(1).toBe(0)
+        }
+    })
+    test('test ownership verify for update/delete document', async () => {
+        const client = await createTestClient()
+        const client2 = await createTestClient()
+        try {
+            const { db, result } = await createDocumentDatabase(
+                client,
+                'db_for_update_delete'
+            )
+            const index: Index = {
+                path: '/city',
+                indexType: IndexType.StringKey,
+            }
+            {
+                const { collection, result } = await createCollection(
+                    db,
+                    'col',
+                    [index]
+                )
+                const collection2 = await getCollection(db.addr, 'col', client2)
+
+                await new Promise((r) => setTimeout(r, 3000))
+                const docId2 = await addDoc(
+                    collection,
+                    {
+                        city: 'beijing',
+                        author: 'imotai',
+                        age: 10,
+                    }
+                )
+
+                const docId3 = await addDoc(
+                    collection2,
+                    {
+                        city: 'beijing2',
+                        author: 'imotai1',
+                        age: 1,
+                    }
+                )
+                await new Promise((r) => setTimeout(r, 3000))
+                {
+                    const queryStr = '/[city = beijing]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(1).toBe(resultSet.docs.length)
+                    expect(resultSet.docs[0].doc.city).toBe('beijing')
+                    expect(resultSet.docs[0].doc.author).toBe('imotai')
+                    expect(resultSet.docs[0].doc.age).toBe(10)
+                    expect(resultSet.docs[0].id).toBe(docId2.id)
+                }
+                {
+                    const queryStr = '/[city = beijing]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection2,
+                        queryStr
+                    )
+                    expect(1).toBe(resultSet.docs.length)
+                    expect(resultSet.docs[0].doc.city).toBe('beijing')
+                    expect(resultSet.docs[0].doc.author).toBe('imotai')
+                    expect(resultSet.docs[0].doc.age).toBe(10)
+                    expect(resultSet.docs[0].id).toBe(docId2.id)
+                }
+
+                try {
+                    await deleteDoc(collection, [
+                        docId3.id,
+                    ])
+                    fail('should not be here')
+                } catch (e) {
+                    expect(decodeURI(e.message)).toBe('fail to verify the owner with error doc owner is not the sender')
+                }
+                // verify docId3 is not deleted
+                await new Promise((r) => setTimeout(r, 3000))
+                {
+                    const queryStr = '/[city = beijing2]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(1).toBe(resultSet.docs.length)
+                    expect(resultSet.docs[0].id).toBe(docId3.id)
+                }
+                await deleteDoc(collection2, [
+                    docId3.id,
+                ])
+                await new Promise((r) => setTimeout(r, 3000))
+                {
+                    const queryStr = '/[city = beijing2]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(0).toBe(resultSet.docs.length)
+                }
+
+                // update doc fail with ownership verify error
+                try {
+                    await updateDoc(
+                        collection2,
+                        docId2.id,
+                        {
+                            city: 'beijing_new',
+                            author: 'imotai_new',
+                            age: 3,
+                        },
+                        []
+                    )
+                } catch (e) {
+                    expect(decodeURI(e.message)).toBe('fail to verify the owner with error doc owner is not the sender')
+                }
+                // verify docId2 is not updated
+                await new Promise((r) => setTimeout(r, 3000))
+                {
+                    const queryStr = '/[city = beijing]'
+                    const resultSet = await queryDoc<Profile>(
+                        collection,
+                        queryStr
+                    )
+                    expect(1).toBe(resultSet.docs.length)
+                    expect(resultSet.docs[0].id).toBe(docId2.id)
                 }
             }
         } catch (e) {
