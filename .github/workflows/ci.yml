@@ -53,6 +53,7 @@ jobs:
           protoc --version
           ROOT_DIR=`pwd`
           cd ${ROOT_DIR}/metadata && yarn install
+          cd ${ROOT_DIR}/metadata && npx hardhat compile --force && echo "return code $?"
           cd ${ROOT_DIR}/metadata && npx hardhat test && echo "return code $?"
           ls ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/
           cd ${ROOT_DIR} && cargo build
