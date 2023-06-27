@@ -505,11 +505,15 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<ScanRollupRecordRequest>,
     ) -> std::result::Result<Response<ScanRollupRecordResponse>, Status> {
         let r = request.into_inner();
-        let records = self
+        let mut records_pending = vec![self.rollup_executor.get_pending_rollup()];
+        let records_done = self
             .storage
             .scan_rollup_records(r.start, r.limit)
             .map_err(|e| Status::internal(format!("{e}")))?;
-        Ok(Response::new(ScanRollupRecordResponse { records }))
+        records_pending.extend_from_slice(&records_done);
+        Ok(Response::new(ScanRollupRecordResponse {
+            records: records_pending,
+        }))
     }
 
     async fn scan_mutation_header(

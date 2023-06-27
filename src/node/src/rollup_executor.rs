@@ -52,7 +52,6 @@ pub struct RollupExecutorConfig {
     pub evm_node_url: String,
     pub contract_addr: String,
 }
-
 pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
@@ -62,6 +61,10 @@ pub struct RollupExecutor {
     wallet: LocalWallet,
     min_rollup_size: Arc<AtomicU64>,
     meta_store: Arc<MetaStoreClient>,
+    pending_mutations: Arc<AtomicU64>,
+    pending_data_size: Arc<AtomicU64>,
+    pending_start_block: Arc<AtomicU64>,
+    pending_end_block: Arc<AtomicU64>,
 }
 
 unsafe impl Sync for RollupExecutor {}
@@ -111,6 +114,10 @@ impl RollupExecutor {
             wallet,
             min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
             meta_store,
+            pending_mutations: Arc::new(AtomicU64::new(0)),
+            pending_data_size: Arc::new(AtomicU64::new(0)),
+            pending_start_block: Arc::new(AtomicU64::new(0)),
+            pending_end_block: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -265,6 +272,21 @@ impl RollupExecutor {
         Ok((addr, balance.to_string()))
     }
 
+    pub fn get_pending_rollup(&self) -> RollupRecord {
+        RollupRecord {
+            end_block: self.pending_end_block.load(Ordering::Relaxed),
+            start_block: self.pending_start_block.load(Ordering::Relaxed),
+            raw_data_size: self.pending_data_size.load(Ordering::Relaxed),
+            compress_data_size: 0,
+            processed_time: 0,
+            arweave_tx: "".to_string(),
+            time: times::get_current_time_in_secs(),
+            mutation_count: self.pending_mutations.load(Ordering::Relaxed),
+            cost: 0,
+            evm_tx: "".to_string(),
+            evm_cost: 0,
+        }
+    }
     pub async fn get_evm_account(&self) -> Result<String> {
         Ok(format!(
             "0x{}",
@@ -280,45 +302,52 @@ impl RollupExecutor {
     pub fn get_min_rollup_size(&self) -> u64 {
         self.min_rollup_size.load(Ordering::Relaxed)
     }
-
     pub async fn process(&self) -> Result<()> {
-        let (_last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
+        let (last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
             Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
             _ => (0_u64, 0_u64, "".to_string()),
         };
-
         let current_block = self.storage.get_current_block()?;
         if current_block <= last_end_block {
             info!("no block to rollup");
             return Ok(());
         }
-
         let now = Instant::now();
         info!(
             "the next rollup start block {} and the newest block {current_block}",
             last_end_block
         );
-
+        self.pending_start_block
+            .store(last_start_block, Ordering::Relaxed);
+        self.pending_end_block
+            .store(current_block, Ordering::Relaxed);
         let mutations = self
             .storage
             .get_range_mutations(last_end_block, current_block)?;
-
         if mutations.len() <= 0 {
             info!("no block to rollup");
             return Ok(());
         }
-
+        self.pending_mutations
+            .store(mutations.len() as u64, Ordering::Relaxed);
         let recordbatch = self.convert_to_recordbatch(&mutations)?;
         let memory_size = recordbatch.get_array_memory_size();
-
+        self.pending_data_size
+            .store(memory_size as u64, Ordering::Relaxed);
         if memory_size < self.min_rollup_size.load(Ordering::Relaxed) as usize {
             info!(
                 "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
                 self.config.min_rollup_size, memory_size
             );
             return Ok(());
+        } else {
+            self.pending_start_block
+                .store(current_block, Ordering::Relaxed);
+            self.pending_end_block
+                .store(current_block, Ordering::Relaxed);
+            self.pending_data_size.store(0, Ordering::Relaxed);
+            self.pending_mutations.store(0, Ordering::Relaxed);
         }
-
         let tmp_dir = TempDir::new_in(&self.config.temp_data_path, "compression")
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
         let file_path = tmp_dir.path().join("rollup.gz.parquet");
@@ -343,7 +372,6 @@ impl RollupExecutor {
         tx_str.as_str(),
         evm_cost.as_u64()
         );
-
         let record = RollupRecord {
             end_block: current_block,
             raw_data_size: memory_size as u64,
