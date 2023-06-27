@@ -20,7 +20,8 @@ const config: HardhatUserConfig = {
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
-  }
+  },
+  artifacts:"./artifacts"
 };
 
 export default config;
