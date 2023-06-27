@@ -58,7 +58,7 @@ jobs:
           cd ${ROOT_DIR}/metadata && npx hardhat test && echo "return code $?"
           test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
           cd ${ROOT_DIR} && cargo build
-          cd ${ROOT_DIR}/tools && sh start_localnet.sh >db3.log 2>&1 &
+          cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
           sleep 3
           cd ${ROOT_DIR}/tools && tail -n200 db3.log
       - name: Run rust test with coverage
