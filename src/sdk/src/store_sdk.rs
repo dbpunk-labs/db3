@@ -743,268 +743,268 @@ impl StoreSDK {
 
 #[cfg(test)]
 mod tests {
-
-    use super::*;
-    use crate::mutation_sdk::MutationSDK;
-    use crate::sdk_test;
-    use bytes::BytesMut;
-
-    use chrono::Utc;
-    use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
-    use db3_proto::db3_database_proto::structured_query::filter::FilterType;
-    use db3_proto::db3_database_proto::structured_query::value::ValueType;
-    use db3_proto::db3_database_proto::structured_query::{FieldFilter, Filter, Projection, Value};
-    use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-    use db3_proto::db3_node_proto::OpenSessionRequest;
-    use db3_proto::db3_session_proto::OpenSessionPayload;
-    use std::sync::Arc;
-    use std::time;
-    use tendermint::block;
-    use tonic::transport::Endpoint;
-    use uuid::Uuid;
-    async fn run_get_bills_flow(
-        use_typed_format: bool,
-        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        counter: i64,
-    ) {
-        let mclient = client.clone();
-        {
-            let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-            let msdk = MutationSDK::new(mclient, signer, use_typed_format);
-            let dm = sdk_test::create_a_database_mutation();
-            let result = msdk.submit_database_mutation(&dm).await;
-            assert!(result.is_ok(), "{:?}", result.err());
-            let ten_millis = time::Duration::from_millis(2000);
-            std::thread::sleep(ten_millis);
-        }
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut sdk = StoreSDK::new(client, signer, use_typed_format);
-        let result = sdk.get_block_bills(1).await;
-        if let Err(ref e) = result {
-            println!("{}", e);
-            assert!(false);
-        }
-        assert!(result.is_ok());
-        let result = sdk.close_session().await;
-        assert!(result.is_ok());
-    }
-
-    async fn run_fetch_block_flow(
-        use_typed_format: bool,
-        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        counter: i64,
-    ) {
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let sdk = StoreSDK::new(client, signer, use_typed_format);
-        let res = sdk.fetch_block_by_height(1).await;
-        assert!(res.is_ok(), "{:?}", res);
-        let block: block::Block = serde_json::from_slice(res.unwrap().block.as_slice()).unwrap();
-        assert_eq!(block.header.height.value(), 1);
-    }
-    #[tokio::test]
-    async fn get_bills_smoke_test() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        run_get_bills_flow(false, client.clone(), 3).await;
-        run_get_bills_flow(true, client.clone(), 5).await;
-    }
-
-    async fn run_doc_crud_happy_path(
-        use_typed_format: bool,
-        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        counter: i64,
-    ) {
-        let (addr1, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let msdk = MutationSDK::new(client.clone(), signer, use_typed_format);
-        let dm = sdk_test::create_a_database_mutation();
-        let result = msdk.submit_database_mutation(&dm).await;
-        assert!(result.is_ok(), "{:?}", result.err());
-        let two_seconds = time::Duration::from_millis(2000);
-        std::thread::sleep(two_seconds);
-        // add a collection
-        let (db_id, _) = result.unwrap();
-        println!("db id {}", db_id.to_hex());
-        let cm = sdk_test::create_a_collection_mutataion("collection1", db_id.address());
-        let result = msdk.submit_database_mutation(&cm).await;
-        assert!(result.is_ok());
-        std::thread::sleep(two_seconds);
-        let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut sdk = StoreSDK::new(client.clone(), signer, use_typed_format);
-        let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
-        assert_eq!(true, my_dbs.len() > 0);
-        let database = sdk.get_database(db_id.to_hex().as_str()).await;
-        if let Ok(Some(db)) = database {
-            assert_eq!(&db.address, db_id.address().as_ref());
-            assert_eq!(&db.sender, addr.as_ref());
-            assert_eq!(db.tx.len(), 2);
-            assert_eq!(db.collections.len(), 1);
-        } else {
-            assert!(false);
-        }
-        // add 4 documents
-        let docm = sdk_test::add_documents(
-            "collection1",
-            db_id.address(),
-            &vec![
-                r#"{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#,
-                r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#,
-                r#"{"name": "Bill","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#,
-                r#"{"name": "Bill","age": 45,"phones": ["+44 1234567","+44 2345678"]}"#,
-            ],
-        );
-        let result = msdk.submit_database_mutation(&docm).await;
-        assert!(result.is_ok());
-        std::thread::sleep(two_seconds);
-
-        // show all documents
-        let documents = sdk
-            .list_documents(db_id.to_hex().as_str(), "collection1", None)
-            .await
-            .unwrap();
-        assert_eq!(documents.documents.len(), 4);
-
-        // list documents with limit=3
-        let documents = sdk
-            .list_documents(db_id.to_hex().as_str(), "collection1", Some(3))
-            .await
-            .unwrap();
-        assert_eq!(documents.documents.len(), 3);
-
-        // run query equivalent to SQL: select * from collection1 where name = "Bill"
-        let query = StructuredQuery {
-            collection_name: "collection1".to_string(),
-            select: Some(Projection { fields: vec![] }),
-            r#where: Some(Filter {
-                filter_type: Some(FilterType::FieldFilter(FieldFilter {
-                    field: "name".to_string(),
-                    op: Operator::Equal.into(),
-                    value: Some(Value {
-                        value_type: Some(ValueType::StringValue("Bill".to_string())),
-                    }),
-                })),
-            }),
-            limit: None,
-        };
-        println!("{}", serde_json::to_string(&query).unwrap());
-
-        let documents = sdk.run_query(db_id.to_hex().as_str(), query).await.unwrap();
-        assert_eq!(documents.documents.len(), 2);
-
-        let result = sdk.close_session().await;
-        println!("{:?}", result);
-        assert!(result.is_ok());
-
-        std::thread::sleep(two_seconds);
-        let account_ret = sdk.get_account(&addr).await;
-        assert!(account_ret.is_ok());
-        let account = account_ret.unwrap();
-        assert_eq!(account.total_mutation_count, 3);
-        assert_eq!(account.total_session_count, 1);
-    }
-    #[tokio::test]
-    async fn proto_doc_curd_happy_path_smoke_test() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        run_doc_crud_happy_path(false, client.clone(), 32).await;
-    }
-
-    #[tokio::test]
-    async fn typed_data_doc_curd_happy_path_smoke_test() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        run_doc_crud_happy_path(true, client.clone(), 31).await;
-    }
-
-    #[tokio::test]
-    async fn open_session_replay_attack() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let mut client = StorageNodeClient::new(channel);
-        let (_, signer) = sdk_test::gen_ed25519_signer(40);
-        let payload = OpenSessionPayload {
-            header: Uuid::new_v4().to_string(),
-            start_time: Utc::now().timestamp(),
-        };
-        let mut buf = BytesMut::with_capacity(1024 * 8);
-        payload.encode(&mut buf).unwrap();
-        let buf = buf.freeze();
-        let signature = signer
-            .sign(buf.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))
-            .unwrap();
-        let r = OpenSessionRequest {
-            payload: buf.as_ref().to_vec(),
-            signature: signature.as_ref().to_vec(),
-            payload_type: PayloadType::QuerySessionPayload.into(),
-        };
-        let request = tonic::Request::new(r.clone());
-        let response = client.open_query_session(request).await;
-        assert!(response.is_ok());
-        // duplicate header
-        std::thread::sleep(time::Duration::from_millis(1000));
-        let request = tonic::Request::new(r.clone());
-        let response = client.open_query_session(request).await;
-        assert!(response.is_err());
-    }
-
-    #[tokio::test]
-    async fn open_session_ttl_expiered() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let mut client = StorageNodeClient::new(channel);
-        let (_, signer) = sdk_test::gen_ed25519_signer(20);
-        let payload = OpenSessionPayload {
-            header: Uuid::new_v4().to_string(),
-            start_time: Utc::now().timestamp() - 6,
-        };
-        let mut buf = BytesMut::with_capacity(1024 * 8);
-        payload.encode(&mut buf).unwrap();
-        let buf = buf.freeze();
-        let signature = signer
-            .sign(buf.as_ref())
-            .map_err(|e| Status::internal(format!("{:?}", e)))
-            .unwrap();
-        let r = OpenSessionRequest {
-            payload: buf.as_ref().to_vec(),
-            signature: signature.as_ref().to_vec(),
-            payload_type: PayloadType::QuerySessionPayload.into(),
-        };
-        let request = tonic::Request::new(r.clone());
-        let response = client.open_query_session(request).await;
-        assert!(response.is_err());
-    }
-
-    #[tokio::test]
-    async fn network_status_test() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        let (_addr, signer) = sdk_test::gen_ed25519_signer(50);
-        let sdk = StoreSDK::new(client.clone(), signer, false);
-        let result = sdk.get_state().await;
-        assert!(result.is_ok());
-    }
-
-    /// write a test case for method get_my_database
-    #[tokio::test]
-    async fn test_get_my_database() {}
-
-    #[tokio::test]
-    async fn fetch_block_by_height() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-
-        run_fetch_block_flow(false, client.clone(), 200).await;
-    }
+    //
+    //    use super::*;
+    //    use crate::mutation_sdk::MutationSDK;
+    //    use crate::sdk_test;
+    //    use bytes::BytesMut;
+    //
+    //    use chrono::Utc;
+    //    use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
+    //    use db3_proto::db3_database_proto::structured_query::filter::FilterType;
+    //    use db3_proto::db3_database_proto::structured_query::value::ValueType;
+    //    use db3_proto::db3_database_proto::structured_query::{FieldFilter, Filter, Projection, Value};
+    //    use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
+    //    use db3_proto::db3_node_proto::OpenSessionRequest;
+    //    use db3_proto::db3_session_proto::OpenSessionPayload;
+    //    use std::sync::Arc;
+    //    use std::time;
+    //    use tendermint::block;
+    //    use tonic::transport::Endpoint;
+    //    use uuid::Uuid;
+    //    async fn run_get_bills_flow(
+    //        use_typed_format: bool,
+    //        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+    //        counter: i64,
+    //    ) {
+    //        let mclient = client.clone();
+    //        {
+    //            let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+    //            let msdk = MutationSDK::new(mclient, signer, use_typed_format);
+    //            let dm = sdk_test::create_a_database_mutation();
+    //            let result = msdk.submit_database_mutation(&dm).await;
+    //            assert!(result.is_ok(), "{:?}", result.err());
+    //            let ten_millis = time::Duration::from_millis(2000);
+    //            std::thread::sleep(ten_millis);
+    //        }
+    //        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+    //        let mut sdk = StoreSDK::new(client, signer, use_typed_format);
+    //        let result = sdk.get_block_bills(1).await;
+    //        if let Err(ref e) = result {
+    //            println!("{}", e);
+    //            assert!(false);
+    //        }
+    //        assert!(result.is_ok());
+    //        let result = sdk.close_session().await;
+    //        assert!(result.is_ok());
+    //    }
+    //
+    //    async fn run_fetch_block_flow(
+    //        use_typed_format: bool,
+    //        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+    //        counter: i64,
+    //    ) {
+    //        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+    //        let sdk = StoreSDK::new(client, signer, use_typed_format);
+    //        let res = sdk.fetch_block_by_height(1).await;
+    //        assert!(res.is_ok(), "{:?}", res);
+    //        let block: block::Block = serde_json::from_slice(res.unwrap().block.as_slice()).unwrap();
+    //        assert_eq!(block.header.height.value(), 1);
+    //    }
+    //    #[tokio::test]
+    //    async fn get_bills_smoke_test() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let client = Arc::new(StorageNodeClient::new(channel));
+    //        run_get_bills_flow(false, client.clone(), 3).await;
+    //        run_get_bills_flow(true, client.clone(), 5).await;
+    //    }
+    //
+    //    async fn run_doc_crud_happy_path(
+    //        use_typed_format: bool,
+    //        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+    //        counter: i64,
+    //    ) {
+    //        let (addr1, signer) = sdk_test::gen_secp256k1_signer(counter);
+    //        let msdk = MutationSDK::new(client.clone(), signer, use_typed_format);
+    //        let dm = sdk_test::create_a_database_mutation();
+    //        let result = msdk.submit_database_mutation(&dm).await;
+    //        assert!(result.is_ok(), "{:?}", result.err());
+    //        let two_seconds = time::Duration::from_millis(2000);
+    //        std::thread::sleep(two_seconds);
+    //        // add a collection
+    //        let (db_id, _) = result.unwrap();
+    //        println!("db id {}", db_id.to_hex());
+    //        let cm = sdk_test::create_a_collection_mutataion("collection1", db_id.address());
+    //        let result = msdk.submit_database_mutation(&cm).await;
+    //        assert!(result.is_ok());
+    //        std::thread::sleep(two_seconds);
+    //        let (addr, signer) = sdk_test::gen_secp256k1_signer(counter);
+    //        let mut sdk = StoreSDK::new(client.clone(), signer, use_typed_format);
+    //        let my_dbs = sdk.get_my_database(addr1.to_hex().as_str()).await.unwrap();
+    //        assert_eq!(true, my_dbs.len() > 0);
+    //        let database = sdk.get_database(db_id.to_hex().as_str()).await;
+    //        if let Ok(Some(db)) = database {
+    //            assert_eq!(&db.address, db_id.address().as_ref());
+    //            assert_eq!(&db.sender, addr.as_ref());
+    //            assert_eq!(db.tx.len(), 2);
+    //            assert_eq!(db.collections.len(), 1);
+    //        } else {
+    //            assert!(false);
+    //        }
+    //        // add 4 documents
+    //        let docm = sdk_test::add_documents(
+    //            "collection1",
+    //            db_id.address(),
+    //            &vec![
+    //                r#"{"name": "John Doe","age": 43,"phones": ["+44 1234567","+44 2345678"]}"#,
+    //                r#"{"name": "Mike","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#,
+    //                r#"{"name": "Bill","age": 44,"phones": ["+44 1234567","+44 2345678"]}"#,
+    //                r#"{"name": "Bill","age": 45,"phones": ["+44 1234567","+44 2345678"]}"#,
+    //            ],
+    //        );
+    //        let result = msdk.submit_database_mutation(&docm).await;
+    //        assert!(result.is_ok());
+    //        std::thread::sleep(two_seconds);
+    //
+    //        // show all documents
+    //        let documents = sdk
+    //            .list_documents(db_id.to_hex().as_str(), "collection1", None)
+    //            .await
+    //            .unwrap();
+    //        assert_eq!(documents.documents.len(), 4);
+    //
+    //        // list documents with limit=3
+    //        let documents = sdk
+    //            .list_documents(db_id.to_hex().as_str(), "collection1", Some(3))
+    //            .await
+    //            .unwrap();
+    //        assert_eq!(documents.documents.len(), 3);
+    //
+    //        // run query equivalent to SQL: select * from collection1 where name = "Bill"
+    //        let query = StructuredQuery {
+    //            collection_name: "collection1".to_string(),
+    //            select: Some(Projection { fields: vec![] }),
+    //            r#where: Some(Filter {
+    //                filter_type: Some(FilterType::FieldFilter(FieldFilter {
+    //                    field: "name".to_string(),
+    //                    op: Operator::Equal.into(),
+    //                    value: Some(Value {
+    //                        value_type: Some(ValueType::StringValue("Bill".to_string())),
+    //                    }),
+    //                })),
+    //            }),
+    //            limit: None,
+    //        };
+    //        println!("{}", serde_json::to_string(&query).unwrap());
+    //
+    //        let documents = sdk.run_query(db_id.to_hex().as_str(), query).await.unwrap();
+    //        assert_eq!(documents.documents.len(), 2);
+    //
+    //        let result = sdk.close_session().await;
+    //        println!("{:?}", result);
+    //        assert!(result.is_ok());
+    //
+    //        std::thread::sleep(two_seconds);
+    //        let account_ret = sdk.get_account(&addr).await;
+    //        assert!(account_ret.is_ok());
+    //        let account = account_ret.unwrap();
+    //        assert_eq!(account.total_mutation_count, 3);
+    //        assert_eq!(account.total_session_count, 1);
+    //    }
+    //    #[tokio::test]
+    //    async fn proto_doc_curd_happy_path_smoke_test() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let client = Arc::new(StorageNodeClient::new(channel));
+    //        run_doc_crud_happy_path(false, client.clone(), 32).await;
+    //    }
+    //
+    //    #[tokio::test]
+    //    async fn typed_data_doc_curd_happy_path_smoke_test() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let client = Arc::new(StorageNodeClient::new(channel));
+    //        run_doc_crud_happy_path(true, client.clone(), 31).await;
+    //    }
+    //
+    //    #[tokio::test]
+    //    async fn open_session_replay_attack() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let mut client = StorageNodeClient::new(channel);
+    //        let (_, signer) = sdk_test::gen_ed25519_signer(40);
+    //        let payload = OpenSessionPayload {
+    //            header: Uuid::new_v4().to_string(),
+    //            start_time: Utc::now().timestamp(),
+    //        };
+    //        let mut buf = BytesMut::with_capacity(1024 * 8);
+    //        payload.encode(&mut buf).unwrap();
+    //        let buf = buf.freeze();
+    //        let signature = signer
+    //            .sign(buf.as_ref())
+    //            .map_err(|e| Status::internal(format!("{:?}", e)))
+    //            .unwrap();
+    //        let r = OpenSessionRequest {
+    //            payload: buf.as_ref().to_vec(),
+    //            signature: signature.as_ref().to_vec(),
+    //            payload_type: PayloadType::QuerySessionPayload.into(),
+    //        };
+    //        let request = tonic::Request::new(r.clone());
+    //        let response = client.open_query_session(request).await;
+    //        assert!(response.is_ok());
+    //        // duplicate header
+    //        std::thread::sleep(time::Duration::from_millis(1000));
+    //        let request = tonic::Request::new(r.clone());
+    //        let response = client.open_query_session(request).await;
+    //        assert!(response.is_err());
+    //    }
+    //
+    //    #[tokio::test]
+    //    async fn open_session_ttl_expiered() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let mut client = StorageNodeClient::new(channel);
+    //        let (_, signer) = sdk_test::gen_ed25519_signer(20);
+    //        let payload = OpenSessionPayload {
+    //            header: Uuid::new_v4().to_string(),
+    //            start_time: Utc::now().timestamp() - 6,
+    //        };
+    //        let mut buf = BytesMut::with_capacity(1024 * 8);
+    //        payload.encode(&mut buf).unwrap();
+    //        let buf = buf.freeze();
+    //        let signature = signer
+    //            .sign(buf.as_ref())
+    //            .map_err(|e| Status::internal(format!("{:?}", e)))
+    //            .unwrap();
+    //        let r = OpenSessionRequest {
+    //            payload: buf.as_ref().to_vec(),
+    //            signature: signature.as_ref().to_vec(),
+    //            payload_type: PayloadType::QuerySessionPayload.into(),
+    //        };
+    //        let request = tonic::Request::new(r.clone());
+    //        let response = client.open_query_session(request).await;
+    //        assert!(response.is_err());
+    //    }
+    //
+    //    #[tokio::test]
+    //    async fn network_status_test() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let client = Arc::new(StorageNodeClient::new(channel));
+    //        let (_addr, signer) = sdk_test::gen_ed25519_signer(50);
+    //        let sdk = StoreSDK::new(client.clone(), signer, false);
+    //        let result = sdk.get_state().await;
+    //        assert!(result.is_ok());
+    //    }
+    //
+    //    /// write a test case for method get_my_database
+    //    #[tokio::test]
+    //    async fn test_get_my_database() {}
+    //
+    //    #[tokio::test]
+    //    async fn fetch_block_by_height() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let client = Arc::new(StorageNodeClient::new(channel));
+    //
+    //        run_fetch_block_flow(false, client.clone(), 200).await;
+    //    }
 }

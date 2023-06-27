@@ -1,41 +1,26 @@
 #! /bin/base
 #
 # start_localnet.sh
-killall db3 tendermint
 test_dir=`pwd`
 BUILD_MODE='debug'
 RUN_L1_CHAIN=""
-if [[ $1 == 'release' ]] ; then
-  BUILD_MODE='release'
-fi
-
-echo "BUILD MODE: ${BUILD_MODE}"
-if [ -e ./tendermint ]
-then
-    echo "tendermint exist"
-else
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        wget https://github.com/tendermint/tendermint/releases/download/v0.37.0-rc2/tendermint_0.37.0-rc2_linux_amd64.tar.gz
-        mv tendermint_0.37.0-rc2_linux_amd64.tar.gz tendermint.tar.gz
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        wget https://github.com/tendermint/tendermint/releases/download/v0.37.0-rc2/tendermint_0.37.0-rc2_darwin_amd64.tar.gz
-        mv tendermint_0.37.0-rc2_darwin_amd64.tar.gz tendermint.tar.gz
-    else
-        echo "$OSTYPE is not supported, please give us a issue https://github.com/dbpunk-labs/db3/issues/new/choose"
-        exit 1
-    fi
-    tar -zxf tendermint.tar.gz
-fi
-
-# clean db3
-killall  db3 ganache
-
+export RUST_BACKTRACE=1
+# the hardhat node rpc url
+EVM_NODE_URL='http://127.0.0.1:8545'
+ADMIN_ADDR='0xF78c7469939f1f21338E4E58b901EC7D9Aa29679'
+# clean local process
+ps -ef | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 
-if [ -e ./db ]
-then
-    rm -rf db
-fi
+cd ${test_dir}/../metadata/ && npx hardhat node >${test_dir}/evm.log 2>&1 &
+sleep 1
+cd ${test_dir}/../metadata/ && bash deploy_to_local.sh >${test_dir}/contract.log
+sleep 1
+CONTRACT_ADDR=`cat ${test_dir}/contract.log | awk '{print $3}'`
+cd ${test_dir}
+
 if [ -e ./mutation_db ]
 then
     rm -rf ./mutation_db
@@ -61,26 +46,34 @@ then
     rm -rf index_meta_db
 fi
 mkdir -p ./keys
-
 echo "start db3 store..."
-../target/${BUILD_MODE}/db3 store --admin-addr=0xF78c7469939f1f21338E4E58b901EC7D9Aa29679 --rollup-interval 60000 --block-interval=500 --contract-addr=0xb9709ce5e749b80978182db1bedfb8c7340039a9 --evm-node-url=https://polygon-mumbai.g.alchemy.com/v2/kiuid-hlfzpnletzqdvwo38iqn0giefr>store.log 2>&1  &
-
+../target/${BUILD_MODE}/db3 store --admin-addr=${ADMIN_ADDR}\
+            --rollup-interval 60000 --block-interval=500\
+            --contract-addr=${CONTRACT_ADDR} --evm-node-url=${EVM_NODE_URL}>store.log 2>&1 &
 sleep 1
 AR_ADDRESS=`less store.log | grep filestore | awk '{print $NF}'`
-echo "the ar address parsed ${AR_ADDRESS}"
 echo "start ar miner..."
-bash ./ar_miner.sh ${AR_ADDRESS}> miner.log 2>&1 &
-echo "start db3 node..."
-./tendermint init > tm.log 2>&1 
-export RUST_BACKTRACE=1
-../target/${BUILD_MODE}/db3 start >db3.log 2>&1  &
+bash ./ar_miner.sh> miner.log 2>&1 &
 sleep 1
-echo "start tendermint node..."
-./tendermint unsafe_reset_all >> tm.log 2>&1  && ./tendermint start >> tm.log 2>&1 &
+echo "request ar token to rollup node"
+curl http://127.0.0.1:1984/mint/${AR_ADDRESS}/10000000000000000
+echo "done!"
 sleep 1
 
 echo "start db3 indexer..."
-../target/${BUILD_MODE}/db3 indexer  --admin-addr=0xF78c7469939f1f21338E4E58b901EC7D9Aa29679 --contract-addr=0xb9709ce5e749b80978182db1bedfb8c7340039a9 --evm-node-url=https://polygon-mumbai.g.alchemy.com/v2/kiuid-hlfzpnletzqdvwo38iqn0giefr> indexer.log 2>&1  &
+../target/${BUILD_MODE}/db3 indexer  --admin-addr=${ADMIN_ADDR}\
+    --contract-addr=${CONTRACT_ADDR}\
+    --evm-node-url=${EVM_NODE_URL}> indexer.log 2>&1  &
 sleep 1
 
+echo "===========the account information=============="
+echo "the AR address ${AR_ADDRESS}"
+echo "the Admin address ${ADMIN_ADDR}"
+echo "the Contract address ${CONTRACT_ADDR}"
+
+echo "===========the node information=============="
+echo "rollup node http://127.0.0.1:26619"
+echo "index node http://127.0.0.1:26639"
+echo "ar mock server http://127.0.0.1:1984"
+echo "evm node ${EVM_NODE_URL}"
 while true; do sleep 1 ; done
