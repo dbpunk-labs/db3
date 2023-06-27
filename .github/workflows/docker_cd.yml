@@ -37,7 +37,7 @@ jobs:
           ls ${ROOT_DIR}/metadata
           cd ${ROOT_DIR}/metadata && npx hardhat compile --force && echo "return code $?"
           ls ${ROOT_DIR}/metadata
-          ls ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/
+          test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
           cd ${ROOT_DIR} && cargo build
           cp ${ROOT_DIR}/target/debug/db3 ${ROOT_DIR}/docker/
       - name: docker login

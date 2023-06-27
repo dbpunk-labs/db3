@@ -29,7 +29,7 @@ jobs:
           protoc --version
           ROOT_DIR=`pwd`
           cd ${ROOT_DIR}/metadata && yarn install && npx hardhat test
-          ls ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/
+          test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
           cd ${ROOT_DIR} && cargo build --release
           cp ${ROOT_DIR}/target/release/db3 ${ROOT_DIR}/docker/
       - name: docker login

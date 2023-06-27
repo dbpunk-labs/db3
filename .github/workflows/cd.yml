@@ -34,7 +34,7 @@ jobs:
               run: |
                   ROOT_DIR=`pwd`
                   cd ${ROOT_DIR}/metadata && yarn install && npx hardhat compile
-                  ls ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/
+                  test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
                   if [[ ${{ matrix.job.target }} == x86_64-unknown-linux-gnu ]]; then
                     sudo apt-get install protobuf-compiler
                   fi

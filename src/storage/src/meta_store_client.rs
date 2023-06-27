@@ -29,7 +29,7 @@ use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 abigen!(
     DB3MetaStore,
-    "metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json"
+    "abi/DB3MetaStore.json"
 );
 
 pub struct MetaStoreClient {
