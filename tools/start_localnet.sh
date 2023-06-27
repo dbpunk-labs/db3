@@ -9,7 +9,8 @@ export RUST_BACKTRACE=1
 EVM_NODE_URL='http://127.0.0.1:8545'
 ADMIN_ADDR='0xF78c7469939f1f21338E4E58b901EC7D9Aa29679'
 # clean local process
-ps -ef | grep db3 | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 
