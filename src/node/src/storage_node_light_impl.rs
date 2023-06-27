@@ -837,6 +837,7 @@ impl StorageNode for StorageNodeV2Impl {
                         block,
                         order,
                         network,
+                        action,
                     )
                     .map_err(|e| Status::internal(format!("{e}")))?;
                 Ok(response)

@@ -4,3 +4,6 @@
 [submodule "thirdparty/arweave-rs"]
 	path = thirdparty/arweave-rs
 	url = https://github.com/imotai/arweave-rs.git
+[submodule "thirdparty/data-manager"]
+	path = thirdparty/data-manager
+	url = https://github.com/dbpunk-labs/data-manager.git

@@ -48,6 +48,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Docker image
         run: |
+          ROOT_DIR=`pwd`
+          cd ${ROOT_DIR}/thirdparty/data-manager && yarn && yarn build && mv -f dist ${ROOT_DIR}/docker/pages
+          cd ${ROOT_DIR}
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:${git_hash}
           docker push ghcr.io/dbpunk-labs/db3:${git_hash}

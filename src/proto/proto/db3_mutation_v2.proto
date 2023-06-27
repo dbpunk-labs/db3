@@ -67,6 +67,7 @@ message MutationHeader {
   uint32 size = 6;
   uint64 nonce = 7;
   uint64 network = 8;
+  MutationAction action = 9;
 }
 
 message MutationBody {

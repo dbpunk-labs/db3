@@ -27,7 +27,6 @@ use ethers::prelude::LocalWallet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-use tracing::debug;
 abigen!(
     DB3MetaStore,
     "metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json"

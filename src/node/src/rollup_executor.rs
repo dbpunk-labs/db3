@@ -85,6 +85,10 @@ impl RollupExecutor {
             arweave_url: config.ar_node_url.to_string(),
         };
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
+        info!(
+            "evm address {}",
+            format!("0x{}", hex::encode(wallet.address().as_bytes()))
+        );
         let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
         let wallet2 = wallet2.with_chain_id(80001_u32);
         let ar_filesystem = ArFileSystem::new(ar_fs_config)?;

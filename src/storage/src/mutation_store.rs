@@ -20,7 +20,7 @@ use db3_base::times;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
+use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord as GCRecord, RollupRecord};
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
@@ -477,6 +477,7 @@ impl MutationStore {
         block: u64,
         order: u32,
         network: u64,
+        action: MutationAction,
     ) -> Result<(String, u64, u32)> {
         let tx_id = TxId::from((payload, signature.as_bytes()));
         let hex_id = tx_id.to_hex();
@@ -501,6 +502,7 @@ impl MutationStore {
             size: buf.len() as u32,
             nonce,
             network,
+            action: action.into(),
         };
         let mut header_buf = BytesMut::with_capacity(1024);
         mutation_header
@@ -580,6 +582,7 @@ mod tests {
                 block,
                 order,
                 1,
+                MutationAction::CreateDocumentDb,
             );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
@@ -598,6 +601,7 @@ mod tests {
                 block,
                 order,
                 1,
+                MutationAction::CreateDocumentDb,
             );
             assert!(result.is_ok());
             if let Ok(headers) = store.scan_mutation_headers(0, 1) {
@@ -693,6 +697,7 @@ mod tests {
                 block,
                 order,
                 1,
+                MutationAction::CreateDocumentDb,
             );
             assert!(result.is_ok());
             let result = store.get_range_mutations(0, 1);
@@ -736,6 +741,7 @@ mod tests {
                 block,
                 order,
                 1,
+                MutationAction::CreateDocumentDb,
             );
             assert!(result.is_ok());
             if let Ok((id, block, order)) = result {
