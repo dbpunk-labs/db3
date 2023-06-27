@@ -15,22 +15,15 @@
 // limitations under the License.
 //
 
-use crate::abci_impl::AbciImpl;
-use crate::auth_storage::AuthStorage;
-use crate::context::Context;
 use crate::indexer_impl::IndexerNodeImpl;
-use crate::node_storage::NodeStorage;
 use crate::rollup_executor::RollupExecutorConfig;
-use crate::storage_node_impl::StorageNodeImpl;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use clap::Parser;
 use db3_cmd::command::{DB3ClientCommand, DB3ClientContext, DB3ClientContextV2};
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_signer::Db3MultiSchemeSigner;
-use db3_proto::db3_event_proto::{EventMessage, Subscription};
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
 use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
-use db3_proto::db3_node_proto::storage_node_server::StorageNodeServer;
 use db3_proto::db3_storage_proto::storage_node_client::StorageNodeClient as StorageNodeV2Client;
 use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
 use db3_proto::db3_storage_proto::{
@@ -44,24 +37,17 @@ use db3_storage::doc_store::DocStoreConfig;
 use db3_storage::mutation_store::MutationStoreConfig;
 use db3_storage::state_store::StateStoreConfig;
 use http::Uri;
-use merkdb::Merk;
-use std::boxed::Box;
 use std::io::{stderr, stdout};
-use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::thread;
-use std::thread::JoinHandle;
 use std::time::Duration;
-use tendermint_abci::ServerBuilder;
-use tendermint_rpc::HttpClient;
 use tokio::sync::mpsc::Sender;
 use tonic::codegen::http::Method;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 use tonic::Status;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
 
 const ABOUT: &str = "
@@ -129,44 +115,6 @@ pub enum DB3Command {
         /// the admin address which can change the configuration this node
         #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
         admin_addr: String,
-    },
-
-    /// Start db3 network
-    #[clap(name = "start")]
-    Start {
-        /// Bind the gprc server to this .
-        #[clap(long, default_value = "127.0.0.1")]
-        public_host: String,
-        /// The port of grpc api
-        #[clap(long, default_value = "26659")]
-        public_grpc_port: u16,
-        /// Bind the abci server to this port.
-        #[clap(long, default_value = "26658")]
-        abci_port: u16,
-        /// The porf of tendemint
-        #[clap(long, default_value = "26657")]
-        tendermint_port: u16,
-        /// The default server read buffer size, in bytes, for each incoming client
-        /// connection.
-        #[clap(short, long, default_value = "1048576")]
-        read_buf_size: usize,
-        /// Increase output logging verbosity to DEBUG level.
-        #[clap(short, long)]
-        verbose: bool,
-        /// Suppress all output logging (overrides --verbose).
-        #[clap(short, long)]
-        quiet: bool,
-        #[clap(short, long, default_value = "./db")]
-        db_path: String,
-        #[clap(long, default_value = "16")]
-        db_tree_level_in_memory: u8,
-        /// disable grpc-web
-        #[clap(long, default_value = "false")]
-        disable_grpc_web: bool,
-        /// disable query session
-        /// the node will be free if you disable the query session
-        #[clap(long, default_value = "false")]
-        disable_query_session: bool,
     },
 
     /// Start db3 interactive console
@@ -450,72 +398,6 @@ impl DB3Command {
                     }
                 }
             }
-            DB3Command::Start {
-                public_host,
-                public_grpc_port,
-                abci_port,
-                tendermint_port,
-                read_buf_size,
-                verbose,
-                quiet,
-                db_path,
-                db_tree_level_in_memory,
-                disable_grpc_web,
-                disable_query_session,
-            } => {
-                let log_level = if quiet {
-                    LevelFilter::OFF
-                } else if verbose {
-                    LevelFilter::DEBUG
-                } else {
-                    LevelFilter::INFO
-                };
-                tracing_subscriber::fmt().with_max_level(log_level).init();
-                info!("{ABOUT}");
-                let opts = Merk::default_db_opts();
-                let merk = Merk::open_opt(&db_path, opts, db_tree_level_in_memory).unwrap();
-                let node_store = Arc::new(Mutex::new(Box::pin(NodeStorage::new(
-                    AuthStorage::new(merk),
-                ))));
-                match node_store.lock() {
-                    Ok(mut store) => {
-                        if store.get_auth_store().init().is_err() {
-                            warn!("Fail to init auth storage!");
-                            return;
-                        }
-                    }
-                    _ => todo!(),
-                }
-                let abci_handler =
-                    Self::start_abci_service(abci_port, read_buf_size, node_store.clone());
-                let tm_addr = format!("http://127.0.0.1:{tendermint_port}");
-                let ws_tm_addr = format!("ws://127.0.0.1:{tendermint_port}/websocket");
-                let client = HttpClient::new(tm_addr.as_str()).unwrap();
-                let context = Context {
-                    node_store: node_store.clone(),
-                    client,
-                    ws_url: ws_tm_addr,
-                    disable_query_session,
-                };
-                Self::start_grpc_service(&public_host, public_grpc_port, disable_grpc_web, context)
-                    .await;
-                let running = Arc::new(AtomicBool::new(true));
-                let r = running.clone();
-                ctrlc::set_handler(move || {
-                    r.store(false, Ordering::SeqCst);
-                })
-                .expect("Error setting Ctrl-C handler");
-                loop {
-                    if running.load(Ordering::SeqCst) {
-                        let ten_millis = Duration::from_millis(10);
-                        thread::sleep(ten_millis);
-                    } else {
-                        info!("stop db3...");
-                        abci_handler.join().unwrap();
-                        break;
-                    }
-                }
-            }
         }
     }
     /// Start store grpc service
@@ -614,73 +496,5 @@ impl DB3Command {
             .serve(addr.parse().unwrap())
             .await
             .unwrap();
-    }
-
-    /// Start GRPC Service
-    async fn start_grpc_service(
-        public_host: &str,
-        public_grpc_port: u16,
-        disable_grpc_web: bool,
-        context: Context,
-    ) {
-        let addr = format!("{public_host}:{public_grpc_port}");
-        let kp = crate::node_key::get_key_pair(None).unwrap();
-        let signer = Db3MultiSchemeSigner::new(kp);
-        // config it
-        let (sender, receiver) = tokio::sync::mpsc::channel::<(
-            DB3Address,
-            Subscription,
-            Sender<std::result::Result<EventMessage, Status>>,
-        )>(1024);
-        let storage_node = StorageNodeImpl::new(context, signer, sender);
-        storage_node.keep_subscription(receiver).await.unwrap();
-        info!("start db3 storage node on public addr {}", addr);
-        if disable_grpc_web {
-            Server::builder()
-                .add_service(StorageNodeServer::new(storage_node))
-                .serve(addr.parse().unwrap())
-                .await
-                .unwrap();
-        } else {
-            let cors_layer = CorsLayer::new()
-                .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-                .allow_headers(Any)
-                .allow_origin(Any);
-            Server::builder()
-                .accept_http1(true)
-                .layer(cors_layer)
-                .layer(tonic_web::GrpcWebLayer::new())
-                .add_service(StorageNodeServer::new(storage_node))
-                .serve(addr.parse().unwrap())
-                .await
-                .unwrap();
-        }
-        info!("db3 storage node exit");
-    }
-
-    ///
-    /// Start ABCI service
-    ///
-    fn start_abci_service(
-        abci_port: u16,
-        read_buf_size: usize,
-        store: Arc<Mutex<Pin<Box<NodeStorage>>>>,
-    ) -> JoinHandle<()> {
-        let addr = format!("{}:{}", "127.0.0.1", abci_port);
-        let abci_impl = AbciImpl::new(store);
-        let handler = thread::spawn(move || {
-            let server = ServerBuilder::new(read_buf_size).bind(addr, abci_impl);
-            match server {
-                Ok(s) => {
-                    if let Err(e) = s.listen() {
-                        warn!("fail to listen addr for error {}", e);
-                    }
-                }
-                Err(e) => {
-                    warn!("fail to bind addr for error {}", e);
-                }
-            }
-        });
-        handler
     }
 }
