@@ -27,10 +27,7 @@ use ethers::prelude::LocalWallet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-abigen!(
-    DB3MetaStore,
-    "abi/DB3MetaStore.json"
-);
+abigen!(DB3MetaStore, "abi/DB3MetaStore.json");
 
 pub struct MetaStoreClient {
     address: Address,
