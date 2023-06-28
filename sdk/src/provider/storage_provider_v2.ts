@@ -245,7 +245,7 @@ export class StorageProviderV2 {
             payload,
         }
         try {
-            const response = await this.client.setup(request)
+            const { response } = await this.client.setup(request)
             return response
         } catch (e) {
             throw new DB3Error(e)

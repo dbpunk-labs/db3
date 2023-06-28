@@ -130,6 +130,22 @@ impl StorageNodeV2Impl {
         })
     }
 
+    pub fn recover(&self) -> Result<()> {
+        let config = self.state_store.get_node_config("storage")?;
+        if let Some(c) = config {
+            self.rollup_executor
+                .update_min_rollup_size(c.min_rollup_size);
+            self.rollup_interval
+                .store(c.rollup_interval, Ordering::Relaxed);
+            self.network_id.store(c.network_id, Ordering::Relaxed);
+            info!(
+                "recover system config with min roll size {}, rollup interval {} and network id {}",
+                c.min_rollup_size, c.rollup_interval, c.network_id
+            );
+        }
+        Ok(())
+    }
+
     pub async fn start_to_produce_block(&self) {
         let local_running = self.running.clone();
         let local_storage = self.storage.clone();
@@ -447,6 +463,7 @@ impl StorageNode for StorageNodeV2Impl {
             .map_err(|e| Status::internal(format!("{e}")))?;
         Ok(Response::new(GetDatabaseResponse { database }))
     }
+
     async fn get_collection_of_database(
         &self,
         request: Request<GetCollectionOfDatabaseRequest>,
@@ -467,6 +484,7 @@ impl StorageNode for StorageNodeV2Impl {
             collections,
         }))
     }
+
     async fn get_database_of_owner(
         &self,
         request: Request<GetDatabaseOfOwnerRequest>,
