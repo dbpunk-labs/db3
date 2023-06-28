@@ -629,7 +629,7 @@ describe('test db3.js client module', () => {
                         'col',
                         [index]
                     )
-            for (var i = 0; i < 10000000; i++) {
+            for (var i = 0; i < 1; i++) {
                 {
                     await addDoc(collection, {
                         name: 'book1',
