@@ -7,7 +7,7 @@ RUN_L1_CHAIN=""
 export RUST_BACKTRACE=1
 # the hardhat node rpc url
 EVM_NODE_URL='http://127.0.0.1:8545'
-ADMIN_ADDR='0xF78c7469939f1f21338E4E58b901EC7D9Aa29679'
+ADMIN_ADDR='0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 # clean local process
 ps -ef | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
@@ -52,6 +52,7 @@ echo "start db3 store..."
             --contract-addr=${CONTRACT_ADDR} --evm-node-url=${EVM_NODE_URL}>store.log 2>&1 &
 sleep 1
 AR_ADDRESS=`less store.log | grep filestore | awk '{print $NF}'`
+STORE_EVM_ADDRESS=`less store.log | grep evm | grep address | awk '{print $NF}'`
 echo "start ar miner..."
 bash ./ar_miner.sh> miner.log 2>&1 &
 sleep 1
@@ -70,6 +71,7 @@ echo "===========the account information=============="
 echo "the AR address ${AR_ADDRESS}"
 echo "the Admin address ${ADMIN_ADDR}"
 echo "the Contract address ${CONTRACT_ADDR}"
+echo "the Store Evm address ${STORE_EVM_ADDRESS}"
 
 echo "===========the node information=============="
 echo "rollup node http://127.0.0.1:26619"

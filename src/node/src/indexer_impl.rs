@@ -207,6 +207,7 @@ impl IndexerNodeImpl {
 
     async fn parse_and_apply_mutations(&self, mutations: &Vec<MutationWrapper>) -> Result<()> {
         for mutation in mutations.iter() {
+            let header = mutation.header.as_ref().unwrap();
             let body = mutation.body.as_ref().unwrap();
             // validate the signature
             let (dm, address, nonce) =
@@ -231,7 +232,7 @@ impl IndexerNodeImpl {
                                     &address,
                                     mutation,
                                     nonce,
-                                    self.network_id.load(Ordering::Relaxed),
+                                    header.network,
                                     block,
                                     order,
                                 )
@@ -258,7 +259,7 @@ impl IndexerNodeImpl {
                                     &address,
                                     doc_db_mutation,
                                     nonce,
-                                    self.network_id.load(Ordering::Relaxed),
+                                    header.network,
                                     block,
                                     order,
                                 )

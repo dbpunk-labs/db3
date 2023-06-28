@@ -15,7 +15,10 @@
 // limitations under the License.
 //
 
+use ethers::types::U256;
+
 const STORAGE_LABELS: [char; 7] = [' ', 'K', 'M', 'G', 'T', 'P', 'E'];
+
 pub fn bytes_to_readable_num_str(bytes_size: u64) -> String {
     let max_shift = 7;
     let mut shift = 0;
@@ -32,4 +35,18 @@ pub fn bytes_to_readable_num_str(bytes_size: u64) -> String {
 
 pub fn units_to_readable_num_str(units: u64) -> String {
     format!("{:.6} db3", units as f64 / 1000_000_000.0)
+}
+
+pub fn evm_to_readable_num_str(units: U256) -> String {
+    format!(
+        "{:.6}",
+        (units / U256::from(1000_000_000)).as_u64() as f64 / 1000_000_000.0
+    )
+}
+
+pub fn ar_to_readable_num_str(units: U256) -> String {
+    format!(
+        "{:.6}",
+        (units / U256::from(1000_000)).as_u64() as f64 / 1000_000.0
+    )
 }

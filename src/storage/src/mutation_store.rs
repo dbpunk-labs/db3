@@ -20,15 +20,19 @@ use db3_base::times;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
+use db3_proto::db3_base_proto::MutationState;
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord as GCRecord, RollupRecord};
+use ethers::types::U256;
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tracing::info;
 
 type StorageEngine = DBWithThreadMode<MultiThreaded>;
+const STATE_CF: &str = "STATE_CF";
 
 #[derive(Clone)]
 pub struct MutationStoreConfig {
@@ -62,11 +66,25 @@ struct BlockState {
     pub order: u32,
 }
 
+struct MutationCost {
+    pub rollup_ar_cost: U256,
+    pub rollup_evm_cost: U256,
+}
+
 #[derive(Clone)]
 pub struct MutationStore {
     config: MutationStoreConfig,
     se: Arc<StorageEngine>,
     block_state: Arc<Mutex<BlockState>>,
+    mutation_count: Arc<AtomicU64>,
+    total_mutation_bytes: Arc<AtomicU64>,
+    total_rollup_bytes: Arc<AtomicU64>,
+    gc_count: Arc<AtomicU64>,
+    rollup_count: Arc<AtomicU64>,
+    total_gc_bytes: Arc<AtomicU64>,
+    rollup_cost: Arc<Mutex<MutationCost>>,
+    total_rollup_raw_bytes: Arc<AtomicU64>,
+    total_rollup_mutation_count: Arc<AtomicU64>,
 }
 
 impl MutationStore {
@@ -86,14 +104,29 @@ impl MutationStore {
                     config.rollup_store_cf_name.as_str(),
                     config.gc_cf_name.as_str(),
                     config.block_state_cf_name.as_str(),
+                    STATE_CF,
                 ],
             )
-            .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
+            .map_err(|e| {
+                DB3Error::OpenStoreError(config.db_path.to_string(), format!("mutation store {e}"))
+            })?,
         );
         Ok(Self {
             config,
             se,
             block_state: Arc::new(Mutex::new(BlockState { block: 0, order: 0 })),
+            mutation_count: Arc::new(AtomicU64::new(0)),
+            total_mutation_bytes: Arc::new(AtomicU64::new(0)),
+            total_rollup_bytes: Arc::new(AtomicU64::new(0)),
+            gc_count: Arc::new(AtomicU64::new(0)),
+            rollup_count: Arc::new(AtomicU64::new(0)),
+            total_gc_bytes: Arc::new(AtomicU64::new(0)),
+            rollup_cost: Arc::new(Mutex::new(MutationCost {
+                rollup_ar_cost: U256::from(0),
+                rollup_evm_cost: U256::from(0),
+            })),
+            total_rollup_raw_bytes: Arc::new(AtomicU64::new(0)),
+            total_rollup_mutation_count: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -121,26 +154,99 @@ impl MutationStore {
                 _ => {}
             }
         }
+        self.recover_last_state()?;
+        Ok(())
+    }
+    pub fn flush_state(&self) -> Result<()> {
+        let state = self.get_latest_state();
+        // record a data point in every hour
+        let key = times::get_current_time_in_secs() / 60 / 60;
+        self.add_record::<MutationState>(STATE_CF, &key.to_be_bytes(), &state)?;
         Ok(())
     }
 
-    pub fn add_gc_record(&self, record: &GCRecord) -> Result<()> {
-        let gc_cf_handle = self
+    pub fn get_latest_state(&self) -> MutationState {
+        let (total_ar_cost, total_evm_cost) = match self.rollup_cost.lock() {
+            Ok(cost) => (cost.rollup_ar_cost, cost.rollup_evm_cost),
+            Err(_) => {
+                todo!()
+            }
+        };
+        let mut storage_cost_bytes: [u8; 32] = [0; 32];
+        total_ar_cost.to_big_endian(&mut storage_cost_bytes);
+        let mut evm_cost_bytes: [u8; 32] = [0; 32];
+        total_evm_cost.to_big_endian(&mut evm_cost_bytes);
+        MutationState {
+            mutation_count: self.mutation_count.load(Ordering::Relaxed),
+            total_mutation_bytes: self.total_mutation_bytes.load(Ordering::Relaxed),
+            gc_count: self.gc_count.load(Ordering::Relaxed),
+            total_gc_bytes: self.total_gc_bytes.load(Ordering::Relaxed),
+            rollup_count: self.rollup_count.load(Ordering::Relaxed),
+            total_rollup_bytes: self.total_rollup_bytes.load(Ordering::Relaxed),
+            total_rollup_raw_bytes: self.total_rollup_raw_bytes.load(Ordering::Relaxed),
+            total_storage_cost: storage_cost_bytes.into(),
+            total_evm_cost: evm_cost_bytes.into(),
+            total_rollup_mutation_count: self.total_rollup_mutation_count.load(Ordering::Relaxed),
+        }
+    }
+
+    fn recover_last_state(&self) -> Result<()> {
+        if let Some(m) = self.get_last_record::<MutationState>(STATE_CF)? {
+            self.mutation_count
+                .store(m.mutation_count, Ordering::Relaxed);
+            self.total_mutation_bytes
+                .store(m.total_mutation_bytes, Ordering::Relaxed);
+            self.gc_count.store(m.gc_count, Ordering::Relaxed);
+            self.rollup_count.store(m.rollup_count, Ordering::Relaxed);
+            self.total_rollup_bytes
+                .store(m.total_rollup_bytes, Ordering::Relaxed);
+            self.total_gc_bytes
+                .store(m.total_gc_bytes, Ordering::Relaxed);
+            self.total_rollup_raw_bytes
+                .store(m.total_rollup_raw_bytes, Ordering::Relaxed);
+            self.total_rollup_mutation_count
+                .store(m.total_rollup_mutation_count, Ordering::Relaxed);
+            match self.rollup_cost.lock() {
+                Ok(mut cost) => {
+                    cost.rollup_ar_cost = U256::from(m.total_storage_cost.as_ref() as &[u8]);
+                    cost.rollup_evm_cost = U256::from(m.total_evm_cost.as_ref() as &[u8]);
+                }
+                Err(_) => {
+                    todo!()
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn add_record<T>(&self, cf: &str, key: &[u8], value: &T) -> Result<usize>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
             .se
-            .cf_handle(self.config.gc_cf_name.as_str())
+            .cf_handle(cf)
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let id = record.start_block.to_be_bytes();
         let mut buf = BytesMut::with_capacity(1024);
-        record
+        value
             .encode(&mut buf)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         let buf = buf.freeze();
         let mut batch = WriteBatch::default();
-        // store the rollup record
-        batch.put_cf(&gc_cf_handle, &id, buf.as_ref());
+        batch.put_cf(&cf_handle, key, buf.as_ref());
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(buf.len())
+    }
+
+    pub fn add_gc_record(&self, record: &GCRecord) -> Result<()> {
+        let id = record.start_block.to_be_bytes();
+        let record_size =
+            self.add_record::<GCRecord>(self.config.gc_cf_name.as_str(), &id, record)?;
+        self.gc_count.fetch_add(1, Ordering::Relaxed);
+        self.total_gc_bytes
+            .fetch_add(record_size as u64, Ordering::Relaxed);
         Ok(())
     }
 
@@ -195,6 +301,20 @@ impl MutationStore {
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        self.rollup_count.fetch_add(1, Ordering::Relaxed);
+        self.total_rollup_bytes
+            .fetch_add(record.compress_data_size, Ordering::Relaxed);
+        self.total_rollup_raw_bytes
+            .fetch_add(record.raw_data_size, Ordering::Relaxed);
+        match self.rollup_cost.lock() {
+            Ok(mut cost) => {
+                cost.rollup_ar_cost = cost.rollup_ar_cost + record.cost;
+                cost.rollup_evm_cost = cost.rollup_ar_cost + record.cost;
+            }
+            Err(_) => {
+                todo!()
+            }
+        }
         Ok(())
     }
 
@@ -525,6 +645,9 @@ impl MutationStore {
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        self.mutation_count.fetch_add(1, Ordering::Relaxed);
+        self.total_mutation_bytes
+            .fetch_add((buf.len() + header_buf.len()) as u64, Ordering::Relaxed);
         Ok((hex_id, block, order))
     }
 }
@@ -758,6 +881,9 @@ mod tests {
                     assert!(false);
                 }
             }
+            let state = store.get_latest_state();
+            assert_eq!(1, state.mutation_count);
+            assert!(state.total_mutation_bytes > 0);
         } else {
             assert!(false);
         }

@@ -57,10 +57,14 @@ impl KeyStore {
         path_buf.push(key_filename.as_str());
         let path = path_buf.as_path();
         let b64_str = Base64::encode(secret);
-        let mut f = File::create(path)
-            .map_err(|e| DB3Error::WriteStoreError(format!("fail to open file {e}")))?;
+        let mut f = File::create(path).map_err(|e| {
+            DB3Error::WriteStoreError(format!(
+                "keystore fail to open file {e} with path {:?}",
+                path
+            ))
+        })?;
         f.write_all(b64_str.as_bytes())
-            .map_err(|e| DB3Error::WriteStoreError(format!("fail to open file {e}")))?;
+            .map_err(|e| DB3Error::WriteStoreError(format!("keystore fail to open file {e}")))?;
         f.sync_all()
             .map_err(|e| DB3Error::WriteStoreError(format!("fail to open file {e}")))?;
         Ok(())
