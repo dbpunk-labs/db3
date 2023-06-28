@@ -15,29 +15,22 @@
 // limitations under the License.
 //
 
-use arrow::array::{ArrayRef, BinaryBuilder, StringBuilder, UInt32Builder, UInt64Builder};
+use crate::ar_toolbox::ArToolBox;
 use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 use db3_base::times;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
-use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::mutation_store::MutationStore;
 use ethers::prelude::{LocalWallet, Signer};
-use parquet::arrow::arrow_writer::ArrowWriter;
-use parquet::basic::Compression;
-use parquet::basic::GzipLevel;
-use parquet::file::properties::WriterProperties;
-use std::fs::File;
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
-use tempdir::TempDir;
 use tracing::{info, warn};
 
 #[derive(Clone)]
@@ -56,9 +49,7 @@ pub struct RollupExecutorConfig {
 pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
-    schema: SchemaRef,
-    network_id: Arc<AtomicU64>,
-    ar_filesystem: ArFileSystem,
+    ar_toolbox: ArToolBox,
     wallet: LocalWallet,
     min_rollup_size: Arc<AtomicU64>,
     meta_store: Arc<MetaStoreClient>,
@@ -80,10 +71,6 @@ impl RollupExecutor {
             Field::new("order", DataType::UInt32, true),
         ]));
 
-        let ar_fs_config = ArFileSystemConfig {
-            key_root_path: config.key_root_path.to_string(),
-            arweave_url: config.ar_node_url.to_string(),
-        };
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
             "evm address {}",
@@ -91,7 +78,6 @@ impl RollupExecutor {
         );
         let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
         let wallet2 = wallet2.with_chain_id(80001_u32);
-        let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
         let min_rollup_size = config.min_rollup_size;
         let meta_store = Arc::new(
             MetaStoreClient::new(
@@ -102,12 +88,17 @@ impl RollupExecutor {
             )
             .await?,
         );
+        let ar_toolbox = ArToolBox::new(
+            config.key_root_path.clone(),
+            config.ar_node_url.clone(),
+            config.temp_data_path.clone(),
+            schema.clone(),
+            network_id.clone(),
+        )?;
         Ok(Self {
             config,
             storage,
-            schema,
-            ar_filesystem,
-            network_id,
+            ar_toolbox,
             wallet,
             min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
             meta_store,
@@ -138,54 +129,12 @@ impl RollupExecutor {
         }
     }
 
+    // TODO: remove this function
     fn convert_to_recordbatch(
         &self,
         mutations: &[(MutationHeader, MutationBody)],
     ) -> Result<RecordBatch> {
-        //TODO limit the memory usage
-        let mut payload_builder = BinaryBuilder::new();
-        let mut signature_builder = StringBuilder::new();
-        let mut block_builder = UInt64Builder::new();
-        let mut order_builder = UInt32Builder::new();
-        for (header, body) in mutations {
-            let body_ref: &[u8] = &body.payload;
-            payload_builder.append_value(body_ref);
-            signature_builder.append_value(body.signature.as_str());
-            block_builder.append_value(header.block_id);
-            order_builder.append_value(header.order_id);
-        }
-        let array_refs: Vec<ArrayRef> = vec![
-            Arc::new(payload_builder.finish()),
-            Arc::new(signature_builder.finish()),
-            Arc::new(block_builder.finish()),
-            Arc::new(order_builder.finish()),
-        ];
-        let record_batch = RecordBatch::try_new(self.schema.clone(), array_refs)
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        info!(
-            "convert {} into recordbatch with memory {}",
-            mutations.len(),
-            record_batch.get_array_memory_size()
-        );
-        Ok(record_batch)
-    }
-
-    fn dump_recordbatch(&self, path: &Path, recordbatch: &RecordBatch) -> Result<(u64, u64)> {
-        let properties = WriterProperties::builder()
-            .set_compression(Compression::GZIP(GzipLevel::default()))
-            .build();
-        let fd = File::create(path).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let mut writer = ArrowWriter::try_new(fd, self.schema.clone(), Some(properties))
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        writer
-            .write(recordbatch)
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let meta = writer
-            .close()
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let metadata =
-            std::fs::metadata(path).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        Ok((meta.num_rows as u64, metadata.len()))
+        self.ar_toolbox.convert_to_recordbatch(mutations)
     }
 
     fn gc_mutation(&self) -> Result<()> {
@@ -260,9 +209,7 @@ impl RollupExecutor {
     }
 
     pub async fn get_ar_account(&self) -> Result<(String, String)> {
-        let addr = self.ar_filesystem.get_address();
-        let balance = self.ar_filesystem.get_balance().await?;
-        Ok((addr, balance.to_string()))
+        self.ar_toolbox.get_ar_account().await
     }
 
     pub async fn get_evm_account(&self) -> Result<String> {
@@ -318,23 +265,9 @@ impl RollupExecutor {
             );
             return Ok(());
         }
-
-        let tmp_dir = TempDir::new_in(&self.config.temp_data_path, "compression")
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        let file_path = tmp_dir.path().join("rollup.gz.parquet");
-        let (num_rows, size) = self.dump_recordbatch(&file_path, &recordbatch)?;
-        let filename = format!("{}_{}.gz.parquet", last_end_block, current_block);
-        //TODO add tx status confirmation
-        let (id, reward) = self
-            .ar_filesystem
-            .upload_file(
-                &file_path,
-                tx.as_str(),
-                last_end_block,
-                current_block,
-                self.network_id.load(Ordering::Relaxed),
-                filename.as_str(),
-            )
+        let (id, reward, num_rows, size) = self
+            .ar_toolbox
+            .compress_and_upload_record_batch(tx, last_end_block, current_block, &recordbatch)
             .await?;
         let (evm_cost, tx_hash) = self.meta_store.update_rollup_step(id.as_str()).await?;
         let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
