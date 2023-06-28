@@ -238,8 +238,10 @@ export class StorageProviderV2 {
             },
         }
         const signature = await signTypedData(this.account, message)
+        console.log(signature)
         const msgParams = JSON.stringify(message)
         const payload = new TextEncoder().encode(msgParams)
+        console.log(toHEX(payload))
         const request: SetupRequest = {
             signature,
             payload,

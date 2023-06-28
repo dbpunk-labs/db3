@@ -88,7 +88,9 @@ impl MutationStore {
                     config.block_state_cf_name.as_str(),
                 ],
             )
-            .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
+            .map_err(|e| {
+                DB3Error::OpenStoreError(config.db_path.to_string(), format!("mutation store {e}"))
+            })?,
         );
         Ok(Self {
             config,

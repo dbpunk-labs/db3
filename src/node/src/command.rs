@@ -442,9 +442,11 @@ impl DB3Command {
             scan_max_limit: 50,
             block_state_cf_name: "block_state_cf".to_string(),
         };
+
         let state_config = StateStoreConfig {
             db_path: state_db_path.to_string(),
         };
+
         let db_store_config = DBStoreV2Config {
             db_path: doc_db_path.to_string(),
             db_store_cf_name: "db_store_cf".to_string(),

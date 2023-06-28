@@ -34,6 +34,7 @@ use db3_proto::db3_mutation_v2_proto::{
 use prost::Message;
 use rocksdb::{DBRawIteratorWithThreadMode, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tracing::info;
 
@@ -62,6 +63,8 @@ pub struct DBStoreV2 {
     se: Arc<StorageEngine>,
     doc_store: Arc<DocStore>,
     db_state: Arc<Mutex<DBState>>,
+    db_count: Arc<AtomicU64>,
+    collection_count: Arc<AtomicU64>,
 }
 
 impl DBStoreV2 {
@@ -84,7 +87,9 @@ impl DBStoreV2 {
                     config.db_owner_store_cf_name.as_str(),
                 ],
             )
-            .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
+            .map_err(|e| {
+                DB3Error::OpenStoreError(config.db_path.to_string(), format!("db_store_v2 {e}"))
+            })?,
         );
         let doc_store = match config.enable_doc_store {
             false => Arc::new(DocStore::mock()),
@@ -97,6 +102,8 @@ impl DBStoreV2 {
             db_state: Arc::new(Mutex::new(DBState {
                 db_doc_order: BTreeMap::new(),
             })),
+            db_count: Arc::new(AtomicU64::new(0)),
+            collection_count: Arc::new(AtomicU64::new(0)),
         })
     }
 

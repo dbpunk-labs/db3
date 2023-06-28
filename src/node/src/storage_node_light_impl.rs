@@ -18,13 +18,16 @@
 use crate::mutation_utils::MutationUtil;
 use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use crate::version_util;
+use db3_base::bson_util::bytes_to_bson_document;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_verifier::DB3Verifier;
 use db3_crypto::id::TxId;
 use db3_error::Result;
+use db3_proto::db3_base_proto::{SystemConfig, SystemStatus};
 use db3_proto::db3_mutation_v2_proto::{
     mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
+
 use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
 use db3_proto::db3_storage_proto::{
@@ -37,17 +40,16 @@ use db3_proto::db3_storage_proto::{
     ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse, SetupRequest,
     SetupResponse, SubscribeRequest,
 };
-use ethers::abi::Address;
 
-use db3_base::bson_util::bytes_to_bson_document;
-use db3_proto::db3_base_proto::{SystemConfig, SystemStatus};
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
     Subscription as SubscriptionV2,
 };
+
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
+use ethers::abi::Address;
 use prost::Message;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -62,6 +64,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
 
+#[derive(Clone)]
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub state_config: StateStoreConfig,
@@ -101,6 +104,7 @@ impl StorageNodeV2Impl {
             Sender<std::result::Result<EventMessageV2, Status>>,
         )>,
     ) -> Result<Self> {
+        if let Err(_e) = std::fs::create_dir_all(config.rollup_config.key_root_path.as_str()) {}
         let storage = MutationStore::new(config.store_config.clone())?;
         storage.recover()?;
         let state_store = StateStore::new(config.state_config.clone())?;
@@ -872,6 +876,118 @@ impl StorageNode for StorageNodeV2Impl {
                 block: 0,
                 order: 0,
             })),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use db3_storage::doc_store::DocStoreConfig;
+    use tempdir::TempDir;
+
+    fn generate_rand_node_config() -> StorageNodeV2Config {
+        let tmp_dir_path = TempDir::new("add_store_path").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let rollup_config = RollupExecutorConfig {
+            rollup_interval: 1000000,
+            temp_data_path: format!("{real_path}/data_path"),
+            ar_node_url: "http://127.0.0.1:1984".to_string(),
+            key_root_path: format!("{real_path}/keys"),
+            min_rollup_size: 1000000,
+            min_gc_round_offset: 100,
+            evm_node_url: "http://127.0.0.1:8545".to_string(),
+            contract_addr: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
+        };
+        let store_config = MutationStoreConfig {
+            db_path: format!("{real_path}/mutation_path"),
+            block_store_cf_name: "block_store_cf".to_string(),
+            tx_store_cf_name: "tx_store_cf".to_string(),
+            rollup_store_cf_name: "rollup_store_cf".to_string(),
+            gc_cf_name: "gc_store_cf".to_string(),
+            message_max_buffer: 4 * 1024,
+            scan_max_limit: 50,
+            block_state_cf_name: "block_state_cf".to_string(),
+        };
+        let state_config = StateStoreConfig {
+            db_path: format!("{real_path}/state_store"),
+        };
+        let db_store_config = DBStoreV2Config {
+            db_path: format!("{real_path}/db_path").to_string(),
+            db_store_cf_name: "db_store_cf".to_string(),
+            doc_store_cf_name: "doc_store_cf".to_string(),
+            collection_store_cf_name: "col_store_cf".to_string(),
+            index_store_cf_name: "idx_store_cf".to_string(),
+            doc_owner_store_cf_name: "doc_owner_store_cf".to_string(),
+            db_owner_store_cf_name: "db_owner_cf".to_string(),
+            scan_max_limit: 1000,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
+        };
+        StorageNodeV2Config {
+            store_config,
+            state_config,
+            rollup_config,
+            db_store_config,
+            network_id: 10,
+            block_interval: 10000,
+            node_url: "http://127.0.0.1:26639".to_string(),
+            contract_addr: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
+            evm_node_url: "http://127.0.0.1:8545".to_string(),
+            admin_addr: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
+        }
+    }
+    #[tokio::test]
+    async fn test_storage_node_recover() {
+        let (sender, _) = tokio::sync::mpsc::channel::<(
+            DB3Address,
+            SubscriptionV2,
+            Sender<std::result::Result<EventMessageV2, Status>>,
+        )>(1024);
+        let config = generate_rand_node_config();
+        let sig:&str = "0x484f7b5353c5238ea1c6a1ab4552cc61b726b10ee3b68fb6be717e1f6fa37f5e248889ab334ee91b83f1250576b6c1faf068d3498f294eb77b600c0115b5919c1c";
+        let payload:&str = "7b227479706573223a7b22454950373132446f6d61696e223a5b5d2c224d657373616765223a5b7b226e616d65223a22726f6c6c7570496e74657276616c222c2274797065223a22737472696e67227d2c7b226e616d65223a226d696e526f6c6c757053697a65222c2274797065223a22737472696e67227d2c7b226e616d65223a226e6574776f726b222c2274797065223a22737472696e67227d5d7d2c22646f6d61696e223a7b7d2c227072696d61727954797065223a224d657373616765222c226d657373616765223a7b22726f6c6c7570496e74657276616c223a2231303030303030222c226d696e526f6c6c757053697a65223a2231303030303030222c226e6574776f726b223a2239353237227d7d";
+        match StorageNodeV2Impl::new(config.clone(), sender).await {
+            Ok(storage_node) => {
+                let payload_binary = hex::decode(payload).unwrap();
+                let request = SetupRequest {
+                    signature: sig.to_string(),
+                    payload: payload_binary,
+                };
+                let tonic_req = Request::new(request);
+                if let Ok(response) = storage_node.setup(tonic_req).await {
+                    let r = response.into_inner();
+                    assert_eq!(0, r.code);
+                } else {
+                    assert!(false);
+                }
+            }
+            Err(e) => {
+                println!("{e}");
+                assert!(false);
+            }
+        }
+        let (sender, _) = tokio::sync::mpsc::channel::<(
+            DB3Address,
+            SubscriptionV2,
+            Sender<std::result::Result<EventMessageV2, Status>>,
+        )>(1024);
+        if let Ok(storage_node) = StorageNodeV2Impl::new(config.clone(), sender).await {
+            if let Err(_e) = storage_node.recover() {
+                assert!(false);
+            }
+            let tonic_req = Request::new(GetSystemStatusRequest {});
+            if let Ok(response) = storage_node.get_system_status(tonic_req).await {
+                let r = response.into_inner();
+                assert!(r.has_inited);
+                let config = r.config.unwrap();
+                assert_eq!(config.min_rollup_size, 1000000);
+                assert_eq!(config.network_id, 9527);
+                assert_eq!(config.rollup_interval, 1000000);
+            }
+        } else {
+            assert!(false);
         }
     }
 }

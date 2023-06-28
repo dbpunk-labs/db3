@@ -41,13 +41,13 @@ pub struct StateStore {
 
 impl StateStore {
     pub fn new(config: StateStoreConfig) -> Result<Self> {
+        info!("open state store with path {}", config.db_path.as_str());
         let path = Path::new(config.db_path.as_str());
         let mut db_builder = DB::new();
         db_builder.set_max_tables(8);
-        let db =
-            Arc::new(db_builder.open(path).map_err(|e| {
-                DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}"))
-            })?);
+        let db = Arc::new(db_builder.open(path).map_err(|e| {
+            DB3Error::OpenStoreError(config.db_path.to_string(), format!("state_store {e}"))
+        })?);
         let txn = db
             .begin_rw_txn()
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
@@ -57,10 +57,6 @@ impl StateStore {
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
         txn.commit()
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
-        info!(
-            "open state store with path {} done",
-            config.db_path.as_str()
-        );
         Ok(Self { db })
     }
 
@@ -171,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_new_state_store() {
-        let tmp_dir_path = TempDir::new("new_state store path").expect("create temp dir");
+        let tmp_dir_path = TempDir::new("new_state_store_path").expect("create temp dir");
         let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
         let config = StateStoreConfig { db_path: real_path };
         let result = StateStore::new(config);
