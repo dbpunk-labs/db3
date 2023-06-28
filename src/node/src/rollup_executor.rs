@@ -302,7 +302,9 @@ impl RollupExecutor {
     pub fn get_min_rollup_size(&self) -> u64 {
         self.min_rollup_size.load(Ordering::Relaxed)
     }
+
     pub async fn process(&self) -> Result<()> {
+        self.storage.flush_state()?;
         let (last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
             Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
             _ => (0_u64, 0_u64, "".to_string()),

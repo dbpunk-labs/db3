@@ -35,6 +35,7 @@ import {
     GetSystemStatusRequest,
     SetupRequest,
     GetDatabaseRequest,
+    GetMutationStateRequest,
 } from '../proto/db3_storage'
 import { fromHEX, toHEX } from '../crypto/crypto_utils'
 import { DB3Account } from '../account/types'
@@ -238,10 +239,8 @@ export class StorageProviderV2 {
             },
         }
         const signature = await signTypedData(this.account, message)
-        console.log(signature)
         const msgParams = JSON.stringify(message)
         const payload = new TextEncoder().encode(msgParams)
-        console.log(toHEX(payload))
         const request: SetupRequest = {
             signature,
             payload,
@@ -258,6 +257,16 @@ export class StorageProviderV2 {
         const request: GetSystemStatusRequest = {}
         try {
             const { response } = await this.client.getSystemStatus(request)
+            return response
+        } catch (e) {
+            throw new DB3Error(e)
+        }
+    }
+
+    async getMutationState() {
+        const request: GetMutationStateRequest = {}
+        try {
+            const { response } = await this.client.getMutationState(request)
             return response
         } catch (e) {
             throw new DB3Error(e)

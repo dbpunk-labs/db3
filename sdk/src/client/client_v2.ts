@@ -64,6 +64,19 @@ export function createClient(
     } as Client
 }
 
+/**
+ *
+ * Setup the storage node with system parameters and only the admin can request the method
+ *
+ * ```ts
+ *  const status = setupStorageNode(client, "1111", "1000", "10240000")
+ * ```
+ *
+ * @param client     - the client of db3 network
+ * @returns the storage system status
+ *
+ **/
+
 export async function setupStorageNode(
     client: Client,
     network: string,
@@ -88,6 +101,23 @@ export async function setupStorageNode(
 export async function getStorageNodeStatus(client: Client) {
     const response = await client.provider.getSystemStatus()
     return response
+}
+
+/**
+ *
+ * Get the mutation state of db3 network
+ *
+ * ```ts
+ *  const state = getMutationState(client)
+ * ```
+ *
+ * @param client     - the client of db3 network
+ * @returns the storage system status
+ *
+ **/
+export async function getMutationState(client: Client) {
+    const response = await client.provider.getMutationState()
+    return response.view
 }
 
 /**

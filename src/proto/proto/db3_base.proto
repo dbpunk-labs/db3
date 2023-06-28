@@ -64,3 +64,16 @@ message SystemStatus {
   string admin_addr = 8;
   Version version = 9;
 }
+
+message MutationState {
+  uint64 mutation_count = 1;
+  uint64 total_mutation_bytes = 2;
+  uint64 gc_count = 3;
+  uint64 rollup_count = 4;
+  uint64 total_rollup_bytes = 5;
+  bytes total_storage_cost = 6;
+  bytes total_evm_cost = 7;
+  uint64 total_gc_bytes = 8;
+  uint64 total_rollup_raw_bytes = 9;
+  uint64 total_rollup_mutation_count = 10;
+}

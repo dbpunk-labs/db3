@@ -20,5 +20,6 @@ rand = "0.8.5"
 bson = "2.5.0"
 serde_json = {workspace=true}
 byteorder = "1.4.3"
+ethers = { workspace = true }
 [dev-dependencies]
 chrono = "0.4.22"

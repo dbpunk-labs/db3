@@ -35,6 +35,7 @@ export {
     getIndexNodeStatus,
     setupStorageNode,
     getContractSyncStatus,
+    getMutationState
 } from './client/client_v2'
 
 export {

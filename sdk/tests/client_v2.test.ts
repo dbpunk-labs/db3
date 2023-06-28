@@ -28,6 +28,7 @@ import {
     configRollup,
     getContractSyncStatus,
     setupStorageNode,
+    getMutationState,
 } from '../src/client/client_v2'
 import {
     addDoc,
@@ -88,12 +89,16 @@ describe('test db3.js client module', () => {
             '1000000',
             '1000000'
         )
+        const { db, result } = await createDocumentDatabase(client, 'db1')
         expect('0').toBe(response.code)
         const status = await getStorageNodeStatus(client)
         expect(true).toBe(status.hasInited)
         expect('9527').toBe(status.config?.networkId)
         expect('1000000').toBe(status.config?.minRollupSize)
         expect('1000000').toBe(status.config?.rollupInterval)
+        const view = await getMutationState(client)
+        expect(true).toBe(parseInt(view.mutationCount) > 0)
+        expect(true).toBe(parseInt(view.totalMutationBytes) > 0)
     })
 
     test('test get index system status', async () => {

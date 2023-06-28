@@ -19,6 +19,7 @@ use crate::mutation_utils::MutationUtil;
 use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use crate::version_util;
 use db3_base::bson_util::bytes_to_bson_document;
+use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_verifier::DB3Verifier;
 use db3_crypto::id::TxId;
@@ -27,19 +28,20 @@ use db3_proto::db3_base_proto::{SystemConfig, SystemStatus};
 use db3_proto::db3_mutation_v2_proto::{
     mutation::body_wrapper::Body, MutationAction, MutationRollupStatus,
 };
-
 use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
 use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, BlockRequest, BlockResponse, ExtraItem,
     GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest,
     GetDatabaseOfOwnerResponse, GetDatabaseRequest, GetDatabaseResponse, GetMutationBodyRequest,
-    GetMutationBodyResponse, GetMutationHeaderRequest, GetMutationHeaderResponse, GetNonceRequest,
-    GetNonceResponse, GetSystemStatusRequest, ScanGcRecordRequest, ScanGcRecordResponse,
+    GetMutationBodyResponse, GetMutationHeaderRequest, GetMutationHeaderResponse,
+    GetMutationStateRequest, GetMutationStateResponse, GetNonceRequest, GetNonceResponse,
+    GetSystemStatusRequest, MutationStateView, ScanGcRecordRequest, ScanGcRecordResponse,
     ScanMutationHeaderRequest, ScanMutationHeaderResponse, ScanRollupRecordRequest,
     ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse, SetupRequest,
     SetupResponse, SubscribeRequest,
 };
+use ethers::types::U256;
 
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
@@ -301,6 +303,32 @@ impl StorageNodeV2Impl {
 
 #[tonic::async_trait]
 impl StorageNode for StorageNodeV2Impl {
+    async fn get_mutation_state(
+        &self,
+        _request: Request<GetMutationStateRequest>,
+    ) -> std::result::Result<Response<GetMutationStateResponse>, Status> {
+        let state = self.storage.get_latest_state();
+        let total_storage_cost = strings::ar_to_readable_num_str(U256::from_big_endian(
+            state.total_storage_cost.as_ref() as &[u8],
+        ));
+        let total_evm_cost = strings::evm_to_readable_num_str(U256::from_big_endian(
+            state.total_evm_cost.as_ref() as &[u8],
+        ));
+        let view = MutationStateView {
+            mutation_count: state.mutation_count,
+            total_mutation_bytes: state.total_mutation_bytes,
+            gc_count: state.gc_count,
+            rollup_count: state.rollup_count,
+            total_rollup_bytes: state.total_rollup_bytes,
+            total_gc_bytes: state.total_gc_bytes,
+            total_rollup_raw_bytes: state.total_rollup_raw_bytes,
+            total_rollup_mutation_count: state.total_rollup_mutation_count,
+            total_storage_cost,
+            total_evm_cost,
+        };
+        Ok(Response::new(GetMutationStateResponse { view: Some(view) }))
+    }
+
     async fn setup(
         &self,
         request: Request<SetupRequest>,
