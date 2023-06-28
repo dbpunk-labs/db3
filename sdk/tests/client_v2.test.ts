@@ -616,21 +616,21 @@ describe('test db3.js client module', () => {
     test('test add large mutations', async () => {
         const client = await createTestClient()
         try {
-            for (var i = 0; i < 1; i++) {
-                const { db, result } = await createDocumentDatabase(
+            const { db } = await createDocumentDatabase(
                     client,
                     'desc'
-                )
-                const index: Index = {
+             )
+            const index: Index = {
                     path: '/city',
                     indexType: IndexType.StringKey,
                 }
-                {
-                    const { collection, result } = await createCollection(
+            const { collection } = await createCollection(
                         db,
                         'col',
                         [index]
                     )
+            for (var i = 0; i < 10000000; i++) {
+                {
                     await addDoc(collection, {
                         name: 'book1',
                         author: 'db3 developers',
