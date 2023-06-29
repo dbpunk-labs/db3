@@ -47,4 +47,6 @@ jobs:
           RELEASE_NAME=${GITHUB_REF/refs\/tags\//}
           cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:$RELEASE_NAME
           docker push ghcr.io/dbpunk-labs/db3:$RELEASE_NAME
+          docker tag  ghcr.io/dbpunk-labs/db3:$RELEASE_NAME ghcr.io/dbpunk-labs/db3:latest
+          docker push ghcr.io/dbpunk-labs/db3:latest
           echo "the image is ghcr.io/dbpunk-labs/db3:$RELEASE_NAME"
