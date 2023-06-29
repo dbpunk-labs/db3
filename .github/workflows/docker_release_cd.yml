@@ -41,9 +41,12 @@ jobs:
       - name: Build Docker image
         run: |
           ROOT_DIR=`pwd`
+          cp ${ROOT_DIR}/docker/config.ts ${ROOT_DIR}/thirdparty/data-manager/src/data-context/
           cd ${ROOT_DIR}/thirdparty/data-manager && yarn && yarn build && mv -f dist ${ROOT_DIR}/docker/pages
           cd ${ROOT_DIR}
           RELEASE_NAME=${GITHUB_REF/refs\/tags\//}
           cd docker && docker build . -t ghcr.io/dbpunk-labs/db3:$RELEASE_NAME
           docker push ghcr.io/dbpunk-labs/db3:$RELEASE_NAME
+          docker tag  ghcr.io/dbpunk-labs/db3:$RELEASE_NAME ghcr.io/dbpunk-labs/db3:latest
+          docker push ghcr.io/dbpunk-labs/db3:latest
           echo "the image is ghcr.io/dbpunk-labs/db3:$RELEASE_NAME"

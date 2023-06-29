@@ -54,9 +54,11 @@ pub struct DBStoreV2Config {
     pub enable_doc_store: bool,
     pub doc_store_conf: DocStoreConfig,
 }
+
 struct DBState {
     pub db_doc_order: BTreeMap<String, i64>,
 }
+
 #[derive(Clone)]
 pub struct DBStoreV2 {
     config: DBStoreV2Config,

@@ -15,31 +15,44 @@
 
 # DB3 Network
 
-DB3 Network is a lightweight, permanent JSON document database for Web3. It is designed to store and retrieve data for decentralized applications built on blockchain technology. DB3 Network has two core features:
+DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is designed to store and retrieve data for decentralized applications built on blockchain technology. DB3 Network has two core features:
 
-1. Using DB3 Network as a JSON document database.
-2. Periodically rolling up the JSON document to the Arweave.
+1. Using DB3 Network as a JSON document database. 
+2. Periodically rolling up the JSON document to the [Arweave](https://www.arweave.org/) at a very low cost.
+
 
 # Have a try
 
 ## Set up self-hosted Node
 
+**1. Start docker container**
 ```shell
 sudo docker run -p 26639:26639 -p 26619:26619 -p 26629:26629 \
                 -e ADMIN_ADDR=0xF78c...29679 \ 
-                -it imotai/db3:v0.3.14
+                -it ghcr.io/dbpunk-labs/db3:latest 
+```
+you should see the following output
+```
+start store node...
+start index node...
+the ar account address e_i_JLA8toEr5HaHCpkZJUIXp3kypCAd5NNAvfWNOgE
+start ar testnet ...
+10000000000000Start the local db3 nodes successfully
+The storage node url: http://127.0.0.1:26619
+The index node url: http://127.0.0.1:26639
+The console node url: http://127.0.0.1:26629/console
+The setup url: http://127.0.0.1:26629/welcome
 ```
 
-## Build
+**2. Setup the node**
 
-```shell
-git clone https://github.com/dbpunk-labs/db3.git
-cd db3 && bash install_env.sh
-cargo build
-```
-If you encounter any problems, you can check the environment by referring to [BUILD](./BUILD.md).
+* open the `http://127.0.0.1:26629/welcome` to setup your node
+* open the `http://127.0.0.1:26629/console/database` to create database or collection
+* open the `http://127.0.0.1:26629/console/node/dashboard` to vist the dashboard
 
-## Write And Query the Document
+**3. Playground**
+
+open the `http://127.0.0.1:26629/console/database` to create database or collection, then use the playgound `http://127.0.0.1:26629/console/database/playground` with the following code
 
 ```typescript
 // create a account
@@ -50,6 +63,7 @@ const client = createClient('http://127.0.0.1:26619',
                              account)
 
 // get the collection
+// please replace the database address and collection name with yours
 const collection = await getCollection("0xF7..79", "book", client)
 
 // add a document
@@ -60,7 +74,7 @@ const {id} = await addDoc(collection, {
 // query the document
 const resultSet = await queryDoc<Book>(collection, "/[author=Cixin-Liu]")
 ```
-you can go to [sdk](https://docs.db3.network/) for more
+if you have any questions, please feel free to ask us for help
 
 # How it works
 
