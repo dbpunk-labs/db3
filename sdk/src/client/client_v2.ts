@@ -44,7 +44,6 @@ import { BSON } from 'db3-bson'
  *
  * @param rollup_node_url  - the url of db3 rollup node
  * @param index_node_url   - the url of db3 index node
- * @param account          - the instance of db3 account
  * @returns the client instance
  *
  **/
