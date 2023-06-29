@@ -1,5 +1,8 @@
-use arrow::array::{ArrayRef, BinaryBuilder, StringBuilder, UInt32Builder, UInt64Builder};
-use arrow::datatypes::SchemaRef;
+use arrow::array::{
+    ArrayRef, BinaryArray, BinaryBuilder, StringArray, StringBuilder, UInt32Array, UInt32Builder,
+    UInt64Array, UInt64Builder,
+};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
@@ -26,7 +29,6 @@ impl ArToolBox {
         key_root_path: String,
         arweave_url: String,
         temp_data_path: String,
-        schema: SchemaRef,
         network_id: Arc<AtomicU64>,
     ) -> Result<Self> {
         let ar_fs_config = ArFileSystemConfig {
@@ -34,6 +36,13 @@ impl ArToolBox {
             arweave_url,
         };
         let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("payload", DataType::Binary, true),
+            Field::new("signature", DataType::Utf8, true),
+            Field::new("block", DataType::UInt64, true),
+            Field::new("order", DataType::UInt32, true),
+        ]));
+
         Ok(Self {
             network_id,
             schema,
@@ -74,6 +83,7 @@ impl ArToolBox {
         Ok((id, reward, num_rows, size))
     }
 
+    /// Compress recordbatch to parquet file
     pub fn dump_recordbatch(path: &Path, recordbatch: &RecordBatch) -> Result<(u64, u64)> {
         let properties = WriterProperties::builder()
             .set_compression(Compression::GZIP(GzipLevel::default()))
@@ -93,6 +103,7 @@ impl ArToolBox {
         Ok((meta.num_rows as u64, metadata.len()))
     }
 
+    /// Parse recordbatch from parquet file
     pub fn parse_gzip_file(path: &Path) -> Result<Vec<RecordBatch>> {
         let fd = File::open(path).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
         // Create a sync parquet reader with batch_size.
@@ -109,11 +120,56 @@ impl ArToolBox {
             let each = batch.map_err(|e| DB3Error::RollupError(format!("{e}")))?;
             batches.push(each);
         }
-
         Ok(batches)
     }
 
-    pub fn convert_to_recordbatch(
+    /// Parse mutation body, block and order from recordbatch
+    pub fn convert_recordbatch_to_mutation(
+        record_batch: &RecordBatch,
+    ) -> Result<Vec<(MutationBody, u64, u32)>> {
+        let mut mutations = Vec::new();
+        let payloads = record_batch
+            .column_by_name("payload")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<BinaryArray>()
+            .unwrap();
+        let signatures = record_batch
+            .column_by_name("signature")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let blocks = record_batch
+            .column_by_name("block")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        let orders = record_batch
+            .column_by_name("order")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .unwrap();
+
+        for i in 0..record_batch.num_rows() {
+            let payload = payloads.value(i);
+            let signature = signatures.value(i);
+            let block = blocks.value(i);
+            let order = orders.value(i);
+            let mutation = MutationBody {
+                payload: payload.to_vec(),
+                signature: signature.to_string(),
+            };
+            mutations.push((mutation, block, order));
+        }
+        Ok(mutations)
+    }
+
+    /// convert mutation to recordbatch
+    /// encode mutation body, block and order to recordbatch
+    pub fn convert_mutations_to_recordbatch(
         &self,
         mutations: &[(MutationHeader, MutationBody)],
     ) -> Result<RecordBatch> {
@@ -149,8 +205,9 @@ impl ArToolBox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::{BinaryArray, StringArray, UInt32Array, UInt64Array};
-    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::array::{Array, AsArray, BinaryArray, StringArray, UInt32Array, UInt64Array};
+    use arrow::datatypes::{BinaryType, DataType, Field, Schema};
+    use std::path::PathBuf;
     #[test]
     fn it_works() {}
 
@@ -205,15 +262,64 @@ mod tests {
         let res = ArToolBox::parse_gzip_file(parquet_file.as_path()).unwrap();
         assert_eq!(res.len(), 1);
         let rec = res[0].clone();
+        println!("schema: {}", rec.schema());
         assert!(rec.num_columns() == 4);
         assert_eq!(rec.num_rows(), 10);
-        println!("rec: {:?}", rec);
+        let payloads = rec
+            .column_by_name("payload")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<BinaryArray>()
+            .unwrap();
+        assert_eq!(payloads.len(), 10);
+        assert_eq!(payloads.value(5), "this is a payload sample".as_bytes());
+
+        let signatures = rec
+            .column_by_name("signature")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(signatures.len(), 10);
+        assert_eq!(signatures.value(5), "0x1234567890");
+
+        let blocks = rec
+            .column_by_name("block")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(blocks.len(), 10);
+        assert_eq!(blocks.value(5), 5);
+
+        let orders = rec
+            .column_by_name("order")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .unwrap();
+        assert_eq!(orders.len(), 10);
+        assert_eq!(orders.value(5), 50);
     }
 
-    // #[test]
-    // fn parse_sample_ar_parquet_ut() {
-    //     let res = ArToolBox::parse_gzip_file(Path::new("/Users/chenjing/work/dbpunk/db3/37829_37968.gz.parquet")).unwrap();
-    //     assert!(res.num_columns() == 4);
-    //     println!("res: {:?}", res);
-    // }
+    #[test]
+    fn parse_sample_ar_parquet_ut() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/test/37829_37968.gz.parquet");
+
+        let res = ArToolBox::parse_gzip_file(path.as_path()).unwrap();
+        assert_eq!(res.len(), 1);
+        let rec = res[0].clone();
+        println!("schema: {}", rec.schema());
+        println!("num_rows: {}", rec.num_rows());
+        assert_eq!(rec.num_columns(), 4);
+        assert_eq!(rec.num_rows(), 204);
+
+        let mutations = ArToolBox::convert_recordbatch_to_mutation(&rec).unwrap();
+        assert_eq!(mutations.len(), 204);
+        let (mutation, block, order) = mutations[0].clone();
+        assert_eq!(block, 37829);
+        assert_eq!(order, 1);
+        assert_eq!(mutation.signature, "0xf6afe1165ae87fa09375eabccdedc61f3e5af4ed1e5c6456f1b63d397862252667e1f13f0f076f30609754f787c80135c52f7c249e95c9b8fab1b9ed27846c1b1c");
+    }
 }

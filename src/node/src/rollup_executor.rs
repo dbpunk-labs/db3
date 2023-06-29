@@ -66,13 +66,6 @@ impl RollupExecutor {
         storage: MutationStore,
         network_id: Arc<AtomicU64>,
     ) -> Result<Self> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("payload", DataType::Binary, true),
-            Field::new("signature", DataType::Utf8, true),
-            Field::new("block", DataType::UInt64, true),
-            Field::new("order", DataType::UInt32, true),
-        ]));
-
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
             "evm address {}",
@@ -94,7 +87,6 @@ impl RollupExecutor {
             config.key_root_path.clone(),
             config.ar_node_url.clone(),
             config.temp_data_path.clone(),
-            schema.clone(),
             network_id.clone(),
         )?;
         Ok(Self {
@@ -133,14 +125,6 @@ impl RollupExecutor {
                 Ok(wallet)
             }
         }
-    }
-
-    // TODO: remove this function
-    fn convert_to_recordbatch(
-        &self,
-        mutations: &[(MutationHeader, MutationBody)],
-    ) -> Result<RecordBatch> {
-        self.ar_toolbox.convert_to_recordbatch(mutations)
     }
 
     fn gc_mutation(&self) -> Result<()> {
@@ -278,7 +262,9 @@ impl RollupExecutor {
         }
         self.pending_mutations
             .store(mutations.len() as u64, Ordering::Relaxed);
-        let recordbatch = self.convert_to_recordbatch(&mutations)?;
+        let recordbatch = self
+            .ar_toolbox
+            .convert_mutations_to_recordbatch(&mutations)?;
         let memory_size = recordbatch.get_array_memory_size();
         self.pending_data_size
             .store(memory_size as u64, Ordering::Relaxed);
