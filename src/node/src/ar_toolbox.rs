@@ -95,7 +95,7 @@ impl ArToolBox {
         Ok((meta.num_rows as u64, metadata.len()))
     }
 
-    pub fn parse_gzip_file(path: &Path) -> Result<RecordBatch> {
+    pub fn parse_gzip_file(path: &Path) -> Result<Vec<RecordBatch>> {
         let fd = File::open(path).map_err(|e| DB3Error::RollupError(format!("{e}")))?;
         // Create a sync parquet reader with batch_size.
         // batch_size is the number of rows to read up to buffer once from pages, defaults to 1024
@@ -112,15 +112,7 @@ impl ArToolBox {
             batches.push(each);
         }
 
-        if batches.len() == 0 {
-            return Err(DB3Error::RollupError(format!(
-                "Invalid number of batches: {}",
-                batches.len()
-            )));
-        } else {
-            info!("Number of batches: {}", batches.len());
-            Ok(batches[0].clone())
-        }
+        Ok(batches)
     }
 
     pub fn convert_to_recordbatch(
@@ -213,9 +205,11 @@ mod tests {
         assert_eq!(num_rows, 10);
         assert_eq!(size, 1862);
         let res = ArToolBox::parse_gzip_file(parquet_file.as_path()).unwrap();
-        assert!(res.num_columns() == 4);
-        assert_eq!(res.num_rows(), 10);
-        println!("res: {:?}", res);
+        assert_eq!(res.len(), 1);
+        let rec = res[0].clone();
+        assert!(rec.num_columns() == 4);
+        assert_eq!(rec.num_rows(), 10);
+        println!("rec: {:?}", rec);
     }
 
     // #[test]
