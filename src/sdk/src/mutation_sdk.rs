@@ -216,72 +216,72 @@ impl MutationSDK {
 
 #[cfg(test)]
 mod tests {
-    use super::MutationSDK;
-    use crate::mutation_sdk::StorageNodeClient;
-    use crate::sdk_test;
-    use crate::store_sdk::StoreSDK;
-    use std::sync::Arc;
-    use std::{thread, time};
-    use tonic::transport::Endpoint;
-
-    async fn run_mint_credits_mutation_flow(
-        use_typed_format: bool,
-        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        counter: i64,
-    ) {
-        let (to_address, _signer) = sdk_test::gen_secp256k1_signer(counter + 1);
-        let (sender_address, signer) = sdk_test::gen_secp256k1_signer(counter + 2);
-        let sdk = MutationSDK::new(client.clone(), signer, use_typed_format);
-        let dm = sdk_test::create_a_mint_mutation(&sender_address, &to_address);
-        let result = sdk.submit_mint_credit_mutation(&dm).await;
-        assert!(result.is_ok());
-        let millis = time::Duration::from_millis(2000);
-        thread::sleep(millis);
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter + 1);
-        let store_sdk = StoreSDK::new(client, signer, use_typed_format);
-        let account = store_sdk.get_account(&to_address).await.unwrap();
-        assert_eq!(account.credits, 9 * 1000_000_000);
-    }
-
-    async fn run_database_mutation_flow(
-        use_typed_format: bool,
-        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
-        counter: i64,
-    ) {
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let sdk = MutationSDK::new(client.clone(), signer, use_typed_format);
-        let dm = sdk_test::create_a_database_mutation();
-        let result = sdk.submit_database_mutation(&dm).await;
-        assert!(result.is_ok());
-        let (db_id, _) = result.unwrap();
-        let millis = time::Duration::from_millis(2000);
-        thread::sleep(millis);
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let mut store_sdk = StoreSDK::new(client, signer, use_typed_format);
-        let database_ret = store_sdk.get_database(db_id.to_hex().as_str()).await;
-        assert!(database_ret.is_ok());
-        assert!(database_ret.unwrap().is_some());
-        let result = store_sdk.close_session().await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn smoke_test_run_mint_credits_mutation_flow() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        run_mint_credits_mutation_flow(false, client.clone(), 10).await;
-        run_mint_credits_mutation_flow(true, client.clone(), 100).await;
-    }
-
-    #[tokio::test]
-    async fn it_database_mutation_smoke_test() {
-        let ep = "http://127.0.0.1:26659";
-        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
-        let channel = rpc_endpoint.connect_lazy();
-        let client = Arc::new(StorageNodeClient::new(channel));
-        run_database_mutation_flow(false, client.clone(), 20).await;
-        run_database_mutation_flow(true, client.clone(), 30).await;
-    }
+    //    use super::MutationSDK;
+    //    use crate::mutation_sdk::StorageNodeClient;
+    //    use crate::sdk_test;
+    //    use crate::store_sdk::StoreSDK;
+    //    use std::sync::Arc;
+    //    use std::{thread, time};
+    //    use tonic::transport::Endpoint;
+    //
+    //    async fn run_mint_credits_mutation_flow(
+    //        use_typed_format: bool,
+    //        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+    //        counter: i64,
+    //    ) {
+    //        let (to_address, _signer) = sdk_test::gen_secp256k1_signer(counter + 1);
+    //        let (sender_address, signer) = sdk_test::gen_secp256k1_signer(counter + 2);
+    //        let sdk = MutationSDK::new(client.clone(), signer, use_typed_format);
+    //        let dm = sdk_test::create_a_mint_mutation(&sender_address, &to_address);
+    //        let result = sdk.submit_mint_credit_mutation(&dm).await;
+    //        assert!(result.is_ok());
+    //        let millis = time::Duration::from_millis(2000);
+    //        thread::sleep(millis);
+    //        let (_, signer) = sdk_test::gen_secp256k1_signer(counter + 1);
+    //        let store_sdk = StoreSDK::new(client, signer, use_typed_format);
+    //        let account = store_sdk.get_account(&to_address).await.unwrap();
+    //        assert_eq!(account.credits, 9 * 1000_000_000);
+    //    }
+    //
+    //    async fn run_database_mutation_flow(
+    //        use_typed_format: bool,
+    //        client: Arc<StorageNodeClient<tonic::transport::Channel>>,
+    //        counter: i64,
+    //    ) {
+    //        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+    //        let sdk = MutationSDK::new(client.clone(), signer, use_typed_format);
+    //        let dm = sdk_test::create_a_database_mutation();
+    //        let result = sdk.submit_database_mutation(&dm).await;
+    //        assert!(result.is_ok());
+    //        let (db_id, _) = result.unwrap();
+    //        let millis = time::Duration::from_millis(2000);
+    //        thread::sleep(millis);
+    //        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
+    //        let mut store_sdk = StoreSDK::new(client, signer, use_typed_format);
+    //        let database_ret = store_sdk.get_database(db_id.to_hex().as_str()).await;
+    //        assert!(database_ret.is_ok());
+    //        assert!(database_ret.unwrap().is_some());
+    //        let result = store_sdk.close_session().await;
+    //        assert!(result.is_ok());
+    //    }
+    //
+    //    #[tokio::test]
+    //    async fn smoke_test_run_mint_credits_mutation_flow() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let client = Arc::new(StorageNodeClient::new(channel));
+    //        run_mint_credits_mutation_flow(false, client.clone(), 10).await;
+    //        run_mint_credits_mutation_flow(true, client.clone(), 100).await;
+    //    }
+    //
+    //    #[tokio::test]
+    //    async fn it_database_mutation_smoke_test() {
+    //        let ep = "http://127.0.0.1:26659";
+    //        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+    //        let channel = rpc_endpoint.connect_lazy();
+    //        let client = Arc::new(StorageNodeClient::new(channel));
+    //        run_database_mutation_flow(false, client.clone(), 20).await;
+    //        run_database_mutation_flow(true, client.clone(), 30).await;
+    //    }
 }

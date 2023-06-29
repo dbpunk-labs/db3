@@ -1,0 +1,254 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "DB3MetaStore",
+  "sourceName": "contracts/DB3MetaStore.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "page",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "pageSize",
+          "type": "uint64"
+        }
+      ],
+      "name": "getAllNetworkRegistrations",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "networkId",
+              "type": "uint64"
+            },
+            {
+              "internalType": "string",
+              "name": "rollupNodeUrl",
+              "type": "string"
+            },
+            {
+              "internalType": "string[]",
+              "name": "indexNodeUrls",
+              "type": "string[]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "indexNodeAddresses",
+              "type": "address[]"
+            },
+            {
+              "internalType": "address",
+              "name": "admin",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "rollupNodeAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "latestArweaveTx",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct IDB3MetaStore.NetworkRegistration[]",
+          "name": "registrations",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "networkId",
+          "type": "uint64"
+        }
+      ],
+      "name": "getNetworkRegistration",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "networkId",
+              "type": "uint64"
+            },
+            {
+              "internalType": "string",
+              "name": "rollupNodeUrl",
+              "type": "string"
+            },
+            {
+              "internalType": "string[]",
+              "name": "indexNodeUrls",
+              "type": "string[]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "indexNodeAddresses",
+              "type": "address[]"
+            },
+            {
+              "internalType": "address",
+              "name": "admin",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "rollupNodeAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "latestArweaveTx",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct IDB3MetaStore.NetworkRegistration",
+          "name": "registration",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "networkId",
+          "type": "uint64"
+        },
+        {
+          "internalType": "string",
+          "name": "indexNodeUrl",
+          "type": "string"
+        }
+      ],
+      "name": "registerIndexNode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "networkId",
+          "type": "uint64"
+        },
+        {
+          "internalType": "string",
+          "name": "rollupNodeUrl",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "rollupNodeAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "string[]",
+          "name": "indexNodeUrls",
+          "type": "string[]"
+        },
+        {
+          "internalType": "address[]",
+          "name": "indexNodeAddresses",
+          "type": "address[]"
+        }
+      ],
+      "name": "registerNetwork",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "networkId",
+          "type": "uint64"
+        },
+        {
+          "internalType": "string",
+          "name": "rollupNodeUrl",
+          "type": "string"
+        }
+      ],
+      "name": "registerRollupNode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "networkId",
+          "type": "uint64"
+        },
+        {
+          "internalType": "string[]",
+          "name": "indexNodeUrls",
+          "type": "string[]"
+        },
+        {
+          "internalType": "address[]",
+          "name": "indexNodeAddresses",
+          "type": "address[]"
+        }
+      ],
+      "name": "updateNetworkIndexNodes",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "networkId",
+          "type": "uint64"
+        },
+        {
+          "internalType": "bytes",
+          "name": "latestArweaveTx",
+          "type": "bytes"
+        }
+      ],
+      "name": "updateRollupSteps",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

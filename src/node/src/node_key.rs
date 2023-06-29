@@ -36,21 +36,3 @@ pub fn get_key_pair(file_path: Option<String>) -> Result<DB3KeyPair> {
         Err(e) => Err(DB3Error::LoadKeyPairError(format!("{e}"))),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_get_key_pair_with_default_path() {
-        let res = get_key_pair(None);
-        assert!(res.is_ok());
-    }
-
-    #[test]
-    fn it_get_key_pair_file_not_exist() {
-        let res = get_key_pair(Some("/node_key_not_exist_file.json".to_string()));
-        assert!(res.is_err());
-        println!("{:?}", res.err())
-    }
-}

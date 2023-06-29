@@ -45,21 +45,19 @@ use ethers::types::transaction::eip712::Eip712;
 use ethers::types::Bytes;
 use prost::Message;
 use std::boxed::Box;
+use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-
 use std::time::{SystemTime, UNIX_EPOCH};
+use tendermint::block;
 use tendermint_rpc::{
     event::EventData,
     query::{EventType, Query},
     Client, SubscriptionClient, WebSocketClient,
 };
-
-use std::collections::BTreeMap;
-use std::collections::HashSet;
-use tendermint::block;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::ReceiverStream;

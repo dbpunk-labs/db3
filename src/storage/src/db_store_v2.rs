@@ -34,6 +34,7 @@ use db3_proto::db3_mutation_v2_proto::{
 use prost::Message;
 use rocksdb::{DBRawIteratorWithThreadMode, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tracing::info;
 
@@ -62,6 +63,8 @@ pub struct DBStoreV2 {
     se: Arc<StorageEngine>,
     doc_store: Arc<DocStore>,
     db_state: Arc<Mutex<DBState>>,
+    db_count: Arc<AtomicU64>,
+    collection_count: Arc<AtomicU64>,
 }
 
 impl DBStoreV2 {
@@ -71,7 +74,6 @@ impl DBStoreV2 {
         cf_opts.create_missing_column_families(true);
         info!("open db store with path {}", config.db_path.as_str());
         let path = Path::new(config.db_path.as_str());
-
         let se = Arc::new(
             StorageEngine::open_cf(
                 &cf_opts,
@@ -85,14 +87,14 @@ impl DBStoreV2 {
                     config.db_owner_store_cf_name.as_str(),
                 ],
             )
-            .map_err(|e| DB3Error::OpenStoreError(config.db_path.to_string(), format!("{e}")))?,
+            .map_err(|e| {
+                DB3Error::OpenStoreError(config.db_path.to_string(), format!("db_store_v2 {e}"))
+            })?,
         );
-
         let doc_store = match config.enable_doc_store {
             false => Arc::new(DocStore::mock()),
             true => Arc::new(DocStore::new(config.doc_store_conf.clone())?),
         };
-
         Ok(Self {
             config,
             se,
@@ -100,6 +102,8 @@ impl DBStoreV2 {
             db_state: Arc::new(Mutex::new(DBState {
                 db_doc_order: BTreeMap::new(),
             })),
+            db_count: Arc::new(AtomicU64::new(0)),
+            collection_count: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -119,6 +123,7 @@ impl DBStoreV2 {
             Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
         }
     }
+
     pub fn get_collection_of_database(&self, db_addr: &DB3Address) -> Result<Vec<Collection>> {
         self.get_entries_with_prefix::<Collection>(
             db_addr.as_ref(),
@@ -230,23 +235,18 @@ impl DBStoreV2 {
                 "fail to find database".to_string(),
             ));
         }
-
         if self.is_db_collection_exist(db_addr, collection.collection_name.as_str())? {
             return Err(DB3Error::ReadStoreError(
                 "collection with name exist".to_string(),
             ));
         }
-
         let ck = collection_key::build_collection_key(db_addr, collection.collection_name.as_str())
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-
         let collection_store_cf_handle = self
             .se
             .cf_handle(self.config.collection_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-
         let ck_ref: &[u8] = ck.as_ref();
-
         let value = self
             .se
             .get_cf(&collection_store_cf_handle, ck_ref)

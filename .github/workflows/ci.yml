@@ -52,14 +52,15 @@ jobs:
           sudo apt-get install protobuf-compiler 
           protoc --version
           ROOT_DIR=`pwd`
-          cd ${ROOT_DIR}/metadata && yarn install && npx hardhat test
-          ls ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/
+          cd ${ROOT_DIR}/metadata && yarn install
+          cd ${ROOT_DIR}/metadata && npx hardhat compile --force && echo "return code $?"
+          ls ${ROOT_DIR}/metadata
+          cd ${ROOT_DIR}/metadata && npx hardhat test && echo "return code $?"
+          test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
           cd ${ROOT_DIR} && cargo build
-          cd ${ROOT_DIR}/tools
-          wget https://github.com/tendermint/tendermint/releases/download/v0.37.0-rc2/tendermint_0.37.0-rc2_linux_amd64.tar.gz
-          tar -zxf tendermint_0.37.0-rc2_linux_amd64.tar.gz
-          sh start_localnet.sh >tm.log 2>&1 &
+          cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
           sleep 3
+          cd ${ROOT_DIR}/tools && tail -n200 db3.log
       - name: Run rust test with coverage
         run: |
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
