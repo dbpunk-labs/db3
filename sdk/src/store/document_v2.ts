@@ -121,11 +121,10 @@ export async function deleteDoc(col: Collection, ids: string[]) {
 export async function updateDoc(
     col: Collection,
     id: string,
-    doc: DocumentData,
-    masks: string[]
+    doc: DocumentData
 ) {
     const documentMask: DocumentMask = {
-        fields: masks,
+        fields: [],
     }
     const documentMutation: DocumentMutation = {
         collectionName: col.name,

@@ -68,13 +68,23 @@ export function createRandomAccount() {
     return createFromPrivateKey(rawKey as Hex)
 }
 
-export async function createFromExternal(chain: Chain) {
+/**
+ *
+ * Create the account from external wallet e.g. metamask
+ *
+ * ```ts
+ * const account = createFromExternal()
+ * ```
+ * @returns the instance of {@link DB3ACCOUNT}
+ *
+ **/
+export async function createFromExternal(chain?: Chain) {
     const [account] = await window.ethereum.request({
         method: 'eth_requestAccounts',
     })
     const client = createWalletClient({
         account,
-        chain,
+        chain: chain ? chain : mainnet,
         transport: custom(window.ethereum),
     })
     const [address] = await client.getAddresses()

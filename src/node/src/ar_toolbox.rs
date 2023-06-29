@@ -5,11 +5,11 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use parquet::arrow::arrow_reader::{
-    ArrowReaderBuilder, ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder,
+    ParquetRecordBatchReaderBuilder,
 };
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, GzipLevel};
-use parquet::file::properties::{ReaderProperties, WriterProperties};
+use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
