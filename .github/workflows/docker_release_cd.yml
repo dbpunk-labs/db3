@@ -41,6 +41,7 @@ jobs:
       - name: Build Docker image
         run: |
           ROOT_DIR=`pwd`
+          cp ${ROOT_DIR}/docker/config.ts ${ROOT_DIR}/thirdparty/data-manager/src/data-context/
           cd ${ROOT_DIR}/thirdparty/data-manager && yarn && yarn build && mv -f dist ${ROOT_DIR}/docker/pages
           cd ${ROOT_DIR}
           RELEASE_NAME=${GITHUB_REF/refs\/tags\//}
