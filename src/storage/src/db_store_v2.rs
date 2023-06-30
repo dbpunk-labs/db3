@@ -779,8 +779,9 @@ mod tests {
         } else {
             assert!(false);
         }
-        if let Ok(cl) = db3_store.get_collection_of_database(db_id.address()) {
+        if let Ok((cl, states)) = db3_store.get_collection_of_database(db_id.address()) {
             assert_eq!(cl.len(), 1);
+            assert_eq!(states.len(), 1);
         } else {
             assert!(false);
         }
@@ -824,8 +825,9 @@ mod tests {
             assert!(false);
         }
 
-        if let Ok(dbs) = db3_store.get_database_of_owner(&DB3Address::ZERO) {
+        if let Ok((dbs, states)) = db3_store.get_database_of_owner(&DB3Address::ZERO) {
             assert_eq!(dbs.len(), 1);
+            assert_eq!(states.len(), 1);
         } else {
             assert!(false);
         }
