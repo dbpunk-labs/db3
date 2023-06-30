@@ -21,6 +21,8 @@ import {
     DatabaseMessage as InternalDatabase,
     Index,
     Collection as InternalCollection,
+    DatabaseState,
+    CollectionState,
 } from '../proto/db3_database_v2'
 
 export type CreateDBResult = {
@@ -37,6 +39,7 @@ export type Database = {
     addr: string
     client: Client
     internal: InternalDatabase | undefined
+    state: DatabaseState | undefined
 }
 
 export type MutationResult = {
@@ -50,6 +53,7 @@ export type Collection = {
     db: Database
     indexFields: Index[]
     internal: InternalCollection | undefined
+    state: CollectionState | undefined
 }
 
 export type QueryResult<T = DocumentData> = {

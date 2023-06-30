@@ -147,7 +147,6 @@ describe('test db3.js client module', () => {
     test('create client smoke test', async () => {
         const client = await createTestClient()
         expect(1).toBe(client.nonce)
-
         const rollupInterval = 10 * 60 * 1000
         const minRollupSize = 10 * 1024 * 1024
         console.log(await getStorageNodeStatus(client))
@@ -175,7 +174,14 @@ describe('test db3.js client module', () => {
                     author: 'imotai',
                     age: 10,
                 })
-
+                const collection_new = await getCollection(
+                    db.addr,
+                    'col',
+                    client
+                )
+                expect('1').toBe(collection_new.state.totalDocCount)
+                const database_new = await getDatabase(db.addr, client)
+                expect('1').toBe(database_new.state.totalDocCount)
                 await addDoc(collection, {
                     city: 'beijing2',
                     author: 'imotai1',
@@ -220,7 +226,6 @@ describe('test db3.js client module', () => {
                         queryStr,
                         [parameter]
                     )
-                    console.log(resultSet)
                     expect(1).toBe(resultSet.docs.length)
                     expect(resultSet.docs[0].doc.city).toBe('beijing')
                     expect(resultSet.docs[0].doc.author).toBe('imotai')
@@ -233,7 +238,6 @@ describe('test db3.js client module', () => {
                         queryStr,
                         []
                     )
-                    console.log(resultSet.docs)
                 }
             }
         } catch (e) {
