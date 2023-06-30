@@ -766,12 +766,12 @@ mod tests {
             index_fields: vec![],
             collection_name: "col1".to_string(),
         };
-        let col_state = db3_store.get_collection_state(&DB3Address::ZERO, "col1");
+        let col_state = db3_store.get_collection_state(&db_id.address(), "col1");
         assert!(col_state.is_none());
         let result =
             db3_store.create_collection(&DB3Address::ZERO, db_id.address(), &collection, 1, 1, 1);
         assert!(result.is_ok());
-        let col_state = db3_store.get_collection_state(&DB3Address::ZERO, "col1");
+        let col_state = db3_store.get_collection_state(&db_id.address(), "col1");
         assert!(col_state.is_some());
         let result = db3_store.get_collection(db_id.address(), "col1");
         if let Ok(Some(_c)) = result {
@@ -814,9 +814,9 @@ mod tests {
 
         let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 1, 1, 1, 1);
         assert!(result.is_ok());
-        let db_state = db3_store.get_database_state(&DB3Address::ZERO);
-        assert!(db_state.is_some());
         let db_id = result.unwrap();
+        let db_state = db3_store.get_database_state(&db_id.address());
+        assert!(db_state.is_some());
         if let Ok(Some(db)) = db3_store.get_database(db_id.address()) {
             if let Some(database_message::Database::DocDb(doc_db)) = db.database {
                 assert_eq!("test_desc", doc_db.desc.as_str());
