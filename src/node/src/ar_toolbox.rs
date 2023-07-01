@@ -15,6 +15,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use subtle_encoding::Base64;
 use tempdir::TempDir;
 use tracing::info;
 pub struct ArToolBox {
@@ -56,6 +57,18 @@ impl ArToolBox {
         Ok((addr, balance.to_string()))
     }
 
+    pub async fn download_and_parse_record_batch(&self, tx: &str) -> Result<Vec<RecordBatch>> {
+        let tmp_dir = TempDir::new_in(&self.temp_data_path, "download")
+            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+        let file_path = tmp_dir.path().join(format!("{}.gz.parquet", tx));
+        self.ar_filesystem
+            .download_file(file_path.as_path(), tx)
+            .await?;
+        Self::parse_gzip_file(file_path.as_path())
+    }
+    pub async fn get_prev_arware_tx(&self, tx_id: &str) -> Result<Option<String>> {
+        self.ar_filesystem.get_last_rollup_tag(tx_id).await
+    }
     pub async fn compress_and_upload_record_batch(
         &self,
         tx: String,
@@ -207,7 +220,10 @@ mod tests {
     use super::*;
     use arrow::array::{Array, AsArray, BinaryArray, StringArray, UInt32Array, UInt64Array};
     use arrow::datatypes::{BinaryType, DataType, Field, Schema};
+    use std::env;
     use std::path::PathBuf;
+    use tempdir::TempDir;
+
     #[test]
     fn it_works() {}
 
@@ -321,5 +337,67 @@ mod tests {
         assert_eq!(block, 37829);
         assert_eq!(order, 1);
         assert_eq!(mutation.signature, "0xf6afe1165ae87fa09375eabccdedc61f3e5af4ed1e5c6456f1b63d397862252667e1f13f0f076f30609754f787c80135c52f7c249e95c9b8fab1b9ed27846c1b1c");
+    }
+
+    #[tokio::test]
+    async fn download_arware_tx_ut() {
+        let temp_dir = TempDir::new("download_arware_tx_ut").expect("create temp dir");
+        let arweave_url = "https://arweave.net";
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let key_root_path = path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("tools/keys")
+            .to_str()
+            .unwrap()
+            .to_string();
+        println!("key_root_path is {}", key_root_path);
+
+        let network_id = Arc::new(AtomicU64::new(1687961160));
+        let ar_toolbox = ArToolBox::new(
+            key_root_path.to_string(),
+            arweave_url.to_string(),
+            temp_dir.path().to_str().unwrap().to_string(),
+            network_id,
+        )
+        .unwrap();
+        let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
+        let res = ar_toolbox
+            .download_and_parse_record_batch(tx_id)
+            .await
+            .unwrap();
+        assert_eq!(res.len(), 2);
+        println!("res: {:?}", res);
+    }
+    #[tokio::test]
+    async fn get_prev_arware_tx_ut() {
+        let temp_dir = TempDir::new("download_arware_tx_ut").expect("create temp dir");
+        let arweave_url = "https://arweave.net";
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let key_root_path = path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("tools/keys")
+            .to_str()
+            .unwrap()
+            .to_string();
+        println!("key_root_path is {}", key_root_path);
+
+        let network_id = Arc::new(AtomicU64::new(1687961160));
+        let ar_toolbox = ArToolBox::new(
+            key_root_path.to_string(),
+            arweave_url.to_string(),
+            temp_dir.path().to_str().unwrap().to_string(),
+            network_id,
+        )
+        .unwrap();
+        let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
+        let res = ar_toolbox.get_prev_arware_tx(tx_id).await.unwrap();
+        assert!(res.is_some());
+        assert_eq!(res.unwrap(), "ld2W-KnmHhmgYcSgc_DcqjjoU_ke9gkwrQEWk0A2Fpg");
     }
 }
