@@ -203,18 +203,11 @@ export async function getDatabase(addr: string, client: Client) {
     if (!db) {
         throw new Error('db with addr ' + addr + ' does not exist')
     }
-    if (db.database.oneofKind === 'docDb') {
-        return {
-            addr,
-            client,
-            internal: db,
-        }
-    } else {
-        return {
-            addr,
-            client,
-            internal: db,
-        }
+    return {
+        addr,
+        client,
+        internal: db,
+        state: response.state,
     }
 }
 
@@ -234,18 +227,20 @@ export async function showDatabase(owner: string, client: Client) {
     const response = await client.provider.getDatabaseOfOwner(owner)
     return response.databases
         .filter((item) => item.database.oneofKind != undefined)
-        .map((db) => {
+        .map((db, index) => {
             if (db.database.oneofKind === 'docDb') {
                 return {
                     addr: '0x' + toHEX(db.database.docDb.address),
                     client,
                     internal: db,
+                    state: response.states[index],
                 }
             } else if (db.database.oneofKind === 'eventDb') {
                 return {
                     addr: '0x' + toHEX(db.database.eventDb.address),
                     client,
                     internal: db,
+                    state: response.states[index],
                 }
             } else {
                 //will not go here
@@ -253,6 +248,7 @@ export async function showDatabase(owner: string, client: Client) {
                     addr: '',
                     client,
                     internal: undefined,
+                    state: response.states[index],
                 }
             }
         })
@@ -280,10 +276,10 @@ export async function showDatabase(owner: string, client: Client) {
 export async function createCollection(
     db: Database,
     name: string,
-    indexFields: Index[]
+    indexFields?: Index[]
 ) {
     const collection: CollectionMutation = {
-        indexFields,
+        indexFields: indexFields ? indexFields : [],
         collectionName: name,
     }
     const body: Mutation_BodyWrapper = {
@@ -310,6 +306,7 @@ export async function createCollection(
             db,
             indexFields,
             internal: undefined,
+            state: undefined,
         }
 
         const result: MutationResult = {
@@ -341,12 +338,13 @@ export async function createCollection(
  **/
 export async function showCollection(db: Database) {
     const response = await db.client.provider.getCollectionOfDatabase(db.addr)
-    const collectionList = response.collections.map((c) => {
+    const collectionList = response.collections.map((c, index) => {
         return {
             name: c.name,
             db,
             indexFields: c.indexFields,
             internal: c,
+            state: response.states[index],
         } as Collection
     })
     return collectionList

@@ -37,6 +37,7 @@ message RunQueryRequest {
 }
 message RunQueryResponse {
   repeated db3_database_v2_proto.Document documents = 2;
+  uint64 count = 3;
 }
 
 message GetSystemStatusRequest {}

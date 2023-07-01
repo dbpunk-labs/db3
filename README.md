@@ -26,9 +26,10 @@ DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is
 ## Set up self-hosted Node
 
 **1. Start docker container**
+
 ```shell
 sudo docker run -p 26639:26639 -p 26619:26619 -p 26629:26629 \
-                -e ADMIN_ADDR=0xF78c...29679 \ 
+                -e ADMIN_ADDR=0xF78c...29679 \ # use your own wallet address
                 -it ghcr.io/dbpunk-labs/db3:latest 
 ```
 you should see the following output

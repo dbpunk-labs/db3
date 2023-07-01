@@ -162,7 +162,6 @@ impl StateStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use db3_proto::db3_database_v2_proto::{database_message, DocumentDatabase};
     use tempdir::TempDir;
 
     #[test]

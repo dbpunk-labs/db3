@@ -480,11 +480,10 @@ impl IndexerNode for IndexerNodeImpl {
         })?;
         if let Some(q) = &r.query {
             info!("query str {} q {:?}", q.query_str, q);
-            let documents = self
+            let (documents, count) = self
                 .db_store
                 .query_docs(&addr, r.col_name.as_str(), q)
                 .map_err(|e| Status::internal(format!("{e}")))?;
-
             info!(
                 "query str {} from collection {} in db {} with result len {}, parameters len {}",
                 q.query_str,
@@ -493,7 +492,7 @@ impl IndexerNode for IndexerNodeImpl {
                 documents.len(),
                 q.parameters.len()
             );
-            Ok(Response::new(RunQueryResponse { documents }))
+            Ok(Response::new(RunQueryResponse { documents, count }))
         } else {
             Err(Status::invalid_argument("no query provided".to_string()))
         }

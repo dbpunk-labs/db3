@@ -49,7 +49,7 @@ export class StorageProviderV2 {
     /**
      * new a storage provider with db3 storage grpc url
      */
-    constructor(url: string, account: DB3Account | undefined) {
+    constructor(url: string, account?: DB3Account) {
         const goptions: GrpcWebOptions = {
             baseUrl: url,
             // simple example for how to add auth headers to each request
@@ -91,10 +91,10 @@ export class StorageProviderV2 {
     }
 
     async getNonce() {
-        const request: GetNonceRequest = {
-            address: this.account.address,
-        }
         try {
+            const request: GetNonceRequest = {
+                address: this.account.address,
+            }
             const { response } = await this.client.getNonce(request)
             return response.nonce
         } catch (e) {
@@ -106,9 +106,8 @@ export class StorageProviderV2 {
      * send mutation to db3 network
      */
     async sendMutation(mutation: Uint8Array, nonce: string) {
-        const request = await this.wrapTypedRequest(mutation, nonce)
-
         try {
+            const request = await this.wrapTypedRequest(mutation, nonce)
             const { response } = await this.client.sendMutation(request)
             return response
         } catch (e) {

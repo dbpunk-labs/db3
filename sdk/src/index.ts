@@ -21,10 +21,11 @@ export {
     createFromExternal,
 } from './account/db3_account'
 export type { DB3Account } from './account/types'
-export type { Client } from './client/types'
+export type { Client, ReadClient } from './client/types'
 export { addDoc, updateDoc, deleteDoc, queryDoc } from './store/document_v2'
 export {
     createClient,
+    createReadonlyClient,
     syncAccountNonce,
     getMutationHeader,
     getMutationBody,
@@ -35,7 +36,7 @@ export {
     getIndexNodeStatus,
     setupStorageNode,
     getContractSyncStatus,
-    getMutationState
+    getMutationState,
 } from './client/client_v2'
 
 export {
@@ -49,6 +50,10 @@ export {
 } from './store/database_v2'
 
 export { Index, IndexType } from './proto/db3_database_v2'
-export { MutationAction, MutationHeader, MutationBody } from './proto/db3_mutation_v2'
+export {
+    MutationAction,
+    MutationHeader,
+    MutationBody,
+} from './proto/db3_mutation_v2'
 export { MutationStateView } from './proto/db3_storage'
 export { db3MetaStoreContractConfig } from './abi/metastore_abi'
