@@ -43,6 +43,7 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
     return {
         docs: entries,
         collection: col,
+        count: response.count,
     } as QueryResult<T>
 }
 
@@ -50,10 +51,38 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
  *
  * Query document with a query language
  *
+ * The usage of query language
+ * for example we have a document looks like the following
+ * ```json
+ *     {
+ *     "firstName": "John",
+ *     "lastName": "Doe",
+ *     "age": 28,
+ *     "pets": [
+ *       {"name": "Rexy rex", "kind": "dog", "likes": ["bones", "jumping", "toys"]},
+ *       {"name": "Grenny", "kind": "parrot", "likes": ["green color", "night", "toys"]}
+ *     ]
+ *    }
+ * ```
+ * 1. Query one document from collection
  * ```ts
  * const queryStr = '/* | limit 1'
  * const resultSet = await queryDoc<Profile>(collection, queryStr)
  * ```
+ * 2. Query documents with filter
+ * ```ts
+ * const queryByName = '/[firstname="John"]'
+ * const resultSet = await queryDoc<Profile>(collection, queryByName)
+ * const queryByFirstAndLast = '/[firstName="John"] and [lastName="Doe"]'
+ * const resultSet = await queryDoc<Profile>(collection, queryByName)
+ * ```
+ * 3. Query documents with filter and projection
+ * ```ts
+ * // only query the firstName and lastName
+ * const queryByName = '/[firstname="John"] | / {firstName, lastName}'
+ * const resultSet = await queryDoc<Profile>(collection, queryByName)
+ * ```
+ *
  * @param col        - the instance of collection
  * @param queryStr   - a document query string
  * @param parameters - an optional query parameters
@@ -159,6 +188,7 @@ export async function updateDoc(
         throw new Error('fail to update doc')
     }
 }
+
 export async function addDoc(col: Collection, doc: DocumentData) {
     const documentMutation: DocumentMutation = {
         collectionName: col.name,

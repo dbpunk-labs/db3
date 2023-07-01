@@ -404,25 +404,21 @@ impl DBStoreV2 {
         db_addr: &DB3Address,
         col_name: &str,
         query: &Query,
-    ) -> Result<Vec<Document>> {
+    ) -> Result<(Vec<Document>, u64)> {
         if !self.is_db_collection_exist(db_addr, col_name)? {
             return Err(DB3Error::ReadStoreError(
                 "collection name {col_name} does not exist".to_string(),
             ));
         }
         if self.config.enable_doc_store {
-            let result = self.doc_store.execute_query(db_addr, col_name, query)?;
+            let (result, count) = self.doc_store.execute_query(db_addr, col_name, query)?;
             let mut documents = vec![];
-
             for (id, doc) in result {
-                documents.push(Document {
-                    id,
-                    doc: doc.to_string(),
-                })
+                documents.push(Document { id, doc })
             }
-            Ok(documents)
+            Ok((documents, count))
         } else {
-            Ok(vec![])
+            Ok((vec![], 0))
         }
     }
 

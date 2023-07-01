@@ -276,10 +276,10 @@ export async function showDatabase(owner: string, client: Client) {
 export async function createCollection(
     db: Database,
     name: string,
-    indexFields: Index[]
+    indexFields?: Index[]
 ) {
     const collection: CollectionMutation = {
-        indexFields,
+        indexFields: indexFields ? indexFields : [],
         collectionName: name,
     }
     const body: Mutation_BodyWrapper = {

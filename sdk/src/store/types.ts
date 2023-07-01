@@ -59,6 +59,7 @@ export type Collection = {
 export type QueryResult<T = DocumentData> = {
     docs: Array<DocumentEntry<T>>
     collection: Collection
+    count: string
 }
 
 export type EventDatabaseOption = {
