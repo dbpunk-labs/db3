@@ -82,6 +82,12 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
  * const queryByName = '/[firstname="John"] | / {firstName, lastName}'
  * const resultSet = await queryDoc<Profile>(collection, queryByName)
  * ```
+ * 4. Query documents with filter and aggregate count
+ * ```ts
+ * // only query the firstName and lastName
+ * const queryByNameAndCount = '/[firstname="John"] | count'
+ * const resultSet = await queryDoc<Profile>(collection, queryByNameAndCount)
+ * ```
  *
  * @param col        - the instance of collection
  * @param queryStr   - a document query string

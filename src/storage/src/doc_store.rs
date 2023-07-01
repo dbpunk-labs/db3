@@ -357,8 +357,14 @@ mod tests {
     #[test]
     fn doc_get_test() {
         let (doc_store, id) = prepare_the_dataset();
-        let result = doc_store.get_doc(&DB3Address::ZERO, "col1", id);
-        assert!(result.is_err());
+        let doc_str = r#"{"f2":"f2", "f1":"f1"}"#;
+        if let Ok(value) = doc_store.get_doc(&DB3Address::ZERO, "col1", id) {
+            let value: serde_json::Value = serde_json::from_str(value.as_str()).unwrap();
+            let right: serde_json::Value = serde_json::from_str(doc_str).unwrap();
+            assert_eq!(value, right);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
@@ -377,6 +383,27 @@ mod tests {
         let right: serde_json::Value = serde_json::from_str(doc_str).unwrap();
         assert_eq!(count, 1);
         assert_eq!(left, right);
+    }
+
+    #[test]
+    fn doc_store_filter_and_test() {
+        let (doc_store, _) = prepare_the_dataset();
+        let doc_str = r#"{"f2":"f", "f1":"f"}"#;
+        let id = doc_store
+            .add_str_doc(&DB3Address::ZERO, "col1", doc_str)
+            .unwrap();
+
+        {
+            let query_str = "/[f1=\"f1\"] and /[f2=\"f2\"]";
+            let query = Query {
+                query_str: query_str.to_string(),
+                parameters: vec![],
+            };
+            let (result, count) = doc_store
+                .execute_query(&DB3Address::ZERO, "col1", &query)
+                .unwrap();
+            assert_eq!(1, count);
+        }
     }
 
     #[test]
