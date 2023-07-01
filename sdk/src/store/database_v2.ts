@@ -304,7 +304,7 @@ export async function createCollection(
         const col: Collection = {
             name,
             db,
-            indexFields,
+            indexFields: indexFields ? indexFields : [],
             internal: undefined,
             state: undefined,
         }
