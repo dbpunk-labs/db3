@@ -125,6 +125,7 @@ describe('test db3.js document_v2 module', () => {
         const queryStr = '/* | count '
         const resultSet = await queryDoc(collection, queryStr)
         expect('1').toBe(resultSet.count)
+
     })
 
     test('test query with projection', async () => {
