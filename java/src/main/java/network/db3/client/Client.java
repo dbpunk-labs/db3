@@ -11,6 +11,9 @@ import io.grpc.ManagedChannelBuilder;
 import network.db3.provider.IndexProvider;
 import network.db3.provider.StorageProvider;
 import network.db3.store.ResultSet;
+import org.bson.*;
+import org.bson.codecs.BsonCodec;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.web3j.crypto.ECKeyPair;
@@ -44,24 +47,37 @@ public class Client {
         logger.info("the new nonce {} for address {}", nonce, Keys.getAddress(keyPair));
     }
 
-    public String createDocDatabase(String desc) throws IOException {
+    public CreateDBResult createDocDatabase(String desc) throws IOException {
         Db3MutationV2.DocumentDatabaseMutation docMutation = Db3MutationV2.DocumentDatabaseMutation.newBuilder().setDbDesc(desc).build();
         Db3MutationV2.Mutation.BodyWrapper body = Db3MutationV2.Mutation.BodyWrapper.newBuilder().setDocDatabaseMutation(docMutation).setDbAddress(ByteString.copyFromUtf8("")).build();
         Db3MutationV2.Mutation mutation = Db3MutationV2.Mutation.newBuilder().setAction(Db3MutationV2.MutationAction.CreateDocumentDB).addBodies(body).build();
         byte[] data = mutation.toByteArray();
         long nonce = this.nonce.incrementAndGet();
         Db3Storage.SendMutationResponse response = this.storageProvider.sendMutation(data, nonce);
-        return response.getItems(0).getValue();
+        return new CreateDBResult(response.getId(), response.getItems(0).getValue());
     }
 
-    public void createCollection(String db, String col) throws IOException {
-        byte[] addr = Numeric.hexStringToByteArray(db);
+    public CreateCollectonResult createCollection(String db, String col) throws IOException {
+        byte[] address = Numeric.hexStringToByteArray(db);
         Db3MutationV2.CollectionMutation collectionMutation = Db3MutationV2.CollectionMutation.newBuilder().setCollectionName(col).build();
-        Db3MutationV2.Mutation.BodyWrapper body = Db3MutationV2.Mutation.BodyWrapper.newBuilder().setCollectionMutation(collectionMutation).setDbAddress(ByteString.copyFrom(addr)).build();
+        Db3MutationV2.Mutation.BodyWrapper body = Db3MutationV2.Mutation.BodyWrapper.newBuilder().setCollectionMutation(collectionMutation).setDbAddress(ByteString.copyFrom(address)).build();
         Db3MutationV2.Mutation mutation = Db3MutationV2.Mutation.newBuilder().setAction(Db3MutationV2.MutationAction.AddCollection).addBodies(body).build();
         byte[] data = mutation.toByteArray();
         long nonce = this.nonce.incrementAndGet();
-        this.storageProvider.sendMutation(data, nonce);
+        Db3Storage.SendMutationResponse response = this.storageProvider.sendMutation(data, nonce);
+        return new CreateCollectonResult(response.getId());
+    }
+
+    public AddDocResult addDoc(String db, String col, String json) throws IOException {
+        RawBsonDocument rawBsonDocument = RawBsonDocument.parse(json);
+        byte[] data = rawBsonDocument.getByteBuffer().array();
+        Db3MutationV2.DocumentMutation documentMutation = Db3MutationV2.DocumentMutation.newBuilder().addDocuments(ByteString.copyFrom(data)).setCollectionName(col).build();
+        Db3MutationV2.Mutation.BodyWrapper body = Db3MutationV2.Mutation.BodyWrapper.newBuilder().setDbAddress(ByteString.fromHex(db)).setDocumentMutation(documentMutation).build();
+        Db3MutationV2.Mutation mutation = Db3MutationV2.Mutation.newBuilder().setAction(Db3MutationV2.MutationAction.AddDocument).addBodies(body).build();
+        byte[] buffer = mutation.toByteArray();
+        long nonce = this.nonce.incrementAndGet();
+        Db3Storage.SendMutationResponse response = this.storageProvider.sendMutation(buffer, nonce);
+        return new AddDocResult(response.getId());
     }
 
     public ResultSet runQuery(String db, String col, String query) {
@@ -71,5 +87,6 @@ public class Client {
         resultSet.setCount(response.getCount());
         return resultSet;
     }
+
 
 }
