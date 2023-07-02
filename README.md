@@ -26,9 +26,10 @@ DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is
 ## Set up self-hosted Node
 
 **1. Start docker container**
+
 ```shell
 sudo docker run -p 26639:26639 -p 26619:26619 -p 26629:26629 \
-                -e ADMIN_ADDR=0xF78c...29679 \ 
+                -e ADMIN_ADDR=0xF78c...29679 \ # use your own wallet address
                 -it ghcr.io/dbpunk-labs/db3:latest 
 ```
 you should see the following output
@@ -74,7 +75,21 @@ const {id} = await addDoc(collection, {
 // query the document
 const resultSet = await queryDoc<Book>(collection, "/[author=Cixin-Liu]")
 ```
-if you have any questions, please feel free to ask us for help
+
+if you have any questions, please feel free to ask us for help and you can find more detail about the example
+* the doc for [createClient](https://docs.db3.network/functions/createClient.html)
+* the doc about [queryDoc](https://docs.db3.network/functions/queryDoc.html)
+
+
+# Try Our Cloud Sandbox
+
+* [Console](https://console.cloud.db3.network/console/home)
+* Data Rollup Node: https://rollup.cloud.db3.network
+* Data Index Node: https://index.cloud.db3.network
+
+You can connect to the Data Rollup Node and Data Index Node with db3.js
+
+Note: the cloud sandbox is just for testing and unstable
 
 # How it works
 

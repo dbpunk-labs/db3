@@ -29,6 +29,7 @@ import {
     getContractSyncStatus,
     setupStorageNode,
     getMutationState,
+    createReadonlyClient,
 } from '../src/client/client_v2'
 import {
     addDoc,
@@ -68,6 +69,14 @@ describe('test db3.js client module', () => {
         return client
     }
 
+    async function createReadClient() {
+        const client = createReadonlyClient(
+            'http://127.0.0.1:26619',
+            'http://127.0.0.1:26639'
+        )
+        return client
+    }
+
     async function createAdminClient() {
         const privateKey =
             '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -80,6 +89,13 @@ describe('test db3.js client module', () => {
         const nonce = await syncAccountNonce(client)
         return client
     }
+
+    test('test readonly client', async () => {
+        const client = await createReadClient()
+        const view = await getMutationState(client)
+        expect(true).toBe(parseInt(view.mutationCount) >= 0)
+        expect(true).toBe(parseInt(view.totalMutationBytes) >= 0)
+    })
 
     test('test setup storage system status', async () => {
         const client = await createAdminClient()
@@ -131,7 +147,6 @@ describe('test db3.js client module', () => {
     test('create client smoke test', async () => {
         const client = await createTestClient()
         expect(1).toBe(client.nonce)
-
         const rollupInterval = 10 * 60 * 1000
         const minRollupSize = 10 * 1024 * 1024
         console.log(await getStorageNodeStatus(client))
@@ -159,7 +174,14 @@ describe('test db3.js client module', () => {
                     author: 'imotai',
                     age: 10,
                 })
-
+                const collection_new = await getCollection(
+                    db.addr,
+                    'col',
+                    client
+                )
+                expect('1').toBe(collection_new.state.totalDocCount)
+                const database_new = await getDatabase(db.addr, client)
+                expect('1').toBe(database_new.state.totalDocCount)
                 await addDoc(collection, {
                     city: 'beijing2',
                     author: 'imotai1',
@@ -204,7 +226,6 @@ describe('test db3.js client module', () => {
                         queryStr,
                         [parameter]
                     )
-                    console.log(resultSet)
                     expect(1).toBe(resultSet.docs.length)
                     expect(resultSet.docs[0].doc.city).toBe('beijing')
                     expect(resultSet.docs[0].doc.author).toBe('imotai')
@@ -217,7 +238,6 @@ describe('test db3.js client module', () => {
                         queryStr,
                         []
                     )
-                    console.log(resultSet.docs)
                 }
             }
         } catch (e) {
@@ -616,19 +636,12 @@ describe('test db3.js client module', () => {
     test('test add large mutations', async () => {
         const client = await createTestClient()
         try {
-            const { db } = await createDocumentDatabase(
-                    client,
-                    'desc'
-             )
+            const { db } = await createDocumentDatabase(client, 'desc')
             const index: Index = {
-                    path: '/city',
-                    indexType: IndexType.StringKey,
-                }
-            const { collection } = await createCollection(
-                        db,
-                        'col',
-                        [index]
-                    )
+                path: '/city',
+                indexType: IndexType.StringKey,
+            }
+            const { collection } = await createCollection(db, 'col', [index])
             for (var i = 0; i < 1; i++) {
                 {
                     await addDoc(collection, {

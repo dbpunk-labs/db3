@@ -41,7 +41,7 @@ cd sdk && make && yarn && yarn build
 ### Start Local Test Environment
 
 ```
-cd tools && bash start_localtestnet.sh
+cd tools && bash start_localnet.sh
 ```
 
 ### Run test cases
@@ -50,22 +50,3 @@ cd tools && bash start_localtestnet.sh
 cargo test
 ```
 
-## Update Documents
-
-if you want update db3 documents , you can follow the steps
-
-### Install Mkdocs
-
-```shell
-pip install mkdocs
-```
-### Document Template
-
-db3 uses https://squidfunk.github.io/mkdocs-material/ as its document framework and you can get started from [here](https://squidfunk.github.io/mkdocs-material/getting-started/)
-
-### Serve the docs
-
-```shell
-git clone https://github.com/dbpunk-labs/db3.git
-mkdocs serve
-```

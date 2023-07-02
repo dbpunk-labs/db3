@@ -40,3 +40,4 @@ tools/state_db
 tools/index_doc_db
 tools/index_meta_db
 bridge
+sdk/dist

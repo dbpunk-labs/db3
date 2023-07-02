@@ -16,6 +16,7 @@
 //
 #![feature(iter_intersperse)]
 pub mod abci_impl;
+pub mod ar_toolbox;
 pub mod auth_storage;
 pub mod command;
 pub mod context;

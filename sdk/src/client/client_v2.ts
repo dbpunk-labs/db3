@@ -26,13 +26,39 @@ import {
 } from '../proto/db3_mutation_v2'
 import type { DocumentData, DocumentEntry } from './base'
 import type { DB3Account } from '../account/types'
-import type { Client } from './types'
+import type { Client, ReadClient } from './types'
 import { Index } from '../proto/db3_database_v2'
 import { StorageProviderV2 } from '../provider/storage_provider_v2'
 import { IndexerProvider } from '../provider/indexer_provider'
 import { fromHEX } from '../crypto/crypto_utils'
 import { BSON } from 'db3-bson'
 
+/**
+ *
+ * Create a readonly client of db3 network
+ *
+ * ```ts
+ * const client = createReadonlyClient("http://127.0.0.1:26619",
+ *                                     "http://127.0.0.1:26620")
+ * ```
+ *
+ * @param rollup_node_url  - the url of db3 rollup node
+ * @param index_node_url   - the url of db3 index node
+ * @returns the client instance
+ *
+ **/
+
+export function createReadonlyClient(
+    rollupNodeUrl: string,
+    indexNodeUrl: string
+) {
+    const provider = new StorageProviderV2(rollupNodeUrl)
+    const indexer = new IndexerProvider(indexNodeUrl)
+    return {
+        provider,
+        indexer,
+    } as ReadClient
+}
 /**
  *
  * Create a client of db3 network

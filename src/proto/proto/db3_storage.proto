@@ -121,6 +121,7 @@ message GetDatabaseRequest {
 }
 message GetDatabaseResponse {
   db3_database_v2_proto.DatabaseMessage database = 1;
+  db3_database_v2_proto.DatabaseState state = 2;
 }
 message GetDatabaseOfOwnerRequest {
   // a hex string
@@ -129,6 +130,7 @@ message GetDatabaseOfOwnerRequest {
 
 message GetDatabaseOfOwnerResponse {
   repeated db3_database_v2_proto.DatabaseMessage databases = 1;
+  repeated db3_database_v2_proto.DatabaseState states = 2;
 }
 
 message GetCollectionOfDatabaseRequest {
@@ -137,6 +139,7 @@ message GetCollectionOfDatabaseRequest {
 
 message GetCollectionOfDatabaseResponse {
   repeated db3_database_v2_proto.Collection collections = 1;
+  repeated db3_database_v2_proto.CollectionState states = 2;
 }
 
 message ScanGcRecordRequest {
@@ -191,7 +194,7 @@ message MutationStateView {
 }
 
 message GetMutationStateResponse {
-    MutationStateView view = 1;
+  MutationStateView view = 1;
 }
 
 service StorageNode {
