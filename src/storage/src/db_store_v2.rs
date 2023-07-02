@@ -44,6 +44,8 @@ use tracing::info;
 type StorageEngine = DBWithThreadMode<MultiThreaded>;
 type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, StorageEngine>;
 
+const STATE_CF: &str = "DB_STATE_CF";
+
 #[derive(Clone)]
 pub struct DBStoreV2Config {
     pub db_path: String,
@@ -58,11 +60,13 @@ pub struct DBStoreV2Config {
     pub doc_store_conf: DocStoreConfig,
 }
 
+#[derive(Clone)]
 struct CollectionState {
     // the total doc count
     pub total_doc_count: u64,
 }
 
+#[derive(Clone)]
 struct DatabaseState {
     pub doc_order: i64,
     pub collection_state: HashMap<String, CollectionState>,
@@ -95,6 +99,7 @@ impl DBStoreV2 {
                     config.index_store_cf_name.as_str(),
                     config.doc_owner_store_cf_name.as_str(),
                     config.db_owner_store_cf_name.as_str(),
+                    STATE_CF,
                 ],
             )
             .map_err(|e| {
@@ -113,6 +118,7 @@ impl DBStoreV2 {
         })
     }
 
+    pub fn flush_state(&self) {}
     fn update_db_state_for_add_db(&self, db_addr: &str) {
         self.db_state.insert(
             db_addr.to_string(),
