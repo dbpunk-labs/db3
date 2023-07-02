@@ -15,7 +15,7 @@ use ethers::types::{
 };
 use prost::Message;
 use std::str::FromStr;
-use tracing::warn;
+use tracing::{info, warn};
 /// parse mutation
 
 macro_rules! parse_mutation {
@@ -237,5 +237,13 @@ mod tests {
         };
         let (_, payload_type, _) = MutationUtil::unwrap_and_verify(request).unwrap();
         assert_eq!(PayloadType::DatabasePayload, payload_type);
+    }
+    #[test]
+    pub fn test_java_sdk_verfiy_ut() {
+        let typed_data = r#"
+        {"types":{"EIP712Domain":[],"Message":[{"name":"payload","type":"bytes"},{"name":"nonce","type":"string"}]},"domain":{}, "primaryType":"Message","message":{"payload":"0x1a0822060a0464657363","nonce":"2"}}"#;
+        let sig:&str = "0x80c9b610c79138cad4e0e4c3bb4085131d609cdced7d2324aed4cb12f9f781134e94cd14e24bb803534085ed2d5bee5eae88442e200300b5aebd9d35ce36dbd91c";
+        let result = MutationUtil::unwrap_and_light_verify(typed_data.as_bytes(), sig);
+        assert!(result.is_ok());
     }
 }
