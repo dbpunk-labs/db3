@@ -56,6 +56,12 @@ message DatabaseState {
   uint64 total_col_count = 3;
 }
 
+message DatabaseStatePersistence {
+  string addr = 1;
+  uint64 total_doc_count = 2;
+  uint64 total_col_count = 3;
+}
+
 message EventTable {
   string name = 1;
   repeated Index index_fields = 2;
