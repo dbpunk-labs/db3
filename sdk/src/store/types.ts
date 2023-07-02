@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-import { Client } from '../client/types'
+import { Client, ReadClient } from '../client/types'
 import { DocumentEntry, DocumentData } from '../client/base'
 import {
     DatabaseMessage as InternalDatabase,
@@ -37,7 +37,7 @@ export type CreateCollectionResult = {
 
 export type Database = {
     addr: string
-    client: Client
+    client: Client | ReadClient
     internal: InternalDatabase | undefined
     state: DatabaseState | undefined
 }
