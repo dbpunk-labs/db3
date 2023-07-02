@@ -6,8 +6,11 @@ import db3_storage_proto.StorageNodeGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.bouncycastle.util.encoders.Hex;
+import org.junit.Assert;
 import org.junit.Test;
 import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.Keys;
+
 
 public class StorageProviderTest {
 
@@ -23,9 +26,11 @@ public class StorageProviderTest {
         Db3MutationV2.Mutation mutation = Db3MutationV2.Mutation.newBuilder().setAction(Db3MutationV2.MutationAction.CreateDocumentDB).addBodies(body).build();
         byte[] data = mutation.toByteArray();
         try {
-            provider.sendMutation(data, 2);
+            long nonce = provider.getNonce(Keys.getAddress(keyPair))  + 1;
+            provider.sendMutation(data, nonce);
         } catch (Exception e) {
             e.printStackTrace();
+            Assert.fail();
         }
     }
 
