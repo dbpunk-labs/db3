@@ -15,7 +15,6 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use subtle_encoding::Base64;
 use tempdir::TempDir;
 use tracing::info;
 pub struct ArToolBox {
@@ -219,6 +218,7 @@ impl ArToolBox {
 mod tests {
     use super::*;
     use arrow::array::{Array, AsArray, BinaryArray, StringArray, UInt32Array, UInt64Array};
+    use arrow::compute::or;
     use arrow::datatypes::{BinaryType, DataType, Field, Schema};
     use std::env;
     use std::path::PathBuf;
@@ -278,7 +278,6 @@ mod tests {
         let res = ArToolBox::parse_gzip_file(parquet_file.as_path()).unwrap();
         assert_eq!(res.len(), 1);
         let rec = res[0].clone();
-        println!("schema: {}", rec.schema());
         assert!(rec.num_columns() == 4);
         assert_eq!(rec.num_rows(), 10);
         let payloads = rec
@@ -326,8 +325,6 @@ mod tests {
         let res = ArToolBox::parse_gzip_file(path.as_path()).unwrap();
         assert_eq!(res.len(), 1);
         let rec = res[0].clone();
-        println!("schema: {}", rec.schema());
-        println!("num_rows: {}", rec.num_rows());
         assert_eq!(rec.num_columns(), 4);
         assert_eq!(rec.num_rows(), 204);
 
@@ -353,7 +350,6 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        println!("key_root_path is {}", key_root_path);
 
         let network_id = Arc::new(AtomicU64::new(1687961160));
         let ar_toolbox = ArToolBox::new(
@@ -368,8 +364,12 @@ mod tests {
             .download_and_parse_record_batch(tx_id)
             .await
             .unwrap();
-        assert_eq!(res.len(), 2);
-        println!("res: {:?}", res);
+        let rec1 = res[0].clone();
+        let mutations = ArToolBox::convert_recordbatch_to_mutation(&rec1).unwrap();
+        assert_eq!(mutations.len(), 8192);
+        let (mutation, block, order) = mutations[0].clone();
+        assert_eq!(block, 3712);
+        assert_eq!(order, 1);
     }
     #[tokio::test]
     async fn get_prev_arware_tx_ut() {
@@ -385,7 +385,6 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        println!("key_root_path is {}", key_root_path);
 
         let network_id = Arc::new(AtomicU64::new(1687961160));
         let ar_toolbox = ArToolBox::new(

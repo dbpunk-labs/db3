@@ -211,7 +211,6 @@ impl ArFileSystem {
             .await
             .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
 
-        println!("tx {:?}", tx);
         if let Some(t) = tx {
             Ok(t.tags)
         } else {
