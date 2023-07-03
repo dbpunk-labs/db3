@@ -34,7 +34,7 @@ import {
     EventDatabaseMutation,
 } from '../proto/db3_mutation_v2'
 
-import { Client } from '../client/types'
+import { Client, ReadClient } from '../client/types'
 import { toHEX, fromHEX } from '../crypto/crypto_utils'
 import { Index } from '../proto/db3_database_v2'
 
@@ -172,7 +172,7 @@ export async function createDocumentDatabase(client: Client, desc: string) {
 export async function getCollection(
     addr: string,
     name: string,
-    client: Client
+    client: Client | ReadClient
 ) {
     const db = await getDatabase(addr, client)
     const collections = await showCollection(db)
@@ -197,7 +197,7 @@ export async function getCollection(
  * @returns the {@link Database}[]
  *
  **/
-export async function getDatabase(addr: string, client: Client) {
+export async function getDatabase(addr: string, client: Client | ReadClient) {
     const response = await client.provider.getDatabase(addr)
     const db = response.database
     if (!db) {
@@ -223,7 +223,7 @@ export async function getDatabase(addr: string, client: Client) {
  * @returns the {@link Database}[]
  *
  **/
-export async function showDatabase(owner: string, client: Client) {
+export async function showDatabase(owner: string, client: Client | ReadClient) {
     const response = await client.provider.getDatabaseOfOwner(owner)
     return response.databases
         .filter((item) => item.database.oneofKind != undefined)
