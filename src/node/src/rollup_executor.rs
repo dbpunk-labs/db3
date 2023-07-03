@@ -16,11 +16,8 @@
 //
 
 use crate::ar_toolbox::ArToolBox;
-use arrow::datatypes::*;
-use arrow::record_batch::RecordBatch;
 use db3_base::times;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
