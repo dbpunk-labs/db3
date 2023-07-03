@@ -261,7 +261,7 @@ export async function showDatabase(owner: string, client: Client | ReadClient) {
  * ```ts
  * const index1:Index = {
  *    path:'/city', // a top level field name 'city' and the path will be '/city'
- *    indexType: Indextype.StringKey
+ *    indexType: IndexType.StringKey
  * }
  * const {collection, result} = await createCollection(db, "test_collection", [index1])
  * ```
