@@ -13,7 +13,9 @@ public class EIP712TypedMessage {
     public EIP712TypedMessage(TypedMessage message) {
         this.types = new LinkedHashMap<>();
         this.types.put("EIP712Domain",
-                Collections.emptyList()
+                Arrays.asList(
+                        new StructuredData.Entry("name", "string")
+                )
         );
         this.types.put("Message",
                 Arrays.asList(
@@ -23,6 +25,7 @@ public class EIP712TypedMessage {
         );
         this.primaryType = "Message";
         this.message = message;
+        this.domain.put("name", "db3.network");
     }
 
     public HashMap<String, List<StructuredData.Entry>> getTypes() {

@@ -2,6 +2,7 @@ package network.db3.provider;
 
 import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
+import db3_database_v2_proto.Db3DatabaseV2;
 import db3_storage_proto.Db3Storage;
 import db3_storage_proto.StorageNodeGrpc;
 import org.web3j.crypto.ECKeyPair;
@@ -9,6 +10,8 @@ import org.web3j.crypto.Sign;
 import org.web3j.utils.Numeric;
 
 import java.io.IOException;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 public class StorageProvider {
     private final StorageNodeGrpc.StorageNodeBlockingStub stub;
@@ -34,14 +37,30 @@ public class StorageProvider {
         requestBuilder.setPayload(ByteString.copyFromUtf8(strMessage));
         requestBuilder.setSignature(signedMessage);
         Db3Storage.SendMutationRequest request = requestBuilder.build();
-        Db3Storage.SendMutationResponse response = stub.sendMutation(request);
-        return response;
+        return stub.sendMutation(request);
     }
 
-    public long getNonce(String addr) {
-        Db3Storage.GetNonceRequest request = Db3Storage.GetNonceRequest.newBuilder().setAddress(addr).build();
+    public long getNonce(String address) {
+        Db3Storage.GetNonceRequest request = Db3Storage.GetNonceRequest.newBuilder().setAddress(address).build();
         Db3Storage.GetNonceResponse response = stub.getNonce(request);
         return response.getNonce();
+    }
+
+    public Db3Storage.GetDatabaseResponse getDatabase(String address) {
+        Db3Storage.GetDatabaseRequest request = Db3Storage.GetDatabaseRequest.newBuilder().setAddr(address).build();
+        return stub.getDatabase(request);
+    }
+
+    public Optional<Db3DatabaseV2.Collection> getCollection(String address, String col) {
+        Db3Storage.GetCollectionOfDatabaseRequest request = Db3Storage.GetCollectionOfDatabaseRequest.newBuilder().setDbAddr(address).build();
+        Db3Storage.GetCollectionOfDatabaseResponse response = stub.getCollectionOfDatabase(request);
+        return response.getCollectionsList().stream().filter(new Predicate<Db3DatabaseV2.Collection>() {
+            @Override
+            public boolean test(Db3DatabaseV2.Collection collection) {
+                if (collection.getName().equals(col)) return true;
+                return false;
+            }
+        }).findFirst();
     }
 
     private EIP712TypedMessage wrapTypedRequest(byte[] mutation, long nonce) {

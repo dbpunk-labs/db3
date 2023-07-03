@@ -240,10 +240,16 @@ mod tests {
     }
     #[test]
     pub fn test_java_sdk_verfiy_ut() {
+        //let expected_addr = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266";
         let typed_data = r#"
-        {"types":{"EIP712Domain":[],"Message":[{"name":"payload","type":"bytes"},{"name":"nonce","type":"string"}]},"domain":{}, "primaryType":"Message","message":{"payload":"0x1a0822060a0464657363","nonce":"2"}}"#;
-        let sig:&str = "0x80c9b610c79138cad4e0e4c3bb4085131d609cdced7d2324aed4cb12f9f781134e94cd14e24bb803534085ed2d5bee5eae88442e200300b5aebd9d35ce36dbd91c";
-        let result = MutationUtil::unwrap_and_light_verify(typed_data.as_bytes(), sig);
-        assert!(result.is_ok());
+       {"types":{"EIP712Domain":[{"name":"name","type":"string"}],"Message":[{"name":"payload","type":"bytes"},{"name":"nonce","type":"string"}]},"primaryType":"Message","message":{"payload":"0x1a0822060a0464657363","nonce":"1"},"domain":{"name":"db3.network"}}
+        "#;
+        let typed_data_obj = serde_json::from_slice::<TypedData>(typed_data.as_bytes()).unwrap();
+        let hashed_message = typed_data_obj.encode_eip712().unwrap();
+        let hex_str = hex::encode(hashed_message);
+        assert_eq!(
+            "2b6ab2777e1ffb472f2f3206566f0cb691228ba5fb02692fd8fe933576b5003e",
+            hex_str.as_str()
+        );
     }
 }

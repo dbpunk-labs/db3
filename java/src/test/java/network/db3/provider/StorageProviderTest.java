@@ -31,7 +31,7 @@ public class StorageProviderTest {
         Db3MutationV2.Mutation mutation = Db3MutationV2.Mutation.newBuilder().setAction(Db3MutationV2.MutationAction.CreateDocumentDB).addBodies(body).build();
         byte[] data = mutation.toByteArray();
         try {
-            long nonce = provider.getNonce(Keys.getAddress(keyPair))  + 1;
+            long nonce = provider.getNonce(Keys.getAddress(keyPair)) + 1;
             Db3Storage.SendMutationResponse response = provider.sendMutation(data, nonce);
             Assert.assertNotNull(response.getId());
         } catch (Exception e) {
