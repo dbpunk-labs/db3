@@ -16,14 +16,13 @@
 //
 
 use db3_error::{DB3Error, Result};
+use ethers::prelude::LocalWallet;
 use ethers::{
     contract::abigen,
     core::types::{Address, Bytes, TxHash, U256},
     middleware::SignerMiddleware,
     providers::{Http, Middleware, Provider, ProviderExt},
 };
-
-use ethers::prelude::LocalWallet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -56,6 +55,17 @@ impl MetaStoreClient {
             client,
             network,
         })
+    }
+    pub async fn get_latest_arweave_tx(&self) -> Result<String> {
+        let store = DB3MetaStore::new(self.address, self.client.clone());
+        let registration = store
+            .get_network_registration(self.network.load(Ordering::Relaxed))
+            .call()
+            .await
+            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        println!("latest_arweave_tx: {:?}", registration.latest_arweave_tx);
+
+        Ok(registration.latest_arweave_tx.to_string())
     }
 
     pub async fn get_admin(&self, network: u64) -> Result<Address> {
