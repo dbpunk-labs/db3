@@ -12,8 +12,6 @@ import network.db3.provider.IndexProvider;
 import network.db3.provider.StorageProvider;
 import network.db3.store.ResultSet;
 import org.bson.*;
-import org.bson.codecs.BsonCodec;
-import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.web3j.crypto.ECKeyPair;
@@ -77,7 +75,7 @@ public class Client {
         byte[] buffer = mutation.toByteArray();
         long nonce = this.nonce.incrementAndGet();
         Db3Storage.SendMutationResponse response = this.storageProvider.sendMutation(buffer, nonce);
-        return new AddDocResult(response.getId());
+        return new AddDocResult(response.getId(), Long.parseLong(response.getItems(0).getValue()));
     }
 
     public ResultSet runQuery(String db, String col, String query) {
@@ -87,6 +85,4 @@ public class Client {
         resultSet.setCount(response.getCount());
         return resultSet;
     }
-
-
 }
