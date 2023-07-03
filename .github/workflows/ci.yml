@@ -69,6 +69,9 @@ jobs:
           ROOT_DIR=`pwd`
           cd $ROOT_DIR/sdk && yarn && make
           cd $ROOT_DIR/sdk && yarn test --coverage
+      - name: Rust java sdk test
+        run: |
+          cd java && mvn test
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}

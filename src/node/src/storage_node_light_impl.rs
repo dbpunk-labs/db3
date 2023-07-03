@@ -626,7 +626,6 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<SendMutationRequest>,
     ) -> std::result::Result<Response<SendMutationResponse>, Status> {
         let r = request.into_inner();
-        // validate the signature
         let (dm, address, nonce) = MutationUtil::unwrap_and_light_verify(
             &r.payload,
             r.signature.as_str(),
