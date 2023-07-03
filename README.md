@@ -83,7 +83,7 @@ if you have any questions, please feel free to ask us for help and you can find 
 
 # Try Our Cloud Sandbox
 
-* [Console](https://console.cloud.db3.network/console/home)
+* [Console](https://console.cloud.db3.network/console/home):https://console.cloud.db3.network/console/home
 * Data Rollup Node: https://rollup.cloud.db3.network
 * Data Index Node: https://index.cloud.db3.network
 
@@ -106,24 +106,19 @@ JSON document must be signed by its owner. Only the owner can update or delete t
 
 # What can we build with the db3 network?
 
-1. A fully on-chain game.
-2. A fully on-chain social network.
-
-All user data will be stored permanently on the DB3 network.
+Now building a fully on-chain application is an easy thing. You can create a fully on-chain game or a fully on-chain social network, or any other application you desire.
 
 # FAQ
 
 Q: Is the DB3 Network a blockchain?
-
 A: No, the DB3 Network is not a blockchain. It is simply a developer tool that can be hosted locally or used through our cloud service.
 
 Q: What are the differences between MongoDB and DB3 Network?
-
 A: MongoDB uses centralized data storage, whereas DB3 Network uses decentralized data storage. Additionally, DB3 Network ensures that data is permanently available.
 
 Q: Will my data be lost if the Data Rollup Node or Data Index Node is not available?
-
 A: No, you can set up your data index node and recover your data from the blockchain.
+
 # License
 
 Apache License, Version 2.0
