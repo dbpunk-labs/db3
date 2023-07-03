@@ -10,6 +10,10 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/dbpunk-labs/db3?color=green&display_name=tag&label=db3&logo=db3&logoColor=https%3A%2F%2Favatars.githubusercontent.com%2Fu%2F102341693%3Fs%3D96%26v%3D4&style=flat-square)[![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)](https://twitter.com/Db3Network)
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/dbpunk-labs/db3/badge)](https://www.gitpoap.io/gh/dbpunk-labs/db3)
 [![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/sz3bmZx2uh)
+![Java SDK](https://img.shields.io/maven-central/v/network.db3/sdk)
+![npm](https://img.shields.io/npm/dw/db3.js?style=flat-square)
+
+
 
 **English**
 

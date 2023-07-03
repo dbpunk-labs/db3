@@ -7,8 +7,12 @@ import db3_indexer_proto.IndexerNodeGrpc;
 import db3_mutation_v2_proto.Db3MutationV2;
 import db3_storage_proto.Db3Storage;
 import db3_storage_proto.StorageNodeGrpc;
+import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.TlsChannelCredentials;
+import io.grpc.netty.GrpcSslContexts;
+import io.netty.handler.ssl.SslContext;
 import network.db3.provider.IndexProvider;
 import network.db3.provider.StorageProvider;
 import network.db3.store.ResultSet;
@@ -21,6 +25,8 @@ import org.web3j.crypto.Keys;
 import org.web3j.utils.Numeric;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,15 +38,26 @@ public class Client {
     private final AtomicLong nonce;
 
     public Client(String rollupUrl, String indexUrl,
-                  ECKeyPair keyPair) {
-        ManagedChannel rollupChannel = ManagedChannelBuilder.forTarget(rollupUrl).usePlaintext().build();
-        ManagedChannel indexChannel = ManagedChannelBuilder.forTarget(indexUrl).usePlaintext().build();
+                  ECKeyPair keyPair) throws MalformedURLException {
+        ManagedChannel rollupChannel = Client.buildFrom(rollupUrl);
+        ManagedChannel indexChannel = Client.buildFrom(indexUrl);
         StorageNodeGrpc.StorageNodeBlockingStub rollupStub = StorageNodeGrpc.newBlockingStub(rollupChannel);
         IndexerNodeGrpc.IndexerNodeBlockingStub indexStub = IndexerNodeGrpc.newBlockingStub(indexChannel);
         this.storageProvider = new StorageProvider(rollupStub, keyPair);
         this.indexProvider = new IndexProvider(indexStub);
         this.keyPair = keyPair;
         this.nonce = new AtomicLong(0);
+    }
+
+    private static ManagedChannel buildFrom(String url) throws MalformedURLException {
+        URL uri = new URL(url);
+        if (uri.getProtocol().equals("https")){
+            TlsChannelCredentials.Builder tlsBuilder = TlsChannelCredentials.newBuilder();
+            return Grpc.newChannelBuilderForAddress(uri.getHost(), uri.getPort() == 0 ? 443: uri.getPort(),
+                    tlsBuilder.build()).build();
+        } else {
+            return ManagedChannelBuilder.forTarget(uri.getHost() + ":" + uri.getPort()).usePlaintext().build();
+        }
     }
 
     public void updateNonce() {
