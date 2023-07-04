@@ -165,7 +165,6 @@ impl DBStoreV2 {
         it.seek_to_first();
         loop {
             if !it.valid() {
-                info!("no database to recover");
                 break;
             }
             if let Some(key) = it.key() {
@@ -781,6 +780,7 @@ impl DBStoreV2 {
             ttl: mutation.ttl,
             events_json_abi: mutation.events_json_abi.to_string(),
             evm_node_url: mutation.evm_node_url.to_string(),
+            start_block: mutation.start_block,
         };
         let database_msg = DatabaseMessage {
             database: Some(database_message::Database::EventDb(database)),

@@ -367,6 +367,7 @@ impl DB3Command {
                 )
                 .unwrap();
                 let indexer_for_syncing = indexer.clone();
+                indexer.recover().await.unwrap();
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
                     indexer_for_syncing
@@ -491,6 +492,7 @@ impl DB3Command {
             addr, network_id
         );
         std::fs::create_dir_all(rollup_data_path).unwrap();
+        storage_node.recover().unwrap();
         storage_node.keep_subscription(receiver).await.unwrap();
         storage_node.start_to_produce_block().await;
         storage_node.start_to_rollup().await;

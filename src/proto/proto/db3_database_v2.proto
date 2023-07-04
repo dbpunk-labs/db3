@@ -38,6 +38,7 @@ message EventDatabase {
   uint64 ttl = 5;
   string events_json_abi = 6;
   string evm_node_url = 7;
+  uint64 start_block = 8;
 }
 
 message DatabaseMessage {

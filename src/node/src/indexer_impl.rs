@@ -98,6 +98,7 @@ impl IndexerNodeImpl {
                 database.events_json_abi.as_str(),
                 &tables,
                 database.contract_address.as_str(),
+                0,
             )
             .await?;
             info!("recover the event db {} done", db_address.to_hex());
@@ -184,6 +185,7 @@ impl IndexerNodeImpl {
         abi: &str,
         tables: &Vec<String>,
         contract_address: &str,
+        start_block: u64,
     ) -> Result<()> {
         let config = EventProcessorConfig {
             evm_node_url: evm_node_url.to_string(),
@@ -191,6 +193,7 @@ impl IndexerNodeImpl {
             abi: abi.to_string(),
             target_events: tables.iter().map(|t| t.to_string()).collect(),
             contract_addr: contract_address.to_string(),
+            start_block,
         };
         let processor = Arc::new(
             EventProcessor::new(config, self.db_store.clone())
@@ -267,6 +270,7 @@ impl IndexerNodeImpl {
                                 mutation.events_json_abi.as_str(),
                                 &tables,
                                 mutation.contract_address.as_str(),
+                                mutation.start_block,
                             )
                             .await
                             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;

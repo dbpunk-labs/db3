@@ -137,7 +137,8 @@ describe('test db3.js client module', () => {
             '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
             ['Transfer', 'Deposit', 'Approval', 'Withdrawal'],
             abi,
-            evmNodeUrl
+            evmNodeUrl,
+            0
         )
         console.log(response)
         await new Promise((r) => setTimeout(r, 10000))

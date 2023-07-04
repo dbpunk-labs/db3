@@ -149,6 +149,7 @@ impl StorageNodeV2Impl {
                 c.min_rollup_size, c.rollup_interval, c.network_id
             );
         }
+        self.db_store.recover_db_state()?;
         Ok(())
     }
 
