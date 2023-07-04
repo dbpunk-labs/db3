@@ -15,7 +15,7 @@ use ethers::types::{
 };
 use prost::Message;
 use std::str::FromStr;
-use tracing::{warn};
+use tracing::warn;
 /// parse mutation
 
 macro_rules! parse_mutation {
