@@ -30,4 +30,5 @@ export type Client = {
 export type ReadClient = {
     provider: StorageProviderV2
     indexer: IndexerProvider
+    nonce: number
 }
