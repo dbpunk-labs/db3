@@ -18,7 +18,6 @@
 use crate::mutation_utils::MutationUtil;
 use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use crate::version_util;
-use db3_base::bson_util::bytes_to_bson_document;
 use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::db3_verifier::DB3Verifier;
@@ -485,12 +484,12 @@ impl StorageNode for StorageNodeV2Impl {
         let r = request.into_inner();
         let addr = DB3Address::from_hex(r.addr.as_str())
             .map_err(|e| Status::invalid_argument(format!("invalid database address {e}")))?;
-
         let database = self
             .db_store
             .get_database(&addr)
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        Ok(Response::new(GetDatabaseResponse { database }))
+            .map_err(|e| Status::internal(format!("fail to get database {e}")))?;
+        let state = self.db_store.get_database_state(&addr);
+        Ok(Response::new(GetDatabaseResponse { database, state }))
     }
 
     async fn get_collection_of_database(
@@ -500,10 +499,10 @@ impl StorageNode for StorageNodeV2Impl {
         let r = request.into_inner();
         let addr = DB3Address::from_hex(r.db_addr.as_str())
             .map_err(|e| Status::invalid_argument(format!("invalid database address {e}")))?;
-        let collections = self
+        let (collections, collection_states) = self
             .db_store
             .get_collection_of_database(&addr)
-            .map_err(|e| Status::internal(format!("{e}")))?;
+            .map_err(|e| Status::internal(format!("fail to get collect of database {e}")))?;
         info!(
             "query collection count {} with database {}",
             collections.len(),
@@ -511,6 +510,7 @@ impl StorageNode for StorageNodeV2Impl {
         );
         Ok(Response::new(GetCollectionOfDatabaseResponse {
             collections,
+            states: collection_states,
         }))
     }
 
@@ -521,7 +521,7 @@ impl StorageNode for StorageNodeV2Impl {
         let r = request.into_inner();
         let addr = DB3Address::from_hex(r.owner.as_str())
             .map_err(|e| Status::invalid_argument(format!("invalid database address {e}")))?;
-        let databases = self
+        let (databases, states) = self
             .db_store
             .get_database_of_owner(&addr)
             .map_err(|e| Status::internal(format!("{e}")))?;
@@ -530,7 +530,10 @@ impl StorageNode for StorageNodeV2Impl {
             databases.len(),
             r.owner.as_str()
         );
-        Ok(Response::new(GetDatabaseOfOwnerResponse { databases }))
+        Ok(Response::new(GetDatabaseOfOwnerResponse {
+            databases,
+            states,
+        }))
     }
 
     async fn get_mutation_body(
@@ -619,7 +622,6 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<SendMutationRequest>,
     ) -> std::result::Result<Response<SendMutationResponse>, Status> {
         let r = request.into_inner();
-        // validate the signature
         let (dm, address, nonce) = MutationUtil::unwrap_and_light_verify(
             &r.payload,
             r.signature.as_str(),

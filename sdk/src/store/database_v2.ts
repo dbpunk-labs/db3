@@ -34,7 +34,7 @@ import {
     EventDatabaseMutation,
 } from '../proto/db3_mutation_v2'
 
-import { Client } from '../client/types'
+import { Client, ReadClient } from '../client/types'
 import { toHEX, fromHEX } from '../crypto/crypto_utils'
 import { Index } from '../proto/db3_database_v2'
 
@@ -172,7 +172,7 @@ export async function createDocumentDatabase(client: Client, desc: string) {
 export async function getCollection(
     addr: string,
     name: string,
-    client: Client
+    client: Client | ReadClient
 ) {
     const db = await getDatabase(addr, client)
     const collections = await showCollection(db)
@@ -197,24 +197,17 @@ export async function getCollection(
  * @returns the {@link Database}[]
  *
  **/
-export async function getDatabase(addr: string, client: Client) {
+export async function getDatabase(addr: string, client: Client | ReadClient) {
     const response = await client.provider.getDatabase(addr)
     const db = response.database
     if (!db) {
         throw new Error('db with addr ' + addr + ' does not exist')
     }
-    if (db.database.oneofKind === 'docDb') {
-        return {
-            addr,
-            client,
-            internal: db,
-        }
-    } else {
-        return {
-            addr,
-            client,
-            internal: db,
-        }
+    return {
+        addr,
+        client,
+        internal: db,
+        state: response.state,
     }
 }
 
@@ -230,22 +223,24 @@ export async function getDatabase(addr: string, client: Client) {
  * @returns the {@link Database}[]
  *
  **/
-export async function showDatabase(owner: string, client: Client) {
+export async function showDatabase(owner: string, client: Client | ReadClient) {
     const response = await client.provider.getDatabaseOfOwner(owner)
     return response.databases
         .filter((item) => item.database.oneofKind != undefined)
-        .map((db) => {
+        .map((db, index) => {
             if (db.database.oneofKind === 'docDb') {
                 return {
                     addr: '0x' + toHEX(db.database.docDb.address),
                     client,
                     internal: db,
+                    state: response.states[index],
                 }
             } else if (db.database.oneofKind === 'eventDb') {
                 return {
                     addr: '0x' + toHEX(db.database.eventDb.address),
                     client,
                     internal: db,
+                    state: response.states[index],
                 }
             } else {
                 //will not go here
@@ -253,6 +248,7 @@ export async function showDatabase(owner: string, client: Client) {
                     addr: '',
                     client,
                     internal: undefined,
+                    state: response.states[index],
                 }
             }
         })
@@ -265,7 +261,7 @@ export async function showDatabase(owner: string, client: Client) {
  * ```ts
  * const index1:Index = {
  *    path:'/city', // a top level field name 'city' and the path will be '/city'
- *    indexType: Indextype.StringKey
+ *    indexType: IndexType.StringKey
  * }
  * const {collection, result} = await createCollection(db, "test_collection", [index1])
  * ```
@@ -280,10 +276,10 @@ export async function showDatabase(owner: string, client: Client) {
 export async function createCollection(
     db: Database,
     name: string,
-    indexFields: Index[]
+    indexFields?: Index[]
 ) {
     const collection: CollectionMutation = {
-        indexFields,
+        indexFields: indexFields ? indexFields : [],
         collectionName: name,
     }
     const body: Mutation_BodyWrapper = {
@@ -308,8 +304,9 @@ export async function createCollection(
         const col: Collection = {
             name,
             db,
-            indexFields,
+            indexFields: indexFields ? indexFields : [],
             internal: undefined,
+            state: undefined,
         }
 
         const result: MutationResult = {
@@ -341,12 +338,13 @@ export async function createCollection(
  **/
 export async function showCollection(db: Database) {
     const response = await db.client.provider.getCollectionOfDatabase(db.addr)
-    const collectionList = response.collections.map((c) => {
+    const collectionList = response.collections.map((c, index) => {
         return {
             name: c.name,
             db,
             indexFields: c.indexFields,
             internal: c,
+            state: response.states[index],
         } as Collection
     })
     return collectionList

@@ -15,7 +15,7 @@ use ethers::types::{
 };
 use prost::Message;
 use std::str::FromStr;
-use tracing::warn;
+use tracing::{warn};
 /// parse mutation
 
 macro_rules! parse_mutation {
@@ -237,5 +237,19 @@ mod tests {
         };
         let (_, payload_type, _) = MutationUtil::unwrap_and_verify(request).unwrap();
         assert_eq!(PayloadType::DatabasePayload, payload_type);
+    }
+    #[test]
+    pub fn test_java_sdk_verfiy_ut() {
+        //let expected_addr = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266";
+        let typed_data = r#"
+       {"types":{"EIP712Domain":[{"name":"name","type":"string"}],"Message":[{"name":"payload","type":"bytes"},{"name":"nonce","type":"string"}]},"primaryType":"Message","message":{"payload":"0x1a0822060a0464657363","nonce":"1"},"domain":{"name":"db3.network"}}
+        "#;
+        let typed_data_obj = serde_json::from_slice::<TypedData>(typed_data.as_bytes()).unwrap();
+        let hashed_message = typed_data_obj.encode_eip712().unwrap();
+        let hex_str = hex::encode(hashed_message);
+        assert_eq!(
+            "2b6ab2777e1ffb472f2f3206566f0cb691228ba5fb02692fd8fe933576b5003e",
+            hex_str.as_str()
+        );
     }
 }

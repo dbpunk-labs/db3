@@ -15,12 +15,14 @@
 // limitations under the License.
 //
 
-import { Client } from '../client/types'
+import { Client, ReadClient } from '../client/types'
 import { DocumentEntry, DocumentData } from '../client/base'
 import {
     DatabaseMessage as InternalDatabase,
     Index,
     Collection as InternalCollection,
+    DatabaseState,
+    CollectionState,
 } from '../proto/db3_database_v2'
 
 export type CreateDBResult = {
@@ -35,8 +37,9 @@ export type CreateCollectionResult = {
 
 export type Database = {
     addr: string
-    client: Client
+    client: Client | ReadClient
     internal: InternalDatabase | undefined
+    state: DatabaseState | undefined
 }
 
 export type MutationResult = {
@@ -50,11 +53,13 @@ export type Collection = {
     db: Database
     indexFields: Index[]
     internal: InternalCollection | undefined
+    state: CollectionState | undefined
 }
 
 export type QueryResult<T = DocumentData> = {
     docs: Array<DocumentEntry<T>>
     collection: Collection
+    count: string
 }
 
 export type EventDatabaseOption = {

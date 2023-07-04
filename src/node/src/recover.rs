@@ -1,7 +1,6 @@
 use crate::ar_toolbox::ArToolBox;
 use crate::mutation_utils::MutationUtil;
 use arweave_rs::crypto::base64::Base64;
-use bytes::Bytes;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
@@ -110,9 +109,6 @@ impl Recover {
         for record_batch in record_batch_vec.iter() {
             let mutations = ArToolBox::convert_recordbatch_to_mutation(record_batch)?;
             for (body, block, order) in mutations.iter() {
-                let payload = &body.payload;
-                let signature = &body.signature;
-                println!("signature {}", signature);
                 let (dm, address, nonce) =
                     MutationUtil::unwrap_and_light_verify(&body.payload, body.signature.as_str())
                         .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;

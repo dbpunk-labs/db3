@@ -26,3 +26,9 @@ export type Client = {
     account: DB3Account
     nonce: number
 }
+
+export type ReadClient = {
+    provider: StorageProviderV2
+    indexer: IndexerProvider
+    nonce: number
+}

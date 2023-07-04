@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
 //
-// ns_store.rs
+// db_store_v2.rs
 // Copyright (C) 2022 db3.network Author imotai <codego.me@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,19 +14,21 @@ use std::collections::BTreeMap;
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+//
+use crate::collection_key;
+use crate::db_doc_key_v2::DbDocKeyV2;
 use crate::db_owner_key_v2::DbOwnerKey;
+use crate::doc_store::{DocStore, DocStoreConfig};
 use bytes::BytesMut;
+use chashmap::CHashMap;
+use db3_base::bson_util::bytes_to_bson_document;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::DbId;
 use db3_crypto::id_v2::OpEntryId;
-
-use crate::collection_key;
-use crate::db_doc_key_v2::DbDocKeyV2;
-use crate::doc_store::{DocStore, DocStoreConfig};
-use db3_base::bson_util::bytes_to_bson_document;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
-    database_message, Collection, DatabaseMessage, Document, DocumentDatabase, EventDatabase, Query,
+    database_message, Collection, CollectionState as CollectionStateProto, DatabaseMessage,
+    DatabaseState as DatabaseStateProto, Document, DocumentDatabase, EventDatabase, Query,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::{
@@ -36,13 +37,16 @@ use db3_proto::db3_mutation_v2_proto::{
 use db3_proto::db3_storage_proto::ExtraItem;
 use prost::Message;
 use rocksdb::{DBRawIteratorWithThreadMode, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::path::Path;
-use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tracing::{debug, info, warn};
-
 type StorageEngine = DBWithThreadMode<MultiThreaded>;
 type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, StorageEngine>;
+
+const STATE_CF: &str = "DB_STATE_CF";
 
 #[derive(Clone)]
 pub struct DBStoreV2Config {
@@ -58,8 +62,17 @@ pub struct DBStoreV2Config {
     pub doc_store_conf: DocStoreConfig,
 }
 
-struct DBState {
-    pub db_doc_order: BTreeMap<String, i64>,
+#[derive(Clone)]
+struct CollectionState {
+    // the total doc count
+    pub total_doc_count: u64,
+}
+
+#[derive(Clone)]
+struct DatabaseState {
+    pub doc_order: i64,
+    pub collection_state: HashMap<String, CollectionState>,
+    pub total_doc_count: u64,
 }
 
 #[derive(Clone)]
@@ -67,9 +80,7 @@ pub struct DBStoreV2 {
     config: DBStoreV2Config,
     se: Arc<StorageEngine>,
     doc_store: Arc<DocStore>,
-    db_state: Arc<Mutex<DBState>>,
-    db_count: Arc<AtomicU64>,
-    collection_count: Arc<AtomicU64>,
+    db_state: Arc<CHashMap<String, DatabaseState>>,
 }
 
 impl DBStoreV2 {
@@ -90,6 +101,7 @@ impl DBStoreV2 {
                     config.index_store_cf_name.as_str(),
                     config.doc_owner_store_cf_name.as_str(),
                     config.db_owner_store_cf_name.as_str(),
+                    STATE_CF,
                 ],
             )
             .map_err(|e| {
@@ -104,45 +116,97 @@ impl DBStoreV2 {
             config,
             se,
             doc_store,
-            db_state: Arc::new(Mutex::new(DBState {
-                db_doc_order: BTreeMap::new(),
-            })),
-            db_count: Arc::new(AtomicU64::new(0)),
-            collection_count: Arc::new(AtomicU64::new(0)),
+            db_state: Arc::new(CHashMap::new()),
         })
     }
 
-    /// increase db doc order
-    fn increase_db_doc_order(&self, db_addr_hex: &String) -> Result<i64> {
-        match self.db_state.lock() {
-            Ok(mut state) => match state.db_doc_order.get_mut(db_addr_hex) {
-                Some(order) => {
-                    *order += 1;
-                    Ok(*order)
-                }
-                None => {
-                    state.db_doc_order.insert(db_addr_hex.clone(), 1);
-                    Ok(1)
-                }
+    pub fn flush_state(&self) {}
+    fn update_db_state_for_add_db(&self, db_addr: &str) {
+        self.db_state.insert(
+            db_addr.to_string(),
+            DatabaseState {
+                doc_order: 0,
+                collection_state: HashMap::new(),
+                total_doc_count: 0,
             },
-            Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
+        );
+    }
+
+    fn update_db_state_for_new_collection(&self, db_addr: &str, col: &str) {
+        if let Some(mut write_guard) = self.db_state.get_mut(db_addr) {
+            let database_state = write_guard.deref_mut();
+            database_state
+                .collection_state
+                .insert(col.to_string(), CollectionState { total_doc_count: 0 });
         }
     }
 
-    pub fn get_collection_of_database(&self, db_addr: &DB3Address) -> Result<Vec<Collection>> {
-        self.get_entries_with_prefix::<Collection>(
-            db_addr.as_ref(),
-            self.config.collection_store_cf_name.as_str(),
-        )
+    fn update_db_state_for_delete_docs(&self, db_addr: &str, col: &str, count: u64) {
+        if let Some(mut write_guard) = self.db_state.get_mut(db_addr) {
+            let database_state = write_guard.deref_mut();
+            database_state.total_doc_count = database_state.total_doc_count - count;
+            if let Some(collection_state) = database_state.collection_state.get_mut(col) {
+                collection_state.total_doc_count = collection_state.total_doc_count - count;
+            }
+        }
     }
 
-    pub fn get_database_of_owner(&self, owner: &DB3Address) -> Result<Vec<DatabaseMessage>> {
+    fn update_db_state_for_add_docs(
+        &self,
+        db_addr_hex: &str,
+        col: &str,
+        count: usize,
+    ) -> Result<Option<Vec<i64>>> {
+        if let Some(mut write_guard) = self.db_state.get_mut(db_addr_hex) {
+            let database_state = write_guard.deref_mut();
+            let mut ids: Vec<i64> = Vec::new();
+            for id in 1..(count + 1) {
+                ids.push(database_state.doc_order + id as i64);
+            }
+            database_state.doc_order = database_state.doc_order + count as i64;
+            database_state.total_doc_count = database_state.total_doc_count + count as u64;
+            if let Some(collection_state) = database_state.collection_state.get_mut(col) {
+                collection_state.total_doc_count = collection_state.total_doc_count + count as u64;
+            }
+            Ok(Some(ids))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_collection_of_database(
+        &self,
+        db_addr: &DB3Address,
+    ) -> Result<(Vec<Collection>, Vec<CollectionStateProto>)> {
+        let collections = self.get_entries_with_prefix::<Collection>(
+            db_addr.as_ref(),
+            self.config.collection_store_cf_name.as_str(),
+        )?;
+        let mut collection_states: Vec<CollectionStateProto> = Vec::new();
+        for col in collections.iter() {
+            if let Some(state) = self.get_collection_state(db_addr, col.name.as_str()) {
+                collection_states.push(state);
+            } else {
+                return Err(DB3Error::CollectionNotFound(
+                    db_addr.to_hex(),
+                    col.name.to_string(),
+                ));
+            }
+        }
+        Ok((collections, collection_states))
+    }
+
+    pub fn get_database_of_owner(
+        &self,
+        owner: &DB3Address,
+    ) -> Result<(Vec<DatabaseMessage>, Vec<DatabaseStateProto>)> {
         let cf_handle = self
             .se
             .cf_handle(self.config.db_owner_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
         let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, owner).into();
         let mut entries: Vec<DatabaseMessage> = Vec::new();
+        let mut database_state: Vec<DatabaseStateProto> = Vec::new();
         while it.valid() {
             if let Some(k) = it.key() {
                 if &k[0..owner.as_ref().len()] != owner.as_ref() {
@@ -155,12 +219,15 @@ impl DBStoreV2 {
                 let addr = DB3Address::try_from(v)
                     .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
                 if let Ok(Some(d)) = self.get_database(&addr) {
-                    entries.push(d);
+                    if let Some(state) = self.get_database_state(&addr) {
+                        entries.push(d);
+                        database_state.push(state);
+                    }
                 }
             }
             it.next();
         }
-        Ok(entries)
+        Ok((entries, database_state))
     }
 
     fn get_entries_with_prefix<T>(&self, prefix: &[u8], cf: &str) -> Result<Vec<T>>
@@ -252,21 +319,8 @@ impl DBStoreV2 {
             .cf_handle(self.config.collection_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
         let ck_ref: &[u8] = ck.as_ref();
-        let value = self
-            .se
-            .get_cf(&collection_store_cf_handle, ck_ref)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-
-        if let Some(_v) = value {
-            return Err(DB3Error::ReadStoreError(format!(
-                "collection with name {} exist",
-                collection.collection_name.as_str()
-            )));
-        }
-
         let id = OpEntryId::create(block, order, idx)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-
         // validate the index
         let col = Collection {
             id: id.as_ref().to_vec(),
@@ -283,6 +337,11 @@ impl DBStoreV2 {
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let db_addr_hex = db_addr.to_hex();
+        self.update_db_state_for_new_collection(
+            db_addr_hex.as_str(),
+            collection.collection_name.as_str(),
+        );
         if self.config.enable_doc_store {
             self.doc_store
                 .create_collection(db_addr, collection)
@@ -293,6 +352,36 @@ impl DBStoreV2 {
 
     pub fn get_database(&self, db_addr: &DB3Address) -> Result<Option<DatabaseMessage>> {
         self.get_entry::<DatabaseMessage>(self.config.db_store_cf_name.as_str(), db_addr.as_ref())
+    }
+
+    pub fn get_collection_state(
+        &self,
+        db_addr: &DB3Address,
+        col: &str,
+    ) -> Option<CollectionStateProto> {
+        let db_addr_hex = db_addr.to_hex();
+        if let Some(guard) = self.db_state.get(db_addr_hex.as_str()) {
+            let database_state = guard.deref();
+            if let Some(col_state) = database_state.collection_state.get(col) {
+                return Some(CollectionStateProto {
+                    total_doc_count: col_state.total_doc_count,
+                });
+            }
+        }
+        None
+    }
+
+    pub fn get_database_state(&self, db_addr: &DB3Address) -> Option<DatabaseStateProto> {
+        let db_addr_hex = db_addr.to_hex();
+        if let Some(guard) = self.db_state.get(db_addr_hex.as_str()) {
+            let database_state = guard.deref();
+            Some(DatabaseStateProto {
+                total_doc_count: database_state.total_doc_count,
+                total_col_count: database_state.collection_state.len() as u64,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn update_docs(
@@ -323,37 +412,21 @@ impl DBStoreV2 {
         db_addr: &DB3Address,
         col_name: &str,
         query: &Query,
-    ) -> Result<Vec<Document>> {
-        let ck = collection_key::build_collection_key(db_addr, col_name)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        let collection_store_cf_handle = self
-            .se
-            .cf_handle(self.config.collection_store_cf_name.as_str())
-            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let ck_ref: &[u8] = ck.as_ref();
-        let value = self
-            .se
-            .get_cf(&collection_store_cf_handle, ck_ref)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        if let None = value {
-            return Err(DB3Error::ReadStoreError(format!(
-                "collection with name {} does not exist",
-                col_name
-            )));
+    ) -> Result<(Vec<Document>, u64)> {
+        if !self.is_db_collection_exist(db_addr, col_name)? {
+            return Err(DB3Error::ReadStoreError(
+                "collection name {col_name} does not exist".to_string(),
+            ));
         }
         if self.config.enable_doc_store {
-            let result = self.doc_store.execute_query(db_addr, col_name, query)?;
+            let (result, count) = self.doc_store.execute_query(db_addr, col_name, query)?;
             let mut documents = vec![];
-
             for (id, doc) in result {
-                documents.push(Document {
-                    id,
-                    doc: doc.to_string(),
-                })
+                documents.push(Document { id, doc })
             }
-            Ok(documents)
+            Ok((documents, count))
         } else {
-            Ok(vec![])
+            Ok((vec![], 0))
         }
     }
 
@@ -375,6 +448,8 @@ impl DBStoreV2 {
             //TODO add id-> owner mapping to control the permissions
             self.doc_store.delete_docs(db_addr, col_name, doc_ids)?;
         }
+        let db_addr_hex = db_addr.to_hex();
+        self.update_db_state_for_delete_docs(db_addr_hex.as_str(), col_name, doc_ids.len() as u64);
         self.delete_doc_ids_from_owner_store(db_addr, doc_ids)
     }
 
@@ -385,37 +460,25 @@ impl DBStoreV2 {
         col_name: &str,
         docs: &Vec<String>,
     ) -> Result<Vec<i64>> {
-        let ck = collection_key::build_collection_key(db_addr, col_name)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        let collection_store_cf_handle = self
-            .se
-            .cf_handle(self.config.collection_store_cf_name.as_str())
-            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let ck_ref: &[u8] = ck.as_ref();
-        let value = self
-            .se
-            .get_cf(&collection_store_cf_handle, ck_ref)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        if let None = value {
-            return Err(DB3Error::ReadStoreError(format!(
-                "collection with name {} does not exist",
-                col_name
-            )));
+        if !self.is_db_collection_exist(db_addr, col_name)? {
+            return Err(DB3Error::CollectionNotFound(
+                col_name.to_string(),
+                db_addr.to_hex(),
+            ));
         }
         let db_addr_hex = db_addr.to_hex();
-        let mut doc_ids = vec![];
-        for _ in 0..docs.len() {
-            let doc_id = self.increase_db_doc_order(&db_addr_hex)?;
-            doc_ids.push(doc_id);
+        let doc_ids =
+            self.update_db_state_for_add_docs(db_addr_hex.as_str(), col_name, docs.len())?;
+        if let Some(all_doc_ids) = doc_ids {
+            self.create_doc_ownership(sender, db_addr, &all_doc_ids)?;
+            // add db+id-> owner mapping to control the permissions
+            if self.config.enable_doc_store {
+                self.doc_store
+                    .add_str_docs(db_addr, col_name, docs, &all_doc_ids)?;
+            }
+            return Ok(all_doc_ids);
         }
-
-        // add db+id-> owner mapping to control the permissions
-        self.create_doc_ownership(sender, db_addr, &doc_ids)?;
-        if self.config.enable_doc_store {
-            self.doc_store
-                .add_str_docs(db_addr, col_name, docs, &doc_ids)?;
-        }
-        Ok(doc_ids)
+        Ok(vec![])
     }
 
     /// verify if the collection exists in the given db
@@ -579,6 +642,9 @@ impl DBStoreV2 {
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+
+        let db_addr_hex = db_addr.to_hex();
+        self.update_db_state_for_add_db(db_addr_hex.as_str());
         for (idx, cm) in mutation.tables.iter().enumerate() {
             self.create_collection(sender, db_addr.address(), cm, block, order, idx as u16)?;
         }
@@ -633,6 +699,8 @@ impl DBStoreV2 {
         self.se
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let db_addr_hex = db_addr.to_hex();
+        self.update_db_state_for_add_db(db_addr_hex.as_str());
         if self.config.enable_doc_store {
             self.doc_store
                 .create_database(db_addr.address())
@@ -896,17 +964,22 @@ mod tests {
             index_fields: vec![],
             collection_name: "col1".to_string(),
         };
+        let col_state = db3_store.get_collection_state(&db_id.address(), "col1");
+        assert!(col_state.is_none());
         let result =
             db3_store.create_collection(&DB3Address::ZERO, db_id.address(), &collection, 1, 1, 1);
         assert!(result.is_ok());
+        let col_state = db3_store.get_collection_state(&db_id.address(), "col1");
+        assert!(col_state.is_some());
         let result = db3_store.get_collection(db_id.address(), "col1");
         if let Ok(Some(_c)) = result {
             assert!(true);
         } else {
             assert!(false);
         }
-        if let Ok(cl) = db3_store.get_collection_of_database(db_id.address()) {
+        if let Ok((cl, states)) = db3_store.get_collection_of_database(db_id.address()) {
             assert_eq!(cl.len(), 1);
+            assert_eq!(states.len(), 1);
         } else {
             assert!(false);
         }
@@ -934,9 +1007,14 @@ mod tests {
             db_desc: "test_desc".to_string(),
         };
         let db3_store = result.unwrap();
+        let db_state = db3_store.get_database_state(&DB3Address::ZERO);
+        assert!(db_state.is_none());
+
         let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 1, 1, 1, 1);
         assert!(result.is_ok());
         let db_id = result.unwrap();
+        let db_state = db3_store.get_database_state(&db_id.address());
+        assert!(db_state.is_some());
         if let Ok(Some(db)) = db3_store.get_database(db_id.address()) {
             if let Some(database_message::Database::DocDb(doc_db)) = db.database {
                 assert_eq!("test_desc", doc_db.desc.as_str());
@@ -945,8 +1023,9 @@ mod tests {
             assert!(false);
         }
 
-        if let Ok(dbs) = db3_store.get_database_of_owner(&DB3Address::ZERO) {
+        if let Ok((dbs, states)) = db3_store.get_database_of_owner(&DB3Address::ZERO) {
             assert_eq!(dbs.len(), 1);
+            assert_eq!(states.len(), 1);
         } else {
             assert!(false);
         }
@@ -982,16 +1061,8 @@ mod tests {
         let db_id_2 = result.unwrap();
 
         let result = db3_store
-            .increase_db_doc_order(&db_id_1.address().to_hex())
+            .update_db_state_for_add_docs(&db_id_1.address().to_hex(), "col1", 3)
             .unwrap();
-        assert_eq!(result, 1);
-        let result = db3_store
-            .increase_db_doc_order(&db_id_1.address().to_hex())
-            .unwrap();
-        assert_eq!(result, 2);
-        let result = db3_store
-            .increase_db_doc_order(&db_id_2.address().to_hex())
-            .unwrap();
-        assert_eq!(result, 1);
+        assert_eq!(result, Some(vec![1, 2, 3]));
     }
 }
