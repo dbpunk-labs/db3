@@ -24,19 +24,22 @@ use db3_crypto::id_v2::OpEntryId;
 use crate::collection_key;
 use crate::db_doc_key_v2::DbDocKeyV2;
 use crate::doc_store::{DocStore, DocStoreConfig};
+use db3_base::bson_util::bytes_to_bson_document;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
     database_message, Collection, DatabaseMessage, Document, DocumentDatabase, EventDatabase, Query,
 };
+use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::{
-    CollectionMutation, DocumentDatabaseMutation, EventDatabaseMutation,
+    CollectionMutation, DocumentDatabaseMutation, EventDatabaseMutation, Mutation, MutationAction,
 };
+use db3_proto::db3_storage_proto::ExtraItem;
 use prost::Message;
 use rocksdb::{DBRawIteratorWithThreadMode, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use tracing::info;
+use tracing::{debug, info, warn};
 
 type StorageEngine = DBWithThreadMode<MultiThreaded>;
 type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, StorageEngine>;
@@ -636,6 +639,200 @@ impl DBStoreV2 {
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         }
         Ok(db_addr)
+    }
+
+    pub fn apply_mutation(
+        &self,
+        action: MutationAction,
+        dm: Mutation,
+        address: &DB3Address,
+        network: u64,
+        nonce: u64,
+        block: u64,
+        order: u32,
+    ) -> Result<Vec<ExtraItem>> {
+        let mut items: Vec<ExtraItem> = Vec::new();
+        match action {
+            MutationAction::CreateEventDb => {
+                for body in dm.bodies {
+                    if let Some(Body::EventDatabaseMutation(ref mutation)) = &body.body {
+                        let db_id = self
+                            .create_event_database(address, mutation, nonce, network, block, order)
+                            .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                        let db_id_hex = db_id.to_hex();
+                        info!(
+                            "add database with addr {} from owner {}",
+                            db_id_hex.as_str(),
+                            address.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "db_addr".to_string(),
+                            value: db_id_hex,
+                        };
+                        items.push(item);
+                        break;
+                    }
+                }
+            }
+            MutationAction::CreateDocumentDb => {
+                for body in dm.bodies {
+                    if let Some(Body::DocDatabaseMutation(ref doc_db_mutation)) = &body.body {
+                        let db_id = self
+                            .create_doc_database(
+                                address,
+                                doc_db_mutation,
+                                nonce,
+                                network,
+                                block,
+                                order,
+                            )
+                            .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                        let db_id_hex = db_id.to_hex();
+                        info!(
+                            "add database with addr {} from owner {}",
+                            db_id_hex.as_str(),
+                            address.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "db_addr".to_string(),
+                            value: db_id_hex,
+                        };
+                        items.push(item);
+                        break;
+                    }
+                }
+            }
+            MutationAction::AddCollection => {
+                for (i, body) in dm.bodies.iter().enumerate() {
+                    let db_address_ref: &[u8] = body.db_address.as_ref();
+                    let db_addr = DB3Address::try_from(db_address_ref)
+                        .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                    if let Some(Body::CollectionMutation(ref col_mutation)) = &body.body {
+                        self.create_collection(
+                            address,
+                            &db_addr,
+                            col_mutation,
+                            block,
+                            order,
+                            i as u16,
+                        )
+                        .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                        info!(
+                            "add collection with db_addr {}, collection_name: {}, from owner {}",
+                            db_addr.to_hex().as_str(),
+                            col_mutation.collection_name.as_str(),
+                            address.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "collection".to_string(),
+                            value: col_mutation.collection_name.to_string(),
+                        };
+                        items.push(item);
+                    }
+                }
+            }
+            MutationAction::AddDocument => {
+                for (_i, body) in dm.bodies.iter().enumerate() {
+                    let db_address_ref: &[u8] = body.db_address.as_ref();
+                    let db_addr = DB3Address::try_from(db_address_ref)
+                        .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                    if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                        let mut docs = Vec::<String>::new();
+                        for buf in doc_mutation.documents.iter() {
+                            let document = bytes_to_bson_document(buf.clone())
+                                .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                            docs.push(document.to_string());
+                        }
+                        let ids = self
+                            .add_docs(
+                                &db_addr,
+                                address,
+                                doc_mutation.collection_name.as_str(),
+                                &docs,
+                            )
+                            .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                        info!(
+                                    "add documents with db_addr {}, collection_name: {}, from owner {}, document size: {}",
+                                    db_addr.to_hex().as_str(),
+                                    doc_mutation.collection_name.as_str(),
+                                    address.to_hex().as_str(),
+                                    ids.len()
+                                );
+                        // return document keys
+                        for id in ids {
+                            let item = ExtraItem {
+                                key: "document".to_string(),
+                                value: id.to_string(),
+                            };
+                            items.push(item);
+                        }
+                    }
+                }
+            }
+            MutationAction::UpdateDocument => {
+                for (_i, body) in dm.bodies.iter().enumerate() {
+                    let db_address_ref: &[u8] = body.db_address.as_ref();
+                    let db_addr = DB3Address::try_from(db_address_ref)
+                        .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                    if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                        if doc_mutation.documents.len() != doc_mutation.ids.len() {
+                            let msg = format!(
+                                "doc ids size {} not equal to documents size {}",
+                                doc_mutation.ids.len(),
+                                doc_mutation.documents.len()
+                            );
+                            warn!("{}", msg.as_str());
+                            return Err(DB3Error::ApplyMutationError(msg));
+                        }
+                        let mut docs = Vec::<String>::new();
+                        for buf in doc_mutation.documents.iter() {
+                            let document = bytes_to_bson_document(buf.clone())
+                                .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                            let doc_str = document.to_string();
+                            debug!("update document: {}", doc_str);
+                            docs.push(doc_str);
+                        }
+                        self.update_docs(
+                            &db_addr,
+                            address,
+                            doc_mutation.collection_name.as_str(),
+                            &docs,
+                            &doc_mutation.ids,
+                        )
+                        .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                        info!(
+                            "update documents with db_addr {}, collection_name: {}, from owner {}",
+                            db_addr.to_hex().as_str(),
+                            doc_mutation.collection_name.as_str(),
+                            address.to_hex().as_str()
+                        );
+                    }
+                }
+            }
+            MutationAction::DeleteDocument => {
+                for (_i, body) in dm.bodies.iter().enumerate() {
+                    let db_address_ref: &[u8] = body.db_address.as_ref();
+                    let db_addr = DB3Address::try_from(db_address_ref)
+                        .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                    if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
+                        self.delete_docs(
+                            &db_addr,
+                            address,
+                            doc_mutation.collection_name.as_str(),
+                            &doc_mutation.ids,
+                        )
+                        .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
+                        info!(
+                            "delete documents with db_addr {}, collection_name: {}, from owner {}",
+                            db_addr.to_hex().as_str(),
+                            doc_mutation.collection_name.as_str(),
+                            address.to_hex().as_str()
+                        );
+                    }
+                }
+            }
+        };
+        Ok(items)
     }
 }
 

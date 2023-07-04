@@ -63,7 +63,6 @@ impl MetaStoreClient {
             .call()
             .await
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        println!("latest_arweave_tx: {:?}", registration.latest_arweave_tx);
 
         Ok(registration.latest_arweave_tx.to_string())
     }

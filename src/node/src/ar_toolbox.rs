@@ -65,9 +65,68 @@ impl ArToolBox {
             .await?;
         Self::parse_gzip_file(file_path.as_path())
     }
-    pub async fn get_prev_arware_tx(&self, tx_id: &str) -> Result<Option<String>> {
-        self.ar_filesystem.get_last_rollup_tag(tx_id).await
+    pub async fn get_tx_tags(&self, tx_id: &str) -> Result<(u64, u64, Option<String>)> {
+        let tags = self.ar_filesystem.get_tags(tx_id).await?;
+        let mut last_rollup_tx = None;
+        let mut start_block = None;
+        let mut end_block = None;
+        for tag in tags {
+            if let Ok(name) = tag.name.to_utf8_string() {
+                if name == "Last-Rollup-Tx" {
+                    last_rollup_tx = Some(
+                        tag.value
+                            .to_utf8_string()
+                            .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?,
+                    );
+                }
+                if name == "Start-Block" {
+                    let start_block_str = tag
+                        .value
+                        .to_utf8_string()
+                        .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                    start_block = Some(
+                        start_block_str
+                            .parse::<u64>()
+                            .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?,
+                    );
+                }
+                if name == "End-Block" {
+                    let end_block_str = tag
+                        .value
+                        .to_utf8_string()
+                        .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                    end_block = Some(
+                        end_block_str
+                            .parse::<u64>()
+                            .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?,
+                    );
+                }
+            }
+        }
+        if start_block.is_none() || end_block.is_none() {
+            return Err(DB3Error::ArwareOpError(format!(
+                "Missing start or end block for tx {}",
+                tx_id
+            )));
+        }
+        Ok((start_block.unwrap(), end_block.unwrap(), last_rollup_tx))
     }
+    pub async fn get_start_block(&self, tx_id: &str) -> Result<Option<String>> {
+        let tags = self.ar_filesystem.get_tags(tx_id).await?;
+        for tag in tags {
+            if let Ok(name) = tag.name.to_utf8_string() {
+                if name == "Start-Block" {
+                    return Ok(Some(
+                        tag.value
+                            .to_utf8_string()
+                            .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?,
+                    ));
+                }
+            }
+        }
+        Ok(None)
+    }
+
     pub async fn compress_and_upload_record_batch(
         &self,
         tx: String,
@@ -372,7 +431,7 @@ mod tests {
         assert_eq!(order, 1);
     }
     #[tokio::test]
-    async fn get_prev_arware_tx_ut() {
+    async fn get_tx_tags_ut() {
         let temp_dir = TempDir::new("download_arware_tx_ut").expect("create temp dir");
         let arweave_url = "https://arweave.net";
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -395,8 +454,12 @@ mod tests {
         )
         .unwrap();
         let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
-        let res = ar_toolbox.get_prev_arware_tx(tx_id).await.unwrap();
-        assert!(res.is_some());
-        assert_eq!(res.unwrap(), "ld2W-KnmHhmgYcSgc_DcqjjoU_ke9gkwrQEWk0A2Fpg");
+        let (start_block, end_block, last_rollup_tx) = ar_toolbox.get_tx_tags(tx_id).await.unwrap();
+        assert_eq!(start_block, 3712);
+        assert!(last_rollup_tx.is_some());
+        assert_eq!(
+            last_rollup_tx.unwrap(),
+            "ld2W-KnmHhmgYcSgc_DcqjjoU_ke9gkwrQEWk0A2Fpg"
+        );
     }
 }

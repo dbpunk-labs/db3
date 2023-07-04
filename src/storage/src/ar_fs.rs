@@ -217,23 +217,6 @@ impl ArFileSystem {
             Err(DB3Error::ArwareOpError("fail to get tx tags ".to_string()))
         }
     }
-
-    /// get last rollup tag
-    pub async fn get_last_rollup_tag(&self, id_str: &str) -> Result<Option<String>> {
-        let tags = self.get_tags(id_str).await?;
-        for tag in tags {
-            if let Ok(name) = tag.name.to_utf8_string() {
-                if name == "Last-Rollup-Tx" {
-                    return Ok(Some(
-                        tag.value
-                            .to_utf8_string()
-                            .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?,
-                    ));
-                }
-            }
-        }
-        Ok(None)
-    }
 }
 
 #[cfg(test)]
