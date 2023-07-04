@@ -10,8 +10,9 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/dbpunk-labs/db3?color=green&display_name=tag&label=db3&logo=db3&logoColor=https%3A%2F%2Favatars.githubusercontent.com%2Fu%2F102341693%3Fs%3D96%26v%3D4&style=flat-square)[![Twitter Follow](https://img.shields.io/twitter/follow/Db3Network?style=flat-square)](https://twitter.com/Db3Network)
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/dbpunk-labs/db3/badge)](https://www.gitpoap.io/gh/dbpunk-labs/db3)
 [![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/sz3bmZx2uh)
+![Java SDK](https://img.shields.io/maven-central/v/network.db3/sdk)
+![npm](https://img.shields.io/npm/dw/db3.js?style=flat-square)
 
-**English**
 
 # DB3 Network
 
@@ -83,7 +84,7 @@ if you have any questions, please feel free to ask us for help and you can find 
 
 # Try Our Cloud Sandbox
 
-* [Console](https://console.cloud.db3.network/console/home)
+* [Console](https://console.cloud.db3.network/console/home):https://console.cloud.db3.network/console/home
 * Data Rollup Node: https://rollup.cloud.db3.network
 * Data Index Node: https://index.cloud.db3.network
 
@@ -106,24 +107,19 @@ JSON document must be signed by its owner. Only the owner can update or delete t
 
 # What can we build with the db3 network?
 
-1. A fully on-chain game.
-2. A fully on-chain social network.
-
-All user data will be stored permanently on the DB3 network.
+Now building a fully on-chain application is an easy thing. You can create a fully on-chain game or a fully on-chain social network, or any other application you desire.
 
 # FAQ
 
 Q: Is the DB3 Network a blockchain?
-
 A: No, the DB3 Network is not a blockchain. It is simply a developer tool that can be hosted locally or used through our cloud service.
 
 Q: What are the differences between MongoDB and DB3 Network?
-
 A: MongoDB uses centralized data storage, whereas DB3 Network uses decentralized data storage. Additionally, DB3 Network ensures that data is permanently available.
 
 Q: Will my data be lost if the Data Rollup Node or Data Index Node is not available?
-
 A: No, you can set up your data index node and recover your data from the blockchain.
+
 # License
 
 Apache License, Version 2.0

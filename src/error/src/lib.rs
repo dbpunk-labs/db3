@@ -129,6 +129,8 @@ pub enum DB3Error {
     ReadStoreError(String),
     #[error("fail to rollup data for error {0}")]
     RollupError(String),
+    #[error("fail to implement arware op for error {0}")]
+    ArwareOpError(String),
     #[error("invalid collection name for error {0}")]
     InvalidCollectionNameError(String),
     #[error("invalid mutation for error {0}")]
