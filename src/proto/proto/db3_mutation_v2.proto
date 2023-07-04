@@ -52,6 +52,7 @@ message EventDatabaseMutation {
   repeated CollectionMutation tables = 4;
   string events_json_abi = 5;
   string evm_node_url = 6;
+  uint64 start_block = 7;
 }
 
 message DocumentMask {

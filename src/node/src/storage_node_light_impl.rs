@@ -149,6 +149,7 @@ impl StorageNodeV2Impl {
                 c.min_rollup_size, c.rollup_interval, c.network_id
             );
         }
+        self.db_store.recover_db_state()?;
         Ok(())
     }
 
@@ -955,6 +956,7 @@ mod tests {
             scan_max_limit: 1000,
             enable_doc_store: false,
             doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 0,
         };
         StorageNodeV2Config {
             store_config,

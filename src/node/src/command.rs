@@ -115,6 +115,9 @@ pub enum DB3Command {
         /// the admin address which can change the configuration this node
         #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
         admin_addr: String,
+        /// this is just for upgrade the node
+        #[clap(long, default_value = "10000")]
+        doc_id_start: i64,
     },
 
     /// Start db3 interactive console
@@ -258,6 +261,7 @@ impl DB3Command {
                 contract_addr,
                 evm_node_url,
                 admin_addr,
+                doc_id_start,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -283,6 +287,7 @@ impl DB3Command {
                     contract_addr.as_str(),
                     evm_node_url.as_str(),
                     admin_addr.as_str(),
+                    doc_id_start,
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -348,6 +353,7 @@ impl DB3Command {
                     scan_max_limit: 1000,
                     enable_doc_store: true,
                     doc_store_conf,
+                    doc_start_id: 0,
                 };
                 let addr = format!("{public_host}:{public_grpc_port}");
                 let indexer = IndexerNodeImpl::new(
@@ -361,6 +367,7 @@ impl DB3Command {
                 )
                 .unwrap();
                 let indexer_for_syncing = indexer.clone();
+                indexer.recover().await.unwrap();
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
                     indexer_for_syncing
@@ -418,6 +425,7 @@ impl DB3Command {
         contract_addr: &str,
         evm_node_url: &str,
         admin_addr: &str,
+        doc_start_id: i64,
     ) {
         let addr = format!("{public_host}:{public_grpc_port}");
 
@@ -458,6 +466,7 @@ impl DB3Command {
             scan_max_limit: 1000,
             enable_doc_store: false,
             doc_store_conf: DocStoreConfig::default(),
+            doc_start_id,
         };
 
         let (sender, receiver) = tokio::sync::mpsc::channel::<(
@@ -483,6 +492,7 @@ impl DB3Command {
             addr, network_id
         );
         std::fs::create_dir_all(rollup_data_path).unwrap();
+        storage_node.recover().unwrap();
         storage_node.keep_subscription(receiver).await.unwrap();
         storage_node.start_to_produce_block().await;
         storage_node.start_to_rollup().await;
