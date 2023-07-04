@@ -74,7 +74,7 @@ export async function createEventDatabase(
         tables: collections,
         eventsJsonAbi: abi,
         evmNodeUrl,
-        startBlock
+        startBlock,
     }
     const body: Mutation_BodyWrapper = {
         body: {
