@@ -54,12 +54,15 @@ message CollectionState {
 message DatabaseState {
   uint64 total_doc_count = 2;
   uint64 total_col_count = 3;
+  int64 doc_order = 4;
 }
 
 message DatabaseStatePersistence {
   string addr = 1;
   uint64 total_doc_count = 2;
   uint64 total_col_count = 3;
+  map<string, CollectionState> collection_states = 4;
+  int64 doc_order = 5;
 }
 
 message EventTable {

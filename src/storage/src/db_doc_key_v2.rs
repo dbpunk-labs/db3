@@ -14,10 +14,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use db3_crypto::db3_address::DB3Address;
-use db3_error::Result;
+use db3_crypto::db3_address::{DB3Address, DB3_ADDRESS_LENGTH};
+use db3_error::{DB3Error, Result};
 use std::fmt;
 const DOC_PREFIX: &str = "/doc/";
+const KEY_LENGTH: usize = DOC_PREFIX.len() + DB3_ADDRESS_LENGTH + 8;
 /// DBDocKey with db address, doc id
 pub struct DbDocKeyV2<'a>(pub &'a DB3Address, pub i64);
 impl<'a> DbDocKeyV2<'a> {
@@ -29,6 +30,18 @@ impl<'a> DbDocKeyV2<'a> {
         encoded_key.extend_from_slice(self.0.as_ref());
         encoded_key.extend_from_slice(self.1.to_be_bytes().as_ref());
         Ok(encoded_key)
+    }
+
+    pub fn decode_id(key: &[u8]) -> Result<i64> {
+        if key.len() != KEY_LENGTH {
+            return Err(DB3Error::KeyCodecError(
+                "invalid doc key length".to_string(),
+            ));
+        }
+        Ok(i64::from_be_bytes(
+            <[u8; 8]>::try_from(&key[KEY_LENGTH - 8..KEY_LENGTH])
+                .map_err(|e| DB3Error::KeyCodecError(format!("get doc id err {e}")))?,
+        ))
     }
 }
 

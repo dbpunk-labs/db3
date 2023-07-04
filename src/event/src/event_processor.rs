@@ -193,7 +193,15 @@ impl EventProcessor {
             Token::Uint(value) | Token::Int(value) => {
                 serde_json::value::Value::String(value.to_string())
             }
-            _ => todo!(),
+            Token::FixedBytes(bytes) | Token::Bytes(bytes) => {
+                serde_json::value::Value::String(hex::encode(bytes))
+            }
+            Token::Bool(value) => serde_json::value::Value::Bool(*value),
+            Token::Array(tokens) | Token::FixedArray(tokens) | Token::Tuple(tokens) => {
+                serde_json::value::Value::Array(
+                    tokens.iter().map(|t| Self::param_to_value(t)).collect(),
+                )
+            }
         }
     }
 }
