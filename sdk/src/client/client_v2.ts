@@ -57,6 +57,7 @@ export function createReadonlyClient(
     return {
         provider,
         indexer,
+        nonce: 0,
     } as ReadClient
 }
 /**
