@@ -32,6 +32,9 @@ ResultSet resultSet = client.runQuery(db, col, """/[author=Cixin-Liu]""");
 ```
 you can the the db3 [console](https://console.cloud.db3.network/console/database/) to create a database
 
+## FAQ
 
+Q: network.db3 is not found in your maven repos
+A: 
 
 

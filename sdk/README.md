@@ -41,3 +41,8 @@ const resultSet = await queryDoc<Book>(collection, "/[author=Cixin-Liu]")
 [Try on codesandbox](https://codesandbox.io/s/db3-js-helloword-447nxd?file=/src/App.tsx:673-710)
 
 
+## Examples
+
+* [build a query api based on db3 and vercel function](https://github.com/dbpunk-labs/db3_vercel_query)
+* [build curd example based on db3 ,express and typescript](https://github.com/dbpunk-labs/db3_express_typescript_example)
+
