@@ -19,25 +19,24 @@ use crate::indexer_impl::IndexerNodeImpl;
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use clap::Parser;
-use db3_cmd::command::{DB3ClientCommand, DB3ClientContext, DB3ClientContextV2};
 use db3_crypto::db3_address::DB3Address;
-use db3_crypto::db3_signer::Db3MultiSchemeSigner;
+use db3_error::DB3Error;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNodeServer;
-use db3_proto::db3_node_proto::storage_node_client::StorageNodeClient;
 use db3_proto::db3_storage_proto::storage_node_client::StorageNodeClient as StorageNodeV2Client;
 use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as StorageNodeV2Server;
 use db3_proto::db3_storage_proto::{
     EventMessage as EventMessageV2, Subscription as SubscriptionV2,
 };
-use db3_sdk::mutation_sdk::MutationSDK;
-use db3_sdk::store_sdk::StoreSDK;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::DBStoreV2Config;
 use db3_storage::doc_store::DocStoreConfig;
+use db3_storage::key_store::KeyStore;
+use db3_storage::key_store::KeyStoreConfig;
 use db3_storage::mutation_store::MutationStoreConfig;
 use db3_storage::state_store::StateStoreConfig;
+use ethers::prelude::LocalWallet;
 use http::Uri;
-use std::io::{stderr, stdout};
+use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -120,14 +119,6 @@ pub enum DB3Command {
         doc_id_start: i64,
     },
 
-    /// Start db3 interactive console
-    #[clap(name = "console")]
-    Console {
-        /// the url of db3 grpc api
-        #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26659")]
-        public_grpc_url: String,
-    },
-
     /// Start db3 indexer
     #[clap(name = "indexer")]
     Indexer {
@@ -171,52 +162,34 @@ pub enum DB3Command {
         #[clap(long, default_value = "100000")]
         doc_id_start: i64,
     },
-
-    /// Run db3 client
-    #[clap(name = "client")]
-    Client {
-        /// the url of db3 grpc api
-        #[clap(long = "url", global = true, default_value = "http://127.0.0.1:26659")]
-        public_grpc_url: String,
-        /// the subcommand
-        #[clap(subcommand)]
-        cmd: Option<DB3ClientCommand>,
-    },
 }
 
 impl DB3Command {
-    fn build_context(public_grpc_url: &str) -> DB3ClientContext {
-        let uri = public_grpc_url.parse::<Uri>().unwrap();
-        let endpoint = match uri.scheme_str() == Some("https") {
+    fn build_wallet(key_root_path: &str) -> std::result::Result<LocalWallet, DB3Error> {
+        let config = KeyStoreConfig {
+            key_root_path: key_root_path.to_string(),
+        };
+        let key_store = KeyStore::new(config);
+        match key_store.has_key("evm") {
             true => {
-                let rpc_endpoint = Endpoint::new(public_grpc_url.to_string())
-                    .unwrap()
-                    .tls_config(ClientTlsConfig::new())
-                    .unwrap();
-                rpc_endpoint
+                let data = key_store.get_key("evm")?;
+                let data_ref: &[u8] = &data;
+                let wallet = LocalWallet::from_bytes(data_ref)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                Ok(wallet)
             }
             false => {
-                let rpc_endpoint = Endpoint::new(public_grpc_url.to_string()).unwrap();
-                rpc_endpoint
+                let mut rng = rand::thread_rng();
+                let wallet = LocalWallet::new(&mut rng);
+                let data = wallet.signer().to_bytes();
+                key_store.write_key("evm", data.deref())?;
+                Ok(wallet)
             }
-        };
-        let channel = endpoint.connect_lazy();
-        let node = Arc::new(StorageNodeClient::new(channel));
-        if !db3_cmd::keystore::KeyStore::has_key(None) {
-            db3_cmd::keystore::KeyStore::recover_keypair(None).unwrap();
-        }
-        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
-        let signer = Db3MultiSchemeSigner::new(kp);
-        let mutation_sdk = MutationSDK::new(node.clone(), signer, true);
-        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
-        let signer = Db3MultiSchemeSigner::new(kp);
-        let store_sdk = StoreSDK::new(node, signer, true);
-        DB3ClientContext {
-            mutation_sdk: Some(mutation_sdk),
-            store_sdk: Some(store_sdk),
         }
     }
-    fn build_context_v2(public_grpc_url: &str) -> DB3ClientContextV2 {
+
+    fn build_store_sdk(public_grpc_url: &str, key_root_path: &str) -> StoreSDKV2 {
+        let wallet = Self::build_wallet(key_root_path).unwrap();
         let uri = public_grpc_url.parse::<Uri>().unwrap();
         let endpoint = match uri.scheme_str() == Some("https") {
             true => {
@@ -233,15 +206,7 @@ impl DB3Command {
         };
         let channel = endpoint.connect_lazy();
         let node = Arc::new(StorageNodeV2Client::new(channel));
-        if !db3_cmd::keystore::KeyStore::has_key(None) {
-            db3_cmd::keystore::KeyStore::recover_keypair(None).unwrap();
-        }
-        let kp = db3_cmd::keystore::KeyStore::get_keypair(None).unwrap();
-        let signer = Db3MultiSchemeSigner::new(kp);
-        let store_sdk = StoreSDKV2::new(node, signer);
-        DB3ClientContextV2 {
-            store_sdk: Some(store_sdk),
-        }
+        StoreSDKV2::new(node, wallet)
     }
 
     pub async fn execute(self) {
@@ -310,13 +275,6 @@ impl DB3Command {
                 }
             }
 
-            DB3Command::Console { public_grpc_url } => {
-                let ctx = Self::build_context(public_grpc_url.as_ref());
-                db3_cmd::console::start_console(ctx, &mut stdout(), &mut stderr())
-                    .await
-                    .unwrap();
-            }
-
             DB3Command::Indexer {
                 public_host,
                 public_grpc_port,
@@ -339,13 +297,14 @@ impl DB3Command {
 
                 tracing_subscriber::fmt().with_max_level(log_level).init();
                 info!("{ABOUT}");
-
-                let ctx = Self::build_context_v2(db3_storage_grpc_url.as_ref());
+                let store_sdk =
+                    Self::build_store_sdk(db3_storage_grpc_url.as_ref(), key_root_path.as_str());
 
                 let doc_store_conf = DocStoreConfig {
                     db_root_path: doc_db_path,
                     in_memory_db_handle_limit: 16,
                 };
+
                 let db_store_config = DBStoreV2Config {
                     db_path: meta_db_path.to_string(),
                     db_store_cf_name: "db_store_cf".to_string(),
@@ -359,6 +318,7 @@ impl DB3Command {
                     doc_store_conf,
                     doc_start_id: doc_id_start,
                 };
+
                 let addr = format!("{public_host}:{public_grpc_port}");
                 let indexer = IndexerNodeImpl::new(
                     db_store_config,
@@ -374,10 +334,7 @@ impl DB3Command {
                 if let Err(_e) = indexer.recover().await {}
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
-                    indexer_for_syncing
-                        .start(ctx.store_sdk.unwrap())
-                        .await
-                        .unwrap();
+                    indexer_for_syncing.start(store_sdk).await.unwrap();
                 });
                 info!("start db3 indexer node on public addr {}", addr);
                 let cors_layer = CorsLayer::new()
@@ -395,19 +352,6 @@ impl DB3Command {
                 let (r1,) = tokio::join!(listen);
                 r1.unwrap();
                 info!("exit standalone indexer")
-            }
-
-            DB3Command::Client {
-                cmd,
-                public_grpc_url,
-            } => {
-                let mut ctx = Self::build_context(public_grpc_url.as_ref());
-                if let Some(c) = cmd {
-                    match c.execute(&mut ctx).await {
-                        Ok(table) => table.printstd(),
-                        Err(e) => println!("{}", e),
-                    }
-                }
             }
         }
     }

@@ -16,30 +16,46 @@
 //
 
 use bytes::BytesMut;
-use db3_crypto::db3_signer::Db3MultiSchemeSigner;
 use db3_proto::db3_storage_proto::{
-    storage_node_client::StorageNodeClient as StorageNodeV2Client, SubscribeRequest,
-};
-use db3_proto::db3_storage_proto::{
-    BlockRequest as BlockRequestV2, BlockResponse as BlockResponseV2,
-    EventMessage as EventMessageV2, EventType as EventTypeV2, Subscription as SubscriptionV2,
+    storage_node_client::StorageNodeClient as StorageNodeV2Client, BlockRequest as BlockRequestV2,
+    BlockResponse as BlockResponseV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
+    SubscribeRequest, Subscription as SubscriptionV2,
 };
 
+use ethers::core::types::{
+    transaction::eip712::{EIP712Domain, TypedData, Types},
+    Bytes,
+};
+use ethers::prelude::{LocalWallet, Signer};
 use prost::Message;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tonic::{Status, Streaming};
 
 pub struct StoreSDKV2 {
     client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
-    signer: Db3MultiSchemeSigner,
+    wallet: LocalWallet,
+    types: Types,
 }
 
 impl StoreSDKV2 {
     pub fn new(
         client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
-        signer: Db3MultiSchemeSigner,
+        wallet: LocalWallet,
     ) -> Self {
-        Self { client, signer }
+        let json = serde_json::json!({
+          "EIP712Domain": [
+          ],
+          "Message":[
+          {"name":"payload", "type":"bytes"}
+          ]
+        });
+        let types: Types = serde_json::from_value(json).unwrap();
+        Self {
+            client,
+            wallet,
+            types,
+        }
     }
 
     pub async fn subscribe_event_message(
@@ -48,17 +64,38 @@ impl StoreSDKV2 {
         let sub = SubscriptionV2 {
             topics: vec![EventTypeV2::Block.into()],
         };
+
         let mut buf = BytesMut::with_capacity(1024 * 4);
         sub.encode(&mut buf)
             .map_err(|e| Status::internal(format!("Fail to encode subscription {e}")))?;
         let buf = buf.freeze();
+        let mbuf = Bytes(buf.clone());
+        let mut message: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        message.insert(
+            "payload".to_string(),
+            serde_json::Value::from(format!("{mbuf}")),
+        );
+        let typed_data = TypedData {
+            domain: EIP712Domain {
+                name: None,
+                version: None,
+                chain_id: None,
+                verifying_contract: None,
+                salt: None,
+            },
+            types: self.types.clone(),
+            primary_type: "Message".to_string(),
+            message,
+        };
         let signature = self
-            .signer
-            .sign(buf.as_ref())
+            .wallet
+            .sign_typed_data(&typed_data)
+            .await
             .map_err(|e| Status::internal(format!("Fail to sign subscription {e}")))?;
+        let sig = format!("0x{}", signature);
         let req = SubscribeRequest {
-            signature: signature.as_ref().to_vec().to_owned(),
-            payload: buf.as_ref().to_vec().to_owned(),
+            signature: sig,
+            payload: buf.as_ref().to_vec(),
         };
         let mut client = self.client.as_ref().clone();
         client.subscribe(req).await
@@ -88,8 +125,9 @@ mod tests {
         client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
         counter: i64,
     ) {
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let sdk = StoreSDKV2::new(client, signer);
+        let mut rng = rand::thread_rng();
+        let wallet = LocalWallet::new(&mut rng);
+        let sdk = StoreSDKV2::new(client, wallet);
         let res: Result<tonic::Response<Streaming<EventMessageV2>>, Status> =
             sdk.subscribe_event_message().await;
         println!("res {:?}", res);
@@ -112,8 +150,9 @@ mod tests {
         counter: i64,
         height: u64,
     ) {
-        let (_, signer) = sdk_test::gen_secp256k1_signer(counter);
-        let sdk = StoreSDKV2::new(client, signer);
+        let mut rng = rand::thread_rng();
+        let wallet = LocalWallet::new(&mut rng);
+        let sdk = StoreSDKV2::new(client, wallet);
         let res = sdk.get_block_by_height(height).await;
         println!("res {:?}", res);
         assert!(res.is_ok(), "{:?}", res);

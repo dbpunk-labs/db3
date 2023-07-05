@@ -16,40 +16,13 @@
 //
 
 use db3_base::bson_util;
-use db3_crypto::{
-    db3_address::DB3Address, db3_signer::Db3MultiSchemeSigner, key_derive,
-    signature_scheme::SignatureScheme,
-};
+use db3_crypto::{db3_address::DB3Address, key_derive, signature_scheme::SignatureScheme};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;
 use db3_proto::db3_mutation_proto::DocumentMutation;
 use db3_proto::db3_mutation_proto::{DatabaseAction, DatabaseMutation, MintCreditsMutation};
 use std::time::{SystemTime, UNIX_EPOCH};
-
-#[cfg(test)]
-pub fn gen_ed25519_signer(seed: i64) -> (DB3Address, Db3MultiSchemeSigner) {
-    let mut seeds: Vec<u8> = vec![];
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    let (addr, kp) =
-        key_derive::derive_key_pair_from_path(&seeds, None, &SignatureScheme::ED25519).unwrap();
-    (addr, Db3MultiSchemeSigner::new(kp))
-}
-
-#[cfg(test)]
-pub fn gen_secp256k1_signer(seed: i64) -> (DB3Address, Db3MultiSchemeSigner) {
-    let mut seeds: Vec<u8> = vec![];
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    seeds.extend_from_slice(&seed.to_be_bytes());
-    let (addr, kp) =
-        key_derive::derive_key_pair_from_path(&seeds, None, &SignatureScheme::Secp256k1).unwrap();
-    (addr, Db3MultiSchemeSigner::new(kp))
-}
 
 #[cfg(test)]
 fn current_seconds() -> u64 {

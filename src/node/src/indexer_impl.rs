@@ -92,7 +92,7 @@ impl IndexerNodeImpl {
             let db_address = DB3Address::try_from(address_ref)?;
             let (collections, _) = self.db_store.get_collection_of_database(&db_address)?;
             let tables = collections.iter().map(|c| c.name.to_string()).collect();
-            if let Err(e) = self
+            if let Err(_e) = self
                 .start_an_event_task(
                     &db_address,
                     database.evm_node_url.as_str(),

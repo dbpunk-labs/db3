@@ -17,9 +17,7 @@
 #![feature(iter_intersperse)]
 pub mod ar_fs;
 pub mod collection_key;
-mod db3_document;
 pub mod db_doc_key_v2;
-mod db_key;
 pub mod db_owner_key;
 pub mod db_owner_key_v2;
 pub mod db_store_v2;

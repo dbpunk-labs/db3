@@ -15,10 +15,10 @@
 // limitations under the License.
 //
 
-#![feature(iter_intersperse)]
-#[macro_use]
-extern crate prettytable;
-pub mod command;
-pub mod console;
-pub mod keystore;
-pub mod shell;
+//#![feature(iter_intersperse)]
+//#[macro_use]
+//extern crate prettytable;
+//pub mod command;
+//pub mod console;
+//pub mod keystore;
+//pub mod shell;
