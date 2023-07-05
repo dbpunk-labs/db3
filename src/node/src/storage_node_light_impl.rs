@@ -441,6 +441,9 @@ impl StorageNode for StorageNodeV2Impl {
         request: Request<SubscribeRequest>,
     ) -> std::result::Result<Response<Self::SubscribeStream>, Status> {
         let r = request.into_inner();
+        if r.payload.len() == 0 || r.signature.len() == 0 {
+            return Err(Status::invalid_argument("the payload or signature is null"));
+        }
         let sender = self.sender.clone();
         let (address, data) = MutationUtil::verify_setup(r.payload.as_ref(), r.signature.as_str())
             .map_err(|e| Status::invalid_argument(format!("invalid signature with error {e}")))?;

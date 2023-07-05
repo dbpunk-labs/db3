@@ -573,9 +573,10 @@ impl DBStoreV2 {
         query: &Query,
     ) -> Result<(Vec<Document>, u64)> {
         if !self.is_db_collection_exist(db_addr, col_name)? {
-            return Err(DB3Error::ReadStoreError(
-                "collection name {col_name} does not exist".to_string(),
-            ));
+            return Err(DB3Error::ReadStoreError(format!(
+                "collection {col_name} does not exist in db {}",
+                db_addr.to_hex().as_str()
+            )));
         }
         if self.config.enable_doc_store {
             let (result, count) = self.doc_store.execute_query(db_addr, col_name, query)?;

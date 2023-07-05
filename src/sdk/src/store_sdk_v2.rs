@@ -87,15 +87,19 @@ impl StoreSDKV2 {
             primary_type: "Message".to_string(),
             message,
         };
+
         let signature = self
             .wallet
             .sign_typed_data(&typed_data)
             .await
             .map_err(|e| Status::internal(format!("Fail to sign subscription {e}")))?;
+        let buf = serde_json::to_vec(&typed_data).map_err(|_| {
+            Status::invalid_argument("fail to convert typed data to json".to_string())
+        })?;
         let sig = format!("0x{}", signature);
         let req = SubscribeRequest {
             signature: sig,
-            payload: buf.as_ref().to_vec(),
+            payload: buf,
         };
         let mut client = self.client.as_ref().clone();
         client.subscribe(req).await
