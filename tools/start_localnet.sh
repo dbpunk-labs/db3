@@ -9,10 +9,10 @@ export RUST_BACKTRACE=1
 EVM_NODE_URL='http://127.0.0.1:8545'
 ADMIN_ADDR='0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 ## clean local process
-#ps -ef | grep db3 | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
-#ps -ef | grep db3 | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
-#ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
-#ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep db3 | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep db3 | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 
 cd ${test_dir}/../metadata/ && npx hardhat node >${test_dir}/evm.log 2>&1 &
 sleep 1
@@ -78,4 +78,3 @@ echo "rollup node http://127.0.0.1:26619"
 echo "index node http://127.0.0.1:26639"
 echo "ar mock server http://127.0.0.1:1984"
 echo "evm node ${EVM_NODE_URL}"
-while true; do sleep 1 ; done
