@@ -58,19 +58,27 @@ jobs:
           cd ${ROOT_DIR}/metadata && npx hardhat test && echo "return code $?"
           test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
           cd ${ROOT_DIR} && cargo build
-          cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
-          sleep 3
-          cat ${ROOT_DIR}/tools/db3.log
       - name: Run Typescript sdk test
         run: |
           ROOT_DIR=`pwd`
+          cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
+          sleep 3
+          cat ${ROOT_DIR}/tools/db3.log
           cd $ROOT_DIR/sdk && yarn && make
           cd $ROOT_DIR/sdk && yarn test --coverage
       - name: Rust Java sdk test
         run: |
+          ROOT_DIR=`pwd`
+          cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
+          sleep 3
+          cat ${ROOT_DIR}/tools/db3.log
           cd java && mvn test
       - name: Run rust test with coverage
         run: |
+          ROOT_DIR=`pwd`
+          cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
+          sleep 3
+          cat ${ROOT_DIR}/tools/db3.log
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:
