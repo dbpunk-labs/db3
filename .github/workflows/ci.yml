@@ -72,13 +72,14 @@ jobs:
           cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
           sleep 3
           cat ${ROOT_DIR}/tools/db3.log
-          cd java && mvn test
+          cd ${ROOT_DIR}/java && mvn test
       - name: Run rust test with coverage
         run: |
           ROOT_DIR=`pwd`
           cd ${ROOT_DIR}/tools && bash start_localnet.sh >db3.log 2>&1 &
           sleep 3
           cat ${ROOT_DIR}/tools/db3.log
+          cd ${ROOT_DIR}
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:
