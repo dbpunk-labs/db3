@@ -171,7 +171,6 @@ impl DBStoreV2 {
                 let key_ref: &[u8] = key.as_ref();
                 let address = DB3Address::try_from(key_ref)?;
                 let address_str = address.to_hex();
-                println!("{address_str}");
                 if let Some(state) = self.recover_from_state(&address).map_err(|e| {
                     DB3Error::ReadStoreError(format!("fail to convert db state with err {e}"))
                 })? {
