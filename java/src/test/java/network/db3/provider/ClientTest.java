@@ -76,7 +76,7 @@ public class ClientTest {
             AddDocResult addDocResult = client.addDoc(result.getDb(), "col1", doc);
             Assert.assertNotNull(addDocResult.getMutationId());
             Thread.sleep(1000 * 3);
-            ResultSet resultSet = client.runQuery(result.getDb(), "col1", "/[name=\"a\"]");
+            ResultSet resultSet = client.runQuery(result.getDb(), "col1", "/[name=1]");
             Assert.assertEquals(1, resultSet.getDocs().size());
         } catch (Exception e) {
             e.printStackTrace();
