@@ -171,6 +171,7 @@ impl DBStoreV2 {
                 let key_ref: &[u8] = key.as_ref();
                 let address = DB3Address::try_from(key_ref)?;
                 let address_str = address.to_hex();
+                println!("{address_str}");
                 if let Some(state) = self.recover_from_state(&address).map_err(|e| {
                     DB3Error::ReadStoreError(format!("fail to convert db state with err {e}"))
                 })? {
@@ -263,18 +264,20 @@ impl DBStoreV2 {
             .se
             .cf_handle(self.config.doc_owner_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
-        let mut it: DBRawIterator = self
-            .se
-            .prefix_iterator_cf(&cf_handle, address.as_ref())
-            .into();
-        it.seek_to_last();
-        if it.valid() {
+        let prefix = DbDocKeyV2::build_prefix(address);
+        let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, &prefix).into();
+        let mut doc_id = 0;
+        while it.valid() {
             if let Some(key) = it.key() {
-                let id = DbDocKeyV2::decode_id(key.as_ref())?;
-                return Ok(Some(id));
+                let key_ref: &[u8] = key.as_ref();
+                if !DbDocKeyV2::is_the_same_db(key_ref, address) {
+                    break;
+                }
+                doc_id = DbDocKeyV2::decode_id(key.as_ref())?;
             }
+            it.next();
         }
-        Ok(None)
+        Ok(Some(doc_id))
     }
 
     fn update_db_state_for_add_db(&self, db_addr: &str) {
@@ -1061,10 +1064,15 @@ mod tests {
             let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 1, 1, 1, 1);
             assert_eq!(result.is_ok(), true);
             let db_id = result.unwrap();
+            let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 2, 2, 2, 2);
+            assert_eq!(result.is_ok(), true);
+            let db_id2 = result.unwrap();
+
             let collection = CollectionMutation {
                 index_fields: vec![],
                 collection_name: "col1".to_string(),
             };
+
             let result = db3_store.create_collection(
                 &DB3Address::ZERO,
                 db_id.address(),
@@ -1074,17 +1082,27 @@ mod tests {
                 1,
             );
             assert!(result.is_ok());
+            let result = db3_store.create_collection(
+                &DB3Address::ZERO,
+                db_id2.address(),
+                &collection,
+                1,
+                1,
+                1,
+            );
+            assert!(result.is_ok());
             let docs = vec!["{\"test\":0}".to_string()];
             address.push(db_id.address().clone());
-            let result = db3_store.add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs);
-            println!("{:?}", result);
-            assert_eq!(result.is_ok(), true);
-            db3_store
-                .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs)
-                .unwrap();
-            db3_store
-                .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs)
-                .unwrap();
+            for _n in 0..1003 {
+                db3_store
+                    .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs)
+                    .unwrap();
+            }
+            for _n in 0..91 {
+                db3_store
+                    .add_docs(db_id2.address(), &DB3Address::ZERO, "col1", &docs)
+                    .unwrap();
+            }
         }
 
         {
@@ -1109,7 +1127,7 @@ mod tests {
             let database_state_ret = db3_store.get_database_state(&address[0]);
             println!("{:?}", database_state_ret);
             let database_state = database_state_ret.unwrap();
-            assert_eq!(database_state.doc_order, 4);
+            assert_eq!(database_state.doc_order, 1004);
         }
     }
 }

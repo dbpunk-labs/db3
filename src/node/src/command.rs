@@ -116,7 +116,7 @@ pub enum DB3Command {
         #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
         admin_addr: String,
         /// this is just for upgrade the node
-        #[clap(long, default_value = "10000")]
+        #[clap(long, default_value = "100000")]
         doc_id_start: i64,
     },
 
@@ -167,6 +167,9 @@ pub enum DB3Command {
         network_id: u64,
         #[clap(short, long)]
         verbose: bool,
+        /// this is just for upgrade the node
+        #[clap(long, default_value = "100000")]
+        doc_id_start: i64,
     },
 
     /// Run db3 client
@@ -326,6 +329,7 @@ impl DB3Command {
                 network_id,
                 verbose,
                 admin_addr,
+                doc_id_start,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -353,7 +357,7 @@ impl DB3Command {
                     scan_max_limit: 1000,
                     enable_doc_store: true,
                     doc_store_conf,
-                    doc_start_id: 0,
+                    doc_start_id: doc_id_start,
                 };
                 let addr = format!("{public_host}:{public_grpc_port}");
                 let indexer = IndexerNodeImpl::new(
@@ -367,7 +371,7 @@ impl DB3Command {
                 )
                 .unwrap();
                 let indexer_for_syncing = indexer.clone();
-                indexer.recover().await.unwrap();
+                if let Err(_e) = indexer.recover().await {}
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
                     indexer_for_syncing

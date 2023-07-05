@@ -32,6 +32,11 @@ impl<'a> DbDocKeyV2<'a> {
         Ok(encoded_key)
     }
 
+    pub fn build_prefix(address: &DB3Address) -> Vec<u8> {
+        let mut encoded_key = DOC_PREFIX.as_bytes().to_vec();
+        encoded_key.extend_from_slice(address.as_ref());
+        encoded_key
+    }
     pub fn decode_id(key: &[u8]) -> Result<i64> {
         if key.len() != KEY_LENGTH {
             return Err(DB3Error::KeyCodecError(
@@ -42,6 +47,10 @@ impl<'a> DbDocKeyV2<'a> {
             <[u8; 8]>::try_from(&key[KEY_LENGTH - 8..KEY_LENGTH])
                 .map_err(|e| DB3Error::KeyCodecError(format!("get doc id err {e}")))?,
         ))
+    }
+
+    pub fn is_the_same_db(key: &[u8], address: &DB3Address) -> bool {
+        &key[DOC_PREFIX.len()..DOC_PREFIX.len() + DB3_ADDRESS_LENGTH] == address.as_ref()
     }
 }
 
