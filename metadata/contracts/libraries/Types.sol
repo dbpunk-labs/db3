@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 library DataTypes {
+
     // the database basic information
     struct Database {
         // generate by the contract
@@ -10,6 +11,8 @@ library DataTypes {
         mapping(string => string) collecions;
         // the database sender can create collection
         address sender;
+	// the description the database
+	string description;
     }
 
     // the data network information
