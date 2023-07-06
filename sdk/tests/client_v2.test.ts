@@ -399,7 +399,7 @@ describe('test db3.js client module', () => {
                     fail('should not reach here')
                 } catch (e) {
                     expect(decodeURI(e.message)).toBe(
-                        'fail to verify the owner with error doc id is not found'
+                        'fail to apply mutation with error fail to verify the owner with error doc id is not found'
                     )
                 }
             }
@@ -469,7 +469,7 @@ describe('test db3.js client module', () => {
                     fail('should not reach here')
                 } catch (e) {
                     expect(decodeURI(e.message)).toBe(
-                        'fail to verify the owner with error doc id is not found'
+                        'fail to apply mutation with error fail to verify the owner with error doc id is not found'
                     )
                 }
             }
@@ -539,8 +539,8 @@ describe('test db3.js client module', () => {
                     await deleteDoc(collection, [docId3.id])
                     fail('should not be here')
                 } catch (e) {
-                    expect(e.message).toBe(
-                        'fail to verify the owner with error doc owner is not the sender'
+                    expect(decodeURI(e.message)).toBe(
+                        'fail to apply mutation with error fail to verify the owner with error doc owner is not the sender'
                     )
                 }
                 // verify docId3 is not deleted
@@ -579,7 +579,7 @@ describe('test db3.js client module', () => {
                     )
                 } catch (e) {
                     expect(decodeURI(e.message)).toBe(
-                        'fail to verify the owner with error doc owner is not the sender'
+                        'fail to apply mutation with error fail to verify the owner with error doc owner is not the sender'
                     )
                 }
                 // verify docId2 is not updated
