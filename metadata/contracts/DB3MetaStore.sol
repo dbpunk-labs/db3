@@ -5,7 +5,6 @@ import "./interfaces/IDB3MetaStore.sol";
 contract DB3MetaStore is IDB3MetaStore {
     // Mapping to store registration info for all registered networks
     mapping(uint64 => NetworkRegistration) private networkRegistrations;
-
     // Counter to keep track of number of registered networks
     uint256 private numNetworks;
 
