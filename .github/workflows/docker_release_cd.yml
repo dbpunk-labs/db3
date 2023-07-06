@@ -33,7 +33,7 @@ jobs:
           cd ${ROOT_DIR} && cargo build --release
           cp ${ROOT_DIR}/target/release/db3 ${ROOT_DIR}/docker/
       - name: docker login
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
