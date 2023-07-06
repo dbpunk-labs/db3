@@ -203,6 +203,7 @@ mod tests {
             scan_max_limit: 50,
             enable_doc_store: false,
             doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 1000,
         };
 
         let recover = Recover::new(RecoverConfig {
