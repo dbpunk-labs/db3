@@ -23,7 +23,6 @@ db3-base={path="../base", version="0.1.0"}
 db3-error={path="../error", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
 db3-sdk={path="../sdk", version="0.1.0"}
-db3-session={path="../session", version="0.1.0"}
 db3-event={path="../event", version="0.1.0"}
 ethers = { workspace = true }
 tonic = { workspace = true }
@@ -35,7 +34,6 @@ signature = { version = "2"}
 hex = "0.4.3"
 rand = "0.8.5"
 rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["recovery", "rand-std", "bitcoin_hashes", "global-context"] }
-merkdb = {version= "2.0.0", path = "../../thirdparty/merkdb"}
 ethereum-types = { version = "0.14.0", default-features = false }
 tempdir = "0.3.7"
 serde_json = { workspace=true}

@@ -31,7 +31,6 @@ use db3_proto::db3_indexer_proto::{
     GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
-use db3_proto::db3_mutation_v2_proto::EventDatabaseMutation;
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
 use db3_proto::db3_storage_proto::event_message;
@@ -83,6 +82,33 @@ impl IndexerNodeImpl {
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
             admin_addr,
         })
+    }
+
+    pub async fn recover(&self) -> Result<()> {
+        self.db_store.recover_db_state()?;
+        let databases = self.db_store.get_all_event_db()?;
+        for database in databases {
+            let address_ref: &[u8] = database.address.as_ref();
+            let db_address = DB3Address::try_from(address_ref)?;
+            let (collections, _) = self.db_store.get_collection_of_database(&db_address)?;
+            let tables = collections.iter().map(|c| c.name.to_string()).collect();
+            if let Err(_e) = self
+                .start_an_event_task(
+                    &db_address,
+                    database.evm_node_url.as_str(),
+                    database.events_json_abi.as_str(),
+                    &tables,
+                    database.contract_address.as_str(),
+                    0,
+                )
+                .await
+            {
+                info!("recover the event db {} has error", db_address.to_hex());
+            } else {
+                info!("recover the event db {} done", db_address.to_hex());
+            }
+        }
+        Ok(())
     }
 
     /// start standalone indexer block syncer
@@ -160,18 +186,19 @@ impl IndexerNodeImpl {
     async fn start_an_event_task(
         &self,
         db: &DB3Address,
-        mutation: &EventDatabaseMutation,
+        evm_node_url: &str,
+        abi: &str,
+        tables: &Vec<String>,
+        contract_address: &str,
+        start_block: u64,
     ) -> Result<()> {
         let config = EventProcessorConfig {
-            evm_node_url: mutation.evm_node_url.to_string(),
+            evm_node_url: evm_node_url.to_string(),
             db_addr: db.to_hex(),
-            abi: mutation.events_json_abi.to_string(),
-            target_events: mutation
-                .tables
-                .iter()
-                .map(|t| t.collection_name.to_string())
-                .collect(),
-            contract_addr: mutation.contract_address.to_string(),
+            abi: abi.to_string(),
+            target_events: tables.iter().map(|t| t.to_string()).collect(),
+            contract_addr: contract_address.to_string(),
+            start_block,
         };
         let processor = Arc::new(
             EventProcessor::new(config, self.db_store.clone())
@@ -181,14 +208,14 @@ impl IndexerNodeImpl {
         match self.processor_mapping.lock() {
             Ok(mut mapping) => {
                 //TODO limit the total count
-                if mapping.contains_key(mutation.contract_address.as_str()) {
-                    warn!("contract addr {} exist", mutation.contract_address.as_str());
+                if mapping.contains_key(contract_address) {
+                    warn!("contract addr {} exist", contract_address);
                     return Err(DB3Error::WriteStoreError(format!(
                         "contract_addr {} exist",
-                        mutation.contract_address.as_str()
+                        contract_address
                     )));
                 }
-                mapping.insert(mutation.contract_address.to_string(), processor.clone());
+                mapping.insert(contract_address.to_string(), processor.clone());
             }
             _ => todo!(),
         }
@@ -237,9 +264,21 @@ impl IndexerNodeImpl {
                                     order,
                                 )
                                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            self.start_an_event_task(db_id.address(), mutation)
-                                .await
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+                            let tables = mutation
+                                .tables
+                                .iter()
+                                .map(|t| t.collection_name.to_string())
+                                .collect();
+                            self.start_an_event_task(
+                                db_id.address(),
+                                mutation.evm_node_url.as_str(),
+                                mutation.events_json_abi.as_str(),
+                                &tables,
+                                mutation.contract_address.as_str(),
+                                mutation.start_block,
+                            )
+                            .await
+                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                             let db_id_hex = db_id.to_hex();
                             info!(
                                 "add event database with addr {} from owner {}",

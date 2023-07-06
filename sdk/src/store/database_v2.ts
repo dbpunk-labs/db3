@@ -56,7 +56,8 @@ export async function createEventDatabase(
     contractAddress: string,
     tables: string[],
     abi: string,
-    evmNodeUrl: string
+    evmNodeUrl: string,
+    startBlock: string
 ) {
     const collections = tables.map((name) => {
         const collection: CollectionMutation = {
@@ -73,6 +74,7 @@ export async function createEventDatabase(
         tables: collections,
         eventsJsonAbi: abi,
         evmNodeUrl,
+        startBlock,
     }
     const body: Mutation_BodyWrapper = {
         body: {

@@ -28,7 +28,6 @@ jobs:
                   toolchain: ${{ matrix.rust }}
                   profile: minimal
                   override: true
-
             - uses: Swatinem/rust-cache@v2
             - name: Setup build env
               run: |
@@ -41,7 +40,6 @@ jobs:
                   if [[ ${{ matrix.job.target }} == x86_64-apple-darwin ]]; then
                     brew install protobuf
                   fi
-
             - name: Cargo build
               uses: actions-rs/cargo@v1
               with:
@@ -70,8 +68,5 @@ jobs:
                   files: |
                       target/${{ matrix.job.target }}/release/db3*.tar.gz
                       target/${{ matrix.job.target }}/release/db3*.sha256
-                      tools/db3up
-                      config/devnet/genesis.json
               env:
                   GITHUB_TOKEN: ${{ secrets.CR_PAT }}
-

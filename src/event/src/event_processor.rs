@@ -38,6 +38,7 @@ pub struct EventProcessorConfig {
     pub abi: String,
     pub target_events: HashSet<String>,
     pub contract_addr: String,
+    pub start_block: u64,
 }
 
 pub struct EventProcessor {
@@ -100,7 +101,18 @@ impl EventProcessor {
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         let db_addr = DB3Address::from_hex(self.config.db_addr.as_str())
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        let filter = Filter::new().address(address);
+        let filter = match self.config.start_block == 0 {
+            true => Filter::new().address(address),
+            false => {
+                info!(
+                    "start process contract from block {} with address {}",
+                    self.config.start_block, self.config.contract_addr
+                );
+                Filter::new()
+                    .from_block(self.config.start_block)
+                    .address(address)
+            }
+        };
         let mut stream = self
             .provider
             .subscribe_logs(&filter)
@@ -193,7 +205,15 @@ impl EventProcessor {
             Token::Uint(value) | Token::Int(value) => {
                 serde_json::value::Value::String(value.to_string())
             }
-            _ => todo!(),
+            Token::FixedBytes(bytes) | Token::Bytes(bytes) => {
+                serde_json::value::Value::String(hex::encode(bytes))
+            }
+            Token::Bool(value) => serde_json::value::Value::Bool(*value),
+            Token::Array(tokens) | Token::FixedArray(tokens) | Token::Tuple(tokens) => {
+                serde_json::value::Value::Array(
+                    tokens.iter().map(|t| Self::param_to_value(t)).collect(),
+                )
+            }
         }
     }
 }

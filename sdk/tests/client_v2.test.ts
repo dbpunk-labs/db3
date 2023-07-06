@@ -137,7 +137,8 @@ describe('test db3.js client module', () => {
             '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
             ['Transfer', 'Deposit', 'Approval', 'Withdrawal'],
             abi,
-            evmNodeUrl
+            evmNodeUrl,
+            0
         )
         console.log(response)
         await new Promise((r) => setTimeout(r, 10000))
@@ -496,14 +497,12 @@ describe('test db3.js client module', () => {
                     [index]
                 )
                 const collection2 = await getCollection(db.addr, 'col', client2)
-
                 await new Promise((r) => setTimeout(r, 3000))
                 const docId2 = await addDoc(collection, {
                     city: 'beijing',
                     author: 'imotai',
                     age: 10,
                 })
-
                 const docId3 = await addDoc(collection2, {
                     city: 'beijing2',
                     author: 'imotai1',
@@ -522,6 +521,7 @@ describe('test db3.js client module', () => {
                     expect(resultSet.docs[0].doc.age).toBe(10)
                     expect(resultSet.docs[0].id).toBe(docId2.id)
                 }
+
                 {
                     const queryStr = '/[city = beijing]'
                     const resultSet = await queryDoc<Profile>(

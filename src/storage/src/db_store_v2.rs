@@ -28,7 +28,8 @@ use db3_crypto::id_v2::OpEntryId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
     database_message, Collection, CollectionState as CollectionStateProto, DatabaseMessage,
-    DatabaseState as DatabaseStateProto, Document, DocumentDatabase, EventDatabase, Query,
+    DatabaseState as DatabaseStateProto, DatabaseStatePersistence, Document, DocumentDatabase,
+    EventDatabase, Query,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::{
@@ -60,6 +61,7 @@ pub struct DBStoreV2Config {
     pub scan_max_limit: usize,
     pub enable_doc_store: bool,
     pub doc_store_conf: DocStoreConfig,
+    pub doc_start_id: i64,
 }
 
 #[derive(Clone)]
@@ -119,8 +121,166 @@ impl DBStoreV2 {
             db_state: Arc::new(CHashMap::new()),
         })
     }
+    pub fn flush(&self) -> Result<()> {
+        self.se
+            .flush()
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))
+    }
 
-    pub fn flush_state(&self) {}
+    pub fn get_all_event_db(&self) -> Result<Vec<EventDatabase>> {
+        let cf_handle = self
+            .se
+            .cf_handle(self.config.db_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&cf_handle);
+        it.seek_to_first();
+        let mut databases: Vec<EventDatabase> = Vec::new();
+        loop {
+            if !it.valid() {
+                break;
+            }
+            if let Some(value) = it.value() {
+                match DatabaseMessage::decode(value.as_ref()) {
+                    Ok(c) => {
+                        if let Some(database_message::Database::EventDb(db)) = c.database {
+                            databases.push(db)
+                        }
+                    }
+                    Err(e) => return Err(DB3Error::ReadStoreError(format!("{e}"))),
+                }
+            }
+            it.next();
+        }
+        Ok(databases)
+    }
+
+    ///
+    /// execute the function before exposing rpc service
+    ///
+    pub fn recover_db_state(&self) -> Result<()> {
+        // recover states
+        let cf_handle = self
+            .se
+            .cf_handle(self.config.db_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&cf_handle);
+        it.seek_to_first();
+        loop {
+            if !it.valid() {
+                break;
+            }
+            if let Some(key) = it.key() {
+                let key_ref: &[u8] = key.as_ref();
+                let address = DB3Address::try_from(key_ref)?;
+                let address_str = address.to_hex();
+                if let Some(state) = self.recover_from_state(&address).map_err(|e| {
+                    DB3Error::ReadStoreError(format!("fail to convert db state with err {e}"))
+                })? {
+                    info!(
+                        "recover db {} with doc order {} and total doc count {} from local state",
+                        address_str.as_str(),
+                        state.doc_order,
+                        state.total_doc_count
+                    );
+                    let collection_state: HashMap<String, CollectionState> = state
+                        .collection_states
+                        .iter()
+                        .map(|item| {
+                            (
+                                item.0.to_string(),
+                                CollectionState {
+                                    total_doc_count: item.1.total_doc_count,
+                                },
+                            )
+                        })
+                        .collect();
+                    self.db_state.insert(
+                        address_str,
+                        DatabaseState {
+                            doc_order: state.doc_order,
+                            collection_state,
+                            total_doc_count: state.total_col_count,
+                        },
+                    );
+                } else {
+                    let collections = self.get_entries_with_prefix::<Collection>(
+                        address.as_ref(),
+                        self.config.collection_store_cf_name.as_str(),
+                    )?;
+
+                    let collection_state: HashMap<String, CollectionState> = collections
+                        .iter()
+                        .map(|item| {
+                            (
+                                item.name.to_string(),
+                                CollectionState { total_doc_count: 0 },
+                            )
+                        })
+                        .collect();
+
+                    // try recover from doc ownership
+                    if let Some(doc_order) = self.recover_db_doc_id(&address)? {
+                        info!(
+                            "recover db {} with doc order {} from doc owner store",
+                            address_str.as_str(),
+                            doc_order
+                        );
+                        self.db_state.insert(
+                            address_str,
+                            DatabaseState {
+                                doc_order: doc_order + 1,
+                                collection_state,
+                                total_doc_count: 0,
+                            },
+                        );
+                    } else {
+                        // fail back the doc id config
+                        info!(
+                            "recover db {} with doc order {}",
+                            address_str.as_str(),
+                            self.config.doc_start_id
+                        );
+                        self.db_state.insert(
+                            address_str,
+                            DatabaseState {
+                                doc_order: self.config.doc_start_id,
+                                collection_state,
+                                total_doc_count: 0,
+                            },
+                        );
+                    }
+                }
+            }
+            it.next();
+        }
+        Ok(())
+    }
+
+    fn recover_from_state(&self, address: &DB3Address) -> Result<Option<DatabaseStatePersistence>> {
+        self.get_entry::<DatabaseStatePersistence>(STATE_CF, address.as_ref())
+    }
+
+    fn recover_db_doc_id(&self, address: &DB3Address) -> Result<Option<i64>> {
+        let cf_handle = self
+            .se
+            .cf_handle(self.config.doc_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let prefix = DbDocKeyV2::build_prefix(address);
+        let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, &prefix).into();
+        let mut doc_id = 0;
+        while it.valid() {
+            if let Some(key) = it.key() {
+                let key_ref: &[u8] = key.as_ref();
+                if !DbDocKeyV2::is_the_same_db(key_ref, address) {
+                    break;
+                }
+                doc_id = DbDocKeyV2::decode_id(key.as_ref())?;
+            }
+            it.next();
+        }
+        Ok(Some(doc_id))
+    }
+
     fn update_db_state_for_add_db(&self, db_addr: &str) {
         self.db_state.insert(
             db_addr.to_string(),
@@ -378,6 +538,7 @@ impl DBStoreV2 {
             Some(DatabaseStateProto {
                 total_doc_count: database_state.total_doc_count,
                 total_col_count: database_state.collection_state.len() as u64,
+                doc_order: database_state.doc_order,
             })
         } else {
             None
@@ -414,9 +575,10 @@ impl DBStoreV2 {
         query: &Query,
     ) -> Result<(Vec<Document>, u64)> {
         if !self.is_db_collection_exist(db_addr, col_name)? {
-            return Err(DB3Error::ReadStoreError(
-                "collection name {col_name} does not exist".to_string(),
-            ));
+            return Err(DB3Error::ReadStoreError(format!(
+                "collection {col_name} does not exist in db {}",
+                db_addr.to_hex().as_str()
+            )));
         }
         if self.config.enable_doc_store {
             let (result, count) = self.doc_store.execute_query(db_addr, col_name, query)?;
@@ -623,6 +785,7 @@ impl DBStoreV2 {
             ttl: mutation.ttl,
             events_json_abi: mutation.events_json_abi.to_string(),
             evm_node_url: mutation.evm_node_url.to_string(),
+            start_block: mutation.start_block,
         };
         let database_msg = DatabaseMessage {
             database: Some(database_message::Database::EventDb(database)),
@@ -924,6 +1087,7 @@ mod tests {
             scan_max_limit: 50,
             enable_doc_store: false,
             doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 1000,
         };
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
@@ -943,6 +1107,7 @@ mod tests {
             scan_max_limit: 50,
             enable_doc_store: false,
             doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 1000,
         };
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
@@ -1000,6 +1165,7 @@ mod tests {
             scan_max_limit: 50,
             enable_doc_store: false,
             doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 1000,
         };
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
@@ -1046,6 +1212,7 @@ mod tests {
             scan_max_limit: 50,
             enable_doc_store: false,
             doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 1000,
         };
         let result = DBStoreV2::new(config);
         assert_eq!(result.is_ok(), true);
@@ -1058,11 +1225,105 @@ mod tests {
         let db_id_1 = result.unwrap();
         let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 2, 1, 2, 1);
         assert!(result.is_ok());
-        let db_id_2 = result.unwrap();
-
         let result = db3_store
             .update_db_state_for_add_docs(&db_id_1.address().to_hex(), "col1", 3)
             .unwrap();
         assert_eq!(result, Some(vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn test_recover_db_state() {
+        let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let mut address: Vec<DB3Address> = Vec::new();
+
+        {
+            let config = DBStoreV2Config {
+                db_path: real_path.to_string(),
+                db_store_cf_name: "db".to_string(),
+                doc_store_cf_name: "doc".to_string(),
+                collection_store_cf_name: "cf2".to_string(),
+                index_store_cf_name: "index".to_string(),
+                doc_owner_store_cf_name: "doc_owner".to_string(),
+                db_owner_store_cf_name: "db_owner".to_string(),
+                scan_max_limit: 50,
+                enable_doc_store: false,
+                doc_store_conf: DocStoreConfig::default(),
+                doc_start_id: 1000,
+            };
+            let result = DBStoreV2::new(config);
+            assert_eq!(result.is_ok(), true);
+            let db_m = DocumentDatabaseMutation {
+                db_desc: "test_desc".to_string(),
+            };
+            let db3_store = result.unwrap();
+            let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 1, 1, 1, 1);
+            assert_eq!(result.is_ok(), true);
+            let db_id = result.unwrap();
+            let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 2, 2, 2, 2);
+            assert_eq!(result.is_ok(), true);
+            let db_id2 = result.unwrap();
+
+            let collection = CollectionMutation {
+                index_fields: vec![],
+                collection_name: "col1".to_string(),
+            };
+
+            let result = db3_store.create_collection(
+                &DB3Address::ZERO,
+                db_id.address(),
+                &collection,
+                1,
+                1,
+                1,
+            );
+            assert!(result.is_ok());
+            let result = db3_store.create_collection(
+                &DB3Address::ZERO,
+                db_id2.address(),
+                &collection,
+                1,
+                1,
+                1,
+            );
+            assert!(result.is_ok());
+            let docs = vec!["{\"test\":0}".to_string()];
+            address.push(db_id.address().clone());
+            for _n in 0..1003 {
+                db3_store
+                    .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs)
+                    .unwrap();
+            }
+            for _n in 0..91 {
+                db3_store
+                    .add_docs(db_id2.address(), &DB3Address::ZERO, "col1", &docs)
+                    .unwrap();
+            }
+        }
+
+        {
+            let config = DBStoreV2Config {
+                db_path: real_path,
+                db_store_cf_name: "db".to_string(),
+                doc_store_cf_name: "doc".to_string(),
+                collection_store_cf_name: "cf2".to_string(),
+                index_store_cf_name: "index".to_string(),
+                doc_owner_store_cf_name: "doc_owner".to_string(),
+                db_owner_store_cf_name: "db_owner".to_string(),
+                scan_max_limit: 50,
+                enable_doc_store: false,
+                doc_store_conf: DocStoreConfig::default(),
+                doc_start_id: 1000,
+            };
+            let result = DBStoreV2::new(config);
+            let db3_store = result.unwrap();
+            let result = db3_store.recover_db_state();
+            println!("{:?}", result);
+            assert_eq!(result.is_ok(), true);
+            let database_state_ret = db3_store.get_database_state(&address[0]);
+            println!("{:?}", database_state_ret);
+            let database_state = database_state_ret.unwrap();
+            assert_eq!(database_state.doc_order, 1004);
+        }
     }
 }

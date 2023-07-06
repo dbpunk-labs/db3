@@ -15,9 +15,7 @@ db3-error={ path = "../error" }
 db3-types={ path = "../types" }
 db3-crypto={ path = "../crypto" }
 tracing = "0.1"
-merkdb = {version= "2.0.0", path = "../../thirdparty/merkdb"}
 fastcrypto = { workspace = true, features = ["copy_key"] }
-redb = "0.21.0"
 hex = "0.4.3"
 bytes = "1"
 prost = "0.11"

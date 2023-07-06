@@ -55,7 +55,7 @@ message GetNonceResponse {
 
 message SubscribeRequest {
   // a hex signature string
-  bytes signature = 1;
+  string signature = 1;
   // the payload of topic
   bytes payload = 2;
 }
