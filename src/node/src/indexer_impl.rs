@@ -92,16 +92,21 @@ impl IndexerNodeImpl {
             let db_address = DB3Address::try_from(address_ref)?;
             let (collections, _) = self.db_store.get_collection_of_database(&db_address)?;
             let tables = collections.iter().map(|c| c.name.to_string()).collect();
-            self.start_an_event_task(
-                &db_address,
-                database.evm_node_url.as_str(),
-                database.events_json_abi.as_str(),
-                &tables,
-                database.contract_address.as_str(),
-                0,
-            )
-            .await?;
-            info!("recover the event db {} done", db_address.to_hex());
+            if let Err(_e) = self
+                .start_an_event_task(
+                    &db_address,
+                    database.evm_node_url.as_str(),
+                    database.events_json_abi.as_str(),
+                    &tables,
+                    database.contract_address.as_str(),
+                    0,
+                )
+                .await
+            {
+                info!("recover the event db {} has error", db_address.to_hex());
+            } else {
+                info!("recover the event db {} done", db_address.to_hex());
+            }
         }
         Ok(())
     }

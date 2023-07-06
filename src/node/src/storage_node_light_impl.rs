@@ -21,7 +21,6 @@ use crate::version_util;
 use db3_base::bson_util::bytes_to_bson_document;
 use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
-use db3_crypto::db3_verifier::DB3Verifier;
 use db3_crypto::id::TxId;
 use db3_error::Result;
 use db3_proto::db3_base_proto::{SystemConfig, SystemStatus};
@@ -41,6 +40,7 @@ use db3_proto::db3_storage_proto::{
     ScanRollupRecordResponse, SendMutationRequest, SendMutationResponse, SetupRequest,
     SetupResponse, SubscribeRequest,
 };
+use ethers::core::types::Bytes as EthersBytes;
 use ethers::types::U256;
 
 use db3_proto::db3_storage_proto::{
@@ -440,27 +440,36 @@ impl StorageNode for StorageNodeV2Impl {
         &self,
         request: Request<SubscribeRequest>,
     ) -> std::result::Result<Response<Self::SubscribeStream>, Status> {
-        info!("receive subscribe request");
         let r = request.into_inner();
+        if r.payload.len() == 0 || r.signature.len() == 0 {
+            return Err(Status::invalid_argument("the payload or signature is null"));
+        }
         let sender = self.sender.clone();
-        info!("sender is close: {}", sender.is_closed());
-        let account_id = DB3Verifier::verify(r.payload.as_ref(), r.signature.as_ref())
-            .map_err(|e| Status::internal(format!("bad signature for {e}")))?;
-        let payload = SubscriptionV2::decode(r.payload.as_ref()).map_err(|e| {
-            Status::internal(format!("fail to decode open session request for {e} "))
-        })?;
-        info!(
-            "add subscriber for addr 0x{}",
-            hex::encode(account_id.addr.as_ref())
-        );
-        info!("payload {:?}", payload);
-        info!("sender {:?}", sender);
-        let (msg_sender, msg_receiver) =
-            tokio::sync::mpsc::channel::<std::result::Result<EventMessageV2, Status>>(10);
-        sender
-            .try_send((account_id.addr, payload, msg_sender))
-            .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
-        Ok(Response::new(ReceiverStream::new(msg_receiver)))
+        let (address, data) = MutationUtil::verify_setup(r.payload.as_ref(), r.signature.as_str())
+            .map_err(|e| Status::invalid_argument(format!("invalid signature with error {e}")))?;
+        if let Some(payload) = data.message.get("payload") {
+            let db3_address = DB3Address::from(address.as_fixed_bytes());
+            let data: EthersBytes = serde_json::from_value(payload.clone()).map_err(|e| {
+                Status::invalid_argument(format!("decode the payload failed for error {e}"))
+            })?;
+            let subscription = SubscriptionV2::decode(data.as_ref()).map_err(|e| {
+                Status::invalid_argument(format!("decode the data to object failed for error {e}"))
+            })?;
+            info!(
+                "add subscriber for addr 0x{}",
+                hex::encode(address.as_ref())
+            );
+            let (msg_sender, msg_receiver) =
+                tokio::sync::mpsc::channel::<std::result::Result<EventMessageV2, Status>>(10);
+            sender
+                .try_send((db3_address, subscription, msg_sender))
+                .map_err(|e| Status::internal(format!("fail to add subscriber for {e}")))?;
+            Ok(Response::new(ReceiverStream::new(msg_receiver)))
+        } else {
+            Err(Status::invalid_argument(
+                "payload was not found from the message".to_string(),
+            ))
+        }
     }
 
     async fn get_block(

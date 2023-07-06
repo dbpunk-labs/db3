@@ -497,14 +497,12 @@ describe('test db3.js client module', () => {
                     [index]
                 )
                 const collection2 = await getCollection(db.addr, 'col', client2)
-
                 await new Promise((r) => setTimeout(r, 3000))
                 const docId2 = await addDoc(collection, {
                     city: 'beijing',
                     author: 'imotai',
                     age: 10,
                 })
-
                 const docId3 = await addDoc(collection2, {
                     city: 'beijing2',
                     author: 'imotai1',
@@ -523,6 +521,7 @@ describe('test db3.js client module', () => {
                     expect(resultSet.docs[0].doc.age).toBe(10)
                     expect(resultSet.docs[0].id).toBe(docId2.id)
                 }
+
                 {
                     const queryStr = '/[city = beijing]'
                     const resultSet = await queryDoc<Profile>(
@@ -540,7 +539,7 @@ describe('test db3.js client module', () => {
                     await deleteDoc(collection, [docId3.id])
                     fail('should not be here')
                 } catch (e) {
-                    expect(decodeURI(e.message)).toBe(
+                    expect(e.message).toBe(
                         'fail to verify the owner with error doc owner is not the sender'
                     )
                 }
