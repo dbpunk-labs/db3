@@ -34,8 +34,6 @@ library Types {
         bytes32 latestArweaveTx;
         // the latest rollup time used track the network activty
         uint256 latestRollupTime;
-        // the all database
-        mapping(address => Database) databases;
         // the description of the data network
         bytes32 description;
     }

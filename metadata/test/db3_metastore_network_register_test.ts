@@ -26,7 +26,9 @@ describe("DB3MetaStore", function () {
                     [sender.address, deployer.address],
                     hello
                 )).to.emit(eventLibABI, "CreateNetwork").withArgs(deployer.address, 1);
-            expect(await metaStore.getDataNetworkAdmin(1)).to.equal(deployer.address);
+            const dataNetwork = await metaStore.getDataNetwork(1);
+            expect(deployer.address).to.equal(dataNetwork.admin);
+            expect(deployer.address).to.equal(dataNetwork.rollupNodeAddress);
         });
     });
 });

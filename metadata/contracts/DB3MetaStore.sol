@@ -6,11 +6,12 @@ import {Events} from "./libraries/Events.sol";
 
 contract DB3MetaStore is IDB3MetaStore {
     // A map to store all data network information
-    mapping(uint256 => Types.DataNetwork) private dataNetworks;
+    mapping(uint256 => Types.DataNetwork) private _dataNetworks;
+    mapping(uint256 => mapping(address=> Types.Database)) private _databases;
     // Counter to keep track of number of data networks
-    uint256 private networkCounter;
+    uint256 private _networkCounter;
     // Counter to keep track of number of database
-    uint256 private databaseCounter;
+    uint256 private _databaseCounter;
 
     function registerDataNetwork(
         string memory rollupNodeUrl,
@@ -26,10 +27,9 @@ contract DB3MetaStore is IDB3MetaStore {
             rollupNodeAddress != address(0),
             "Invalid rollupNodeAddress address"
         );
-
-        networkCounter++;
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkCounter];
-        dataNetwork.id = networkCounter;
+        _networkCounter++;
+        Types.DataNetwork storage dataNetwork = _dataNetworks[_networkCounter];
+        dataNetwork.id = _networkCounter;
         dataNetwork.rollupNodeUrl = rollupNodeUrl;
         dataNetwork.rollupNodeAddress = rollupNodeAddress;
         dataNetwork.admin = msg.sender;
@@ -37,7 +37,7 @@ contract DB3MetaStore is IDB3MetaStore {
         dataNetwork.indexNodeAddresses = indexNodeAddresses;
         dataNetwork.description = description;
         // emit a create network event
-        emit Events.CreateNetwork(msg.sender, networkCounter);
+        emit Events.CreateNetwork(msg.sender, _networkCounter);
     }
 
     function updateIndexNodes(
@@ -46,9 +46,8 @@ contract DB3MetaStore is IDB3MetaStore {
         address[] memory indexNodeAddresses
     ) public {
         // Check the network must be registered
-        require(networkId <= networkCounter, "Network is not registered");
-
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
+        require(networkId <= _networkCounter, "Network is not registered");
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
         // Check permission
         require(msg.sender == dataNetwork.admin, "you are not the admin");
         dataNetwork.indexNodeUrls = indexNodeUrls;
@@ -61,28 +60,16 @@ contract DB3MetaStore is IDB3MetaStore {
         );
     }
 
-    function getDataNetworkAdmin(
+    function getDataNetwork(
         uint256 networkId
-    ) external view returns (address) {
+    ) external view returns (Types.DataNetwork memory dataNetwork) {
         // Check the data network must be registered
-        require(networkId <= networkCounter, "Data Network is not registered");
+        require(networkId <= _networkCounter, "Data Network is not registered");
         // Get data network struct
-        return dataNetworks[networkId].admin;
+        dataNetwork = _dataNetworks[networkId];
+        return dataNetwork;
     }
 
-    function getRullupStatus(
-        uint256 networkId
-    ) external view returns (address, string memory, bytes32, uint256) {
-        // Check the data network must be registered
-        require(networkId <= networkCounter, "Data Network is not registered");
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
-        return (
-            dataNetwork.rollupNodeAddress,
-            dataNetwork.rollupNodeUrl,
-            dataNetwork.latestArweaveTx,
-            dataNetwork.latestRollupTime
-        );
-    }
 
     // Register a new Rollup node for a specific network ID
     function updateRollupNode(
@@ -91,7 +78,7 @@ contract DB3MetaStore is IDB3MetaStore {
         address rollupNodeAddress
     ) public {
         // Check the data network must be registered
-        require(networkId <= networkCounter, "Data Network is not registered");
+        require(networkId <= _networkCounter, "Data Network is not registered");
 
         // Check if rollupNodeUrl is not empty
         require(
@@ -100,7 +87,7 @@ contract DB3MetaStore is IDB3MetaStore {
         );
 
         // Check if network is registered
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
         // check the permission
         require(msg.sender == dataNetwork.admin, "you are not the admin");
         // Update Rollup node url
@@ -123,9 +110,9 @@ contract DB3MetaStore is IDB3MetaStore {
         // Check the latestarweavetx
         require(latestArweaveTx != bytes32(0), "Invalid arweave tx");
         // Check if network is registered
-        require(networkId <= networkCounter, "Data Network is not registered");
+        require(networkId <= _networkCounter, "Data Network is not registered");
 
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
 
         // Check the rollup permission
         require(
@@ -141,20 +128,19 @@ contract DB3MetaStore is IDB3MetaStore {
 
     function createDocDatabase(uint256 networkId, bytes32 description) public {
         // Check if network is registered
-        require(networkId <= networkCounter, "Data Network is not registered");
+        require(networkId <= _networkCounter, "Data Network is not registered");
         // Everyone can create a database currently
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
-        databaseCounter++;
+        _databaseCounter++;
         address db = address(
             uint160(
                 bytes20(
                     keccak256(
-                        abi.encodePacked(networkId, databaseCounter, msg.sender)
+                        abi.encodePacked(networkId, _databaseCounter, msg.sender)
                     )
                 )
             )
         );
-        Types.Database storage database = dataNetwork.databases[db];
+        Types.Database storage database = _databases[networkId][db];
         require(database.sender == address(0), "the must be a new database");
         database.sender = msg.sender;
         database.db = db;
@@ -169,10 +155,9 @@ contract DB3MetaStore is IDB3MetaStore {
         bytes32 name
     ) public {
         // Check if network is registered
-        require(networkId <= networkCounter, "Data Network is not registered");
+        require(networkId <= _networkCounter, "Data Network is not registered");
         // Everyone can create a database currently
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
-        Types.Database storage database = dataNetwork.databases[db];
+        Types.Database storage database = _databases[networkId][db];
         // Check the permission
         require(database.sender == msg.sender, "You must the database sender");
         bool created = database.collecions[name];
@@ -186,8 +171,8 @@ contract DB3MetaStore is IDB3MetaStore {
 
     function transferNetwork(uint256 networkId, address to) public {
         // Check if network is registered
-        require(networkId <= networkCounter, "Data Network is not registered");
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
         // Check the transfer permission
         require(
             msg.sender == dataNetwork.admin,
@@ -203,11 +188,11 @@ contract DB3MetaStore is IDB3MetaStore {
         address to
     ) public {
         // Check if network is registered
-        require(networkId <= networkCounter, "Data Network is not registered");
-        Types.DataNetwork storage dataNetwork = dataNetworks[networkId];
-        Types.Database storage database = dataNetwork.databases[db];
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        Types.Database storage database = _databases[networkId][db];
         require(database.sender == msg.sender, "You must the database sender");
         database.sender = to;
         emit Events.TransferDatabase(msg.sender, networkId, db, to);
     }
+
 }
