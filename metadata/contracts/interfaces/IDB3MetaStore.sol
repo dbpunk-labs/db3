@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import "../Types.sol";
+import {Types} from "../libraries/Types.sol";
 
 /**
  *
@@ -22,7 +22,8 @@ interface IDB3MetaStore {
         string memory rollupNodeUrl,
         address rollupNodeAddress,
         string[] memory indexNodeUrls,
-        address[] memory indexNodeAddresses
+        address[] memory indexNodeAddresses,
+        bytes32 description
     ) external;
 
     /**
@@ -32,7 +33,7 @@ interface IDB3MetaStore {
      * @param indexNodeAddresses The evm addresses of data index nodes
      */
     function updateIndexNodes(
-        uint64 networkId,
+        uint256 networkId,
         string[] memory indexNodeUrls,
         address[] memory indexNodeAddresses
     ) external;
@@ -41,20 +42,26 @@ interface IDB3MetaStore {
      * get the data network by network id
      * @param id The id of your data network
      */
-    function getDataNetwork(
-        uint64 id
-    ) external view returns (DataNetwork memory);
+    function getDataNetworkAdmin(uint256 id) external view returns (address);
+
+    /**
+     * get the rollup status of network
+     * @param id The id of your data network
+     */
+    function getRullupStatus(
+        uint256 id
+    ) external view returns (address, string memory, bytes32, uint256);
 
     /**
      * update the data rollup node config
      * @param id                  The id of your data network
-     * @param rollupNodeUrls      The url of data rollup node
-     * @param rollupNodeAddresses The evm addresses of data rollup node
+     * @param rollupNodeUrl       The url of data rollup node
+     * @param rollupNodeAddress   The evm addresses of data rollup node
      */
     function updateRollupNode(
-        uint64 id,
+        uint256 id,
         string memory rollupNodeUrl,
-        address memory rollupNodeAddress
+        address rollupNodeAddress
     ) external;
 
     /**
@@ -62,14 +69,35 @@ interface IDB3MetaStore {
      * @param id                  The id of your data network
      * @param latestArweaveTx     The latest arweave transaction id
      */
-    function updateRollupSteps(
-        uint64 id,
-        bytes memory latestArweaveTx
-    ) external;
+    function updateRollupSteps(uint256 id, bytes32 latestArweaveTx) external;
 
     /**
      * create a document database
-     * @param id                  The id of your data network
+     * @param id                 The id of your data network
+     & @param description        The description of database
      */
-    function createDocDatabase(uint64 id) external;
+    function createDocDatabase(uint256 id, bytes32 description) external;
+
+    /**
+     * create a document collection
+     * @param id                 The id of your data network
+     & @param db                 The address of database
+     & @param name               The name of collection
+     */
+    function createCollection(uint256 id, address db, bytes32 name) external;
+
+    /**
+     * transfer the data network to a new admin
+     * @param id                 The id of your data network
+     & @param to                 The address of new admin
+     */
+    function transferNetwork(uint256 id, address to) external;
+
+    /**
+     * transfer the data database to a maintainer
+     * @param id                 The id of your data network
+     * @param db                 The address of database
+     & @param to                 The address of maintainer
+     */
+    function transferDatabase(uint256 id, address db, address to) external;
 }

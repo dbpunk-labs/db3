@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-library DataTypes {
-
+library Types {
     // the database basic information
     struct Database {
         // generate by the contract
         address db;
         // the mapping relationships
-        mapping(string => string) collecions;
+        mapping(bytes32 => bool) collecions;
         // the database sender can create collection
         address sender;
-	// the description the database
-	string description;
+        // the description the database
+        bytes32 description;
+        // the counter of the collection id
+        uint64 counter;
     }
 
     // the data network information
     struct DataNetwork {
         // the id of the network
-        uint64 id;
+        uint256 id;
         // the url of data rollup node
         string rollupNodeUrl;
         // the account address of data rollup node
@@ -30,12 +31,12 @@ library DataTypes {
         // the admin who can add or change the node url
         address admin;
         // the latest arweave tx and the rollup node can update the latest arweave tx
-        bytes latestArweaveTx;
+        bytes32 latestArweaveTx;
         // the latest rollup time used track the network activty
-        uint64 latestRollupTime;
+        uint256 latestRollupTime;
         // the all database
         mapping(address => Database) databases;
         // the description of the data network
-        string description;
+        bytes32 description;
     }
 }
