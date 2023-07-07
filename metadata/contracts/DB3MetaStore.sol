@@ -26,6 +26,7 @@ contract DB3MetaStore is IDB3MetaStore {
             rollupNodeAddress != address(0),
             "Invalid rollupNodeAddress address"
         );
+
         networkCounter++;
         Types.DataNetwork storage dataNetwork = dataNetworks[networkCounter];
         dataNetwork.id = networkCounter;
