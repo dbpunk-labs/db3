@@ -92,4 +92,11 @@ interface IDB3MetaStore {
      & @param to                 The address of maintainer
      */
     function transferDatabase(uint256 id, address db, address to) external;
+
+    /**
+     * get the database
+     * @param id                 The id of your data network
+     * @param db                 The address of database
+     */
+    function getDatabase(uint256 id, address db) external view returns (Types.Database memory);
 }

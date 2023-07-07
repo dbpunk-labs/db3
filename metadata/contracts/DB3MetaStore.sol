@@ -8,6 +8,7 @@ contract DB3MetaStore is IDB3MetaStore {
     // A map to store all data network information
     mapping(uint256 => Types.DataNetwork) private _dataNetworks;
     mapping(uint256 => mapping(address=> Types.Database)) private _databases;
+    mapping(uint256 => mapping(address=> mapping(bytes32=>bool))) private _collections;
     // Counter to keep track of number of data networks
     uint256 private _networkCounter;
     // Counter to keep track of number of database
@@ -160,12 +161,9 @@ contract DB3MetaStore is IDB3MetaStore {
         Types.Database storage database = _databases[networkId][db];
         // Check the permission
         require(database.sender == msg.sender, "You must the database sender");
-        bool created = database.collecions[name];
+        bool created = _collections[networkId][db][name];
         // The collection name must not be used
         require(created == false, "The collection name has been used");
-        // Mark the collection name used
-        database.collecions[name] = true;
-        database.counter++;
         emit Events.CreateCollection(msg.sender, networkId, db, name);
     }
 
@@ -193,6 +191,14 @@ contract DB3MetaStore is IDB3MetaStore {
         require(database.sender == msg.sender, "You must the database sender");
         database.sender = to;
         emit Events.TransferDatabase(msg.sender, networkId, db, to);
+    }
+
+    function getDatabase(uint256 id, address db) public view returns (Types.Database memory database) {
+        // Check if network is registered
+        require(id <= _networkCounter, "Data Network is not registered");
+        database = _databases[id][db];
+        require(database.sender == address(0), "the must be a new database");
+        return database;
     }
 
 }

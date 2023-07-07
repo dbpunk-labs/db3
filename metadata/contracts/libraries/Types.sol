@@ -6,8 +6,6 @@ library Types {
     struct Database {
         // generate by the contract
         address db;
-        // the mapping relationships
-        mapping(bytes32 => bool) collecions;
         // the database sender can create collection
         address sender;
         // the description the database
