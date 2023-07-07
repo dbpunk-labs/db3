@@ -15,7 +15,22 @@ describe("DB3MetaStore", function () {
     describe("registerDataNetwork", function () {
         it("registers a new network ", async function () {
             const hello = ethers.utils.formatBytes32String("hello");
-            let eventLibABI = await ethers.getContractAt("Events", metaStore.address, deployer)
+            let eventLibABI = await ethers.getContractAt("Events", metaStore.address, deployer);
+            await expect(metaStore
+                .connect(deployer)
+                .registerDataNetwork(
+                    "https://rollup-node.com",
+                    deployer.address,
+                    ["https://index-node-1.com", "https://index-node-2.com"],
+                    [sender.address, deployer.address],
+                    hello
+                )).to.emit(eventLibABI, "CreateNetwork").withArgs(deployer.address, 1);
+        });
+
+        it("get network test", async function () {
+            await expect(metaStore.getDataNetwork(2)).to.revertedWith("Data Network is not registered");
+            let eventLibABI = await ethers.getContractAt("Events", metaStore.address, deployer);
+            const hello = ethers.utils.formatBytes32String("hello");
             await expect(metaStore
                 .connect(deployer)
                 .registerDataNetwork(
@@ -28,7 +43,7 @@ describe("DB3MetaStore", function () {
             const dataNetwork = await metaStore.getDataNetwork(1);
             expect(deployer.address).to.equal(dataNetwork.admin);
             expect(deployer.address).to.equal(dataNetwork.rollupNodeAddress);
-            await expect(metaStore.getDataNetwork(2)).to.revertedWith("Data Network is not registered");
-        });
+        })
+
     });
 });
