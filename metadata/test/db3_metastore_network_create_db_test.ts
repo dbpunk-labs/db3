@@ -47,6 +47,15 @@ describe("DB3MetaStore", function () {
           1,
           "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A"
         );
+      const database = await metaStore.getDatabase(
+        1,
+        "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A"
+      );
+      expect(database.db).to.equal(
+        "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A"
+      );
+      expect(database.sender).to.equal(deployer.address);
+      expect(database.description).to.equal(hello);
     });
   });
 });

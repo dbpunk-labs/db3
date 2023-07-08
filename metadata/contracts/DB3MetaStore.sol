@@ -103,11 +103,10 @@ contract DB3MetaStore is IDB3MetaStore {
         uint256 networkId,
         bytes32 latestArweaveTx
     ) public {
-        // Check the latestarweavetx
-        require(latestArweaveTx != bytes32(0), "Invalid arweave tx");
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
-
+        // Check the latestarweavetx
+        require(latestArweaveTx != bytes32(0), "Invalid arweave tx");
         Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
 
         // Check the rollup permission
@@ -170,6 +169,10 @@ contract DB3MetaStore is IDB3MetaStore {
     function transferNetwork(uint256 networkId, address to) public {
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
+        require(
+            msg.sender != to,
+            "you are transfering the data network to yourself"
+        );
         Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
         // Check the transfer permission
         require(
@@ -200,7 +203,7 @@ contract DB3MetaStore is IDB3MetaStore {
         // Check if network is registered
         require(id <= _networkCounter, "Data Network is not registered");
         database = _databases[id][db];
-        require(database.sender == address(0), "the must be a new database");
+        require(database.sender != address(0), "the must be a exist database");
         return database;
     }
 }

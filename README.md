@@ -21,7 +21,6 @@ DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is
 1. Using DB3 Network as a JSON document database. 
 2. Periodically rolling up the JSON document to the [Arweave](https://www.arweave.org/) at a very low cost.
 
-
 # Have a try
 
 ## Set up self-hosted Node
