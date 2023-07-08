@@ -42,7 +42,9 @@ interface IDB3MetaStore {
      * get the data network by network id
      * @param id The id of your data network
      */
-    function getDataNetwork(uint256 id) external view returns (Types.DataNetwork memory);
+    function getDataNetwork(
+        uint256 id
+    ) external view returns (Types.DataNetwork memory);
 
     /**
      * update the data rollup node config
@@ -98,5 +100,8 @@ interface IDB3MetaStore {
      * @param id                 The id of your data network
      * @param db                 The address of database
      */
-    function getDatabase(uint256 id, address db) external view returns (Types.Database memory);
+    function getDatabase(
+        uint256 id,
+        address db
+    ) external view returns (Types.Database memory);
 }

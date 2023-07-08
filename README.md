@@ -104,6 +104,18 @@ JSON document must be signed by its owner. Only the owner can update or delete t
 <p align="center">
 <img width="500px" src="./docs/images/db3_arch.png" align="center"/>
 
+## The Plan to support public chain list 
+
+| Public Chains   |      Testnet      |  Mainnet |
+|----------|:-------------:|:------:|
+| Arweave |  :heavy_check_mark: | :heavy_check_mark:|
+| Polygon |   :heavy_check_mark: [Mumbai](https://mumbai.polygonscan.com/address/0xb9709cE5E749b80978182db1bEdfb8c7340039A9) |   :soon: |
+| Zksync | :soon: |   :soon: |
+| Scroll | :soon: |   :soon: |
+| Arbitrum | :soon: |   :soon: |
+| Optimism | :soon: |   :soon: |
+
+If you want us to support the other public chains, just give us an [issue](https://github.com/dbpunk-labs/db3/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.md&title=)
 
 # What can we build with the db3 network?
 

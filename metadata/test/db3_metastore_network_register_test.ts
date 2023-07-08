@@ -31,6 +31,7 @@ describe("DB3MetaStore", function () {
             await expect(metaStore.getDataNetwork(2)).to.revertedWith("Data Network is not registered");
             let eventLibABI = await ethers.getContractAt("Events", metaStore.address, deployer);
             const hello = ethers.utils.formatBytes32String("hello");
+            const empty = ethers.utils.formatBytes32String("");
             await expect(metaStore
                 .connect(deployer)
                 .registerDataNetwork(
@@ -43,7 +44,11 @@ describe("DB3MetaStore", function () {
             const dataNetwork = await metaStore.getDataNetwork(1);
             expect(deployer.address).to.equal(dataNetwork.admin);
             expect(deployer.address).to.equal(dataNetwork.rollupNodeAddress);
+            expect(hello).to.equal(dataNetwork.description);
+            expect(1).to.equal(dataNetwork.id);
+            expect(0).to.equal(dataNetwork.latestRollupTime);
+            expect(empty).to.equal(dataNetwork.latestArweaveTx);
+            expect("https://rollup-node.com").to.equal(dataNetwork.rollupNodeUrl);
         })
-
     });
 });
