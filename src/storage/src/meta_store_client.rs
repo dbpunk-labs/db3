@@ -15,11 +15,12 @@
 // limitations under the License.
 //
 
+use arweave_rs::crypto::base64::Base64;
 use db3_error::{DB3Error, Result};
 use ethers::prelude::LocalWallet;
 use ethers::{
     contract::abigen,
-    core::types::{Address, Bytes, TxHash, U256},
+    core::types::{Address, TxHash, U256},
     middleware::SignerMiddleware,
     providers::{Http, Middleware, Provider, ProviderExt},
 };
@@ -56,32 +57,42 @@ impl MetaStoreClient {
             network,
         })
     }
+
     pub async fn get_latest_arweave_tx(&self) -> Result<String> {
         let store = DB3MetaStore::new(self.address, self.client.clone());
+        let network_id = U256::from(self.network.load(Ordering::Relaxed));
         let data_network = store
-            .get_data_network(self.network.load(Ordering::Relaxed))
+            .get_data_network(network_id)
             .call()
             .await
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-
-        Ok(registration.latest_arweave_tx.to_string())
+        let tx_ref: &[u8] = data_network.latest_arweave_tx.as_ref();
+        let b64 = Base64::from(tx_ref);
+        Ok(format!("{}", b64))
     }
 
     pub async fn get_admin(&self, network: u64) -> Result<Address> {
         let store = DB3MetaStore::new(self.address, self.client.clone());
-        let registration = store
-            .get_network_registration(network)
+        let network_id = U256::from(network);
+        let data_network = store
+            .get_data_network(network_id)
             .call()
             .await
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        Ok(registration.admin)
+        Ok(data_network.admin)
     }
 
     pub async fn update_rollup_step(&self, ar_tx: &str) -> Result<(U256, TxHash)> {
+        let b64: Base64 = serde_json::from_str(ar_tx)
+            .map_err(|_| DB3Error::StoreEventError("fail to decode arweave tx".to_string()))?;
+        let ar_tx_binary: [u8; 32] = b64
+            .0
+            .try_into()
+            .map_err(|_| DB3Error::StoreEventError("fail to decode arweave tx".to_string()))?;
         let store = DB3MetaStore::new(self.address, self.client.clone());
-        let data = Bytes::from(ar_tx.as_bytes().to_vec());
-        let tx = store.update_rollup_steps(self.network.load(Ordering::Relaxed), data);
-        //TODO set gas
+        let network_id = U256::from(self.network.load(Ordering::Relaxed));
+        let tx = store.update_rollup_steps(network_id, ar_tx_binary);
+        //TODO set gas limit
         let pending_tx = tx
             .send()
             .await
