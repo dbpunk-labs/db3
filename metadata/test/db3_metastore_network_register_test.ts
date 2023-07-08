@@ -51,9 +51,33 @@ describe("DB3MetaStore", function () {
           )
       ).to.revertedWith("Invalid Rollup node URL");
     });
-    it("registers a new network ", async function () {
+
+    it("registers a lot of network ", async function () {
       const hello = ethers.utils.formatBytes32String("hello");
-      let eventLibABI = await ethers.getContractAt(
+      const eventLibABI = await ethers.getContractAt(
+        "Events",
+        metaStore.address,
+        deployer
+      );
+      for (let i = 0; i < 100; i++) {
+        await expect(
+          metaStore
+            .connect(deployer)
+            .registerDataNetwork(
+              "https://rollup-node.com",
+              deployer.address,
+              ["https://index-node-1.com", "https://index-node-2.com"],
+              [sender.address, deployer.address],
+              hello
+            )
+        )
+          .to.emit(eventLibABI, "CreateNetwork")
+          .withArgs(deployer.address, i + 1);
+      }
+    });
+    it("registers a new network smoke test ", async function () {
+      const hello = ethers.utils.formatBytes32String("hello");
+      const eventLibABI = await ethers.getContractAt(
         "Events",
         metaStore.address,
         deployer
