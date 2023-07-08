@@ -23,7 +23,6 @@ db3-base={path="../base", version="0.1.0"}
 db3-error={path="../error", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
 db3-sdk={path="../sdk", version="0.1.0"}
-db3-session={path="../session", version="0.1.0"}
 db3-event={path="../event", version="0.1.0"}
 ethers = { workspace = true }
 tonic = { workspace = true }
@@ -35,7 +34,6 @@ signature = { version = "2"}
 hex = "0.4.3"
 rand = "0.8.5"
 rust_secp256k1 = { version = "0.24.0", package = "secp256k1", features = ["recovery", "rand-std", "bitcoin_hashes", "global-context"] }
-merkdb = {version= "2.0.0", path = "../../thirdparty/merkdb"}
 ethereum-types = { version = "0.14.0", default-features = false }
 tempdir = "0.3.7"
 serde_json = { workspace=true}
@@ -46,7 +44,7 @@ tokio-stream = "0.1.12"
 clap = { version = "4.0.20", features = ["derive"] }
 subtle-encoding = { version = "0.5", default-features = false, features = ["bech32-preview"] }
 http = "0.2"
-shadow-rs = "0.21.0"
+shadow-rs = "0.23.0"
 tower-http = { version = "0.4", features = ["cors"] }
 ctrlc = { version = "3.0", features = ["termination"] }
 ed25519-dalek = "2.0.0-rc.2"
@@ -58,4 +56,4 @@ parquet = {version="41.0.0", features=["arrow", "lz4", "flate2"], default-featur
 arweave-rs = {workspace=true}
 url = "2.4.0"
 [build-dependencies]
-shadow-rs = "0.21.0"
+shadow-rs = "0.23.0"

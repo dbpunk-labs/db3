@@ -72,14 +72,11 @@ public class ClientTest {
             Optional<Db3DatabaseV2.Collection> collection = client.getCollection(result.getDb(), "col1");
             Assert.assertEquals(collection.isPresent(), true);
             Assert.assertEquals(collection.get().getName(), "col1");
-            String doc = """{
-                "name":"a"}
-
-                """;
+            String doc = "{\"name\":1}";
             AddDocResult addDocResult = client.addDoc(result.getDb(), "col1", doc);
             Assert.assertNotNull(addDocResult.getMutationId());
             Thread.sleep(1000 * 3);
-            ResultSet resultSet = client.runQuery(result.getDb(), "col1", "/[name=\"a\"]");
+            ResultSet resultSet = client.runQuery(result.getDb(), "col1", "/[name=1]");
             Assert.assertEquals(1, resultSet.getDocs().size());
         } catch (Exception e) {
             e.printStackTrace();

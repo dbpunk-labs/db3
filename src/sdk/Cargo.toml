@@ -13,9 +13,7 @@ ethers = { workspace = true }
 db3-proto={path="../proto", version="0.1.0"}
 db3-error={path="../error", version="0.1.0"}
 db3-crypto={path="../crypto", version="0.1.0"}
-db3-session={path="../session", version="0.1.0"}
 bytes = { version = "1.0", default-features = false }
-merkdb = {version= "2.0.0", path = "../../thirdparty/merkdb"}
 tokio = { version = "1.17.0", features = ["full"] }
 tonic = { workspace=true, features = ["tls-roots"]}
 tonic-web = {workspace=true}

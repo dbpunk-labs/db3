@@ -31,7 +31,6 @@ use db3_proto::db3_indexer_proto::{
     GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
-use db3_proto::db3_mutation_v2_proto::EventDatabaseMutation;
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
 use db3_proto::db3_storage_proto::event_message;
@@ -83,6 +82,33 @@ impl IndexerNodeImpl {
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
             admin_addr,
         })
+    }
+
+    pub async fn recover(&self) -> Result<()> {
+        self.db_store.recover_db_state()?;
+        let databases = self.db_store.get_all_event_db()?;
+        for database in databases {
+            let address_ref: &[u8] = database.address.as_ref();
+            let db_address = DB3Address::try_from(address_ref)?;
+            let (collections, _) = self.db_store.get_collection_of_database(&db_address)?;
+            let tables = collections.iter().map(|c| c.name.to_string()).collect();
+            if let Err(_e) = self
+                .start_an_event_task(
+                    &db_address,
+                    database.evm_node_url.as_str(),
+                    database.events_json_abi.as_str(),
+                    &tables,
+                    database.contract_address.as_str(),
+                    0,
+                )
+                .await
+            {
+                info!("recover the event db {} has error", db_address.to_hex());
+            } else {
+                info!("recover the event db {} done", db_address.to_hex());
+            }
+        }
+        Ok(())
     }
 
     /// start standalone indexer block syncer
@@ -160,18 +186,19 @@ impl IndexerNodeImpl {
     async fn start_an_event_task(
         &self,
         db: &DB3Address,
-        mutation: &EventDatabaseMutation,
+        evm_node_url: &str,
+        abi: &str,
+        tables: &Vec<String>,
+        contract_address: &str,
+        start_block: u64,
     ) -> Result<()> {
         let config = EventProcessorConfig {
-            evm_node_url: mutation.evm_node_url.to_string(),
+            evm_node_url: evm_node_url.to_string(),
             db_addr: db.to_hex(),
-            abi: mutation.events_json_abi.to_string(),
-            target_events: mutation
-                .tables
-                .iter()
-                .map(|t| t.collection_name.to_string())
-                .collect(),
-            contract_addr: mutation.contract_address.to_string(),
+            abi: abi.to_string(),
+            target_events: tables.iter().map(|t| t.to_string()).collect(),
+            contract_addr: contract_address.to_string(),
+            start_block,
         };
         let processor = Arc::new(
             EventProcessor::new(config, self.db_store.clone())
@@ -181,14 +208,14 @@ impl IndexerNodeImpl {
         match self.processor_mapping.lock() {
             Ok(mut mapping) => {
                 //TODO limit the total count
-                if mapping.contains_key(mutation.contract_address.as_str()) {
-                    warn!("contract addr {} exist", mutation.contract_address.as_str());
+                if mapping.contains_key(contract_address) {
+                    warn!("contract addr {} exist", contract_address);
                     return Err(DB3Error::WriteStoreError(format!(
                         "contract_addr {} exist",
-                        mutation.contract_address.as_str()
+                        contract_address
                     )));
                 }
-                mapping.insert(mutation.contract_address.to_string(), processor.clone());
+                mapping.insert(contract_address.to_string(), processor.clone());
             }
             _ => todo!(),
         }
@@ -222,182 +249,15 @@ impl IndexerNodeImpl {
                     "invalid mutation header".to_string(),
                 )),
             }?;
-            match action {
-                MutationAction::CreateEventDb => {
-                    for body in dm.bodies {
-                        if let Some(Body::EventDatabaseMutation(ref mutation)) = &body.body {
-                            let db_id = self
-                                .db_store
-                                .create_event_database(
-                                    &address,
-                                    mutation,
-                                    nonce,
-                                    header.network,
-                                    block,
-                                    order,
-                                )
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            self.start_an_event_task(db_id.address(), mutation)
-                                .await
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            let db_id_hex = db_id.to_hex();
-                            info!(
-                                "add event database with addr {} from owner {}",
-                                db_id_hex.as_str(),
-                                address.to_hex().as_str()
-                            );
-                            break;
-                        }
-                    }
-                }
-                MutationAction::CreateDocumentDb => {
-                    for body in dm.bodies {
-                        if let Some(Body::DocDatabaseMutation(ref doc_db_mutation)) = &body.body {
-                            let id = self
-                                .db_store
-                                .create_doc_database(
-                                    &address,
-                                    doc_db_mutation,
-                                    nonce,
-                                    header.network,
-                                    block,
-                                    order,
-                                )
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            info!(
-                                "add database with addr {} from owner {}",
-                                id.to_hex().as_str(),
-                                address.to_hex().as_str()
-                            );
-                            break;
-                        }
-                    }
-                }
-
-                MutationAction::AddCollection => {
-                    for (i, body) in dm.bodies.iter().enumerate() {
-                        let db_address_ref: &[u8] = body.db_address.as_ref();
-                        let db_addr = DB3Address::try_from(db_address_ref)
-                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                        if let Some(Body::CollectionMutation(ref col_mutation)) = &body.body {
-                            self.db_store
-                                .create_collection(
-                                    &address,
-                                    &db_addr,
-                                    col_mutation,
-                                    block,
-                                    order,
-                                    i as u16,
-                                )
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            info!(
-                                    "add collection with db_addr {}, collection_name: {}, from owner {}",
-                                    db_addr.to_hex().as_str(),
-                                    col_mutation.collection_name.as_str(),
-                                    address.to_hex().as_str()
-                                );
-                        }
-                    }
-                }
-                MutationAction::UpdateDocument => {
-                    for (_i, body) in dm.bodies.iter().enumerate() {
-                        let db_address_ref: &[u8] = body.db_address.as_ref();
-                        let db_addr = DB3Address::try_from(db_address_ref)
-                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                        if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
-                            if doc_mutation.documents.len() != doc_mutation.ids.len() {
-                                let msg = format!(
-                                    "doc ids size {} not equal to documents size {}",
-                                    doc_mutation.ids.len(),
-                                    doc_mutation.documents.len()
-                                );
-                                warn!("{}", msg.as_str());
-                                return Err(DB3Error::InvalidMutationError(msg));
-                            }
-                            let mut docs = Vec::<String>::new();
-                            for buf in doc_mutation.documents.iter() {
-                                let document = bytes_to_bson_document(buf.clone())
-                                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                                let doc_str = document.to_string();
-                                debug!("add document: {}", doc_str);
-                                docs.push(doc_str);
-                            }
-                            self.db_store
-                                .update_docs(
-                                    &db_addr,
-                                    &address,
-                                    doc_mutation.collection_name.as_str(),
-                                    &docs,
-                                    &doc_mutation.ids,
-                                )
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            info!(
-                                    "update documents with db_addr {}, collection_name: {}, from owner {}",
-                                    db_addr.to_hex().as_str(),
-                                    doc_mutation.collection_name.as_str(),
-                                    address.to_hex().as_str()
-                                );
-                        }
-                    }
-                }
-                MutationAction::DeleteDocument => {
-                    for (_i, body) in dm.bodies.iter().enumerate() {
-                        let db_address_ref: &[u8] = body.db_address.as_ref();
-                        let db_addr = DB3Address::try_from(db_address_ref)
-                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                        if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
-                            self.db_store
-                                .delete_docs(
-                                    &db_addr,
-                                    &address,
-                                    doc_mutation.collection_name.as_str(),
-                                    &doc_mutation.ids,
-                                )
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            info!(
-                                    "delete documents with db_addr {}, collection_name: {}, from owner {}",
-                                    db_addr.to_hex().as_str(),
-                                    doc_mutation.collection_name.as_str(),
-                                    address.to_hex().as_str()
-                                );
-                        }
-                    }
-                }
-
-                MutationAction::AddDocument => {
-                    for (_i, body) in dm.bodies.iter().enumerate() {
-                        let db_address_ref: &[u8] = body.db_address.as_ref();
-                        let db_addr = DB3Address::try_from(db_address_ref)
-                            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                        if let Some(Body::DocumentMutation(ref doc_mutation)) = &body.body {
-                            let mut docs = Vec::<String>::new();
-                            for buf in doc_mutation.documents.iter() {
-                                let document = bytes_to_bson_document(buf.clone())
-                                    .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                                let doc_str = document.to_string();
-                                debug!("add document: {}", doc_str);
-                                docs.push(doc_str);
-                            }
-                            let ids = self
-                                .db_store
-                                .add_docs(
-                                    &db_addr,
-                                    &address,
-                                    doc_mutation.collection_name.as_str(),
-                                    &docs,
-                                )
-                                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-                            info!(
-                                    "add documents with db_addr {}, collection_name: {}, from owner {}, ids: {:?}",
-                                    db_addr.to_hex().as_str(),
-                                    doc_mutation.collection_name.as_str(),
-                                    address.to_hex().as_str(),
-                                    ids
-                                );
-                        }
-                    }
-                }
-            }
+            self.db_store.apply_mutation(
+                action,
+                dm,
+                &address,
+                header.network,
+                nonce,
+                block,
+                order,
+            )?;
         }
         Ok(())
     }
