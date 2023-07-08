@@ -5,10 +5,12 @@ import {Types} from "./libraries/Types.sol";
 import {Events} from "./libraries/Events.sol";
 
 contract DB3MetaStore is IDB3MetaStore {
-    // A map to store all data network information
+    // A map to store data network information
     mapping(uint256 => Types.DataNetwork) private _dataNetworks;
+    // A map to store database information
     mapping(uint256 => mapping(address => Types.Database)) private _databases;
-    mapping(uint256 => mapping(address => mapping(bytes32 => bool)))
+    // A map to store collection information
+    mapping(uint256 => mapping(address => mapping(bytes32 => Types.Collection)))
         private _collections;
     // Counter to keep track of number of data networks
     uint256 private _networkCounter;
@@ -151,19 +153,47 @@ contract DB3MetaStore is IDB3MetaStore {
     function createCollection(
         uint256 networkId,
         address db,
-        bytes32 name
+        bytes32 name,
+        bytes32 licenseName,
+        bytes32 licenseContent
     ) public {
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
+        require(name != bytes32(0), "name is empty");
+        require(licenseName != bytes32(0), "license is empty");
+        require(licenseContent != bytes32(0), "license content is empty");
         // Everyone can create a database currently
         Types.Database storage database = _databases[networkId][db];
         require(database.db != address(0), "Database was not found");
         // Check the permission
         require(database.sender == msg.sender, "You must the database sender");
-        bool created = _collections[networkId][db][name];
+        Types.Collection storage collection = _collections[networkId][db][name];
         // The collection name must not be used
-        require(created == false, "The collection name has been used");
+        require(
+            collection.created == false,
+            "The collection name has been used"
+        );
+        collection.created = true;
+        collection.name = name;
+        collection.licenseName = licenseName;
+        collection.licenseContent = licenseContent;
         emit Events.CreateCollection(msg.sender, networkId, db, name);
+    }
+
+    function getCollection(
+        uint256 networkId,
+        address db,
+        bytes32 name
+    ) public view returns (Types.Collection memory collection) {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        // Everyone can create a database currently
+        Types.Database storage database = _databases[networkId][db];
+        require(database.db != address(0), "Database was not found");
+        collection = _collections[networkId][db][name];
+        // The collection name must not be used
+        require(collection.created == true, "The collection was not found");
+        return collection;
     }
 
     function transferNetwork(uint256 networkId, address to) public {

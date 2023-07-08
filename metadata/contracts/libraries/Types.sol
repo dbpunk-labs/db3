@@ -2,6 +2,17 @@
 pragma solidity ^0.8.9;
 
 library Types {
+    struct Collection {
+        // the name of the collection
+        bytes32 name;
+        // the licenseName of the collection
+        bytes32 licenseName;
+        // the licenseContent of the collection
+        bytes32 licenseContent;
+        // the created flag
+        bool created;
+    }
+
     // the database basic information
     struct Database {
         // generate by the contract

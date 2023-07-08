@@ -68,17 +68,37 @@ interface IDB3MetaStore {
     /**
      * create a document database
      * @param id                 The id of your data network
-     & @param description        The description of database
+     * @param description        The description of database
      */
     function createDocDatabase(uint256 id, bytes32 description) external;
 
     /**
      * create a document collection
      * @param id                 The id of your data network
-     & @param db                 The address of database
-     & @param name               The name of collection
+     * @param db                 The address of database
+     * @param name               The name of collection
+     * @param licenseName        The name of the license
+     * @param licenseContent     The content is a arweave tx id
      */
-    function createCollection(uint256 id, address db, bytes32 name) external;
+    function createCollection(
+        uint256 id,
+        address db,
+        bytes32 name,
+        bytes32 licenseName,
+        bytes32 licenseContent
+    ) external;
+
+    /**
+     * get a document collection
+     * @param id                 The id of your data network
+     * @param db                 The address of database
+     * @param name               The name of collection
+     */
+    function getCollection(
+        uint256 id,
+        address db,
+        bytes32 name
+    ) external view returns (Types.Collection memory);
 
     /**
      * transfer the data network to a new admin
