@@ -82,13 +82,6 @@ contract DB3MetaStore is IDB3MetaStore {
     ) public {
         // Check the data network must be registered
         require(networkId <= _networkCounter, "Data Network is not registered");
-
-        // Check if rollupNodeUrl is not empty
-        require(
-            bytes(rollupNodeUrl).length > 0,
-            "Rollup node URL cannot be empty"
-        );
-
         // Check if network is registered
         Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
         // check the permission

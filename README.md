@@ -102,7 +102,7 @@ The DB3 Network has two roles:
 To prevent tampering, every 
 JSON document must be signed by its owner. Only the owner can update or delete the JSON document.
 <p align="center">
-<img width="500px" src="./docs/images/db3_arch.png" align="center"/>
+<img width="800px" src="./docs/images/db3_arch.png"/>
 
 ## The Plan to support public chain list 
 
