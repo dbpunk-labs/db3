@@ -165,6 +165,7 @@ contract DB3MetaStore is IDB3MetaStore {
         require(networkId <= _networkCounter, "Data Network is not registered");
         // Everyone can create a database currently
         Types.Database storage database = _databases[networkId][db];
+        require(database.db != address(0), "Database was not found");
         // Check the permission
         require(database.sender == msg.sender, "You must the database sender");
         bool created = _collections[networkId][db][name];
