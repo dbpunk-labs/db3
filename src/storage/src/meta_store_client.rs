@@ -58,8 +58,8 @@ impl MetaStoreClient {
     }
     pub async fn get_latest_arweave_tx(&self) -> Result<String> {
         let store = DB3MetaStore::new(self.address, self.client.clone());
-        let registration = store
-            .get_network_registration(self.network.load(Ordering::Relaxed))
+        let data_network = store
+            .get_data_network(self.network.load(Ordering::Relaxed))
             .call()
             .await
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
