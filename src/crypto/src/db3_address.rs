@@ -17,15 +17,12 @@
 
 use db3_error::DB3Error;
 use fastcrypto::encoding::{decode_bytes_hex, Encoding, Hex};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 pub const DB3_ADDRESS_LENGTH: usize = 20;
 #[serde_as]
-#[derive(
-    Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema,
-)]
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct DB3Address([u8; DB3_ADDRESS_LENGTH]);
 
 impl DB3Address {
