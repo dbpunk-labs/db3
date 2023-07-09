@@ -16,7 +16,7 @@
 //
 
 use db3_base::bson_util;
-use db3_crypto::{db3_address::DB3Address, key_derive, signature_scheme::SignatureScheme};
+use db3_crypto::{db3_address::DB3Address, signature_scheme::SignatureScheme};
 use db3_proto::db3_base_proto::{BroadcastMeta, ChainId, ChainRole};
 use db3_proto::db3_database_proto::Index;
 use db3_proto::db3_mutation_proto::CollectionMutation;

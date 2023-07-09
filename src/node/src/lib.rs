@@ -19,7 +19,6 @@ pub mod ar_toolbox;
 pub mod command;
 pub mod indexer_impl;
 mod mutation_utils;
-pub mod node_key;
 pub mod recover;
 pub mod rollup_executor;
 pub mod storage_node_light_impl;

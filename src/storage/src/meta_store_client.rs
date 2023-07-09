@@ -25,7 +25,6 @@ use ethers::{
     providers::{Http, Middleware, Provider, ProviderExt},
 };
 use std::str::FromStr;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 abigen!(DB3MetaStore, "abi/DB3MetaStore.json");

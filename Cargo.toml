@@ -4,7 +4,6 @@ members = [
     "src/crypto",
     "src/proto",
     "src/error",
-    "src/types",
     "src/base",
     "src/storage",
     "src/node",

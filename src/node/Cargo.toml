@@ -18,7 +18,6 @@ flex-error = { version = "0.4.4", default-features = false }
 db3-proto={path="../proto", version="0.1.0"}
 db3-crypto={path="../crypto", version="0.1.0"}
 db3-storage={path="../storage", version="0.1.0"}
-db3-types={path="../types", version="0.1.0"}
 db3-base={path="../base", version="0.1.0"}
 db3-error={path="../error", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
