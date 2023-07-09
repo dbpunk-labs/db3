@@ -24,8 +24,8 @@ use db3_crypto::id::TxId;
 use db3_error::Result;
 use db3_proto::db3_base_proto::{SystemConfig, SystemStatus};
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
+use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
-use db3_proto::db3_storage_proto::{block_response, ExtraItem};
 use db3_proto::db3_storage_proto::{
     storage_node_server::StorageNode, BlockRequest, BlockResponse, GetCollectionOfDatabaseRequest,
     GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
@@ -49,7 +49,6 @@ use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use ethers::abi::Address;
 use prost::Message;
-use serde_json::json;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicU64, Ordering};

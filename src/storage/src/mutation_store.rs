@@ -23,7 +23,6 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::MutationState;
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord as GCRecord, RollupRecord};
-use db3_proto::db3_storage_proto::ExtraItem;
 use ethers::types::U256;
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
