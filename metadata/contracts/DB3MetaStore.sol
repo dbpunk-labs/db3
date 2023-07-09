@@ -16,6 +16,8 @@ contract DB3MetaStore is IDB3MetaStore {
     uint256 private _networkCounter;
     // Counter to keep track of number of database
     uint256 private _databaseCounter;
+    // Counter to keep track of number of collection
+    uint256 private _collectionCounter;
 
     function registerDataNetwork(
         string memory rollupNodeUrl,
@@ -173,6 +175,7 @@ contract DB3MetaStore is IDB3MetaStore {
             collection.created == false,
             "The collection name has been used"
         );
+        _collectionCounter++;
         collection.created = true;
         collection.name = name;
         collection.licenseName = licenseName;
@@ -235,5 +238,9 @@ contract DB3MetaStore is IDB3MetaStore {
         database = _databases[id][db];
         require(database.sender != address(0), "the must be a exist database");
         return database;
+    }
+
+    function getState() public view returns (uint256, uint256, uint256) {
+        return (_networkCounter, _databaseCounter, _collectionCounter);
     }
 }

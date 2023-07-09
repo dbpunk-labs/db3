@@ -124,4 +124,9 @@ interface IDB3MetaStore {
         uint256 id,
         address db
     ) external view returns (Types.Database memory);
+
+    /**
+     * get the state
+     */
+    function getState() external view returns (uint256, uint256, uint256);
 }

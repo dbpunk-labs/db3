@@ -74,6 +74,9 @@ describe("DB3MetaStore", function () {
           .to.emit(eventLibABI, "CreateNetwork")
           .withArgs(deployer.address, i + 1);
       }
+      const [dataNetworkCount, databaseCount, collectionCount] =
+        await metaStore.getState();
+      expect(dataNetworkCount).to.equal(100);
     });
     it("registers a new network smoke test ", async function () {
       const hello = ethers.utils.formatBytes32String("hello");

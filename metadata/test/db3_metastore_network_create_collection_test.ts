@@ -285,6 +285,11 @@ describe("DB3MetaStore", function () {
       expect(collection.name).to.equal(hello);
       expect(collection.licenseName).to.equal(udl);
       expect(collection.licenseContent).to.equal(arTx);
+      const [dataNetworkCount, databaseCount, collectionCount] =
+        await metaStore.getState();
+      expect(dataNetworkCount).to.equal(1);
+      expect(databaseCount).to.equal(1);
+      expect(collectionCount).to.equal(1);
     });
   });
 });

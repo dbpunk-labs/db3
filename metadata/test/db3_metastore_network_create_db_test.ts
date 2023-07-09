@@ -56,6 +56,10 @@ describe("DB3MetaStore", function () {
       );
       expect(database.sender).to.equal(deployer.address);
       expect(database.description).to.equal(hello);
+      const [dataNetworkCount, databaseCount, collectionCount] =
+        await metaStore.getState();
+      expect(dataNetworkCount).to.equal(1);
+      expect(databaseCount).to.equal(1);
     });
   });
 });
