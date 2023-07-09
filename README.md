@@ -21,7 +21,6 @@ DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is
 1. Using DB3 Network as a JSON document database. 
 2. Periodically rolling up the JSON document to the [Arweave](https://www.arweave.org/) at a very low cost.
 
-
 # Have a try
 
 ## Set up self-hosted Node
@@ -102,8 +101,20 @@ The DB3 Network has two roles:
 To prevent tampering, every 
 JSON document must be signed by its owner. Only the owner can update or delete the JSON document.
 <p align="center">
-<img width="500px" src="./docs/images/db3_arch.png" align="center"/>
+<img width="800px" src="./docs/images/db3_arch.png"/>
 
+## The Plan to support public chain list 
+
+| Public Chains   |      Testnet      |  Mainnet |
+|----------|:-------------:|:------:|
+| Arweave |  :heavy_check_mark: | :heavy_check_mark:|
+| Polygon |   :heavy_check_mark: [Mumbai](https://mumbai.polygonscan.com/address/0xb9709cE5E749b80978182db1bEdfb8c7340039A9) |   :soon: |
+| Zksync | :soon: |   :soon: |
+| Scroll | :soon: |   :soon: |
+| Arbitrum | :soon: |   :soon: |
+| Optimism | :soon: |   :soon: |
+
+If you want us to support the other public chains, just give us an [issue](https://github.com/dbpunk-labs/db3/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.md&title=)
 
 # What can we build with the db3 network?
 

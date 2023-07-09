@@ -18,12 +18,10 @@
 pub mod ar_fs;
 pub mod collection_key;
 pub mod db_doc_key_v2;
-pub mod db_owner_key;
 pub mod db_owner_key_v2;
 pub mod db_store_v2;
 pub mod doc_key_v2;
 pub mod doc_store;
-pub mod key;
 pub mod key_store;
 pub mod meta_store_client;
 pub mod mutation_store;

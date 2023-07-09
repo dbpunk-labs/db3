@@ -15,15 +15,11 @@ db3-base={ path = "../base" }
 db3-sdk={ path = "../sdk" }
 db3-proto={ path = "../proto" }
 db3-crypto={ path = "../crypto" }
-ethereum-types = { version = "0.14.0", default-features = false }
 prost = "0.11"
 prost-types = "0.11"
 prettytable-rs = "^0.10"
-ed25519-dalek = "2.0.0-rc.2"
 rand = "0.7"
-rand_core = "0.6"
 dirs = "5.0.0"
-bip32 = "0.5.0"
 rustyline = "9.1.2"
 rustyline-derive = "0.8.0"
 colored = "2.0.0"

@@ -12,7 +12,6 @@ ethereum-types = { version = "0.14.0", default-features = false }
 db3-base={ path = "../base" }
 db3-proto={ path ="../proto" }
 db3-error={ path = "../error" }
-db3-types={ path = "../types" }
 db3-crypto={ path = "../crypto" }
 tracing = "0.1"
 fastcrypto = { workspace = true, features = ["copy_key"] }
@@ -40,5 +39,3 @@ rsa = "0.6.1"
 rand = "0.8.5"
 tokio = { version = "1.17.0", features = ["full"] }
 chashmap = "2.2.2"
-[dev-dependencies]
-tokio = { version = "1.17.0", features = ["full"] }

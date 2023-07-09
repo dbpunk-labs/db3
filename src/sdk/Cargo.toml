@@ -20,23 +20,13 @@ tonic-web = {workspace=true}
 prost = "0.11"
 prost-types = "0.11"
 chrono = "0.4.22"
-enum-primitive-derive = "^0.2"
-num-traits = "^0.2"
 rand = "0.8.5"
 serde_json = {workspace=true}
 hex = "0.4.3"
-tendermint = "0.31.1"
 [dev-dependencies]
 db3-base={path="../base", version="0.1.0"}
 db3-cmd={path="../cmd", version="0.1.0"}
 criterion = { version = "0.3.4", default-features = false,features = ["async_futures", "async_tokio"]}
-[dependencies.uuid]
-version = "1.2.2"
-features = [
-    "v4",                # Lets you generate random UUIDs
-    "fast-rng",          # Use a faster (but still sufficiently random) RNG
-    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
-]
 [[bench]]
 name = "sdk_benchmark"
 harness = false
