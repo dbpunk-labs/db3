@@ -24,6 +24,7 @@ use ethers::{
     middleware::SignerMiddleware,
     providers::{Http, Middleware, Provider, ProviderExt},
 };
+use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -32,18 +33,12 @@ abigen!(DB3MetaStore, "abi/DB3MetaStore.json");
 pub struct MetaStoreClient {
     address: Address,
     client: Arc<SignerMiddleware<Arc<Provider<Http>>, LocalWallet>>,
-    network: Arc<AtomicU64>,
 }
 unsafe impl Sync for MetaStoreClient {}
 unsafe impl Send for MetaStoreClient {}
 
 impl MetaStoreClient {
-    pub async fn new(
-        contract_addr: &str,
-        rpc_url: &str,
-        network: Arc<AtomicU64>,
-        wallet: LocalWallet,
-    ) -> Result<Self> {
+    pub async fn new(contract_addr: &str, rpc_url: &str, wallet: LocalWallet) -> Result<Self> {
         let address = contract_addr
             .parse::<Address>()
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
@@ -51,11 +46,7 @@ impl MetaStoreClient {
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
         let client = Arc::new(signable_client);
-        Ok(Self {
-            address,
-            client,
-            network,
-        })
+        Ok(Self { address, client })
     }
 
     pub async fn register_data_network(
@@ -80,9 +71,9 @@ impl MetaStoreClient {
         Ok(())
     }
 
-    pub async fn get_latest_arweave_tx(&self) -> Result<String> {
+    pub async fn get_latest_arweave_tx(&self, network: u64) -> Result<String> {
         let store = DB3MetaStore::new(self.address, self.client.clone());
-        let network_id = U256::from(self.network.load(Ordering::Relaxed));
+        let network_id = U256::from(network);
         let data_network = store
             .get_data_network(network_id)
             .call()
@@ -104,15 +95,17 @@ impl MetaStoreClient {
         Ok(data_network.admin)
     }
 
-    pub async fn update_rollup_step(&self, ar_tx: &str) -> Result<(U256, TxHash)> {
-        let b64: Base64 = serde_json::from_str(ar_tx)
-            .map_err(|_| DB3Error::StoreEventError("fail to decode arweave tx".to_string()))?;
-        let ar_tx_binary: [u8; 32] = b64
-            .0
-            .try_into()
-            .map_err(|_| DB3Error::StoreEventError("fail to decode arweave tx".to_string()))?;
+    pub async fn update_rollup_step(&self, ar_tx: &str, network: u64) -> Result<(U256, TxHash)> {
+        let b64: Base64 = Base64::from_str(ar_tx).map_err(|e| {
+            DB3Error::StoreEventError(format!(
+                "fail to decode arweave tx from base64 for error {e}"
+            ))
+        })?;
+        let ar_tx_binary: [u8; 32] = b64.0.try_into().map_err(|_| {
+            DB3Error::StoreEventError("fail to convert tx bytes to bytes32".to_string())
+        })?;
         let store = DB3MetaStore::new(self.address, self.client.clone());
-        let network_id = U256::from(self.network.load(Ordering::Relaxed));
+        let network_id = U256::from(network);
         let tx = store.update_rollup_steps(network_id, ar_tx_binary);
         //TODO set gas limit
         let pending_tx = tx
@@ -156,16 +149,23 @@ mod tests {
         let data_ref: &[u8] = data.as_ref();
         let wallet = LocalWallet::from_bytes(data_ref).unwrap();
         let wallet = wallet.with_chain_id(31337_u32);
+        let rollup_node_address = wallet.address();
         let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
         let address = contract_addr.parse::<Address>().unwrap();
         let rpc_url = "http://127.0.0.1:8545";
-        let network_id = Arc::new(AtomicU64::new(0));
-        let client = MetaStoreClient::new(contract_addr, rpc_url, network_id, wallet)
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
             .await
             .unwrap();
-        client
-            .register_data_network(&address, rpc_url)
-            .await
-            .unwrap();
+        let result = client
+            .register_data_network(&rollup_node_address, rpc_url)
+            .await;
+        assert!(result.is_ok());
+        let tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
+        let result = client.update_rollup_step(tx, 1).await;
+        assert!(result.is_ok());
+        let tx_ret = client.get_latest_arweave_tx(1).await;
+        assert!(tx_ret.is_ok());
+        let tx_remote = tx_ret.unwrap();
+        assert_eq!(tx, tx_remote);
     }
 }

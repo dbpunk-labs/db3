@@ -25,13 +25,12 @@ use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
 use ethers::prelude::{LocalWallet, Signer};
 use std::ops::Deref;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::info;
 
 pub struct RecoverConfig {
     pub db_store_config: DBStoreV2Config,
-    pub network_id: u64,
     pub key_root_path: String,
     pub ar_node_url: String,
     pub temp_data_path: String,
@@ -44,23 +43,23 @@ pub struct Recover {
     pub ar_toolbox: Arc<ArToolBox>,
     pub meta_store: Arc<MetaStoreClient>,
     pub db_store: Arc<DBStoreV2>,
+    network_id: Arc<AtomicU64>,
 }
 
 impl Recover {
-    pub async fn new(config: RecoverConfig) -> Result<Self> {
-        let network_id = Arc::new(AtomicU64::new(config.network_id));
+    pub async fn new(config: RecoverConfig, network_id: Arc<AtomicU64>) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
             "evm address {}",
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
         let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
+        //TODO config the chain id
         let wallet2 = wallet2.with_chain_id(80001_u32);
         let meta_store = Arc::new(
             MetaStoreClient::new(
                 config.contract_addr.as_str(),
                 config.evm_node_url.as_str(),
-                network_id.clone(),
                 wallet2,
             )
             .await?,
@@ -71,14 +70,13 @@ impl Recover {
             config.temp_data_path.clone(),
             network_id.clone(),
         )?);
-
         let db_store = Arc::new(DBStoreV2::new(config.db_store_config.clone())?);
-
         Ok(Self {
             config,
             ar_toolbox,
             meta_store,
             db_store,
+            network_id,
         })
     }
 
@@ -122,7 +120,6 @@ impl Recover {
     /// recover from arweave tx
     async fn recover_from_arware_tx(&self, tx: &str) -> Result<()> {
         let record_batch_vec = self.ar_toolbox.download_and_parse_record_batch(tx).await?;
-        let network_id = self.config.network_id;
         for record_batch in record_batch_vec.iter() {
             let mutations = ArToolBox::convert_recordbatch_to_mutation(record_batch)?;
             for (body, block, order) in mutations.iter() {
@@ -137,7 +134,7 @@ impl Recover {
                     action,
                     dm,
                     &address,
-                    network_id,
+                    self.network_id.load(Ordering::Relaxed),
                     nonce,
                     block.clone(),
                     order.clone(),
@@ -173,7 +170,11 @@ impl Recover {
 
     /// retrieve the latest arweave tx id from meta store
     pub async fn get_latest_arweave_tx(&self) -> Result<String> {
-        let tx = self.meta_store.get_latest_arweave_tx().await.unwrap();
+        let tx = self
+            .meta_store
+            .get_latest_arweave_tx(self.network_id.load(Ordering::Relaxed))
+            .await
+            .unwrap();
         let data = hex::decode(&tx[2..])
             .map_err(|e| DB3Error::KeyCodecError(format!("fail to decode tx id for {e}")))
             .unwrap();
@@ -223,16 +224,18 @@ mod tests {
             doc_start_id: 1000,
         };
 
-        let recover = Recover::new(RecoverConfig {
-            db_store_config,
-            network_id,
-            key_root_path,
-            ar_node_url: "https://arweave.net".to_string(),
-            temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
-            contract_addr: contract_addr.to_string(),
-            evm_node_url: rpc_url.to_string(),
-            enable_mutation_recover: true,
-        })
+        let recover = Recover::new(
+            RecoverConfig {
+                db_store_config,
+                key_root_path,
+                ar_node_url: "https://arweave.net".to_string(),
+                temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
+                contract_addr: contract_addr.to_string(),
+                evm_node_url: rpc_url.to_string(),
+                enable_mutation_recover: true,
+            },
+            Arc::new(AtomicU64::new(network_id)),
+        )
         .await
         .unwrap();
         recover
