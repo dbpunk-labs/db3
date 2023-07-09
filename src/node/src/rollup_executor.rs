@@ -52,6 +52,7 @@ pub struct RollupExecutor {
     pending_data_size: Arc<AtomicU64>,
     pending_start_block: Arc<AtomicU64>,
     pending_end_block: Arc<AtomicU64>,
+    network_id: Arc<AtomicU64>,
 }
 
 unsafe impl Sync for RollupExecutor {}
@@ -69,13 +70,13 @@ impl RollupExecutor {
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
         let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
+        //TODO config the chain id
         let wallet2 = wallet2.with_chain_id(80001_u32);
         let min_rollup_size = config.min_rollup_size;
         let meta_store = Arc::new(
             MetaStoreClient::new(
                 config.contract_addr.as_str(),
                 config.evm_node_url.as_str(),
-                network_id.clone(),
                 wallet2,
             )
             .await?,
@@ -84,7 +85,6 @@ impl RollupExecutor {
             config.key_root_path.clone(),
             config.ar_node_url.clone(),
             config.temp_data_path.clone(),
-            network_id.clone(),
         )?;
         Ok(Self {
             config,
@@ -97,6 +97,7 @@ impl RollupExecutor {
             pending_data_size: Arc::new(AtomicU64::new(0)),
             pending_start_block: Arc::new(AtomicU64::new(0)),
             pending_end_block: Arc::new(AtomicU64::new(0)),
+            network_id,
         })
     }
 
@@ -246,6 +247,7 @@ impl RollupExecutor {
             "the next rollup start block {} and the newest block {current_block}",
             last_end_block
         );
+        let network_id = self.network_id.load(Ordering::Relaxed);
         self.pending_start_block
             .store(last_start_block, Ordering::Relaxed);
         self.pending_end_block
@@ -281,9 +283,18 @@ impl RollupExecutor {
         }
         let (id, reward, num_rows, size) = self
             .ar_toolbox
-            .compress_and_upload_record_batch(tx, last_end_block, current_block, &recordbatch)
+            .compress_and_upload_record_batch(
+                tx,
+                last_end_block,
+                current_block,
+                &recordbatch,
+                network_id,
+            )
             .await?;
-        let (evm_cost, tx_hash) = self.meta_store.update_rollup_step(id.as_str()).await?;
+        let (evm_cost, tx_hash) = self
+            .meta_store
+            .update_rollup_step(id.as_str(), network_id)
+            .await?;
         let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
         info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} ar cost {} and evm tx {} and cost {}", now.elapsed().as_secs(),
         id.as_str(), reward,

@@ -1,222 +1,262 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
-import "./interfaces/IDB3MetaStore.sol";
+import {IDB3MetaStore} from "./interfaces/IDB3MetaStore.sol";
+import {Types} from "./libraries/Types.sol";
+import {Events} from "./libraries/Events.sol";
 
 contract DB3MetaStore is IDB3MetaStore {
-    // Mapping to store registration info for all registered networks
-    mapping(uint64 => NetworkRegistration) private networkRegistrations;
+    // A map to store data network information
+    mapping(uint256 => Types.DataNetwork) private _dataNetworks;
+    // A map to store database information
+    mapping(uint256 => mapping(address => Types.Database)) private _databases;
+    // A map to store collection information
+    mapping(uint256 => mapping(address => mapping(bytes32 => Types.Collection)))
+        private _collections;
+    // Counter to keep track of number of data networks
+    uint256 private _networkCounter;
+    // Counter to keep track of number of database
+    uint256 private _databaseCounter;
+    // Counter to keep track of number of collection
+    uint256 private _collectionCounter;
 
-    // Counter to keep track of number of registered networks
-    uint256 private numNetworks;
-
-    // Register a new network
-    function registerNetwork(
-        uint64 networkId,
+    function registerDataNetwork(
         string memory rollupNodeUrl,
         address rollupNodeAddress,
         string[] memory indexNodeUrls,
-        address[] memory indexNodeAddresses
+        address[] memory indexNodeAddresses,
+        bytes32 description
     ) public {
         // Check if Rollup node address, Index node addresses and sender address are valid
         require(bytes(rollupNodeUrl).length > 0, "Invalid Rollup node URL");
-        // require(indexNodeUrls.length > 0, "At least one Index node URL required");
         require(msg.sender != address(0), "Invalid sender address");
         require(
             rollupNodeAddress != address(0),
             "Invalid rollupNodeAddress address"
         );
-        // Check if network is already registered
-        NetworkRegistration storage registration = networkRegistrations[
-            networkId
-        ];
-        require(
-            bytes(registration.rollupNodeUrl).length == 0,
-            "Network already registered"
-        );
-        // Add new network info to struct and update mapping
-        registration.rollupNodeUrl = rollupNodeUrl;
-        registration.indexNodeUrls = indexNodeUrls;
-        registration.indexNodeAddresses = indexNodeAddresses;
-        registration.networkId = networkId;
-        registration.admin = msg.sender;
-        registration.rollupNodeAddress = rollupNodeAddress;
-        // Increment registered network counter
-        numNetworks++;
+        _networkCounter++;
+        Types.DataNetwork storage dataNetwork = _dataNetworks[_networkCounter];
+        dataNetwork.id = _networkCounter;
+        dataNetwork.rollupNodeUrl = rollupNodeUrl;
+        dataNetwork.rollupNodeAddress = rollupNodeAddress;
+        dataNetwork.admin = msg.sender;
+        dataNetwork.indexNodeUrls = indexNodeUrls;
+        dataNetwork.indexNodeAddresses = indexNodeAddresses;
+        dataNetwork.description = description;
+        dataNetwork.latestArweaveTx = bytes32(0);
+        dataNetwork.latestRollupTime = 0;
+        // emit a create network event
+        emit Events.CreateNetwork(msg.sender, _networkCounter);
     }
 
-    // Update an existing network's information
-    function updateNetworkIndexNodes(
-        uint64 networkId,
+    function updateIndexNodes(
+        uint256 networkId,
         string[] memory indexNodeUrls,
         address[] memory indexNodeAddresses
     ) public {
-        // Check if network is registered
-        NetworkRegistration storage registration = networkRegistrations[
-            networkId
-        ];
-        require(
-            bytes(registration.rollupNodeUrl).length > 0,
-            "Network not registered"
+        // Check the network must be registered
+        require(networkId <= _networkCounter, "Network is not registered");
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
+        // Check permission
+        require(msg.sender == dataNetwork.admin, "you are not the admin");
+        dataNetwork.indexNodeUrls = indexNodeUrls;
+        dataNetwork.indexNodeAddresses = indexNodeAddresses;
+        emit Events.UpdateIndexNode(
+            msg.sender,
+            networkId,
+            indexNodeAddresses,
+            indexNodeUrls
         );
-
-        // Check if sender is the same as admin
-        require(
-            msg.sender == registration.admin,
-            "msg.sender must be the same as  registration.admin "
-        );
-
-        // Update  Index node URLs in registration struct
-
-        if (indexNodeUrls.length > 0) {
-            registration.indexNodeUrls = indexNodeUrls;
-        }
-
-        if (indexNodeAddresses.length > 0) {
-            registration.indexNodeAddresses = indexNodeAddresses;
-        }
     }
 
-    // Get registration info for a specific network ID
-    function getNetworkRegistration(
-        uint64 networkId
-    ) external view returns (NetworkRegistration memory registration) {
-        // Get network registration struct and ensure it exists
-        registration = networkRegistrations[networkId];
-        require(
-            bytes(registration.rollupNodeUrl).length > 0,
-            "Network not registered"
-        );
-        // Return registration info
-        return registration;
-    }
-
-    // Get registration info for all networks (with pagination)
-    function getAllNetworkRegistrations(
-        uint64 page,
-        uint64 pageSize
-    ) external view returns (NetworkRegistration[] memory registrations) {
-        // Calculate number of registration infos to return
-        uint256 startIndex = (page - 1) * pageSize;
-        uint256 endIndex = startIndex + pageSize;
-        if (endIndex > numNetworks) {
-            endIndex = numNetworks;
-        }
-        uint256 numNetworksToReturn = endIndex - startIndex;
-
-        // Create dynamic array to store registration infos
-        registrations = new NetworkRegistration[](numNetworksToReturn);
-
-        // Iterate over registered networks and add necessary registration infos to array
-        uint256 i = 0;
-        for (uint64 networkId = 1; networkId <= numNetworks; networkId++) {
-            if (
-                bytes(networkRegistrations[networkId].rollupNodeUrl).length > 0
-            ) {
-                if ((i >= startIndex) && (i < endIndex)) {
-                    registrations[i - startIndex] = networkRegistrations[
-                        networkId
-                    ];
-                }
-                i++;
-            }
-        }
-
-        // Return registration info array
-        return registrations;
+    function getDataNetwork(
+        uint256 networkId
+    ) external view returns (Types.DataNetwork memory dataNetwork) {
+        // Check the data network must be registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        // Get data network struct
+        dataNetwork = _dataNetworks[networkId];
+        return dataNetwork;
     }
 
     // Register a new Rollup node for a specific network ID
-    function registerRollupNode(
-        uint64 networkId,
-        string memory rollupNodeUrl
-    ) public returns (bool success) {
-        // Check if rollupNodeUrl is not empty
-        require(
-            bytes(rollupNodeUrl).length > 0,
-            "Rollup node URL cannot be empty"
-        );
-
+    function updateRollupNode(
+        uint256 networkId,
+        string memory rollupNodeUrl,
+        address rollupNodeAddress
+    ) public {
+        // Check the data network must be registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
         // Check if network is registered
-        NetworkRegistration storage registration = networkRegistrations[
-            networkId
-        ];
-
-        require(
-            bytes(registration.rollupNodeUrl).length > 0,
-            "Network not registered"
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
+        // check the permission
+        require(msg.sender == dataNetwork.admin, "you are not the admin");
+        // Update Rollup node url
+        dataNetwork.rollupNodeUrl = rollupNodeUrl;
+        // We allow disable the rollup node by setting the address to 0x0
+        dataNetwork.rollupNodeAddress = rollupNodeAddress;
+        emit Events.UpdateRollupNode(
+            msg.sender,
+            networkId,
+            rollupNodeAddress,
+            rollupNodeUrl
         );
-
-        // Check if sender is the same as rollupNodeAddress
-        require(
-            msg.sender == registration.rollupNodeAddress,
-            "msg.sender must be the same as RollupNodeAddress"
-        );
-
-        // Update Rollup node in registration struct
-        registration.rollupNodeUrl = rollupNodeUrl;
-        return true;
-    }
-
-    // Register a new Index node for a specific network ID
-    function registerIndexNode(
-        uint64 networkId,
-        string memory indexNodeUrl
-    ) public returns (bool success) {
-        // Check if network is registered
-        NetworkRegistration storage registration = networkRegistrations[
-            networkId
-        ];
-        require(
-            bytes(registration.rollupNodeUrl).length > 0,
-            "Network not registered"
-        );
-
-        // Check if sender is in the list of index node addresses
-        bool senderIsRegistered = false;
-        for (uint i = 0; i < registration.indexNodeAddresses.length; i++) {
-            if (registration.indexNodeAddresses[i] == msg.sender) {
-                senderIsRegistered = true;
-                break;
-            }
-        }
-        require(
-            senderIsRegistered,
-            "Sender address is not a registered Index node"
-        );
-
-        // Check if index node URL is not empty
-        require(bytes(indexNodeUrl).length > 0, "Empty index node URL");
-
-        // Update or add Index node URL to array in registration struct
-        bool indexNodeUpdated = false;
-        for (uint i = 0; i < registration.indexNodeUrls.length; i++) {
-            if (registration.indexNodeAddresses[i] == msg.sender) {
-                registration.indexNodeUrls[i] = indexNodeUrl;
-                indexNodeUpdated = true;
-                break;
-            }
-        }
-
-        return indexNodeUpdated;
     }
 
     // Update network information for a specific network ID
     function updateRollupSteps(
-        uint64 networkId,
-        bytes memory latestArweaveTx
-    ) public returns (bool success) {
+        uint256 networkId,
+        bytes32 latestArweaveTx
+    ) public {
         // Check if network is registered
-        NetworkRegistration storage registration = networkRegistrations[
-            networkId
-        ];
-        require(registration.admin != address(0), "Network not registered");
-        // Check if sender is the same as rollupNodeAddress
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        // Check the latestarweavetx
+        require(latestArweaveTx != bytes32(0), "Invalid arweave tx");
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
+
+        // Check the rollup permission
         require(
-            msg.sender == registration.rollupNodeAddress,
+            msg.sender == dataNetwork.rollupNodeAddress,
             "msg.sender must be the same as RollupNodeAddress"
         );
         // Update latest Arweave transaction in registration struct
-        registration.latestArweaveTx = latestArweaveTx;
-        return true;
+        dataNetwork.latestArweaveTx = latestArweaveTx;
+        dataNetwork.latestRollupTime = block.timestamp;
+        // emit an event
+        emit Events.UpdateRollupStep(msg.sender, networkId, latestArweaveTx);
+    }
+
+    function createDocDatabase(uint256 networkId, bytes32 description) public {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        // Everyone can create a database currently
+        _databaseCounter++;
+        address db = address(
+            uint160(
+                bytes20(
+                    keccak256(
+                        abi.encodePacked(
+                            networkId,
+                            _databaseCounter,
+                            msg.sender
+                        )
+                    )
+                )
+            )
+        );
+        Types.Database storage database = _databases[networkId][db];
+        require(database.sender == address(0), "the must be a new database");
+        database.sender = msg.sender;
+        database.db = db;
+        database.description = description;
+        database.counter = 0;
+        emit Events.CreateDatabase(msg.sender, networkId, db);
+    }
+
+    function createCollection(
+        uint256 networkId,
+        address db,
+        bytes32 name,
+        bytes32 licenseName,
+        bytes32 licenseContent
+    ) public {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        require(name != bytes32(0), "name is empty");
+        require(licenseName != bytes32(0), "license is empty");
+        require(licenseContent != bytes32(0), "license content is empty");
+        // Everyone can create a database currently
+        Types.Database storage database = _databases[networkId][db];
+        require(database.db != address(0), "Database was not found");
+        // Check the permission
+        require(database.sender == msg.sender, "You must the database sender");
+        Types.Collection storage collection = _collections[networkId][db][name];
+        // The collection name must not be used
+        require(
+            collection.created == false,
+            "The collection name has been used"
+        );
+        _collectionCounter++;
+        collection.created = true;
+        collection.name = name;
+        collection.licenseName = licenseName;
+        collection.licenseContent = licenseContent;
+        emit Events.CreateCollection(msg.sender, networkId, db, name);
+    }
+
+    function getCollection(
+        uint256 networkId,
+        address db,
+        bytes32 name
+    ) public view returns (Types.Collection memory collection) {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        // Everyone can create a database currently
+        Types.Database storage database = _databases[networkId][db];
+        require(database.db != address(0), "Database was not found");
+        collection = _collections[networkId][db][name];
+        // The collection name must not be used
+        require(collection.created == true, "The collection was not found");
+        return collection;
+    }
+
+    function transferNetwork(uint256 networkId, address to) public {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        require(
+            msg.sender != to,
+            "you are transfering the data network to yourself"
+        );
+        Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
+        // Check the transfer permission
+        require(
+            msg.sender == dataNetwork.admin,
+            "msg.sender must be the same as data network admin"
+        );
+        dataNetwork.admin = to;
+        emit Events.TransferNetwork(msg.sender, networkId, to);
+    }
+
+    function transferDatabase(
+        uint256 networkId,
+        address db,
+        address to
+    ) public {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        Types.Database storage database = _databases[networkId][db];
+        require(database.sender == msg.sender, "You must the database sender");
+        database.sender = to;
+        emit Events.TransferDatabase(msg.sender, networkId, db, to);
+    }
+
+    function getDatabase(
+        uint256 id,
+        address db
+    ) public view returns (Types.Database memory database) {
+        // Check if network is registered
+        require(id <= _networkCounter, "Data Network is not registered");
+        database = _databases[id][db];
+        require(database.sender != address(0), "the must be a exist database");
+        return database;
+    }
+
+    function getState() public view returns (uint256, uint256, uint256) {
+        return (_networkCounter, _databaseCounter, _collectionCounter);
+    }
+
+    function forkNetwork(uint256 networkId) public {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        Types.DataNetwork storage dataNetwork = _dataNetworks[_networkCounter];
+        _networkCounter++;
+        Types.DataNetwork storage forkedDataNetwork = _dataNetworks[
+            _networkCounter
+        ];
+        forkedDataNetwork.admin = msg.sender;
+        forkedDataNetwork.id = _networkCounter;
+        forkedDataNetwork.description = dataNetwork.description;
+        forkedDataNetwork.latestArweaveTx = dataNetwork.latestArweaveTx;
+        forkedDataNetwork.latestRollupTime = dataNetwork.latestRollupTime;
+        emit Events.ForkNetwork(msg.sender, networkId, _networkCounter);
     }
 }

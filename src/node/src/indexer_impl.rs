@@ -17,9 +17,6 @@
 
 use crate::mutation_utils::MutationUtil;
 use crate::version_util;
-use ethers::abi::Address;
-
-use db3_base::bson_util::bytes_to_bson_document;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
@@ -30,7 +27,6 @@ use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
     GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
 };
-use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
 use db3_proto::db3_storage_proto::event_message;
@@ -38,6 +34,7 @@ use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
+use ethers::abi::Address;
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
 use std::ops::Deref;
