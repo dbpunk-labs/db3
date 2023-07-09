@@ -107,4 +107,16 @@ library Events {
         address db,
         bytes32 name
     );
+
+    /**
+     * Emitted when a developer fork a network
+     *
+     * @param sender          The sender of transaction
+     * @param networkId       The id of the network
+     */
+    event ForkNetwork(
+        address sender,
+        uint256 networkId,
+        uint256 forkedNetworkId
+    );
 }

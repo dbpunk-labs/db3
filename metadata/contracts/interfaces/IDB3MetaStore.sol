@@ -129,4 +129,10 @@ interface IDB3MetaStore {
      * get the state
      */
     function getState() external view returns (uint256, uint256, uint256);
+
+    /**
+     * fork a data network
+     * @param id                 The id of your data network
+     */
+    function forkNetwork(uint256 id) external;
 }

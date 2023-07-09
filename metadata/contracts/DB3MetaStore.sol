@@ -243,4 +243,20 @@ contract DB3MetaStore is IDB3MetaStore {
     function getState() public view returns (uint256, uint256, uint256) {
         return (_networkCounter, _databaseCounter, _collectionCounter);
     }
+
+    function forkNetwork(uint256 networkId) public {
+        // Check if network is registered
+        require(networkId <= _networkCounter, "Data Network is not registered");
+        Types.DataNetwork storage dataNetwork = _dataNetworks[_networkCounter];
+        _networkCounter++;
+        Types.DataNetwork storage forkedDataNetwork = _dataNetworks[
+            _networkCounter
+        ];
+        forkedDataNetwork.admin = msg.sender;
+        forkedDataNetwork.id = _networkCounter;
+        forkedDataNetwork.description = dataNetwork.description;
+        forkedDataNetwork.latestArweaveTx = dataNetwork.latestArweaveTx;
+        forkedDataNetwork.latestRollupTime = dataNetwork.latestRollupTime;
+        emit Events.ForkNetwork(msg.sender, networkId, _networkCounter);
+    }
 }
