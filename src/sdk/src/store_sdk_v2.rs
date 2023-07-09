@@ -121,7 +121,6 @@ impl StoreSDKV2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sdk_test;
     use std::time::Duration;
     use tonic::transport::Endpoint;
 
