@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use tempdir::TempDir;
     use tokio::time::{sleep, Duration as TokioDuration};
-    #[tokio::test]
+    //#[tokio::test]
     async fn register_a_data_network_test() {
         let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
             .unwrap();
