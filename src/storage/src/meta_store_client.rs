@@ -17,7 +17,7 @@
 
 use arweave_rs::crypto::base64::Base64;
 use db3_error::{DB3Error, Result};
-use ethers::prelude::LocalWallet;
+use ethers::prelude::{LocalWallet, Signer};
 use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},
@@ -56,6 +56,28 @@ impl MetaStoreClient {
             client,
             network,
         })
+    }
+
+    pub async fn register_data_network(
+        &self,
+        rollup_node_address: &Address,
+        rollup_node_url: &str,
+    ) -> Result<()> {
+        let store = DB3MetaStore::new(self.address, self.client.clone());
+        let empty_index_urls: Vec<String> = vec![];
+        let empty_index_addresses: Vec<Address> = vec![];
+        let desc: [u8; 32] = [0; 32];
+        let tx = store.register_data_network(
+            rollup_node_url.to_string(),
+            rollup_node_address.clone(),
+            empty_index_urls,
+            empty_index_addresses,
+            desc,
+        );
+        tx.send()
+            .await
+            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        Ok(())
     }
 
     pub async fn get_latest_arweave_tx(&self) -> Result<String> {
@@ -127,17 +149,23 @@ impl MetaStoreClient {
 mod tests {
     use super::*;
     use tempdir::TempDir;
-
     #[tokio::test]
-    async fn test_get_admin() {
-        let contract_addr = "0xb9709cE5E749b80978182db1bEdfb8c7340039A9";
-        let rpc_url = "https://polygon-mumbai.g.alchemy.com/v2/KIUID-hlFzpnLetzQdVwO38IQn0giefR";
-        let network: u64 = 1687245246;
-        //let addr = MetaStoreClient::get_admin(contract_addr, rpc_url, network)
-        //    .await
-        //    .unwrap();
-        //let expect_addr = "0xF78c7469939f1f21338E4E58b901EC7D9Aa29679";
-        //let expect_address = expect_addr.parse::<Address>().unwrap();
-        //assert_eq!(addr, expect_address);
+    async fn register_a_data_network_test() {
+        let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+            .unwrap();
+        let data_ref: &[u8] = data.as_ref();
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+        let address = contract_addr.parse::<Address>().unwrap();
+        let rpc_url = "http://127.0.0.1:8545";
+        let network_id = Arc::new(AtomicU64::new(0));
+        let client = MetaStoreClient::new(contract_addr, rpc_url, network_id, wallet)
+            .await
+            .unwrap();
+        client
+            .register_data_network(&address, rpc_url)
+            .await
+            .unwrap();
     }
 }
