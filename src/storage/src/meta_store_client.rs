@@ -141,6 +141,7 @@ impl MetaStoreClient {
 mod tests {
     use super::*;
     use tempdir::TempDir;
+    use tokio::time::{sleep, Duration as TokioDuration};
     #[tokio::test]
     async fn register_a_data_network_test() {
         let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
@@ -159,6 +160,7 @@ mod tests {
             .register_data_network(&rollup_node_address, rpc_url)
             .await;
         assert!(result.is_ok());
+        sleep(TokioDuration::from_millis(2 * 1000)).await;
         let tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
         let result = client.update_rollup_step(tx, 1).await;
         assert!(result.is_ok());
