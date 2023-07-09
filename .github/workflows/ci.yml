@@ -71,6 +71,7 @@ jobs:
           cd ${ROOT_DIR}/java && mvn test
       - name: Run rust test with coverage
         run: |
+          cargo test register_a_data_network_test
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:

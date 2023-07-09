@@ -85,7 +85,6 @@ impl RollupExecutor {
             config.key_root_path.clone(),
             config.ar_node_url.clone(),
             config.temp_data_path.clone(),
-            network_id.clone(),
         )?;
         Ok(Self {
             config,
@@ -248,6 +247,7 @@ impl RollupExecutor {
             "the next rollup start block {} and the newest block {current_block}",
             last_end_block
         );
+        let network_id = self.network_id.load(Ordering::Relaxed);
         self.pending_start_block
             .store(last_start_block, Ordering::Relaxed);
         self.pending_end_block
@@ -283,11 +283,17 @@ impl RollupExecutor {
         }
         let (id, reward, num_rows, size) = self
             .ar_toolbox
-            .compress_and_upload_record_batch(tx, last_end_block, current_block, &recordbatch)
+            .compress_and_upload_record_batch(
+                tx,
+                last_end_block,
+                current_block,
+                &recordbatch,
+                network_id,
+            )
             .await?;
         let (evm_cost, tx_hash) = self
             .meta_store
-            .update_rollup_step(id.as_str(), self.network_id.load(Ordering::Relaxed))
+            .update_rollup_step(id.as_str(), network_id)
             .await?;
         let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
         info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} ar cost {} and evm tx {} and cost {}", now.elapsed().as_secs(),
