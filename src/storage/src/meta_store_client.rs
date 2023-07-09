@@ -164,6 +164,7 @@ mod tests {
         let tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
         let result = client.update_rollup_step(tx, 1).await;
         assert!(result.is_ok());
+        sleep(TokioDuration::from_millis(2 * 1000)).await;
         let tx_ret = client.get_latest_arweave_tx(1).await;
         assert!(tx_ret.is_ok());
         let tx_remote = tx_ret.unwrap();
