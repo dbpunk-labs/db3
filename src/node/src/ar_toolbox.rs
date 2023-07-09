@@ -112,6 +112,21 @@ impl ArToolBox {
         }
         Ok((start_block.unwrap(), end_block.unwrap(), last_rollup_tx))
     }
+    pub async fn get_version_id(&self, tx_id: &str) -> Result<Option<String>> {
+        let tags = self.ar_filesystem.get_tags(tx_id).await?;
+        for tag in tags {
+            if let Ok(name) = tag.name.to_utf8_string() {
+                if name == "Version-Id" {
+                    let version = tag
+                        .value
+                        .to_utf8_string()
+                        .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                    return Ok(Some(version));
+                }
+            }
+        }
+        return Ok(None);
+    }
     pub async fn get_start_block(&self, tx_id: &str) -> Result<Option<String>> {
         let tags = self.ar_filesystem.get_tags(tx_id).await?;
         for tag in tags {
@@ -250,18 +265,21 @@ impl ArToolBox {
         let mut signature_builder = StringBuilder::new();
         let mut block_builder = UInt64Builder::new();
         let mut order_builder = UInt32Builder::new();
+        let mut docids_builder = StringBuilder::new();
         for (header, body) in mutations {
             let body_ref: &[u8] = &body.payload;
             payload_builder.append_value(body_ref);
             signature_builder.append_value(body.signature.as_str());
             block_builder.append_value(header.block_id);
             order_builder.append_value(header.order_id);
+            docids_builder.append_value(header.doc_ids_map.as_str());
         }
         let array_refs: Vec<ArrayRef> = vec![
             Arc::new(payload_builder.finish()),
             Arc::new(signature_builder.finish()),
             Arc::new(block_builder.finish()),
             Arc::new(order_builder.finish()),
+            Arc::new(docids_builder.finish()),
         ];
         let record_batch = RecordBatch::try_new(self.schema.clone(), array_refs)
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
@@ -431,8 +449,9 @@ mod tests {
         assert_eq!(block, 3712);
         assert_eq!(order, 1);
     }
+
     #[tokio::test]
-    async fn get_tx_tags_ut() {
+    async fn get_tx_tags_ut_for_v0_data() {
         let temp_dir = TempDir::new("download_arware_tx_ut").expect("create temp dir");
         let arweave_url = "https://arweave.net";
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -462,5 +481,8 @@ mod tests {
             last_rollup_tx.unwrap(),
             "ld2W-KnmHhmgYcSgc_DcqjjoU_ke9gkwrQEWk0A2Fpg"
         );
+
+        let version = ar_toolbox.get_version_id(tx_id).await.unwrap();
+        assert!(version.is_none());
     }
 }
