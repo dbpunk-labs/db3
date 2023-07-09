@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 //
 // mutation_utils.rs
 // Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
@@ -17,10 +18,14 @@
 use db3_crypto::db3_address::DB3Address;
 use db3_error::DB3Error;
 use db3_proto::db3_mutation_v2_proto::Mutation as MutationV2;
+use db3_proto::db3_storage_proto::ExtraItem;
 use ethers::core::types::Bytes as EthersBytes;
 use ethers::types::{transaction::eip712::TypedData, Address, Signature};
 use prost::Message;
+use rust_secp256k1::ffi::types::size_t;
+use serde_json::json;
 use std::str::FromStr;
+use tracing::warn;
 
 pub struct MutationUtil {}
 
@@ -115,6 +120,49 @@ impl MutationUtil {
             ))),
         }
     }
+
+    pub fn get_create_doc_ids_map(items: &Vec<ExtraItem>) -> String {
+        let doc_ids = items
+            .iter()
+            .filter(|item| item.key == "document")
+            .map(|item| item.value.clone())
+            .collect::<Vec<String>>()
+            .join(",");
+        if doc_ids.is_empty() {
+            return "".to_string();
+        } else {
+            json!({ "0": doc_ids }).to_string()
+        }
+    }
+
+    pub fn convert_doc_ids_map_to_vec(
+        doc_ids_map_str: &str,
+    ) -> Result<HashMap<String, Vec<i64>>, DB3Error> {
+        let mut res = HashMap::new();
+        if let Ok(doc_ids_map) = serde_json::from_str::<serde_json::Value>(doc_ids_map_str) {
+            if let Some(map) = doc_ids_map.as_object() {
+                for (k, v) in map.iter() {
+                    if let Some(v) = v.as_str() {
+                        let mut doc_ids = vec![];
+                        let ids = v.split(",").collect::<Vec<&str>>();
+                        for id in ids {
+                            if let Ok(doc_id) = i64::from_str(id) {
+                                doc_ids.push(doc_id)
+                            } else {
+                                return Err(DB3Error::ApplyMutationError(format!(
+                                    "invalid doc id {}",
+                                    id
+                                )));
+                            }
+                        }
+                        res.insert(k.clone(), doc_ids);
+                    }
+                }
+            }
+        }
+
+        Ok(res)
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -123,6 +171,45 @@ mod tests {
     use chrono::Utc;
     use ethers::types::transaction::eip712::Eip712;
 
+    #[test]
+    pub fn convert_doc_ids_map_to_vec_ut() {
+        let doc_ids_map_str = json!({"0": "1,2"}).to_string();
+        let doc_ids = MutationUtil::convert_doc_ids_map_to_vec(&doc_ids_map_str).unwrap();
+        assert_eq!(
+            doc_ids,
+            HashMap::from_iter(vec![("0".to_string(), vec![1, 2])])
+        );
+    }
+    #[test]
+    pub fn get_create_doc_ids_map_ut() {
+        let mut items = Vec::new();
+        items.push(ExtraItem {
+            key: "document".to_string(),
+            value: "1".to_string(),
+        });
+        items.push(ExtraItem {
+            key: "document".to_string(),
+            value: "2".to_string(),
+        });
+        let doc_ids = MutationUtil::get_create_doc_ids_map(&items);
+        assert_eq!(doc_ids, json!({"0": "1,2"}).to_string());
+
+        let mut items = Vec::new();
+        items.push(ExtraItem {
+            key: "db_addr".to_string(),
+            value: "1".to_string(),
+        });
+        items.push(ExtraItem {
+            key: "db_addr".to_string(),
+            value: "2".to_string(),
+        });
+        let doc_ids = MutationUtil::get_create_doc_ids_map(&items);
+        assert_eq!(doc_ids, "");
+
+        let mut items = Vec::new();
+        let doc_ids = MutationUtil::get_create_doc_ids_map(&items);
+        assert_eq!(doc_ids, "");
+    }
     #[test]
     pub fn test_java_sdk_verfiy_ut() {
         //let expected_addr = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266";

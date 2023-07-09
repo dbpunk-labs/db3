@@ -23,9 +23,11 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::MutationState;
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationBody, MutationHeader};
 use db3_proto::db3_rollup_proto::{GcRecord as GCRecord, RollupRecord};
+use db3_proto::db3_storage_proto::ExtraItem;
 use ethers::types::U256;
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
+use serde_json::json;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -592,6 +594,7 @@ impl MutationStore {
         &self,
         payload: &[u8],
         signature: &str,
+        doc_ids_map: &str,
         sender: &DB3Address,
         nonce: u64,
         block: u64,
@@ -623,6 +626,7 @@ impl MutationStore {
             nonce,
             network,
             action: action.into(),
+            doc_ids_map: doc_ids_map.to_string(),
         };
         let mut header_buf = BytesMut::with_capacity(1024);
         mutation_header
@@ -700,6 +704,7 @@ mod tests {
             let result = store.add_mutation(
                 payload.as_ref(),
                 signature,
+                "",
                 &DB3Address::ZERO,
                 1,
                 block,
@@ -719,6 +724,7 @@ mod tests {
             let result = store.add_mutation(
                 payload.as_ref(),
                 signature,
+                "",
                 &DB3Address::ZERO,
                 1,
                 block,
@@ -815,6 +821,7 @@ mod tests {
             let result = store.add_mutation(
                 payload.as_ref(),
                 signature,
+                "",
                 &DB3Address::ZERO,
                 1,
                 block,
@@ -859,6 +866,7 @@ mod tests {
             let result = store.add_mutation(
                 payload.as_ref(),
                 signature,
+                "",
                 &DB3Address::ZERO,
                 1,
                 block,

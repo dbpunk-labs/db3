@@ -41,6 +41,7 @@ impl ArToolBox {
             Field::new("signature", DataType::Utf8, true),
             Field::new("block", DataType::UInt64, true),
             Field::new("order", DataType::UInt32, true),
+            Field::new("doc_ids", DataType::Utf8, true),
         ]));
 
         Ok(Self {

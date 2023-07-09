@@ -621,6 +621,7 @@ impl DBStoreV2 {
         sender: &DB3Address,
         col_name: &str,
         docs: &Vec<String>,
+        doc_ids: Option<&Vec<i64>>,
     ) -> Result<Vec<i64>> {
         if !self.is_db_collection_exist(db_addr, col_name)? {
             return Err(DB3Error::CollectionNotFound(
@@ -629,8 +630,22 @@ impl DBStoreV2 {
             ));
         }
         let db_addr_hex = db_addr.to_hex();
-        let doc_ids =
-            self.update_db_state_for_add_docs(db_addr_hex.as_str(), col_name, docs.len())?;
+        let doc_ids = match doc_ids {
+            Some(ids) => {
+                if ids.len() != docs.len() {
+                    return Err(DB3Error::ReadStoreError(format!(
+                        "doc_ids and docs length mismatch {} != {}",
+                        ids.len(),
+                        docs.len()
+                    )));
+                }
+                Some(ids.clone())
+            }
+            None => {
+                self.update_db_state_for_add_docs(db_addr_hex.as_str(), col_name, docs.len())?
+            }
+        };
+
         if let Some(all_doc_ids) = doc_ids {
             self.create_doc_ownership(sender, db_addr, &all_doc_ids)?;
             // add db+id-> owner mapping to control the permissions
@@ -881,6 +896,7 @@ impl DBStoreV2 {
         nonce: u64,
         block: u64,
         order: u32,
+        doc_ids_map: &HashMap<String, Vec<i64>>,
     ) -> Result<Vec<ExtraItem>> {
         let mut items: Vec<ExtraItem> = Vec::new();
         match action {
@@ -963,7 +979,7 @@ impl DBStoreV2 {
                 }
             }
             MutationAction::AddDocument => {
-                for (_i, body) in dm.bodies.iter().enumerate() {
+                for (i, body) in dm.bodies.iter().enumerate() {
                     let db_address_ref: &[u8] = body.db_address.as_ref();
                     let db_addr = DB3Address::try_from(db_address_ref)
                         .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
@@ -980,6 +996,7 @@ impl DBStoreV2 {
                                 address,
                                 doc_mutation.collection_name.as_str(),
                                 &docs,
+                                doc_ids_map.get(i.to_string().as_str()),
                             )
                             .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
                         info!(
@@ -1291,12 +1308,12 @@ mod tests {
             address.push(db_id.address().clone());
             for _n in 0..1003 {
                 db3_store
-                    .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs)
+                    .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs, None)
                     .unwrap();
             }
             for _n in 0..91 {
                 db3_store
-                    .add_docs(db_id2.address(), &DB3Address::ZERO, "col1", &docs)
+                    .add_docs(db_id2.address(), &DB3Address::ZERO, "col1", &docs, None)
                     .unwrap();
             }
         }
