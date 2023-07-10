@@ -56,7 +56,6 @@ impl ArFileSystem {
         );
         let arweave_url = url::Url::from_str(config.arweave_url.as_str())
             .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
-
         let wallet = WalletInfoClient::new(arweave_url);
         Ok(Self { arweave, wallet })
     }

@@ -35,6 +35,7 @@ pub struct MetaStoreClient {
     address: Address,
     client: Arc<SignerMiddleware<Arc<Provider<Ws>>, LocalWallet>>,
 }
+
 unsafe impl Sync for MetaStoreClient {}
 unsafe impl Send for MetaStoreClient {}
 

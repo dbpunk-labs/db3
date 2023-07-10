@@ -17,7 +17,7 @@
 
 use crate::key_store::{KeyStore, KeyStoreConfig};
 use crate::state_store::StateStore;
-use arweave_rs::Arweave;
+use arweave_rs::{crypto::sign::Signer as ArSigner, Arweave};
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::SystemConfig;
 use ethers::core::types::Address;
@@ -85,9 +85,42 @@ impl SystemStore {
     }
 
     pub fn get_ar_address(&self) -> Result<String> {
-        // we just get the wallet address
-        let arweave = self.get_ar_wallet("https://arweave.net/")?;
-        Ok(arweave.get_wallet_address())
+        let key_store_config = KeyStoreConfig {
+            key_root_path: self.config.key_root_path.to_string(),
+        };
+        let key_store = KeyStore::new(key_store_config);
+        match key_store.has_key(self.config.ar_wallet_key.as_str()) {
+            true => {
+                let data = key_store.get_key(self.config.ar_wallet_key.as_str())?;
+                let data_ref: &[u8] = &data;
+                let priv_key: RsaPrivateKey = RsaPrivateKey::from_pkcs8_der(data_ref)
+                    .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                let signer = ArSigner::new(priv_key);
+                let address = signer
+                    .wallet_address()
+                    .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                Ok(address.to_string())
+            }
+            false => {
+                let mut rng = rand::thread_rng();
+                let bits = 2048;
+                let priv_key = RsaPrivateKey::new(&mut rng, bits)
+                    .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                let doc = priv_key
+                    .to_pkcs8_der()
+                    .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                key_store
+                    .write_key(self.config.ar_wallet_key.as_str(), doc.as_ref())
+                    .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                let signer = ArSigner::new(priv_key);
+                let address = signer
+                    .wallet_address()
+                    .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                let address_str = address.to_string();
+                info!("generate a new arweave wallet with address {}", address_str);
+                Ok(address_str)
+            }
+        }
     }
 
     pub fn get_ar_wallet(&self, url: &str) -> Result<Arweave> {
@@ -99,10 +132,6 @@ impl SystemStore {
         let key_store = KeyStore::new(key_store_config);
         match key_store.has_key(self.config.ar_wallet_key.as_str()) {
             true => {
-                info!(
-                    "recover ar key store from {}",
-                    self.config.key_root_path.as_str()
-                );
                 let data = key_store.get_key(self.config.ar_wallet_key.as_str())?;
                 let data_ref: &[u8] = &data;
                 let priv_key: RsaPrivateKey = RsaPrivateKey::from_pkcs8_der(data_ref)

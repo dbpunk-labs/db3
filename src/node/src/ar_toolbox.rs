@@ -33,11 +33,15 @@ use std::path::Path;
 use std::sync::Arc;
 use tempdir::TempDir;
 use tracing::info;
+
 pub struct ArToolBox {
     pub schema: SchemaRef,
     pub ar_filesystem: ArFileSystem,
     pub temp_data_path: String,
 }
+
+unsafe impl Send for ArToolBox {}
+unsafe impl Sync for ArToolBox {}
 
 impl ArToolBox {
     pub fn new(key_root_path: String, arweave_url: String, temp_data_path: String) -> Result<Self> {

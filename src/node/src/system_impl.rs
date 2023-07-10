@@ -15,18 +15,21 @@
 // limitations under the License.
 //
 
-use std::sync::Arc;
-use ethers::abi::Address;
 use crate::mutation_utils::MutationUtil;
-use db3_storage::system_store::{SystemStore};
-use db3_error::{Result, DB3Error};
+use crate::version_util;
+use db3_error::{DB3Error, Result};
+use db3_proto::db3_base_proto::SystemConfig;
+use db3_proto::db3_base_proto::SystemStatus;
 use db3_proto::db3_system_proto::{
-    system_server::System,
-    SetupRequest, SetupResponse
+    system_server::System, GetSystemStatusRequest, SetupRequest, SetupResponse,
 };
+use db3_storage::system_store::{SystemRole, SystemStore};
+use ethers::abi::Address;
+use std::sync::Arc;
+use tonic::{Request, Response, Status};
+use tracing::info;
 
 type UpdateHook = fn();
-
 
 ///
 /// the setup grpc service for data rollup node and data index node
@@ -34,19 +37,26 @@ type UpdateHook = fn();
 pub struct SystemImpl {
     update_hook: UpdateHook,
     system_store: Arc<SystemStore>,
+    role: SystemRole,
+    // include the protocol, host and port
+    public_node_url: String,
+    admin_addr: Address,
 }
 
-///
-///
-///
 impl SystemImpl {
     pub fn new(
-               update_hook: UpdateHook,
-               state_store:Arc<StateStore>
-               ) -> Self {
+        update_hook: UpdateHook,
+        system_store: Arc<SystemStore>,
+        role: SystemRole,
+        public_node_url: String,
+        admin_addr: Address,
+    ) -> Self {
         Self {
             update_hook,
-            state_store
+            system_store,
+            role,
+            public_node_url,
+            admin_addr,
         }
     }
 }
@@ -62,83 +72,118 @@ impl System for SystemImpl {
         // verify the typed data signature
         let (address, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
             .map_err(|e| Status::invalid_argument(format!("invalid signature {e}")))?;
-
+        info!("setup with config {:?}", data);
         // only admin can request the setup function
-        if self.admin_addr != addr {
+        if self.admin_addr != address {
             return Err(Status::permission_denied(
                 "You are not the admin".to_string(),
             ));
         }
-
         // the chain id must be provided
         let chain_id = MutationUtil::get_u32_field(&data, "chainId", 0);
         if chain_id == 0 {
-            return Err(Status::invalid_argument(
-                    format!("invalid chain id {chain_id}")
-            ));
+            return Err(Status::invalid_argument(format!(
+                "invalid chain id {chain_id}"
+            )));
         }
-
-        let rollup_interval = MutationUtil::get_u64_field(
-            &data,
-            "rollupInterval",
-            10 * 60 * 1000
-        );
-
-        let min_rollup_size = MutationUtil::get_u64_field(
-            &data,
-            "minRollupSize",
-            1024 * 1024
-        );
-
-        let evm_node_rpc =
-            MutationUtil::get_str_field(&data, "evmNodeRpc", "");
+        let rollup_interval = MutationUtil::get_u64_field(&data, "rollupInterval", 10 * 60 * 1000);
+        let rollup_max_interval =
+            MutationUtil::get_u64_field(&data, "rollupMaxInterval", 24 * 60 * 60 * 1000);
+        let min_rollup_size = MutationUtil::get_u64_field(&data, "minRollupSize", 1024 * 1024);
+        let evm_node_rpc = MutationUtil::get_str_field(&data, "evmNodeRpc", "");
         if evm_node_rpc.is_empty() {
-            return Err(Status::invalid_argument(
-                    format!("evm node rpc is empty")
-            ));
+            return Err(Status::invalid_argument(format!("evm node rpc is empty")));
         }
-
-        let ar_node_url = MutationUtil::get_str_field(
-            &data,
-            "arNodeUrl",
-            ""
-        );
-
-        if ar_node_rpc.is_empty() {
-            return Err(Status::invalid_argument(
-                    format!("ar node rpc is empty")
-            ));
+        if !evm_node_rpc.starts_with("wss") && !evm_node_rpc.starts_with("ws") {
+            return Err(Status::invalid_argument(format!(
+                "only the websocket url is valid"
+            )));
         }
-
+        let ar_node_url = MutationUtil::get_str_field(&data, "arNodeUrl", "");
+        if ar_node_url.is_empty() {
+            return Err(Status::invalid_argument(format!("ar node rpc is empty")));
+        }
         let network = MutationUtil::get_str_field(&data, "network", "0")
             .parse::<u64>()
             .map_err(|e| Status::invalid_argument(format!("fail to parse network id {e}")))?;
-
-        info!("setup with config {:?}", data);
-        let system_config = SystemConfig {
-            min_rollup_size,
-            rollup_interval,
-            network_id: network,
-            evm_node_url: evm_node_rpc.to_string(),
-            ar_node_url: ar_node_url.to_string(),
-        };
-
-        self.state_store
-            .store_node_config("storage", &system_config)
-            .map_err(|e| Status::internal(format!("{e}")))?;
-
+        if network == 0 {
+            return Err(Status::invalid_argument(format!("invalid network id")));
+        }
+        if let Some(old_config) = self
+            .system_store
+            .get_config(&self.role)
+            .map_err(|e| Status::internal(format!("fail to get old config {e}")))?
+        {
+            let system_config = SystemConfig {
+                min_rollup_size,
+                rollup_interval,
+                network_id: old_config.network_id,
+                evm_node_url: evm_node_rpc.to_string(),
+                ar_node_url: ar_node_url.to_string(),
+                chain_id: old_config.chain_id,
+                rollup_max_interval,
+            };
+            // if the node has been setuped the network id and chain id can not been changed
+            self.system_store
+                .update_config(&self.role, &system_config)
+                .map_err(|e| Status::internal(format!("{e}")))?;
+            (self.update_hook)();
+        } else {
+            let system_config = SystemConfig {
+                min_rollup_size,
+                rollup_interval,
+                network_id: network,
+                evm_node_url: evm_node_rpc.to_string(),
+                ar_node_url: ar_node_url.to_string(),
+                chain_id,
+                rollup_max_interval,
+            };
+            self.system_store
+                .update_config(&self.role, &system_config)
+                .map_err(|e| Status::internal(format!("{e}")))?;
+            (self.update_hook)();
+        }
         return Ok(Response::new(SetupResponse {
             code: 0,
             msg: "ok".to_string(),
         }));
     }
+
+    async fn get_system_status(
+        &self,
+        _request: Request<GetSystemStatusRequest>,
+    ) -> std::result::Result<Response<SystemStatus>, Status> {
+        let system_config = self
+            .system_store
+            .get_config(&self.role)
+            .map_err(|e| Status::internal(format!("fail to get old config {e}")))?;
+        let has_inited = !system_config.is_none();
+        let evm_address = self
+            .system_store
+            .get_evm_address()
+            .map_err(|e| Status::internal(format!("fail to get evm address {e}")))?;
+        let ar_address = self
+            .system_store
+            .get_ar_address()
+            .map_err(|e| Status::internal(format!("fail to get evm address {e}")))?;
+        Ok(Response::new(SystemStatus {
+            evm_account: format!("0x{}", evm_address),
+            evm_balance: "".to_string(),
+            ar_account: ar_address,
+            ar_balance: "".to_string(),
+            node_url: self.public_node_url.to_string(),
+            config: system_config,
+            has_inited,
+            admin_addr: self.admin_addr.to_string(),
+            version: Some(version_util::build_version()),
+        }))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-	use super::*;
+    use super::*;
 
-	#[test]
-	fn it_works() {
-	}
+    #[test]
+    fn it_works() {}
 }
