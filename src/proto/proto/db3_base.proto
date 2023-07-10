@@ -28,6 +28,7 @@ message SystemConfig {
   uint32 chain_id = 6;
   // rollup at once of max time
   uint64 rollup_max_interval = 7;
+  string contract_addr = 8;
 }
 
 message Version {

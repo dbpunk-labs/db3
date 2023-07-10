@@ -230,6 +230,7 @@ mod tests {
                 ar_node_url: "ar_node_url".to_string(),
                 chain_id: 1,
                 rollup_max_interval: 5,
+                contract_addr: "0x1213".to_string(),
             };
             let result = system_store.update_config(&SystemRole::DataIndexNode, &system_config);
             assert!(result.is_ok());
@@ -253,11 +254,13 @@ mod tests {
                 assert_eq!(c.ar_node_url.as_str(), "ar_node_url");
                 assert_eq!(c.chain_id, 1);
                 assert_eq!(c.rollup_max_interval, 5);
+                assert_eq!(c.contract_addr.as_str(), "0x1213");
             } else {
                 assert!(false);
             }
         }
     }
+
     #[test]
     fn system_store_ar_smoke_test() {
         let tmp_dir_path = TempDir::new("system_store_path").expect("create temp dir");

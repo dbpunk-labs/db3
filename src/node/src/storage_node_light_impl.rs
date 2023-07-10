@@ -22,7 +22,6 @@ use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::Result;
-use db3_proto::db3_base_proto::{SystemConfig, SystemStatus};
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
@@ -31,25 +30,28 @@ use db3_proto::db3_storage_proto::{
     GetCollectionOfDatabaseResponse, GetDatabaseOfOwnerRequest, GetDatabaseOfOwnerResponse,
     GetDatabaseRequest, GetDatabaseResponse, GetMutationBodyRequest, GetMutationBodyResponse,
     GetMutationHeaderRequest, GetMutationHeaderResponse, GetMutationStateRequest,
-    GetMutationStateResponse, GetNonceRequest, GetNonceResponse, GetSystemStatusRequest,
-    MutationStateView, ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
+    GetMutationStateResponse, GetNonceRequest, GetNonceResponse, MutationStateView,
+    ScanGcRecordRequest, ScanGcRecordResponse, ScanMutationHeaderRequest,
     ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
-    SendMutationRequest, SendMutationResponse, SetupRequest, SetupResponse, SubscribeRequest,
+    SendMutationRequest, SendMutationResponse, SubscribeRequest,
 };
-use ethers::core::types::Bytes as EthersBytes;
-use ethers::types::U256;
 
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
     Subscription as SubscriptionV2,
 };
-
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
+use db3_storage::system_store::{SystemRole, SystemStore};
 use ethers::abi::Address;
+use ethers::core::types::Bytes as EthersBytes;
+use ethers::types::U256;
 use prost::Message;
+use std::boxed::Box;
 use std::collections::{BTreeMap, HashSet};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -65,20 +67,17 @@ use tracing::{debug, info, warn};
 #[derive(Clone)]
 pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
-    pub state_config: StateStoreConfig,
     pub rollup_config: RollupExecutorConfig,
     pub db_store_config: DBStoreV2Config,
     pub network_id: u64,
     pub block_interval: u64,
-    pub node_url: String,
     pub evm_node_url: String,
     pub contract_addr: String,
-    pub admin_addr: String,
 }
 
 pub struct StorageNodeV2Impl {
     storage: MutationStore,
-    state_store: StateStore,
+    state_store: Arc<StateStore>,
     config: StorageNodeV2Config,
     running: Arc<AtomicBool>,
     db_store: DBStoreV2,
@@ -91,11 +90,14 @@ pub struct StorageNodeV2Impl {
     rollup_executor: Arc<RollupExecutor>,
     rollup_interval: Arc<AtomicU64>,
     network_id: Arc<AtomicU64>,
+    system_store: Arc<SystemStore>,
 }
 
 impl StorageNodeV2Impl {
     pub async fn new(
         config: StorageNodeV2Config,
+        system_store: Arc<SystemStore>,
+        state_store: Arc<StateStore>,
         sender: Sender<(
             DB3Address,
             SubscriptionV2,
@@ -105,46 +107,64 @@ impl StorageNodeV2Impl {
         if let Err(_e) = std::fs::create_dir_all(config.rollup_config.key_root_path.as_str()) {}
         let storage = MutationStore::new(config.store_config.clone())?;
         storage.recover()?;
-        let state_store = StateStore::new(config.state_config.clone())?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
-        let network_id = Arc::new(AtomicU64::new(config.network_id));
-        let rollup_executor = Arc::new(
-            RollupExecutor::new(
-                config.rollup_config.clone(),
-                storage.clone(),
-                network_id.clone(),
-            )
-            .await?,
-        );
-        let rollup_interval = config.rollup_config.rollup_interval;
-        Ok(Self {
-            storage,
-            state_store,
-            config,
-            running: Arc::new(AtomicBool::new(true)),
-            db_store,
-            sender,
-            broadcast_sender,
-            rollup_executor,
-            rollup_interval: Arc::new(AtomicU64::new(rollup_interval)),
-            network_id,
-        })
+        if let Some(c) = system_store.get_config(&SystemRole::DataRollupNode)? {
+            info!("init storage node from persistence config {:?}", c);
+            let network_id = Arc::new(AtomicU64::new(c.network_id));
+            let rollup_executor = Arc::new(
+                RollupExecutor::new(
+                    config.rollup_config.clone(),
+                    storage.clone(),
+                    network_id.clone(),
+                    system_store.clone(),
+                )
+                .await?,
+            );
+            let rollup_interval = c.rollup_interval;
+            Ok(Self {
+                storage,
+                state_store,
+                config,
+                running: Arc::new(AtomicBool::new(true)),
+                db_store,
+                sender,
+                broadcast_sender,
+                rollup_executor,
+                rollup_interval: Arc::new(AtomicU64::new(rollup_interval)),
+                network_id,
+                system_store,
+            })
+        } else {
+            info!("init storage node from command config");
+            let network_id = Arc::new(AtomicU64::new(config.network_id));
+            let rollup_executor = Arc::new(
+                RollupExecutor::new(
+                    config.rollup_config.clone(),
+                    storage.clone(),
+                    network_id.clone(),
+                    system_store.clone(),
+                )
+                .await?,
+            );
+            let rollup_interval = config.rollup_config.rollup_interval;
+            Ok(Self {
+                storage,
+                state_store,
+                config,
+                running: Arc::new(AtomicBool::new(true)),
+                db_store,
+                sender,
+                broadcast_sender,
+                rollup_executor,
+                rollup_interval: Arc::new(AtomicU64::new(rollup_interval)),
+                network_id,
+                system_store,
+            })
+        }
     }
 
     pub fn recover(&self) -> Result<()> {
-        let config = self.state_store.get_node_config("storage")?;
-        if let Some(c) = config {
-            self.rollup_executor
-                .update_min_rollup_size(c.min_rollup_size);
-            self.rollup_interval
-                .store(c.rollup_interval, Ordering::Relaxed);
-            self.network_id.store(c.network_id, Ordering::Relaxed);
-            info!(
-                "recover system config with min roll size {}, rollup interval {} and network id {}",
-                c.min_rollup_size, c.rollup_interval, c.network_id
-            );
-        }
         self.db_store.recover_db_state()?;
         Ok(())
     }
@@ -220,11 +240,15 @@ impl StorageNodeV2Impl {
             SubscriptionV2,
             Sender<std::result::Result<EventMessageV2, Status>>,
         )>,
+        mut update_receiver: Receiver<()>,
     ) -> std::result::Result<(), Status> {
         info!("start to keep subscription");
         let local_running = self.running.clone();
         let local_broadcast_sender = self.broadcast_sender.clone();
-
+        let local_rollup_interval = self.rollup_interval.clone();
+        let local_rollup_executor = self.rollup_executor.clone();
+        let local_system_store = self.system_store.clone();
+        let local_network_id = self.network_id.clone();
         tokio::spawn(async move {
             info!("listen to subscription update event and event message broadcaster");
             while local_running.load(Ordering::Relaxed) {
@@ -240,7 +264,14 @@ impl StorageNodeV2Impl {
                 let mut event_sub = local_broadcast_sender.subscribe();
                 while local_running.load(Ordering::Relaxed) {
                     tokio::select! {
-                         Some((addr, sub, sender)) = receiver.recv() => {
+                        Some(()) = update_receiver.recv() => {
+                            if let Ok(Some(c)) = local_system_store.get_config(&SystemRole::DataRollupNode) {
+                                local_network_id.store(c.network_id, Ordering::Relaxed);
+                                local_rollup_interval.store(c.rollup_interval, Ordering::Relaxed);
+                            }
+                            if let Ok(()) = local_rollup_executor.update_config().await {}
+                        }
+                        Some((addr, sub, sender)) = receiver.recv() => {
                             info!("add or update the subscriber with addr 0x{}", hex::encode(addr.as_ref()));
                             //TODO limit the max address count
                             subscribers.insert(addr, (sender, sub));
@@ -324,100 +355,6 @@ impl StorageNode for StorageNodeV2Impl {
             total_evm_cost,
         };
         Ok(Response::new(GetMutationStateResponse { view: Some(view) }))
-    }
-
-    async fn setup(
-        &self,
-        request: Request<SetupRequest>,
-    ) -> std::result::Result<Response<SetupResponse>, Status> {
-        let r = request.into_inner();
-        let (addr, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        info!("setup the storage node with config {:?}", data);
-        let admin_addr = self
-            .config
-            .admin_addr
-            .parse::<Address>()
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        if admin_addr != addr {
-            return Err(Status::permission_denied(
-                "You are not the admin".to_string(),
-            ));
-        }
-        let rollup_interval = MutationUtil::get_u64_field(
-            &data,
-            "rollupInterval",
-            self.rollup_interval.load(Ordering::Relaxed),
-        );
-        let min_rollup_size = MutationUtil::get_u64_field(
-            &data,
-            "minRollupSize",
-            self.rollup_executor.get_min_rollup_size(),
-        );
-        let evm_node_rpc =
-            MutationUtil::get_str_field(&data, "evmNodeRpc", self.config.evm_node_url.as_str());
-        let ar_node_url = MutationUtil::get_str_field(
-            &data,
-            "arNodeUrl",
-            self.config.rollup_config.ar_node_url.as_str(),
-        );
-
-        let network = MutationUtil::get_str_field(&data, "network", "0")
-            .parse::<u64>()
-            .map_err(|e| Status::internal(format!("{e}")))?;
-
-        self.rollup_executor.update_min_rollup_size(min_rollup_size);
-        self.rollup_interval
-            .store(rollup_interval, Ordering::Relaxed);
-        self.network_id.store(network, Ordering::Relaxed);
-        let system_config = SystemConfig {
-            min_rollup_size,
-            rollup_interval,
-            network_id: network,
-            evm_node_url: evm_node_rpc.to_string(),
-            ar_node_url: ar_node_url.to_string(),
-            chain_id: 0,
-            rollup_max_interval: 0,
-        };
-        self.state_store
-            .store_node_config("storage", &system_config)
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        return Ok(Response::new(SetupResponse {
-            code: 0,
-            msg: "ok".to_string(),
-        }));
-    }
-
-    async fn get_system_status(
-        &self,
-        _request: Request<GetSystemStatusRequest>,
-    ) -> std::result::Result<Response<SystemStatus>, Status> {
-        let (addr, balance) = self
-            .rollup_executor
-            .get_ar_account()
-            .await
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let evm_addr = self
-            .rollup_executor
-            .get_evm_account()
-            .await
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let system_config = self
-            .state_store
-            .get_node_config("storage")
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let has_inited = !system_config.is_none();
-        Ok(Response::new(SystemStatus {
-            evm_account: evm_addr,
-            evm_balance: "".to_string(),
-            ar_account: addr,
-            ar_balance: balance,
-            node_url: self.config.node_url.to_string(),
-            config: system_config,
-            has_inited,
-            admin_addr: self.config.admin_addr.to_string(),
-            version: Some(version_util::build_version()),
-        }))
     }
 
     async fn scan_gc_record(

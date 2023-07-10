@@ -23,6 +23,7 @@ use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::mutation_store::MutationStore;
+use db3_storage::system_store::{SystemRole, SystemStore};
 use ethers::prelude::{LocalWallet, Signer};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -41,19 +42,21 @@ pub struct RollupExecutorConfig {
     pub key_root_path: String,
     pub evm_node_url: String,
     pub contract_addr: String,
+    pub rollup_max_interval: u64,
 }
+
 pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
-    ar_toolbox: ArToolBox,
-    wallet: LocalWallet,
+    ar_toolbox: ArcSwap<ArToolBox>,
     min_rollup_size: Arc<AtomicU64>,
-    meta_store: Arc<MetaStoreClient>,
+    meta_store: ArcSwap<MetaStoreClient>,
     pending_mutations: Arc<AtomicU64>,
     pending_data_size: Arc<AtomicU64>,
     pending_start_block: Arc<AtomicU64>,
     pending_end_block: Arc<AtomicU64>,
     network_id: Arc<AtomicU64>,
+    system_store: Arc<SystemStore>,
 }
 
 unsafe impl Sync for RollupExecutor {}
@@ -64,66 +67,97 @@ impl RollupExecutor {
         config: RollupExecutorConfig,
         storage: MutationStore,
         network_id: Arc<AtomicU64>,
+        system_store: Arc<SystemStore>,
     ) -> Result<Self> {
-        let wallet = Self::build_wallet(config.key_root_path.as_str())?;
-        info!(
-            "evm address {}",
-            format!("0x{}", hex::encode(wallet.address().as_bytes()))
-        );
-        let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
-        //TODO config the chain id
-        let wallet2 = wallet2.with_chain_id(80001_u32);
-        let min_rollup_size = config.min_rollup_size;
-        let meta_store = Arc::new(
-            MetaStoreClient::new(
-                config.contract_addr.as_str(),
-                config.evm_node_url.as_str(),
-                wallet2,
-            )
-            .await?,
-        );
-        let ar_toolbox = ArToolBox::new(
-            config.key_root_path.clone(),
-            config.ar_node_url.clone(),
-            config.temp_data_path.clone(),
-        )?;
-        Ok(Self {
-            config,
-            storage,
-            ar_toolbox,
-            wallet,
-            min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
-            meta_store,
-            pending_mutations: Arc::new(AtomicU64::new(0)),
-            pending_data_size: Arc::new(AtomicU64::new(0)),
-            pending_start_block: Arc::new(AtomicU64::new(0)),
-            pending_end_block: Arc::new(AtomicU64::new(0)),
-            network_id,
-        })
+        if let Some(c) = system_store.get_config(&SystemRole::DataRollupNode)? {
+            info!(
+                "use persistence config to build rollup executor with config {:?}",
+                c
+            );
+            let wallet = system_store.get_evm_wallet(c.chain_id)?;
+            let min_rollup_size = c.min_rollup_size;
+            let meta_store = ArcSwap::from(Arc::new(
+                MetaStoreClient::new(c.contract_addr.as_str(), c.evm_node_url.as_str(), wallet)
+                    .await?,
+            ));
+            let ar_toolbox = ArcSwap::from(Arc::new(ArToolBox::new(
+                config.key_root_path.clone(),
+                c.ar_node_url.clone(),
+                config.temp_data_path.clone(),
+            )?));
+            Ok(Self {
+                config,
+                storage,
+                ar_toolbox,
+                min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
+                meta_store,
+                pending_mutations: Arc::new(AtomicU64::new(0)),
+                pending_data_size: Arc::new(AtomicU64::new(0)),
+                pending_start_block: Arc::new(AtomicU64::new(0)),
+                pending_end_block: Arc::new(AtomicU64::new(0)),
+                network_id: Arc::new(AtomicU64::new(c.network_id)),
+                system_store,
+            })
+        } else {
+            // current the default is mumbai chain
+            let wallet = system_store.get_evm_wallet(80000)?;
+            info!("use the command config to start the rollup executor");
+            let min_rollup_size = config.min_rollup_size;
+            let meta_store = ArcSwap::from(Arc::new(
+                MetaStoreClient::new(
+                    config.contract_addr.as_str(),
+                    config.evm_node_url.as_str(),
+                    wallet,
+                )
+                .await?,
+            ));
+            let ar_toolbox = ArcSwap::from(Arc::new(ArToolBox::new(
+                config.key_root_path.clone(),
+                config.ar_node_url.clone(),
+                config.temp_data_path.clone(),
+            )?));
+            Ok(Self {
+                config,
+                storage,
+                ar_toolbox,
+                min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
+                meta_store,
+                pending_mutations: Arc::new(AtomicU64::new(0)),
+                pending_data_size: Arc::new(AtomicU64::new(0)),
+                pending_start_block: Arc::new(AtomicU64::new(0)),
+                pending_end_block: Arc::new(AtomicU64::new(0)),
+                network_id,
+                system_store,
+            })
+        }
     }
 
-    fn build_wallet(key_root_path: &str) -> Result<LocalWallet> {
-        let config = KeyStoreConfig {
-            key_root_path: key_root_path.to_string(),
-        };
-        let key_store = KeyStore::new(config);
-        match key_store.has_key("evm") {
-            true => {
-                let data = key_store.get_key("evm")?;
-                let data_ref: &[u8] = &data;
-                let wallet = LocalWallet::from_bytes(data_ref)
-                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-                Ok(wallet)
-            }
-
-            false => {
-                let mut rng = rand::thread_rng();
-                let wallet = LocalWallet::new(&mut rng);
-                let data = wallet.signer().to_bytes();
-                key_store.write_key("evm", data.deref())?;
-                Ok(wallet)
-            }
+    ///
+    /// call by the update hook
+    ///
+    pub async fn update_config(&self) -> Result<()> {
+        if let Some(c) = self.system_store.get_config(&SystemRole::DataRollupNode)? {
+            info!(
+                "update the new system config {:?} for the rollup executor",
+                c
+            );
+            let wallet = self.system_store.get_evm_wallet(c.chain_id)?;
+            self.min_rollup_size
+                .store(c.min_rollup_size, Ordering::Relaxed);
+            let meta_store = Arc::new(
+                MetaStoreClient::new(c.contract_addr.as_str(), c.evm_node_url.as_str(), wallet)
+                    .await?,
+            );
+            self.meta_store.store(meta_store);
+            let ar_toolbox = Arc::new(ArToolBox::new(
+                self.config.key_root_path.clone(),
+                c.ar_node_url.clone(),
+                self.config.temp_data_path.clone(),
+            )?);
+            self.ar_toolbox.store(ar_toolbox);
+            self.network_id.store(c.network_id, Ordering::Relaxed);
         }
+        Ok(())
     }
 
     fn gc_mutation(&self) -> Result<()> {
@@ -197,10 +231,6 @@ impl RollupExecutor {
         }
     }
 
-    pub async fn get_ar_account(&self) -> Result<(String, String)> {
-        self.ar_toolbox.get_ar_account().await
-    }
-
     pub fn get_pending_rollup(&self) -> RollupRecord {
         RollupRecord {
             end_block: self.pending_end_block.load(Ordering::Relaxed),
@@ -216,12 +246,6 @@ impl RollupExecutor {
             evm_cost: 0,
         }
     }
-    pub async fn get_evm_account(&self) -> Result<String> {
-        Ok(format!(
-            "0x{}",
-            hex::encode(self.wallet.address().as_bytes())
-        ))
-    }
 
     pub fn update_min_rollup_size(&self, min_rollup_data_size: u64) {
         self.min_rollup_size
@@ -234,6 +258,8 @@ impl RollupExecutor {
 
     pub async fn process(&self) -> Result<()> {
         self.storage.flush_state()?;
+        let meta_store = self.meta_store.load();
+        let ar_toolbox = self.ar_toolbox.load();
         let (last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
             Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
             _ => (0_u64, 0_u64, "".to_string()),
@@ -262,9 +288,7 @@ impl RollupExecutor {
         }
         self.pending_mutations
             .store(mutations.len() as u64, Ordering::Relaxed);
-        let recordbatch = self
-            .ar_toolbox
-            .convert_mutations_to_recordbatch(&mutations)?;
+        let recordbatch = ar_toolbox.convert_mutations_to_recordbatch(&mutations)?;
         let memory_size = recordbatch.get_array_memory_size();
         self.pending_data_size
             .store(memory_size as u64, Ordering::Relaxed);
@@ -282,8 +306,7 @@ impl RollupExecutor {
             self.pending_data_size.store(0, Ordering::Relaxed);
             self.pending_mutations.store(0, Ordering::Relaxed);
         }
-        let (id, reward, num_rows, size) = self
-            .ar_toolbox
+        let (id, reward, num_rows, size) = ar_toolbox
             .compress_and_upload_record_batch(
                 tx,
                 last_end_block,
@@ -292,8 +315,7 @@ impl RollupExecutor {
                 network_id,
             )
             .await?;
-        let (evm_cost, tx_hash) = self
-            .meta_store
+        let (evm_cost, tx_hash) = meta_store
             .update_rollup_step(id.as_str(), network_id)
             .await?;
         let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));

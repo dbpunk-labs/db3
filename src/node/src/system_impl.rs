@@ -25,39 +25,48 @@ use db3_proto::db3_system_proto::{
 };
 use db3_storage::system_store::{SystemRole, SystemStore};
 use ethers::abi::Address;
+use std::boxed::Box;
+use std::future::Future;
+use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
 use tonic::{Request, Response, Status};
 use tracing::info;
-
-type UpdateHook = fn();
 
 ///
 /// the setup grpc service for data rollup node and data index node
 ///
 pub struct SystemImpl {
-    update_hook: UpdateHook,
     system_store: Arc<SystemStore>,
     role: SystemRole,
     // include the protocol, host and port
     public_node_url: String,
     admin_addr: Address,
+    sender: Sender<()>,
 }
+
+unsafe impl Send for SystemImpl {}
+unsafe impl Sync for SystemImpl {}
 
 impl SystemImpl {
     pub fn new(
-        update_hook: UpdateHook,
+        sender: Sender<()>,
         system_store: Arc<SystemStore>,
         role: SystemRole,
         public_node_url: String,
-        admin_addr: Address,
-    ) -> Self {
-        Self {
-            update_hook,
+        admin_addr: &str,
+    ) -> Result<Self> {
+        let address = admin_addr
+            .parse::<Address>()
+            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        Ok(Self {
+            sender,
             system_store,
             role,
             public_node_url,
-            admin_addr,
-        }
+            admin_addr: address,
+        })
     }
 }
 
@@ -86,6 +95,13 @@ impl System for SystemImpl {
                 "invalid chain id {chain_id}"
             )));
         }
+
+        let contract_addr = MutationUtil::get_str_field(&data, "contractAddress", "");
+        if contract_addr.is_empty() {
+            return Err(Status::invalid_argument(format!(
+                "contract address is empty"
+            )));
+        }
         let rollup_interval = MutationUtil::get_u64_field(&data, "rollupInterval", 10 * 60 * 1000);
         let rollup_max_interval =
             MutationUtil::get_u64_field(&data, "rollupMaxInterval", 24 * 60 * 60 * 1000);
@@ -94,6 +110,7 @@ impl System for SystemImpl {
         if evm_node_rpc.is_empty() {
             return Err(Status::invalid_argument(format!("evm node rpc is empty")));
         }
+
         if !evm_node_rpc.starts_with("wss") && !evm_node_rpc.starts_with("ws") {
             return Err(Status::invalid_argument(format!(
                 "only the websocket url is valid"
@@ -122,12 +139,13 @@ impl System for SystemImpl {
                 ar_node_url: ar_node_url.to_string(),
                 chain_id: old_config.chain_id,
                 rollup_max_interval,
+                contract_addr: old_config.contract_addr,
             };
             // if the node has been setuped the network id and chain id can not been changed
             self.system_store
                 .update_config(&self.role, &system_config)
                 .map_err(|e| Status::internal(format!("{e}")))?;
-            (self.update_hook)();
+            if let Err(e) = self.sender.send(()).await {}
         } else {
             let system_config = SystemConfig {
                 min_rollup_size,
@@ -137,11 +155,12 @@ impl System for SystemImpl {
                 ar_node_url: ar_node_url.to_string(),
                 chain_id,
                 rollup_max_interval,
+                contract_addr: contract_addr.to_string(),
             };
             self.system_store
                 .update_config(&self.role, &system_config)
                 .map_err(|e| Status::internal(format!("{e}")))?;
-            (self.update_hook)();
+            if let Err(e) = self.sender.send(()).await {}
         }
         return Ok(Response::new(SetupResponse {
             code: 0,

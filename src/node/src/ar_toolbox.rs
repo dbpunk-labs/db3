@@ -63,11 +63,6 @@ impl ArToolBox {
             temp_data_path,
         })
     }
-    pub async fn get_ar_account(&self) -> Result<(String, String)> {
-        let addr = self.ar_filesystem.get_address();
-        let balance = self.ar_filesystem.get_balance().await?;
-        Ok((addr, balance.to_string()))
-    }
 
     pub async fn download_and_parse_record_batch(&self, tx: &str) -> Result<Vec<RecordBatch>> {
         let tmp_dir = TempDir::new_in(&self.temp_data_path, "download")

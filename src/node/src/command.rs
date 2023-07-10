@@ -18,6 +18,7 @@
 use crate::indexer_impl::IndexerNodeImpl;
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
+use crate::system_impl::SystemImpl;
 use clap::Parser;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::DB3Error;
@@ -27,13 +28,15 @@ use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as Stor
 use db3_proto::db3_storage_proto::{
     EventMessage as EventMessageV2, Subscription as SubscriptionV2,
 };
+use db3_proto::db3_system_proto::system_server::SystemServer;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::DBStoreV2Config;
 use db3_storage::doc_store::DocStoreConfig;
 use db3_storage::key_store::KeyStore;
 use db3_storage::key_store::KeyStoreConfig;
 use db3_storage::mutation_store::MutationStoreConfig;
-use db3_storage::state_store::StateStoreConfig;
+use db3_storage::state_store::{StateStore, StateStoreConfig};
+use db3_storage::system_store::{SystemRole, SystemStore, SystemStoreConfig};
 use ethers::prelude::LocalWallet;
 use http::Uri;
 use std::ops::Deref;
@@ -65,12 +68,15 @@ pub enum DB3Command {
     /// Start the store node
     #[clap(name = "store")]
     Store {
+        /// the public address
+        #[clap(long, default_value = "http://127.0.0.1:26619")]
+        public_url: String,
         /// Bind the gprc server to this .
         #[clap(long, default_value = "127.0.0.1")]
-        public_host: String,
+        bind_host: String,
         /// The port of grpc api
         #[clap(long, default_value = "26619")]
-        public_grpc_port: u16,
+        listening_port: u16,
         /// Log more logs
         #[clap(short, long)]
         verbose: bool,
@@ -212,8 +218,9 @@ impl DB3Command {
     pub async fn execute(self) {
         match self {
             DB3Command::Store {
-                public_host,
-                public_grpc_port,
+                public_url,
+                bind_host,
+                listening_port,
                 verbose,
                 mutation_db_path,
                 state_db_path,
@@ -239,8 +246,9 @@ impl DB3Command {
                 tracing_subscriber::fmt().with_max_level(log_level).init();
                 info!("{ABOUT}");
                 Self::start_store_grpc_service(
-                    public_host.as_str(),
-                    public_grpc_port,
+                    public_url.as_str(),
+                    bind_host.as_str(),
+                    listening_port,
                     mutation_db_path.as_str(),
                     state_db_path.as_str(),
                     doc_db_path.as_str(),
@@ -357,8 +365,9 @@ impl DB3Command {
     }
     /// Start store grpc service
     async fn start_store_grpc_service(
-        public_host: &str,
-        public_grpc_port: u16,
+        public_url: &str,
+        bind_host: &str,
+        listening_port: u16,
         mutation_db_path: &str,
         state_db_path: &str,
         doc_db_path: &str,
@@ -375,7 +384,7 @@ impl DB3Command {
         admin_addr: &str,
         doc_start_id: i64,
     ) {
-        let addr = format!("{public_host}:{public_grpc_port}");
+        let listen_addr = format!("{bind_host}:{listening_port}");
 
         let rollup_config = RollupExecutorConfig {
             rollup_interval,
@@ -386,6 +395,7 @@ impl DB3Command {
             min_gc_round_offset,
             evm_node_url: evm_node_url.to_string(),
             contract_addr: contract_addr.to_string(),
+            rollup_max_interval: 24 * 60 * 60 * 1000,
         };
 
         let store_config = MutationStoreConfig {
@@ -402,6 +412,15 @@ impl DB3Command {
         let state_config = StateStoreConfig {
             db_path: state_db_path.to_string(),
         };
+        let state_store = Arc::new(StateStore::new(state_config).unwrap());
+
+        let system_store_config = SystemStoreConfig {
+            key_root_path: key_root_path.to_string(),
+            evm_wallet_key: "evm".to_string(),
+            ar_wallet_key: "ar".to_string(),
+        };
+
+        let system_store = Arc::new(SystemStore::new(system_store_config, state_store.clone()));
 
         let db_store_config = DBStoreV2Config {
             db_path: doc_db_path.to_string(),
@@ -416,7 +435,7 @@ impl DB3Command {
             doc_store_conf: DocStoreConfig::default(),
             doc_start_id,
         };
-
+        let (update_sender, update_receiver) = tokio::sync::mpsc::channel::<()>(8);
         let (sender, receiver) = tokio::sync::mpsc::channel::<(
             DB3Address,
             SubscriptionV2,
@@ -424,24 +443,36 @@ impl DB3Command {
         )>(1024);
         let config = StorageNodeV2Config {
             store_config,
-            state_config,
             rollup_config,
             db_store_config,
             network_id,
             block_interval,
-            node_url: addr.to_string(),
             contract_addr: contract_addr.to_string(),
             evm_node_url: evm_node_url.to_string(),
-            admin_addr: admin_addr.to_string(),
         };
-        let storage_node = StorageNodeV2Impl::new(config, sender).await.unwrap();
+
+        let storage_node =
+            StorageNodeV2Impl::new(config, system_store.clone(), state_store.clone(), sender)
+                .await
+                .unwrap();
         info!(
             "start db3 store node on public addr {} and network {}",
-            addr, network_id
+            public_url, network_id
         );
         std::fs::create_dir_all(rollup_data_path).unwrap();
         storage_node.recover().unwrap();
-        storage_node.keep_subscription(receiver).await.unwrap();
+        let system_impl = SystemImpl::new(
+            update_sender,
+            system_store.clone(),
+            SystemRole::DataRollupNode,
+            public_url.to_string(),
+            admin_addr,
+        )
+        .unwrap();
+        storage_node
+            .keep_subscription(receiver, update_receiver)
+            .await
+            .unwrap();
         storage_node.start_to_produce_block().await;
         storage_node.start_to_rollup().await;
         let cors_layer = CorsLayer::new()
@@ -453,7 +484,8 @@ impl DB3Command {
             .layer(cors_layer)
             .layer(tonic_web::GrpcWebLayer::new())
             .add_service(StorageNodeV2Server::new(storage_node))
-            .serve(addr.parse().unwrap())
+            .add_service(SystemServer::new(system_impl))
+            .serve(listen_addr.parse().unwrap())
             .await
             .unwrap();
     }
