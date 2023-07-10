@@ -450,7 +450,6 @@ impl DB3Command {
             contract_addr: contract_addr.to_string(),
             evm_node_url: evm_node_url.to_string(),
         };
-
         let storage_node =
             StorageNodeV2Impl::new(config, system_store.clone(), state_store.clone(), sender)
                 .await

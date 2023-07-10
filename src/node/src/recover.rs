@@ -108,24 +108,27 @@ impl Recover {
     /// recover from start_block to latest arweave tx
     pub async fn recover_from_block(&self, start_block: u64) -> Result<u64> {
         let txs = self.fetch_arweave_tx_from_block(start_block).await?;
-        for tx in txs.iter().rev() {
-            self.recover_from_arweave_tx(tx.as_str()).await?;
+        for (tx, version) in txs.iter().rev() {
+            self.recover_from_arweave_tx(tx.as_str(), version.clone())
+                .await?;
         }
         Ok(start_block)
     }
 
     /// recover from arweave tx
-    async fn recover_from_arweave_tx(&self, tx: &str) -> Result<()> {
+    async fn recover_from_arweave_tx(&self, tx: &str, version: Option<String>) -> Result<()> {
         let record_batch_vec = self.ar_toolbox.download_and_parse_record_batch(tx).await?;
         for record_batch in record_batch_vec.iter() {
-            let mutations = ArToolBox::convert_recordbatch_to_mutation(record_batch)?;
-            for (body, block, order) in mutations.iter() {
+            let mutations =
+                ArToolBox::convert_recordbatch_to_mutation(record_batch, version.clone())?;
+            for (body, block, order, doc_ids) in mutations.iter() {
                 let (dm, address, nonce) =
                     MutationUtil::unwrap_and_light_verify(&body.payload, body.signature.as_str())
                         .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
                 let action = MutationAction::from_i32(dm.action).ok_or(
                     DB3Error::WriteStoreError("fail to convert action type".to_string()),
                 )?;
+                let doc_ids_map = MutationUtil::convert_doc_ids_map_to_vec(doc_ids.as_str())?;
                 // apply mutation to db store
                 self.db_store.apply_mutation(
                     action,
@@ -135,6 +138,7 @@ impl Recover {
                     nonce,
                     block.clone(),
                     order.clone(),
+                    &doc_ids_map,
                 )?;
             }
         }
@@ -142,18 +146,21 @@ impl Recover {
         Ok(())
     }
     /// fetch arweave tx range from block to latest tx
-    async fn fetch_arweave_tx_from_block(&self, block: u64) -> Result<Vec<String>> {
+    async fn fetch_arweave_tx_from_block(
+        &self,
+        block: u64,
+    ) -> Result<Vec<(String, Option<String>)>> {
         let mut txs = vec![];
         // 1. get latest arweave tx id from meta store
         let mut tx = self.get_latest_arweave_tx().await?;
         loop {
-            let (_start_block, end_block, last_rollup_tx) =
+            let (_start_block, end_block, last_rollup_tx, version) =
                 self.ar_toolbox.get_tx_tags(tx.as_str()).await?;
             // 2. if end_block < block, return txs
             if end_block < block {
                 return Ok(txs);
             }
-            txs.push(tx.clone());
+            txs.push((tx.clone(), version));
             // stop if last_rollup_tx is None
             if let Some(t) = last_rollup_tx {
                 tx = t;
@@ -243,5 +250,6 @@ mod tests {
         let txs = res.unwrap();
         assert!(txs.len() > 0);
         println!("txs {:?}", txs);
+        assert!(txs[0].1.is_none());
     }
 }

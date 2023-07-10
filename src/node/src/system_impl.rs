@@ -24,11 +24,7 @@ use db3_proto::db3_system_proto::{
     system_server::System, GetSystemStatusRequest, SetupRequest, SetupResponse,
 };
 use db3_storage::system_store::{SystemRole, SystemStore};
-use ethers::abi::Address;
-use std::boxed::Box;
-use std::future::Future;
-use std::pin::Pin;
-use std::str::FromStr;
+use ethers::types::Address;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tonic::{Request, Response, Status};

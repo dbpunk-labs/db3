@@ -315,18 +315,37 @@ impl DBStoreV2 {
         &self,
         db_addr_hex: &str,
         col: &str,
-        count: usize,
+        doc_count: usize,
+        doc_ids: Option<&Vec<i64>>,
     ) -> Result<Option<Vec<i64>>> {
         if let Some(mut write_guard) = self.db_state.get_mut(db_addr_hex) {
             let database_state = write_guard.deref_mut();
             let mut ids: Vec<i64> = Vec::new();
-            for id in 1..(count + 1) {
-                ids.push(database_state.doc_order + id as i64);
+
+            if let Some(temp_ids) = doc_ids {
+                if temp_ids.len() != doc_count {
+                    return Err(DB3Error::WriteStoreError(format!(
+                        "doc_ids and docs length mismatch {} != {}",
+                        temp_ids.len(),
+                        doc_count
+                    )));
+                }
+                ids = temp_ids.clone();
+                database_state.doc_order = ids
+                    .iter()
+                    .max()
+                    .unwrap_or(&(database_state.doc_order + doc_count as i64))
+                    .clone();
+            } else {
+                for id in 1..(doc_count + 1) {
+                    ids.push(database_state.doc_order + id as i64);
+                }
+                database_state.doc_order = database_state.doc_order + doc_count as i64;
             }
-            database_state.doc_order = database_state.doc_order + count as i64;
-            database_state.total_doc_count = database_state.total_doc_count + count as u64;
+            database_state.total_doc_count = database_state.total_doc_count + doc_count as u64;
             if let Some(collection_state) = database_state.collection_state.get_mut(col) {
-                collection_state.total_doc_count = collection_state.total_doc_count + count as u64;
+                collection_state.total_doc_count =
+                    collection_state.total_doc_count + doc_count as u64;
             }
             Ok(Some(ids))
         } else {
@@ -621,6 +640,7 @@ impl DBStoreV2 {
         sender: &DB3Address,
         col_name: &str,
         docs: &Vec<String>,
+        given_doc_ids: Option<&Vec<i64>>,
     ) -> Result<Vec<i64>> {
         if !self.is_db_collection_exist(db_addr, col_name)? {
             return Err(DB3Error::CollectionNotFound(
@@ -629,8 +649,12 @@ impl DBStoreV2 {
             ));
         }
         let db_addr_hex = db_addr.to_hex();
-        let doc_ids =
-            self.update_db_state_for_add_docs(db_addr_hex.as_str(), col_name, docs.len())?;
+        let doc_ids = self.update_db_state_for_add_docs(
+            db_addr_hex.as_str(),
+            col_name,
+            docs.len(),
+            given_doc_ids,
+        )?;
         if let Some(all_doc_ids) = doc_ids {
             self.create_doc_ownership(sender, db_addr, &all_doc_ids)?;
             // add db+id-> owner mapping to control the permissions
@@ -881,6 +905,7 @@ impl DBStoreV2 {
         nonce: u64,
         block: u64,
         order: u32,
+        doc_ids_map: &HashMap<String, Vec<i64>>,
     ) -> Result<Vec<ExtraItem>> {
         let mut items: Vec<ExtraItem> = Vec::new();
         match action {
@@ -963,7 +988,7 @@ impl DBStoreV2 {
                 }
             }
             MutationAction::AddDocument => {
-                for (_i, body) in dm.bodies.iter().enumerate() {
+                for (i, body) in dm.bodies.iter().enumerate() {
                     let db_address_ref: &[u8] = body.db_address.as_ref();
                     let db_addr = DB3Address::try_from(db_address_ref)
                         .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
@@ -980,6 +1005,7 @@ impl DBStoreV2 {
                                 address,
                                 doc_mutation.collection_name.as_str(),
                                 &docs,
+                                doc_ids_map.get(i.to_string().as_str()),
                             )
                             .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
                         info!(
@@ -1226,7 +1252,41 @@ mod tests {
         let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 2, 1, 2, 1);
         assert!(result.is_ok());
         let result = db3_store
-            .update_db_state_for_add_docs(&db_id_1.address().to_hex(), "col1", 3)
+            .update_db_state_for_add_docs(&db_id_1.address().to_hex(), "col1", 3, None)
+            .unwrap();
+        assert_eq!(result, Some(vec![1, 2, 3]));
+    }
+    #[test]
+    fn test_update_db_state_for_add_docs_with_given_doc_ids() {
+        let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = DBStoreV2Config {
+            db_path: real_path,
+            db_store_cf_name: "db".to_string(),
+            doc_store_cf_name: "doc".to_string(),
+            collection_store_cf_name: "cf2".to_string(),
+            index_store_cf_name: "index".to_string(),
+            doc_owner_store_cf_name: "doc_owner".to_string(),
+            db_owner_store_cf_name: "db_owner".to_string(),
+            scan_max_limit: 50,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 1000,
+        };
+        let result = DBStoreV2::new(config);
+        assert_eq!(result.is_ok(), true);
+        let db_m = DocumentDatabaseMutation {
+            db_desc: "test_desc".to_string(),
+        };
+        let db3_store = result.unwrap();
+        let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 1, 1, 1, 1);
+        assert!(result.is_ok());
+        let db_id_1 = result.unwrap();
+        let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 2, 1, 2, 1);
+        assert!(result.is_ok());
+        let doc_ids: Vec<i64> = vec![1, 2, 3];
+        let result = db3_store
+            .update_db_state_for_add_docs(&db_id_1.address().to_hex(), "col1", 3, Some(&doc_ids))
             .unwrap();
         assert_eq!(result, Some(vec![1, 2, 3]));
     }
@@ -1291,12 +1351,12 @@ mod tests {
             address.push(db_id.address().clone());
             for _n in 0..1003 {
                 db3_store
-                    .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs)
+                    .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs, None)
                     .unwrap();
             }
             for _n in 0..91 {
                 db3_store
-                    .add_docs(db_id2.address(), &DB3Address::ZERO, "col1", &docs)
+                    .add_docs(db_id2.address(), &DB3Address::ZERO, "col1", &docs, None)
                     .unwrap();
             }
         }

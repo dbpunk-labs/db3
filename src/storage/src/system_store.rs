@@ -25,7 +25,6 @@ use ethers::prelude::{LocalWallet, Signer};
 use rsa::{pkcs8::DecodePrivateKey, pkcs8::EncodePrivateKey, RsaPrivateKey};
 use std::ops::Deref;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tracing::{info, warn};
 

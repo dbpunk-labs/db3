@@ -32,7 +32,7 @@ use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 use tracing::info;
-
+const AR_SCHEMA_VERSION_1: &str = "1";
 #[derive(Clone)]
 pub struct ArFileSystemConfig {
     pub arweave_url: String,
@@ -142,6 +142,8 @@ impl ArFileSystem {
         let mut tags: Vec<Tag<Base64>> = {
             let app_tag: Tag<Base64> = Tag::from_utf8_strs("App-Name", "DB3 Network")
                 .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+            let version_tag: Tag<Base64> = Tag::from_utf8_strs("Version-Id", AR_SCHEMA_VERSION_1)
+                .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
             let block_start_tag: Tag<Base64> =
                 Tag::from_utf8_strs("Start-Block", start_block.to_string().as_str())
                     .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
@@ -155,6 +157,7 @@ impl ArFileSystem {
                     .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
             vec![
                 app_tag,
+                version_tag,
                 block_start_tag,
                 block_end_tag,
                 filename_tag,

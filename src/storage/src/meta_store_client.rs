@@ -22,7 +22,7 @@ use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},
     middleware::SignerMiddleware,
-    providers::{Middleware, Provider, StreamExt, Ws},
+    providers::{Middleware, Provider, Ws},
 };
 use std::str::FromStr;
 use std::sync::Arc;
