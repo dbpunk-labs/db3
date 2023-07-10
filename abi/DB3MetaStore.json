@@ -6,114 +6,99 @@
     {
       "inputs": [
         {
-          "internalType": "uint64",
-          "name": "page",
-          "type": "uint64"
+          "internalType": "uint256",
+          "name": "networkId",
+          "type": "uint256"
         },
         {
-          "internalType": "uint64",
-          "name": "pageSize",
-          "type": "uint64"
-        }
-      ],
-      "name": "getAllNetworkRegistrations",
-      "outputs": [
+          "internalType": "address",
+          "name": "db",
+          "type": "address"
+        },
         {
-          "components": [
-            {
-              "internalType": "uint64",
-              "name": "networkId",
-              "type": "uint64"
-            },
-            {
-              "internalType": "string",
-              "name": "rollupNodeUrl",
-              "type": "string"
-            },
-            {
-              "internalType": "string[]",
-              "name": "indexNodeUrls",
-              "type": "string[]"
-            },
-            {
-              "internalType": "address[]",
-              "name": "indexNodeAddresses",
-              "type": "address[]"
-            },
-            {
-              "internalType": "address",
-              "name": "admin",
-              "type": "address"
-            },
-            {
-              "internalType": "address",
-              "name": "rollupNodeAddress",
-              "type": "address"
-            },
-            {
-              "internalType": "bytes",
-              "name": "latestArweaveTx",
-              "type": "bytes"
-            }
-          ],
-          "internalType": "struct IDB3MetaStore.NetworkRegistration[]",
-          "name": "registrations",
-          "type": "tuple[]"
+          "internalType": "bytes32",
+          "name": "name",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "licenseName",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "licenseContent",
+          "type": "bytes32"
         }
       ],
-      "stateMutability": "view",
+      "name": "createCollection",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
         {
-          "internalType": "uint64",
+          "internalType": "uint256",
           "name": "networkId",
-          "type": "uint64"
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "description",
+          "type": "bytes32"
         }
       ],
-      "name": "getNetworkRegistration",
+      "name": "createDocDatabase",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "networkId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "db",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "name",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getCollection",
       "outputs": [
         {
           "components": [
             {
-              "internalType": "uint64",
-              "name": "networkId",
-              "type": "uint64"
+              "internalType": "bytes32",
+              "name": "name",
+              "type": "bytes32"
             },
             {
-              "internalType": "string",
-              "name": "rollupNodeUrl",
-              "type": "string"
+              "internalType": "bytes32",
+              "name": "licenseName",
+              "type": "bytes32"
             },
             {
-              "internalType": "string[]",
-              "name": "indexNodeUrls",
-              "type": "string[]"
+              "internalType": "bytes32",
+              "name": "licenseContent",
+              "type": "bytes32"
             },
             {
-              "internalType": "address[]",
-              "name": "indexNodeAddresses",
-              "type": "address[]"
-            },
-            {
-              "internalType": "address",
-              "name": "admin",
-              "type": "address"
-            },
-            {
-              "internalType": "address",
-              "name": "rollupNodeAddress",
-              "type": "address"
-            },
-            {
-              "internalType": "bytes",
-              "name": "latestArweaveTx",
-              "type": "bytes"
+              "internalType": "bool",
+              "name": "created",
+              "type": "bool"
             }
           ],
-          "internalType": "struct IDB3MetaStore.NetworkRegistration",
-          "name": "registration",
+          "internalType": "struct Types.Collection",
+          "name": "collection",
           "type": "tuple"
         }
       ],
@@ -123,34 +108,117 @@
     {
       "inputs": [
         {
-          "internalType": "uint64",
+          "internalType": "uint256",
           "name": "networkId",
-          "type": "uint64"
-        },
-        {
-          "internalType": "string",
-          "name": "indexNodeUrl",
-          "type": "string"
+          "type": "uint256"
         }
       ],
-      "name": "registerIndexNode",
+      "name": "getDataNetwork",
       "outputs": [
         {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "rollupNodeUrl",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "rollupNodeAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "string[]",
+              "name": "indexNodeUrls",
+              "type": "string[]"
+            },
+            {
+              "internalType": "address[]",
+              "name": "indexNodeAddresses",
+              "type": "address[]"
+            },
+            {
+              "internalType": "address",
+              "name": "admin",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "latestArweaveTx",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "latestRollupTime",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "description",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct Types.DataNetwork",
+          "name": "dataNetwork",
+          "type": "tuple"
         }
       ],
-      "stateMutability": "nonpayable",
+      "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
         {
-          "internalType": "uint64",
-          "name": "networkId",
-          "type": "uint64"
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
         },
+        {
+          "internalType": "address",
+          "name": "db",
+          "type": "address"
+        }
+      ],
+      "name": "getDatabase",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "db",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "sender",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "description",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "counter",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct Types.Database",
+          "name": "database",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
         {
           "internalType": "string",
           "name": "rollupNodeUrl",
@@ -170,9 +238,14 @@
           "internalType": "address[]",
           "name": "indexNodeAddresses",
           "type": "address[]"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "description",
+          "type": "bytes32"
         }
       ],
-      "name": "registerNetwork",
+      "name": "registerDataNetwork",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -180,33 +253,50 @@
     {
       "inputs": [
         {
-          "internalType": "uint64",
+          "internalType": "uint256",
           "name": "networkId",
-          "type": "uint64"
+          "type": "uint256"
         },
         {
-          "internalType": "string",
-          "name": "rollupNodeUrl",
-          "type": "string"
-        }
-      ],
-      "name": "registerRollupNode",
-      "outputs": [
+          "internalType": "address",
+          "name": "db",
+          "type": "address"
+        },
         {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
         }
       ],
+      "name": "transferDatabase",
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
         {
-          "internalType": "uint64",
+          "internalType": "uint256",
           "name": "networkId",
-          "type": "uint64"
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        }
+      ],
+      "name": "transferNetwork",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "networkId",
+          "type": "uint256"
         },
         {
           "internalType": "string[]",
@@ -219,7 +309,7 @@
           "type": "address[]"
         }
       ],
-      "name": "updateNetworkIndexNodes",
+      "name": "updateIndexNodes",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -227,24 +317,41 @@
     {
       "inputs": [
         {
-          "internalType": "uint64",
+          "internalType": "uint256",
           "name": "networkId",
-          "type": "uint64"
+          "type": "uint256"
         },
         {
-          "internalType": "bytes",
+          "internalType": "string",
+          "name": "rollupNodeUrl",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "rollupNodeAddress",
+          "type": "address"
+        }
+      ],
+      "name": "updateRollupNode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "networkId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
           "name": "latestArweaveTx",
-          "type": "bytes"
+          "type": "bytes32"
         }
       ],
       "name": "updateRollupSteps",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     }

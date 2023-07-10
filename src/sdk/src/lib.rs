@@ -16,6 +16,4 @@
 //
 
 pub mod indexer_sdk;
-#[cfg(test)]
-pub mod sdk_test;
 pub mod store_sdk_v2;

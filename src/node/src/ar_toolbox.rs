@@ -1,3 +1,20 @@
+//
+// ar_toolbox.rs
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 use arrow::array::{
     ArrayRef, BinaryArray, BinaryBuilder, StringArray, StringBuilder, UInt32Array, UInt32Builder,
     UInt64Array, UInt64Builder,
@@ -13,24 +30,17 @@ use parquet::basic::{Compression, GzipLevel};
 use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tempdir::TempDir;
 use tracing::info;
 pub struct ArToolBox {
-    pub network_id: Arc<AtomicU64>,
     pub schema: SchemaRef,
     pub ar_filesystem: ArFileSystem,
     pub temp_data_path: String,
 }
 
 impl ArToolBox {
-    pub fn new(
-        key_root_path: String,
-        arweave_url: String,
-        temp_data_path: String,
-        network_id: Arc<AtomicU64>,
-    ) -> Result<Self> {
+    pub fn new(key_root_path: String, arweave_url: String, temp_data_path: String) -> Result<Self> {
         let ar_fs_config = ArFileSystemConfig {
             key_root_path,
             arweave_url,
@@ -45,7 +55,6 @@ impl ArToolBox {
         ]));
 
         Ok(Self {
-            network_id,
             schema,
             ar_filesystem,
             temp_data_path,
@@ -165,6 +174,7 @@ impl ArToolBox {
         last_end_block: u64,
         current_block: u64,
         recordbatch: &RecordBatch,
+        network_id: u64,
     ) -> Result<(String, u64, u64, u64)> {
         let tmp_dir = TempDir::new_in(&self.temp_data_path, "compression")
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
@@ -179,7 +189,7 @@ impl ArToolBox {
                 tx.as_str(),
                 last_end_block,
                 current_block,
-                self.network_id.load(Ordering::Relaxed),
+                network_id,
                 filename.as_str(),
             )
             .await?;
@@ -462,12 +472,10 @@ mod tests {
             .unwrap()
             .to_string();
 
-        let network_id = Arc::new(AtomicU64::new(1687961160));
         let ar_toolbox = ArToolBox::new(
             key_root_path.to_string(),
             arweave_url.to_string(),
             temp_dir.path().to_str().unwrap().to_string(),
-            network_id,
         )
         .unwrap();
         let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
@@ -499,12 +507,10 @@ mod tests {
             .unwrap()
             .to_string();
 
-        let network_id = Arc::new(AtomicU64::new(1687961160));
         let ar_toolbox = ArToolBox::new(
             key_root_path.to_string(),
             arweave_url.to_string(),
             temp_dir.path().to_str().unwrap().to_string(),
-            network_id,
         )
         .unwrap();
         let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";

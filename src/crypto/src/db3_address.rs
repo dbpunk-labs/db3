@@ -15,25 +15,15 @@
 // limitations under the License.
 //
 
-use crate::db3_public_key::{DB3PublicKey, DB3PublicKeyScheme};
-use crate::db3_serde::Readable;
 use db3_error::DB3Error;
 use fastcrypto::encoding::{decode_bytes_hex, Encoding, Hex};
-use fastcrypto::hash::{HashFunction, Sha3_256};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 pub const DB3_ADDRESS_LENGTH: usize = 20;
 #[serde_as]
-#[derive(
-    Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema,
-)]
-pub struct DB3Address(
-    #[schemars(with = "Hex")]
-    #[serde_as(as = "Readable<Hex, _>")]
-    [u8; DB3_ADDRESS_LENGTH],
-);
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
+pub struct DB3Address([u8; DB3_ADDRESS_LENGTH]);
 
 impl DB3Address {
     pub const ZERO: Self = Self([0u8; DB3_ADDRESS_LENGTH]);
@@ -85,15 +75,6 @@ impl DB3Address {
             Self::try_from(data.as_slice())
         }
     }
-
-    pub fn from_evm_public_key(pk: &DB3PublicKey) -> Self {
-        let mut hasher = Sha3_256::default();
-        hasher.update(pk);
-        let g_arr = hasher.finalize();
-        let mut res = [0u8; DB3_ADDRESS_LENGTH];
-        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
-        DB3Address(res)
-    }
 }
 
 impl TryFrom<Vec<u8>> for DB3Address {
@@ -108,30 +89,6 @@ impl TryFrom<Vec<u8>> for DB3Address {
 impl From<&[u8; DB3_ADDRESS_LENGTH]> for DB3Address {
     fn from(data: &[u8; DB3_ADDRESS_LENGTH]) -> Self {
         Self(*data)
-    }
-}
-
-impl From<&DB3PublicKey> for DB3Address {
-    fn from(pk: &DB3PublicKey) -> Self {
-        let mut hasher = Sha3_256::default();
-        hasher.update([pk.flag()]);
-        hasher.update(pk);
-        let g_arr = hasher.finalize();
-        let mut res = [0u8; DB3_ADDRESS_LENGTH];
-        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
-        DB3Address(res)
-    }
-}
-
-impl<T: DB3PublicKeyScheme> From<&T> for DB3Address {
-    fn from(pk: &T) -> Self {
-        let mut hasher = Sha3_256::default();
-        hasher.update([T::SIGNATURE_SCHEME.flag()]);
-        hasher.update(pk);
-        let g_arr = hasher.finalize();
-        let mut res = [0u8; DB3_ADDRESS_LENGTH];
-        res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..DB3_ADDRESS_LENGTH]);
-        DB3Address(res)
     }
 }
 

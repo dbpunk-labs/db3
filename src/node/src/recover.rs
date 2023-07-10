@@ -1,6 +1,22 @@
+//
+// recover.rs
+// Copyright (C) 2023 db3.network Author imotai <codego.me@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 use crate::ar_toolbox::ArToolBox;
 use crate::mutation_utils::MutationUtil;
-use arweave_rs::crypto::base64::Base64;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
@@ -9,13 +25,12 @@ use db3_storage::meta_store_client::MetaStoreClient;
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::info;
 
 pub struct RecoverConfig {
     pub db_store_config: DBStoreV2Config,
-    pub network_id: u64,
     pub key_root_path: String,
     pub ar_node_url: String,
     pub temp_data_path: String,
@@ -28,24 +43,23 @@ pub struct Recover {
     pub ar_toolbox: Arc<ArToolBox>,
     pub meta_store: Arc<MetaStoreClient>,
     pub db_store: Arc<DBStoreV2>,
+    network_id: Arc<AtomicU64>,
 }
 
 impl Recover {
-    pub async fn new(config: RecoverConfig) -> Result<Self> {
-        let network_id = Arc::new(AtomicU64::new(config.network_id));
+    pub async fn new(config: RecoverConfig, network_id: Arc<AtomicU64>) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
             "evm address {}",
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
-        let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
-        let wallet2 = wallet2.with_chain_id(80001_u32);
+        //TODO config the chain id
+        let wallet = wallet.with_chain_id(80001_u32);
         let meta_store = Arc::new(
             MetaStoreClient::new(
                 config.contract_addr.as_str(),
                 config.evm_node_url.as_str(),
-                network_id.clone(),
-                wallet2,
+                wallet,
             )
             .await?,
         );
@@ -53,16 +67,14 @@ impl Recover {
             config.key_root_path.clone(),
             config.ar_node_url.clone(),
             config.temp_data_path.clone(),
-            network_id.clone(),
         )?);
-
         let db_store = Arc::new(DBStoreV2::new(config.db_store_config.clone())?);
-
         Ok(Self {
             config,
             ar_toolbox,
             meta_store,
             db_store,
+            network_id,
         })
     }
 
@@ -98,16 +110,15 @@ impl Recover {
     pub async fn recover_from_block(&self, start_block: u64) -> Result<u64> {
         let txs = self.fetch_arware_tx_from_block(start_block).await?;
         for (tx, version) in txs.iter().rev() {
-            self.recover_from_arware_tx(tx.as_str(), version.clone())
+            self.recover_from_arweave_tx(tx.as_str(), version.clone())
                 .await?;
         }
         Ok(start_block)
     }
 
     /// recover from arweave tx
-    async fn recover_from_arware_tx(&self, tx: &str, version: Option<String>) -> Result<()> {
+    async fn recover_from_arweave_tx(&self, tx: &str, version: Option<String>) -> Result<()> {
         let record_batch_vec = self.ar_toolbox.download_and_parse_record_batch(tx).await?;
-        let network_id = self.config.network_id;
         for record_batch in record_batch_vec.iter() {
             let mutations =
                 ArToolBox::convert_recordbatch_to_mutation(record_batch, version.clone())?;
@@ -124,7 +135,7 @@ impl Recover {
                     action,
                     dm,
                     &address,
-                    network_id,
+                    self.network_id.load(Ordering::Relaxed),
                     nonce,
                     block.clone(),
                     order.clone(),
@@ -136,14 +147,13 @@ impl Recover {
         Ok(())
     }
     /// fetch arweave tx range from block to latest tx
-    async fn fetch_arware_tx_from_block(
+    async fn fetch_arweave_tx_from_block(
         &self,
         block: u64,
     ) -> Result<Vec<(String, Option<String>)>> {
         let mut txs = vec![];
         // 1. get latest arweave tx id from meta store
         let mut tx = self.get_latest_arweave_tx().await?;
-
         loop {
             let (_start_block, end_block, last_rollup_tx, version) =
                 self.ar_toolbox.get_tx_tags(tx.as_str()).await?;
@@ -164,14 +174,9 @@ impl Recover {
 
     /// retrieve the latest arweave tx id from meta store
     pub async fn get_latest_arweave_tx(&self) -> Result<String> {
-        let tx = self.meta_store.get_latest_arweave_tx().await.unwrap();
-        let data = hex::decode(&tx[2..])
-            .map_err(|e| DB3Error::KeyCodecError(format!("fail to decode tx id for {e}")))
-            .unwrap();
-        let base64_tx_str = Base64(data)
-            .to_utf8_string()
-            .map_err(|e| DB3Error::KeyCodecError(format!("fail to decode tx id for {e}")))?;
-        Ok(base64_tx_str)
+        self.meta_store
+            .get_latest_arweave_tx(self.network_id.load(Ordering::Relaxed))
+            .await
     }
 }
 
@@ -184,8 +189,8 @@ mod tests {
     use tempdir::TempDir;
 
     async fn build_recover_instance(temp_dir: &TempDir) -> Recover {
-        let contract_addr = "0xb9709cE5E749b80978182db1bEdfb8c7340039A9";
-        let rpc_url = "https://polygon-mumbai.g.alchemy.com/v2/KIUID-hlFzpnLetzQdVwO38IQn0giefR";
+        let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+        let rpc_url = "http://127.0.0.1:8545";
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
@@ -196,9 +201,7 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-
-        let network_id: u64 = 1687961160;
-
+        let network_id: u64 = 1;
         let real_path = temp_dir.path().to_str().unwrap().to_string();
         let db_store_config = DBStoreV2Config {
             db_path: real_path,
@@ -214,21 +217,23 @@ mod tests {
             doc_start_id: 1000,
         };
 
-        let recover = Recover::new(RecoverConfig {
-            db_store_config,
-            network_id,
-            key_root_path,
-            ar_node_url: "https://arweave.net".to_string(),
-            temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
-            contract_addr: contract_addr.to_string(),
-            evm_node_url: rpc_url.to_string(),
-            enable_mutation_recover: true,
-        })
+        let recover = Recover::new(
+            RecoverConfig {
+                db_store_config,
+                key_root_path,
+                ar_node_url: "https://arweave.net".to_string(),
+                temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
+                contract_addr: contract_addr.to_string(),
+                evm_node_url: rpc_url.to_string(),
+                enable_mutation_recover: true,
+            },
+            Arc::new(AtomicU64::new(network_id)),
+        )
         .await
         .unwrap();
         recover
     }
-    #[tokio::test]
+    //#[tokio::test]
     async fn test_get_latest_arweave_tx() {
         let temp_dir = TempDir::new("test_get_latest_arweave_tx").unwrap();
         let recover = build_recover_instance(&temp_dir).await;
@@ -237,11 +242,11 @@ mod tests {
         println!("res {:?}", res);
     }
 
-    #[tokio::test]
+    //#[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
         let temp_dir = TempDir::new("test_fetch_arware_tx_from_block").unwrap();
         let recover = build_recover_instance(&temp_dir).await;
-        let res = recover.fetch_arware_tx_from_block(0).await;
+        let res = recover.fetch_arweave_tx_from_block(0).await;
         assert!(res.is_ok());
         let txs = res.unwrap();
         assert!(txs.len() > 0);

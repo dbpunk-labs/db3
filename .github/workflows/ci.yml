@@ -49,17 +49,15 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Setup Build env
         run: |
-          sudo apt-get install protobuf-compiler 
-          protoc --version
           ROOT_DIR=`pwd`
+          sudo apt-get install protobuf-compiler
           cd ${ROOT_DIR}/metadata && yarn install
-          cd ${ROOT_DIR}/metadata && npx hardhat compile --force && echo "return code $?"
-          ls ${ROOT_DIR}/metadata
-          cd ${ROOT_DIR}/metadata && npx hardhat test && echo "return code $?"
+          cd ${ROOT_DIR}/metadata && npx hardhat test
           test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
           cd ${ROOT_DIR} && cargo build
           cd ${ROOT_DIR}/tools && bash start_localnet.sh
           sleep 2
+          export RUST_BACKTRACE=1
       - name: Run Typescript sdk test
         run: |
           ROOT_DIR=`pwd`
@@ -71,6 +69,7 @@ jobs:
           cd ${ROOT_DIR}/java && mvn test
       - name: Run rust test with coverage
         run: |
+          export RUST_BACKTRACE=1
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
       - uses: codecov/codecov-action@v3
         with:
