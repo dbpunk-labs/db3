@@ -51,6 +51,7 @@ impl ArToolBox {
             Field::new("signature", DataType::Utf8, true),
             Field::new("block", DataType::UInt64, true),
             Field::new("order", DataType::UInt32, true),
+            Field::new("doc_ids", DataType::Utf8, true),
         ]));
 
         Ok(Self {
@@ -74,11 +75,15 @@ impl ArToolBox {
             .await?;
         Self::parse_gzip_file(file_path.as_path())
     }
-    pub async fn get_tx_tags(&self, tx_id: &str) -> Result<(u64, u64, Option<String>)> {
+    pub async fn get_tx_tags(
+        &self,
+        tx_id: &str,
+    ) -> Result<(u64, u64, Option<String>, Option<String>)> {
         let tags = self.ar_filesystem.get_tags(tx_id).await?;
         let mut last_rollup_tx = None;
         let mut start_block = None;
         let mut end_block = None;
+        let mut version_id = None;
         for tag in tags {
             if let Ok(name) = tag.name.to_utf8_string() {
                 if name == "Last-Rollup-Tx" {
@@ -110,6 +115,13 @@ impl ArToolBox {
                             .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?,
                     );
                 }
+                if name == "Version-Id" {
+                    version_id = Some(
+                        tag.value
+                            .to_utf8_string()
+                            .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?,
+                    );
+                }
             }
         }
         if start_block.is_none() || end_block.is_none() {
@@ -118,7 +130,27 @@ impl ArToolBox {
                 tx_id
             )));
         }
-        Ok((start_block.unwrap(), end_block.unwrap(), last_rollup_tx))
+        Ok((
+            start_block.unwrap(),
+            end_block.unwrap(),
+            last_rollup_tx,
+            version_id,
+        ))
+    }
+    pub async fn get_version_id(&self, tx_id: &str) -> Result<Option<String>> {
+        let tags = self.ar_filesystem.get_tags(tx_id).await?;
+        for tag in tags {
+            if let Ok(name) = tag.name.to_utf8_string() {
+                if name == "Version-Id" {
+                    let version = tag
+                        .value
+                        .to_utf8_string()
+                        .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+                    return Ok(Some(version));
+                }
+            }
+        }
+        return Ok(None);
     }
     pub async fn get_start_block(&self, tx_id: &str) -> Result<Option<String>> {
         let tags = self.ar_filesystem.get_tags(tx_id).await?;
@@ -207,7 +239,8 @@ impl ArToolBox {
     /// Parse mutation body, block and order from recordbatch
     pub fn convert_recordbatch_to_mutation(
         record_batch: &RecordBatch,
-    ) -> Result<Vec<(MutationBody, u64, u32)>> {
+        version: Option<String>,
+    ) -> Result<Vec<(MutationBody, u64, u32, String)>> {
         let mut mutations = Vec::new();
         let payloads = record_batch
             .column_by_name("payload")
@@ -233,6 +266,17 @@ impl ArToolBox {
             .as_any()
             .downcast_ref::<UInt32Array>()
             .unwrap();
+        let doc_ids_opt = match version {
+            Some(_) => Some(
+                record_batch
+                    .column_by_name("doc_ids")
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap(),
+            ),
+            None => None,
+        };
 
         for i in 0..record_batch.num_rows() {
             let payload = payloads.value(i);
@@ -243,7 +287,11 @@ impl ArToolBox {
                 payload: payload.to_vec(),
                 signature: signature.to_string(),
             };
-            mutations.push((mutation, block, order));
+            let doc_ids = match doc_ids_opt {
+                Some(doc_ids) => doc_ids.value(i),
+                None => "",
+            };
+            mutations.push((mutation, block, order, doc_ids.to_string()));
         }
         Ok(mutations)
     }
@@ -259,18 +307,21 @@ impl ArToolBox {
         let mut signature_builder = StringBuilder::new();
         let mut block_builder = UInt64Builder::new();
         let mut order_builder = UInt32Builder::new();
+        let mut docids_builder = StringBuilder::new();
         for (header, body) in mutations {
             let body_ref: &[u8] = &body.payload;
             payload_builder.append_value(body_ref);
             signature_builder.append_value(body.signature.as_str());
             block_builder.append_value(header.block_id);
             order_builder.append_value(header.order_id);
+            docids_builder.append_value(header.doc_ids_map.as_str());
         }
         let array_refs: Vec<ArrayRef> = vec![
             Arc::new(payload_builder.finish()),
             Arc::new(signature_builder.finish()),
             Arc::new(block_builder.finish()),
             Arc::new(order_builder.finish()),
+            Arc::new(docids_builder.finish()),
         ];
         let record_batch = RecordBatch::try_new(self.schema.clone(), array_refs)
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
@@ -397,12 +448,13 @@ mod tests {
         assert_eq!(rec.num_columns(), 4);
         assert_eq!(rec.num_rows(), 204);
 
-        let mutations = ArToolBox::convert_recordbatch_to_mutation(&rec).unwrap();
+        let mutations = ArToolBox::convert_recordbatch_to_mutation(&rec, None).unwrap();
         assert_eq!(mutations.len(), 204);
-        let (mutation, block, order) = mutations[0].clone();
+        let (mutation, block, order, doc_ids) = mutations[0].clone();
         assert_eq!(block, 37829);
         assert_eq!(order, 1);
         assert_eq!(mutation.signature, "0xf6afe1165ae87fa09375eabccdedc61f3e5af4ed1e5c6456f1b63d397862252667e1f13f0f076f30609754f787c80135c52f7c249e95c9b8fab1b9ed27846c1b1c");
+        assert!(doc_ids.is_empty())
     }
 
     #[tokio::test]
@@ -432,14 +484,16 @@ mod tests {
             .await
             .unwrap();
         let rec1 = res[0].clone();
-        let mutations = ArToolBox::convert_recordbatch_to_mutation(&rec1).unwrap();
+        let mutations = ArToolBox::convert_recordbatch_to_mutation(&rec1, None).unwrap();
         assert_eq!(mutations.len(), 8192);
-        let (mutation, block, order) = mutations[0].clone();
+        let (mutation, block, order, doc_ids) = mutations[0].clone();
         assert_eq!(block, 3712);
         assert_eq!(order, 1);
+        assert_eq!(doc_ids, "");
     }
+
     #[tokio::test]
-    async fn get_tx_tags_ut() {
+    async fn get_tx_tags_ut_for_v0_data() {
         let temp_dir = TempDir::new("download_arware_tx_ut").expect("create temp dir");
         let arweave_url = "https://arweave.net";
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -460,12 +514,17 @@ mod tests {
         )
         .unwrap();
         let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
-        let (start_block, end_block, last_rollup_tx) = ar_toolbox.get_tx_tags(tx_id).await.unwrap();
+        let (start_block, end_block, last_rollup_tx, version) =
+            ar_toolbox.get_tx_tags(tx_id).await.unwrap();
         assert_eq!(start_block, 3712);
         assert!(last_rollup_tx.is_some());
+        assert!(version.is_none());
         assert_eq!(
             last_rollup_tx.unwrap(),
             "ld2W-KnmHhmgYcSgc_DcqjjoU_ke9gkwrQEWk0A2Fpg"
         );
+
+        let version = ar_toolbox.get_version_id(tx_id).await.unwrap();
+        assert!(version.is_none());
     }
 }

@@ -69,6 +69,7 @@ message MutationHeader {
   uint64 nonce = 7;
   uint64 network = 8;
   MutationAction action = 9;
+  string doc_ids_map = 10;
 }
 
 message MutationBody {

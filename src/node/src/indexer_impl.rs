@@ -240,12 +240,13 @@ impl IndexerNodeImpl {
             let action = MutationAction::from_i32(dm.action).ok_or(DB3Error::WriteStoreError(
                 "fail to convert action type".to_string(),
             ))?;
-            let (block, order) = match &mutation.header {
-                Some(header) => Ok((header.block_id, header.order_id)),
+            let (block, order, doc_ids_map_str) = match &mutation.header {
+                Some(header) => Ok((header.block_id, header.order_id, &header.doc_ids_map)),
                 _ => Err(DB3Error::WriteStoreError(
                     "invalid mutation header".to_string(),
                 )),
             }?;
+            let doc_ids_map = MutationUtil::convert_doc_ids_map_to_vec(doc_ids_map_str)?;
             self.db_store.apply_mutation(
                 action,
                 dm,
@@ -254,6 +255,7 @@ impl IndexerNodeImpl {
                 nonce,
                 block,
                 order,
+                &doc_ids_map,
             )?;
         }
         Ok(())
