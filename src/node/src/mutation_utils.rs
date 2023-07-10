@@ -179,6 +179,9 @@ mod tests {
             doc_ids,
             HashMap::from_iter(vec![("0".to_string(), vec![1, 2])])
         );
+
+        let doc_ids_empty = MutationUtil::convert_doc_ids_map_to_vec("").unwrap();
+        assert!(doc_ids_empty.is_empty());
     }
     #[test]
     pub fn get_create_doc_ids_map_ut() {
