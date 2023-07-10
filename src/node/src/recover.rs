@@ -108,7 +108,7 @@ impl Recover {
 
     /// recover from start_block to latest arweave tx
     pub async fn recover_from_block(&self, start_block: u64) -> Result<u64> {
-        let txs = self.fetch_arware_tx_from_block(start_block).await?;
+        let txs = self.fetch_arweave_tx_from_block(start_block).await?;
         for (tx, version) in txs.iter().rev() {
             self.recover_from_arweave_tx(tx.as_str(), version.clone())
                 .await?;

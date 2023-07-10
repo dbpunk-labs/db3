@@ -22,7 +22,6 @@ use db3_proto::db3_storage_proto::ExtraItem;
 use ethers::core::types::Bytes as EthersBytes;
 use ethers::types::{transaction::eip712::TypedData, Address, Signature};
 use prost::Message;
-use rust_secp256k1::ffi::types::size_t;
 use serde_json::json;
 use std::str::FromStr;
 use tracing::warn;
