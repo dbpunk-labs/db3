@@ -37,6 +37,22 @@ impl MutationUtil {
         }
     }
 
+    pub fn get_u32_field(data: &TypedData, name: &str, default_val: u32) -> u32 {
+        if let Some(v) = data.message.get(name) {
+            if let Some(t) = v.as_str() {
+                if let Ok(vt) = t.parse::<u32>() {
+                    return vt;
+                } else {
+                    default_val
+                }
+            } else {
+                default_val
+            }
+        } else {
+            default_val
+        }
+    }
+
     pub fn get_u64_field(data: &TypedData, name: &str, default_val: u64) -> u64 {
         if let Some(v) = data.message.get(name) {
             if let Some(t) = v.as_str() {

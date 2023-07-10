@@ -23,19 +23,14 @@ fn main() {
         .compile(
             &[
                 "proto/db3_base.proto",
-                "proto/db3_session.proto",
-                "proto/db3_mutation.proto",
                 "proto/db3_mutation_v2.proto",
-                "proto/db3_bill.proto",
-                "proto/db3_account.proto",
-                "proto/db3_node.proto",
-                "proto/db3_database.proto",
                 "proto/db3_database_v2.proto",
                 "proto/db3_message.proto",
                 "proto/db3_event.proto",
                 "proto/db3_indexer.proto",
                 "proto/db3_storage.proto",
                 "proto/db3_rollup.proto",
+                "proto/db3_system.proto",
             ],
             &["proto"],
         )

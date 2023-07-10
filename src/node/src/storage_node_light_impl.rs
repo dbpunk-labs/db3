@@ -376,6 +376,8 @@ impl StorageNode for StorageNodeV2Impl {
             network_id: network,
             evm_node_url: evm_node_rpc.to_string(),
             ar_node_url: ar_node_url.to_string(),
+            chain_id: 0,
+            rollup_max_interval: 0,
         };
         self.state_store
             .store_node_config("storage", &system_config)

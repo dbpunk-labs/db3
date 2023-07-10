@@ -22,16 +22,18 @@ use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},
     middleware::SignerMiddleware,
-    providers::{Http, Middleware, Provider, ProviderExt},
+    providers::{Middleware, Provider, StreamExt, Ws},
 };
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
+
 abigen!(DB3MetaStore, "abi/DB3MetaStore.json");
+abigen!(Events, "abi/Events.json");
 
 pub struct MetaStoreClient {
     address: Address,
-    client: Arc<SignerMiddleware<Arc<Provider<Http>>, LocalWallet>>,
+    client: Arc<SignerMiddleware<Arc<Provider<Ws>>, LocalWallet>>,
 }
 unsafe impl Sync for MetaStoreClient {}
 unsafe impl Send for MetaStoreClient {}
@@ -41,7 +43,9 @@ impl MetaStoreClient {
         let address = contract_addr
             .parse::<Address>()
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        let provider = Provider::<Http>::connect(rpc_url).await;
+        let provider = Provider::<Ws>::connect(rpc_url)
+            .await
+            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
         let client = Arc::new(signable_client);

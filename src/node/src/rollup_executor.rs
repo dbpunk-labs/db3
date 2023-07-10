@@ -16,6 +16,7 @@
 //
 
 use crate::ar_toolbox::ArToolBox;
+use arc_swap::ArcSwap;
 use db3_base::times;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
