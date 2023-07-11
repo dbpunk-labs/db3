@@ -49,7 +49,7 @@ use db3_storage::mutation_store::{MutationStore, MutationStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use ethers::abi::Address;
 use prost::Message;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -609,7 +609,6 @@ impl StorageNode for StorageNodeV2Impl {
             rollup_tx: vec![],
         }))
     }
-
     async fn get_nonce(
         &self,
         request: Request<GetNonceRequest>,
@@ -650,34 +649,45 @@ impl StorageNode for StorageNodeV2Impl {
                     .storage
                     .generate_mutation_block_and_order(&r.payload, r.signature.as_str())
                     .map_err(|e| Status::internal(format!("{e}")))?;
-                let response = match self
-                    .db_store
-                    .apply_mutation(action, dm, &address, network, nonce, block, order)
-                {
-                    Ok(items) => Response::new(SendMutationResponse {
-                        id,
-                        code: 0,
-                        msg: "ok".to_string(),
-                        items,
-                        block,
-                        order,
-                    }),
+                let response = match self.db_store.apply_mutation(
+                    action,
+                    dm,
+                    &address,
+                    network,
+                    nonce,
+                    block,
+                    order,
+                    &HashMap::new(),
+                ) {
+                    Ok(items) => {
+                        let doc_ids_map = MutationUtil::get_create_doc_ids_map(&items);
+
+                        self.storage
+                            .add_mutation(
+                                &r.payload,
+                                r.signature.as_str(),
+                                doc_ids_map.as_str(),
+                                &address,
+                                nonce,
+                                block,
+                                order,
+                                network,
+                                action,
+                            )
+                            .map_err(|e| Status::internal(format!("{e}")))?;
+                        Response::new(SendMutationResponse {
+                            id,
+                            code: 0,
+                            msg: "ok".to_string(),
+                            items,
+                            block,
+                            order,
+                        })
+                    }
                     Err(e) => {
                         return Err(Status::internal(format!("{e}")));
                     }
                 };
-                self.storage
-                    .add_mutation(
-                        &r.payload,
-                        r.signature.as_str(),
-                        &address,
-                        nonce,
-                        block,
-                        order,
-                        network,
-                        action,
-                    )
-                    .map_err(|e| Status::internal(format!("{e}")))?;
                 Ok(response)
             }
             Err(_e) => Ok(Response::new(SendMutationResponse {

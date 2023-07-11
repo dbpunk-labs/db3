@@ -168,6 +168,7 @@ impl EventProcessor {
                                 &DB3Address::ZERO,
                                 e.name.as_str(),
                                 &values,
+                                None,
                             ) {
                                 warn!("fail to write json doc {} for {e}", value.as_str());
                             } else {
