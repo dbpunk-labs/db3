@@ -30,7 +30,7 @@ import {
 } from '../src/account/db3_account'
 
 describe('test db3.js provider module', () => {
-    test('provider setup test', async () => {
+    test('system node setup test', async () => {
         const privateKey =
             '0xca6ade874391db77a7a66e542f800ba4f89f249cb7c785371eeacbaa3ef74cfd'
         const db3_account = createFromPrivateKey(privateKey)

@@ -16,7 +16,6 @@
 //
 
 use clap::*;
-
 use crate::keystore::KeyStore;
 use db3_base::{bson_util, strings};
 use db3_crypto::db3_address::DB3Address;

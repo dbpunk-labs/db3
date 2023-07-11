@@ -33,7 +33,6 @@ import {
     GetCollectionOfDatabaseRequest,
     ScanGcRecordRequest,
     GetSystemStatusRequest,
-    SetupRequest,
     GetDatabaseRequest,
     GetMutationStateRequest,
 } from '../proto/db3_storage'
@@ -220,34 +219,42 @@ export class StorageProviderV2 {
         rollupInterval: string,
         minRollupSize: string
     ) {
-        const message = {
-            types: {
-                EIP712Domain: [],
-                Message: [
-                    { name: 'rollupInterval', type: 'string' },
-                    { name: 'minRollupSize', type: 'string' },
-                    { name: 'network', type: 'string' },
-                ],
-            },
-            domain: {},
-            primaryType: 'Message',
-            message: {
-                rollupInterval,
-                minRollupSize,
-                network,
-            },
-        }
-        const signature = await signTypedData(this.account, message)
-        const msgParams = JSON.stringify(message)
-        const payload = new TextEncoder().encode(msgParams)
-        const request: SetupRequest = {
-            signature,
-            payload,
-        }
         try {
-            const { response } = await this.client.setup(request)
-            return response
+            const message = {
+                types: {
+                    EIP712Domain: [],
+                    Message: [
+                        { name: 'rollupInterval', type: 'string' },
+                        { name: 'minRollupSize', type: 'string' },
+                        { name: 'network', type: 'string' },
+                        { name: 'chainId', type: 'string' },
+                        { name: 'contractAddress', type: 'string' },
+                        { name: 'rollupMaxInterval', type: 'string' },
+                        { name: 'evmNodeRpc', type: 'string' },
+                        { name: 'arNodeUrl', type: 'string' },
+                    ],
+                },
+                domain: {},
+                primaryType: 'Message',
+                message: {
+                    rollupInterval,
+                    minRollupSize,
+                    network,
+                    chainId: '1',
+                    contractAddress: '0x1213',
+                    rollupMaxInterval: '111111111',
+                    evmNodeRpc: 'ws://127.0.0.1:8080',
+                    arNodeUrl: 'http://127.0.0.1:9527',
+                },
+            }
+            const signature = await signTypedData(this.account, message)
+            const msgParams = JSON.stringify(message)
+            const payload = new TextEncoder().encode(msgParams)
+            console.log(this.account)
+            console.log(signature)
+            console.log(toHEX(payload))
         } catch (e) {
+            console.log(e)
             throw new DB3Error(e)
         }
     }

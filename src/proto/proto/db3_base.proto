@@ -29,6 +29,7 @@ message SystemConfig {
   // rollup at once of max time
   uint64 rollup_max_interval = 7;
   string contract_addr = 8;
+  uint64 min_gc_offset = 9;
 }
 
 message Version {

@@ -16,7 +16,7 @@
 //
 
 use crate::ar_toolbox::ArToolBox;
-use arc_swap::ArcSwap;
+use arc_swap::ArcSwapOption;
 use db3_base::times;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
@@ -30,30 +30,24 @@ use tracing::{info, warn};
 
 #[derive(Clone)]
 pub struct RollupExecutorConfig {
-    // the interval in ms
-    pub rollup_interval: u64,
     pub temp_data_path: String,
-    pub ar_node_url: String,
-    pub min_rollup_size: u64,
-    pub min_gc_round_offset: u64,
     pub key_root_path: String,
-    pub evm_node_url: String,
-    pub contract_addr: String,
-    pub rollup_max_interval: u64,
 }
 
 pub struct RollupExecutor {
     config: RollupExecutorConfig,
     storage: MutationStore,
-    ar_toolbox: ArcSwap<ArToolBox>,
+    ar_toolbox: ArcSwapOption<ArToolBox>,
     min_rollup_size: Arc<AtomicU64>,
-    meta_store: ArcSwap<MetaStoreClient>,
+    meta_store: ArcSwapOption<MetaStoreClient>,
     pending_mutations: Arc<AtomicU64>,
     pending_data_size: Arc<AtomicU64>,
     pending_start_block: Arc<AtomicU64>,
     pending_end_block: Arc<AtomicU64>,
     network_id: Arc<AtomicU64>,
     system_store: Arc<SystemStore>,
+    rollup_max_interval: Arc<AtomicU64>,
+    min_gc_round_offset: Arc<AtomicU64>,
 }
 
 unsafe impl Sync for RollupExecutor {}
@@ -63,7 +57,6 @@ impl RollupExecutor {
     pub async fn new(
         config: RollupExecutorConfig,
         storage: MutationStore,
-        network_id: Arc<AtomicU64>,
         system_store: Arc<SystemStore>,
     ) -> Result<Self> {
         if let Some(c) = system_store.get_config(&SystemRole::DataRollupNode)? {
@@ -73,15 +66,16 @@ impl RollupExecutor {
             );
             let wallet = system_store.get_evm_wallet(c.chain_id)?;
             let min_rollup_size = c.min_rollup_size;
-            let meta_store = ArcSwap::from(Arc::new(
+            let meta_store = ArcSwapOption::from(Some(Arc::new(
                 MetaStoreClient::new(c.contract_addr.as_str(), c.evm_node_url.as_str(), wallet)
                     .await?,
-            ));
-            let ar_toolbox = ArcSwap::from(Arc::new(ArToolBox::new(
+            )));
+            let ar_toolbox = ArcSwapOption::from(Some(Arc::new(ArToolBox::new(
                 config.key_root_path.clone(),
                 c.ar_node_url.clone(),
                 config.temp_data_path.clone(),
-            )?));
+            )?)));
+            let rollup_max_interval = Arc::new(AtomicU64::new(c.rollup_max_interval));
             Ok(Self {
                 config,
                 storage,
@@ -94,37 +88,25 @@ impl RollupExecutor {
                 pending_end_block: Arc::new(AtomicU64::new(0)),
                 network_id: Arc::new(AtomicU64::new(c.network_id)),
                 system_store,
+                rollup_max_interval,
+                min_gc_round_offset: Arc::new(AtomicU64::new(c.min_gc_offset)),
             })
         } else {
-            // current the default is mumbai chain
-            let wallet = system_store.get_evm_wallet(80000)?;
-            info!("use the command config to start the rollup executor");
-            let min_rollup_size = config.min_rollup_size;
-            let meta_store = ArcSwap::from(Arc::new(
-                MetaStoreClient::new(
-                    config.contract_addr.as_str(),
-                    config.evm_node_url.as_str(),
-                    wallet,
-                )
-                .await?,
-            ));
-            let ar_toolbox = ArcSwap::from(Arc::new(ArToolBox::new(
-                config.key_root_path.clone(),
-                config.ar_node_url.clone(),
-                config.temp_data_path.clone(),
-            )?));
+            let rollup_max_interval = Arc::new(AtomicU64::new(0));
             Ok(Self {
                 config,
                 storage,
-                ar_toolbox,
-                min_rollup_size: Arc::new(AtomicU64::new(min_rollup_size)),
-                meta_store,
+                ar_toolbox: ArcSwapOption::from(None),
+                min_rollup_size: Arc::new(AtomicU64::new(0)),
+                meta_store: ArcSwapOption::from(None),
                 pending_mutations: Arc::new(AtomicU64::new(0)),
                 pending_data_size: Arc::new(AtomicU64::new(0)),
                 pending_start_block: Arc::new(AtomicU64::new(0)),
                 pending_end_block: Arc::new(AtomicU64::new(0)),
-                network_id,
+                network_id: Arc::new(AtomicU64::new(0)),
                 system_store,
+                rollup_max_interval,
+                min_gc_round_offset: Arc::new(AtomicU64::new(0)),
             })
         }
     }
@@ -141,16 +123,20 @@ impl RollupExecutor {
             let wallet = self.system_store.get_evm_wallet(c.chain_id)?;
             self.min_rollup_size
                 .store(c.min_rollup_size, Ordering::Relaxed);
-            let meta_store = Arc::new(
+            self.rollup_max_interval
+                .store(c.rollup_max_interval, Ordering::Relaxed);
+            let meta_store = Some(Arc::new(
                 MetaStoreClient::new(c.contract_addr.as_str(), c.evm_node_url.as_str(), wallet)
                     .await?,
-            );
+            ));
+            self.min_gc_round_offset
+                .store(c.min_gc_offset, Ordering::Relaxed);
             self.meta_store.store(meta_store);
-            let ar_toolbox = Arc::new(ArToolBox::new(
+            let ar_toolbox = Some(Arc::new(ArToolBox::new(
                 self.config.key_root_path.clone(),
                 c.ar_node_url.clone(),
                 self.config.temp_data_path.clone(),
-            )?);
+            )?));
             self.ar_toolbox.store(ar_toolbox);
             self.network_id.store(c.network_id, Ordering::Relaxed);
         }
@@ -169,10 +155,10 @@ impl RollupExecutor {
         );
 
         let now = Instant::now();
-        if self
-            .storage
-            .has_enough_round_left(last_start_block, self.config.min_gc_round_offset)?
-        {
+        if self.storage.has_enough_round_left(
+            last_start_block,
+            self.min_gc_round_offset.load(Ordering::Relaxed),
+        )? {
             if first {
                 if let Some(r) = self.storage.get_rollup_record(last_start_block)? {
                     self.storage.gc_range_mutation(r.start_block, r.end_block)?;
@@ -244,100 +230,96 @@ impl RollupExecutor {
         }
     }
 
-    pub fn update_min_rollup_size(&self, min_rollup_data_size: u64) {
-        self.min_rollup_size
-            .store(min_rollup_data_size, Ordering::Relaxed)
-    }
-
-    pub fn get_min_rollup_size(&self) -> u64 {
-        self.min_rollup_size.load(Ordering::Relaxed)
-    }
-
     pub async fn process(&self) -> Result<()> {
-        self.storage.flush_state()?;
-        let meta_store = self.meta_store.load();
-        let ar_toolbox = self.ar_toolbox.load();
-        let (last_start_block, last_end_block, tx) = match self.storage.get_last_rollup_record()? {
-            Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
-            _ => (0_u64, 0_u64, "".to_string()),
-        };
-        let current_block = self.storage.get_current_block()?;
-        if current_block <= last_end_block {
-            info!("no block to rollup");
-            return Ok(());
-        }
-        let now = Instant::now();
-        info!(
-            "the next rollup start block {} and the newest block {current_block}",
-            last_end_block
-        );
-        let network_id = self.network_id.load(Ordering::Relaxed);
-        self.pending_start_block
-            .store(last_start_block, Ordering::Relaxed);
-        self.pending_end_block
-            .store(current_block, Ordering::Relaxed);
-        let mutations = self
-            .storage
-            .get_range_mutations(last_end_block, current_block)?;
-        if mutations.len() <= 0 {
-            info!("no block to rollup");
-            return Ok(());
-        }
-        self.pending_mutations
-            .store(mutations.len() as u64, Ordering::Relaxed);
-        let recordbatch = ar_toolbox.convert_mutations_to_recordbatch(&mutations)?;
-        let memory_size = recordbatch.get_array_memory_size();
-        self.pending_data_size
-            .store(memory_size as u64, Ordering::Relaxed);
-        if memory_size < self.min_rollup_size.load(Ordering::Relaxed) as usize {
+        if let (Some(ref meta_store), Some(ref ar_toolbox)) =
+            (self.meta_store.load_full(), self.ar_toolbox.load_full())
+        {
+            let network_id = self.network_id.load(Ordering::Relaxed);
+            self.storage.flush_state()?;
+            let (last_start_block, last_end_block, tx) =
+                match self.storage.get_last_rollup_record()? {
+                    Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
+                    _ => (0_u64, 0_u64, "".to_string()),
+                };
+            let current_block = self.storage.get_current_block()?;
+            if current_block <= last_end_block {
+                info!("no block to rollup");
+                return Ok(());
+            }
+            let now = Instant::now();
             info!(
-                "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
-                self.config.min_rollup_size, memory_size
+                "the next rollup start block {} and the newest block {current_block}",
+                last_end_block
             );
-            return Ok(());
-        } else {
             self.pending_start_block
-                .store(current_block, Ordering::Relaxed);
+                .store(last_start_block, Ordering::Relaxed);
             self.pending_end_block
                 .store(current_block, Ordering::Relaxed);
-            self.pending_data_size.store(0, Ordering::Relaxed);
-            self.pending_mutations.store(0, Ordering::Relaxed);
+            let mutations = self
+                .storage
+                .get_range_mutations(last_end_block, current_block)?;
+            if mutations.len() <= 0 {
+                info!("no block to rollup");
+                return Ok(());
+            }
+            self.pending_mutations
+                .store(mutations.len() as u64, Ordering::Relaxed);
+            let recordbatch = ar_toolbox.convert_mutations_to_recordbatch(&mutations)?;
+            let memory_size = recordbatch.get_array_memory_size();
+            self.pending_data_size
+                .store(memory_size as u64, Ordering::Relaxed);
+            if memory_size < self.min_rollup_size.load(Ordering::Relaxed) as usize {
+                info!(
+                "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
+                self.min_rollup_size.load(Ordering::Relaxed), memory_size
+            );
+                return Ok(());
+            } else {
+                self.pending_start_block
+                    .store(current_block, Ordering::Relaxed);
+                self.pending_end_block
+                    .store(current_block, Ordering::Relaxed);
+                self.pending_data_size.store(0, Ordering::Relaxed);
+                self.pending_mutations.store(0, Ordering::Relaxed);
+            }
+            let (id, reward, num_rows, size) = ar_toolbox
+                .compress_and_upload_record_batch(
+                    tx,
+                    last_end_block,
+                    current_block,
+                    &recordbatch,
+                    network_id,
+                )
+                .await?;
+            let (evm_cost, tx_hash) = meta_store
+                .update_rollup_step(id.as_str(), network_id)
+                .await?;
+            let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
+            info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} ar cost {} and evm tx {} and cost {}", now.elapsed().as_secs(),
+                id.as_str(), reward,
+                tx_str.as_str(),
+                evm_cost.as_u64()
+                );
+            let record = RollupRecord {
+                end_block: current_block,
+                raw_data_size: memory_size as u64,
+                compress_data_size: size,
+                processed_time: now.elapsed().as_secs(),
+                arweave_tx: id,
+                time: times::get_current_time_in_secs(),
+                mutation_count: num_rows,
+                cost: reward,
+                start_block: last_end_block,
+                evm_tx: tx_str,
+                evm_cost: evm_cost.as_u64(),
+            };
+            self.storage
+                .add_rollup_record(&record)
+                .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+            self.gc_mutation()?;
+        } else {
+            warn!("the system has not been setup, please setup it first");
         }
-        let (id, reward, num_rows, size) = ar_toolbox
-            .compress_and_upload_record_batch(
-                tx,
-                last_end_block,
-                current_block,
-                &recordbatch,
-                network_id,
-            )
-            .await?;
-        let (evm_cost, tx_hash) = meta_store
-            .update_rollup_step(id.as_str(), network_id)
-            .await?;
-        let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
-        info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} ar cost {} and evm tx {} and cost {}", now.elapsed().as_secs(),
-        id.as_str(), reward,
-        tx_str.as_str(),
-        evm_cost.as_u64()
-        );
-        let record = RollupRecord {
-            end_block: current_block,
-            raw_data_size: memory_size as u64,
-            compress_data_size: size,
-            processed_time: now.elapsed().as_secs(),
-            arweave_tx: id,
-            time: times::get_current_time_in_secs(),
-            mutation_count: num_rows,
-            cost: reward,
-            start_block: last_end_block,
-            evm_tx: tx_str,
-            evm_cost: evm_cost.as_u64(),
-        };
-        self.storage
-            .add_rollup_record(&record)
-            .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-        self.gc_mutation()?;
         Ok(())
     }
 }

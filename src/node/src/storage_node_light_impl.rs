@@ -64,10 +64,7 @@ pub struct StorageNodeV2Config {
     pub store_config: MutationStoreConfig,
     pub rollup_config: RollupExecutorConfig,
     pub db_store_config: DBStoreV2Config,
-    pub network_id: u64,
     pub block_interval: u64,
-    pub evm_node_url: String,
-    pub contract_addr: String,
 }
 
 pub struct StorageNodeV2Impl {
@@ -111,7 +108,6 @@ impl StorageNodeV2Impl {
                 RollupExecutor::new(
                     config.rollup_config.clone(),
                     storage.clone(),
-                    network_id.clone(),
                     system_store.clone(),
                 )
                 .await?,
@@ -132,17 +128,15 @@ impl StorageNodeV2Impl {
             })
         } else {
             info!("init storage node from command config");
-            let network_id = Arc::new(AtomicU64::new(config.network_id));
+            let network_id = Arc::new(AtomicU64::new(0));
             let rollup_executor = Arc::new(
                 RollupExecutor::new(
                     config.rollup_config.clone(),
                     storage.clone(),
-                    network_id.clone(),
                     system_store.clone(),
                 )
                 .await?,
             );
-            let rollup_interval = config.rollup_config.rollup_interval;
             Ok(Self {
                 storage,
                 state_store,
@@ -152,7 +146,7 @@ impl StorageNodeV2Impl {
                 sender,
                 broadcast_sender,
                 rollup_executor,
-                rollup_interval: Arc::new(AtomicU64::new(rollup_interval)),
+                rollup_interval: Arc::new(AtomicU64::new(1000 * 10 * 60)),
                 network_id,
                 system_store,
             })
@@ -263,8 +257,14 @@ impl StorageNodeV2Impl {
                             if let Ok(Some(c)) = local_system_store.get_config(&SystemRole::DataRollupNode) {
                                 local_network_id.store(c.network_id, Ordering::Relaxed);
                                 local_rollup_interval.store(c.rollup_interval, Ordering::Relaxed);
+                                info!("update the network {} and rollup interval {}", local_network_id.load(Ordering::Relaxed),
+                                local_rollup_interval.load(Ordering::Relaxed)
+                                );
                             }
-                            if let Ok(()) = local_rollup_executor.update_config().await {}
+
+                            if let Err(e) = local_rollup_executor.update_config().await {
+                                warn!("fail update rollup executor config for {e}");
+                            }
                         }
                         Some((addr, sub, sender)) = receiver.recv() => {
                             info!("add or update the subscriber with addr 0x{}", hex::encode(addr.as_ref()));
@@ -543,6 +543,7 @@ impl StorageNode for StorageNodeV2Impl {
             rollup_tx: vec![],
         }))
     }
+
     async fn get_nonce(
         &self,
         request: Request<GetNonceRequest>,
@@ -564,6 +565,12 @@ impl StorageNode for StorageNodeV2Impl {
         &self,
         request: Request<SendMutationRequest>,
     ) -> std::result::Result<Response<SendMutationResponse>, Status> {
+        let network = self.network_id.load(Ordering::Relaxed);
+        if network == 0 {
+            return Err(Status::internal(
+                "the system has not been setup".to_string(),
+            ));
+        }
         let r = request.into_inner();
         let (dm, address, nonce) = MutationUtil::unwrap_and_light_verify(
             &r.payload,
@@ -574,7 +581,6 @@ impl StorageNode for StorageNodeV2Impl {
         })?;
         let action = MutationAction::from_i32(dm.action)
             .ok_or(Status::internal("fail to convert action type".to_string()))?;
-        let network = self.network_id.load(Ordering::Relaxed);
         // TODO validate the database mutation
         match self.state_store.incr_nonce(&address, nonce) {
             Ok(_) => {
@@ -640,22 +646,30 @@ impl StorageNode for StorageNodeV2Impl {
 mod tests {
 
     use super::*;
+    use crate::system_impl::SystemImpl;
+    use db3_proto::db3_system_proto::system_server::System;
+    use db3_proto::db3_system_proto::SetupRequest;
     use db3_storage::doc_store::DocStoreConfig;
+    use db3_storage::state_store::StateStoreConfig;
+    use db3_storage::system_store::SystemStoreConfig;
+
     use tempdir::TempDir;
 
-    fn generate_rand_node_config() -> StorageNodeV2Config {
-        let tmp_dir_path = TempDir::new("add_store_path").expect("create temp dir");
-        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+    fn generate_rand_node_config(
+        real_path: &str,
+    ) -> (StateStoreConfig, SystemStoreConfig, StorageNodeV2Config) {
+        if let Err(_e) = std::fs::create_dir_all(real_path) {}
         let rollup_config = RollupExecutorConfig {
-            rollup_interval: 1000000,
             temp_data_path: format!("{real_path}/data_path"),
-            ar_node_url: "http://127.0.0.1:1984".to_string(),
             key_root_path: format!("{real_path}/keys"),
-            min_rollup_size: 1000000,
-            min_gc_round_offset: 100,
-            evm_node_url: "http://127.0.0.1:8545".to_string(),
-            contract_addr: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
         };
+
+        let system_store_config = SystemStoreConfig {
+            key_root_path: rollup_config.key_root_path.to_string(),
+            evm_wallet_key: "evm".to_string(),
+            ar_wallet_key: "ar".to_string(),
+        };
+
         let store_config = MutationStoreConfig {
             db_path: format!("{real_path}/mutation_path"),
             block_store_cf_name: "block_store_cf".to_string(),
@@ -666,9 +680,13 @@ mod tests {
             scan_max_limit: 50,
             block_state_cf_name: "block_state_cf".to_string(),
         };
+
         let state_config = StateStoreConfig {
             db_path: format!("{real_path}/state_store"),
         };
+
+        if let Err(_e) = std::fs::create_dir_all(state_config.db_path.as_str()) {}
+
         let db_store_config = DBStoreV2Config {
             db_path: format!("{real_path}/db_path").to_string(),
             db_store_cf_name: "db_store_cf".to_string(),
@@ -682,69 +700,68 @@ mod tests {
             doc_store_conf: DocStoreConfig::default(),
             doc_start_id: 0,
         };
-        StorageNodeV2Config {
-            store_config,
+
+        (
             state_config,
-            rollup_config,
-            db_store_config,
-            network_id: 10,
-            block_interval: 10000,
-            node_url: "http://127.0.0.1:26639".to_string(),
-            contract_addr: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
-            evm_node_url: "http://127.0.0.1:8545".to_string(),
-            admin_addr: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
-        }
+            system_store_config,
+            StorageNodeV2Config {
+                store_config,
+                rollup_config,
+                db_store_config,
+                block_interval: 10000,
+            },
+        )
     }
     #[tokio::test]
-    async fn test_storage_node_recover() {
-        let (sender, _) = tokio::sync::mpsc::channel::<(
+    async fn test_update_config() {
+        let tmp_dir_path = TempDir::new("add_store_path").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let (sender, receiver) = tokio::sync::mpsc::channel::<(
             DB3Address,
             SubscriptionV2,
             Sender<std::result::Result<EventMessageV2, Status>>,
         )>(1024);
-        let config = generate_rand_node_config();
-        let sig:&str = "0x484f7b5353c5238ea1c6a1ab4552cc61b726b10ee3b68fb6be717e1f6fa37f5e248889ab334ee91b83f1250576b6c1faf068d3498f294eb77b600c0115b5919c1c";
-        let payload:&str = "7b227479706573223a7b22454950373132446f6d61696e223a5b5d2c224d657373616765223a5b7b226e616d65223a22726f6c6c7570496e74657276616c222c2274797065223a22737472696e67227d2c7b226e616d65223a226d696e526f6c6c757053697a65222c2274797065223a22737472696e67227d2c7b226e616d65223a226e6574776f726b222c2274797065223a22737472696e67227d5d7d2c22646f6d61696e223a7b7d2c227072696d61727954797065223a224d657373616765222c226d657373616765223a7b22726f6c6c7570496e74657276616c223a2231303030303030222c226d696e526f6c6c757053697a65223a2231303030303030222c226e6574776f726b223a2239353237227d7d";
-        match StorageNodeV2Impl::new(config.clone(), sender).await {
-            Ok(storage_node) => {
-                let payload_binary = hex::decode(payload).unwrap();
-                let request = SetupRequest {
-                    signature: sig.to_string(),
-                    payload: payload_binary,
-                };
-                let tonic_req = Request::new(request);
-                if let Ok(response) = storage_node.setup(tonic_req).await {
-                    let r = response.into_inner();
-                    assert_eq!(0, r.code);
-                } else {
-                    assert!(false);
-                }
-            }
-            Err(e) => {
-                println!("{e}");
-                assert!(false);
-            }
-        }
-        let (sender, _) = tokio::sync::mpsc::channel::<(
-            DB3Address,
-            SubscriptionV2,
-            Sender<std::result::Result<EventMessageV2, Status>>,
-        )>(1024);
-        if let Ok(storage_node) = StorageNodeV2Impl::new(config.clone(), sender).await {
-            if let Err(_e) = storage_node.recover() {
-                assert!(false);
-            }
-            let tonic_req = Request::new(GetSystemStatusRequest {});
-            if let Ok(response) = storage_node.get_system_status(tonic_req).await {
-                let r = response.into_inner();
-                assert!(r.has_inited);
-                let config = r.config.unwrap();
-                assert_eq!(config.min_rollup_size, 1000000);
-                assert_eq!(config.network_id, 9527);
-                assert_eq!(config.rollup_interval, 1000000);
-            }
+        let (update_sender, update_receiver) = tokio::sync::mpsc::channel::<()>(1024);
+        let (state_config, system_store_config, config) =
+            generate_rand_node_config(real_path.as_str());
+        let state_store = Arc::new(StateStore::new(state_config).unwrap());
+        let system_store = Arc::new(SystemStore::new(system_store_config, state_store.clone()));
+        let sig:&str = "0xcdc5b45e3c632bbffb3950cd1ac301909a91c53e40749da455a6c4720330c60f727ab4fcb96efc11bf9f1b72111ae29ec234c3af63beb81f59057f7c191630201b";
+        let payload:&str = "7b227479706573223a7b22454950373132446f6d61696e223a5b5d2c224d657373616765223a5b7b226e616d65223a22726f6c6c7570496e74657276616c222c2274797065223a22737472696e67227d2c7b226e616d65223a226d696e526f6c6c757053697a65222c2274797065223a22737472696e67227d2c7b226e616d65223a226e6574776f726b222c2274797065223a22737472696e67227d2c7b226e616d65223a22636861696e4964222c2274797065223a22737472696e67227d2c7b226e616d65223a22636f6e747261637441646472657373222c2274797065223a22737472696e67227d2c7b226e616d65223a22726f6c6c75704d6178496e74657276616c222c2274797065223a22737472696e67227d2c7b226e616d65223a2265766d4e6f6465527063222c2274797065223a22737472696e67227d2c7b226e616d65223a2261724e6f646555726c222c2274797065223a22737472696e67227d5d7d2c22646f6d61696e223a7b7d2c227072696d61727954797065223a224d657373616765222c226d657373616765223a7b22726f6c6c7570496e74657276616c223a2231303030303030222c226d696e526f6c6c757053697a65223a223131303030303030222c226e6574776f726b223a2231313131222c22636861696e4964223a2231222c22636f6e747261637441646472657373223a22307831323133222c22726f6c6c75704d6178496e74657276616c223a22313131313131313131222c2265766d4e6f6465527063223a2277733a2f2f3132372e302e302e313a38303830222c2261724e6f646555726c223a22687474703a2f2f3132372e302e302e313a39353237227d7d";
+        let storage_node = StorageNodeV2Impl::new(
+            config.clone(),
+            system_store.clone(),
+            state_store.clone(),
+            sender,
+        )
+        .await
+        .unwrap();
+        storage_node
+            .keep_subscription(receiver, update_receiver)
+            .await
+            .unwrap();
+        let admin_addr = "0xBbE29f26dc7ADEFEf6592FA34a2EFa037585087C";
+        let public_url = "http://127.0.0.1:8080";
+        let system_impl = SystemImpl::new(
+            update_sender,
+            system_store.clone(),
+            SystemRole::DataRollupNode,
+            public_url.to_string(),
+            admin_addr,
+        )
+        .unwrap();
+        let payload_binary = hex::decode(payload).unwrap();
+        let request = SetupRequest {
+            signature: sig.to_string(),
+            payload: payload_binary,
+        };
+        let tonic_req = Request::new(request);
+        if let Ok(response) = system_impl.setup(tonic_req).await {
+            let r = response.into_inner();
+            assert_eq!(0, r.code);
         } else {
             assert!(false);
         }
+        sleep(TokioDuration::from_millis(10000)).await;
     }
 }

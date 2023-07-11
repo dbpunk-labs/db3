@@ -28,7 +28,7 @@ use ethers::types::Address;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tonic::{Request, Response, Status};
-use tracing::info;
+use tracing::{info, warn};
 
 ///
 /// the setup grpc service for data rollup node and data index node
@@ -98,15 +98,16 @@ impl System for SystemImpl {
                 "contract address is empty"
             )));
         }
+
         let rollup_interval = MutationUtil::get_u64_field(&data, "rollupInterval", 10 * 60 * 1000);
         let rollup_max_interval =
             MutationUtil::get_u64_field(&data, "rollupMaxInterval", 24 * 60 * 60 * 1000);
+        let min_gc_offset = MutationUtil::get_u64_field(&data, "minGcOffset", 10 * 24 * 60 * 1000);
         let min_rollup_size = MutationUtil::get_u64_field(&data, "minRollupSize", 1024 * 1024);
         let evm_node_rpc = MutationUtil::get_str_field(&data, "evmNodeRpc", "");
         if evm_node_rpc.is_empty() {
             return Err(Status::invalid_argument(format!("evm node rpc is empty")));
         }
-
         if !evm_node_rpc.starts_with("wss") && !evm_node_rpc.starts_with("ws") {
             return Err(Status::invalid_argument(format!(
                 "only the websocket url is valid"
@@ -136,12 +137,15 @@ impl System for SystemImpl {
                 chain_id: old_config.chain_id,
                 rollup_max_interval,
                 contract_addr: old_config.contract_addr,
+                min_gc_offset,
             };
             // if the node has been setuped the network id and chain id can not been changed
             self.system_store
                 .update_config(&self.role, &system_config)
                 .map_err(|e| Status::internal(format!("{e}")))?;
-            if let Err(e) = self.sender.send(()).await {}
+            if let Err(e) = self.sender.send(()).await {
+                warn!("fail to send update config notification with error {e}");
+            }
         } else {
             let system_config = SystemConfig {
                 min_rollup_size,
@@ -152,11 +156,14 @@ impl System for SystemImpl {
                 chain_id,
                 rollup_max_interval,
                 contract_addr: contract_addr.to_string(),
+                min_gc_offset,
             };
             self.system_store
                 .update_config(&self.role, &system_config)
                 .map_err(|e| Status::internal(format!("{e}")))?;
-            if let Err(e) = self.sender.send(()).await {}
+            if let Err(e) = self.sender.send(()).await {
+                warn!("fail to send update config notification with error {e}");
+            }
         }
         return Ok(Response::new(SetupResponse {
             code: 0,
