@@ -187,9 +187,10 @@ impl System for SystemImpl {
         let ar_address = self
             .system_store
             .get_ar_address()
-            .map_err(|e| Status::internal(format!("fail to get evm address {e}")))?;
+            .map_err(|e| Status::internal(format!("fail to get ar address {e}")))?;
+        let readable_addr = hex::encode(evm_address);
         Ok(Response::new(SystemStatus {
-            evm_account: format!("0x{}", evm_address),
+            evm_account: format!("0x{}", readable_addr),
             evm_balance: "".to_string(),
             ar_account: ar_address,
             ar_balance: "".to_string(),
@@ -200,12 +201,4 @@ impl System for SystemImpl {
             version: Some(version_util::build_version()),
         }))
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {}
 }

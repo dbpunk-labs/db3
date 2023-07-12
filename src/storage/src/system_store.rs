@@ -230,6 +230,7 @@ mod tests {
                 chain_id: 1,
                 rollup_max_interval: 5,
                 contract_addr: "0x1213".to_string(),
+                min_gc_offset: 1,
             };
             let result = system_store.update_config(&SystemRole::DataIndexNode, &system_config);
             assert!(result.is_ok());

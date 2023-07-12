@@ -127,7 +127,7 @@ impl StorageNodeV2Impl {
                 system_store,
             })
         } else {
-            info!("init storage node from command config");
+            info!("please setup the node first");
             let network_id = Arc::new(AtomicU64::new(0));
             let rollup_executor = Arc::new(
                 RollupExecutor::new(

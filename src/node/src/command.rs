@@ -65,9 +65,9 @@ const ABOUT: &str = "
 #[clap(name = "db3")]
 #[clap(about = ABOUT, long_about = None)]
 pub enum DB3Command {
-    /// Start the store node
-    #[clap(name = "store")]
-    Store {
+    /// Start the data rollup node
+    #[clap(name = "rollup")]
+    Rollup {
         /// the public address
         #[clap(long, default_value = "http://127.0.0.1:26619")]
         public_url: String,
@@ -106,9 +106,9 @@ pub enum DB3Command {
         doc_id_start: i64,
     },
 
-    /// Start db3 indexer
-    #[clap(name = "indexer")]
-    Indexer {
+    /// Start data index node
+    #[clap(name = "index")]
+    Index {
         /// the public address
         #[clap(long, default_value = "http://127.0.0.1:26639")]
         public_url: String,
@@ -192,7 +192,7 @@ impl DB3Command {
 
     pub async fn execute(self) {
         match self {
-            DB3Command::Store {
+            DB3Command::Rollup {
                 public_url,
                 bind_host,
                 listening_port,
@@ -213,7 +213,7 @@ impl DB3Command {
                 };
                 tracing_subscriber::fmt().with_max_level(log_level).init();
                 info!("{ABOUT}");
-                Self::start_store_grpc_service(
+                Self::start_rollup_grpc_service(
                     public_url.as_str(),
                     bind_host.as_str(),
                     listening_port,
@@ -244,7 +244,7 @@ impl DB3Command {
                 }
             }
 
-            DB3Command::Indexer {
+            DB3Command::Index {
                 public_url,
                 bind_host,
                 listening_port,
@@ -272,12 +272,15 @@ impl DB3Command {
                     evm_wallet_key: "evm".to_string(),
                     ar_wallet_key: "ar".to_string(),
                 };
+
                 let state_config = StateStoreConfig {
                     db_path: state_db_path.to_string(),
                 };
                 let (update_sender, update_receiver) = tokio::sync::mpsc::channel::<()>(8);
                 let state_store = Arc::new(StateStore::new(state_config).unwrap());
                 let system_store = Arc::new(SystemStore::new(system_store_config, state_store));
+                info!("Arweave address {}", system_store.get_ar_address().unwrap());
+                info!("Evm address 0x{}", system_store.get_evm_address().unwrap());
                 let system_impl = SystemImpl::new(
                     update_sender,
                     system_store.clone(),
@@ -335,8 +338,8 @@ impl DB3Command {
             }
         }
     }
-    /// Start store grpc service
-    async fn start_store_grpc_service(
+    /// Start rollup grpc service
+    async fn start_rollup_grpc_service(
         public_url: &str,
         bind_host: &str,
         listening_port: u16,
@@ -379,7 +382,11 @@ impl DB3Command {
         };
 
         let system_store = Arc::new(SystemStore::new(system_store_config, state_store.clone()));
-
+        info!("Arweave address {}", system_store.get_ar_address().unwrap());
+        info!(
+            "Evm address 0x{}",
+            hex::encode(system_store.get_evm_address().unwrap())
+        );
         let db_store_config = DBStoreV2Config {
             db_path: doc_db_path.to_string(),
             db_store_cf_name: "db_store_cf".to_string(),
