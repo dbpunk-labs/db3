@@ -73,9 +73,7 @@ impl System for SystemImpl {
         request: Request<SetupRequest>,
     ) -> std::result::Result<Response<SetupResponse>, Status> {
         let r = request.into_inner();
-        // TODO avoid replay attack
-        // verify the typed data signature
-        let (address, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
+        let (address, data) = MutationUtil::verify_setup(r.payload.as_str(), r.signature.as_str())
             .map_err(|e| Status::invalid_argument(format!("invalid signature {e}")))?;
         info!("setup with config {:?} from address {}", data, address);
         // only admin can request the setup function
@@ -92,7 +90,7 @@ impl System for SystemImpl {
             )));
         }
 
-        let contract_addr = MutationUtil::get_str_field(&data, "contractAddress", "");
+        let contract_addr = MutationUtil::get_str_field(&data, "contractAddr", "");
         if contract_addr.is_empty() {
             return Err(Status::invalid_argument(format!(
                 "contract address is empty"
@@ -103,7 +101,7 @@ impl System for SystemImpl {
             MutationUtil::get_u64_field(&data, "rollupMaxInterval", 24 * 60 * 60 * 1000);
         let min_gc_offset = MutationUtil::get_u64_field(&data, "minGcOffset", 10 * 24 * 60 * 1000);
         let min_rollup_size = MutationUtil::get_u64_field(&data, "minRollupSize", 1024 * 1024);
-        let evm_node_rpc = MutationUtil::get_str_field(&data, "evmNodeRpc", "");
+        let evm_node_rpc = MutationUtil::get_str_field(&data, "evmNodeUrl", "");
         if evm_node_rpc.is_empty() {
             return Err(Status::invalid_argument(format!("evm node rpc is empty")));
         }
@@ -116,7 +114,7 @@ impl System for SystemImpl {
         if ar_node_url.is_empty() {
             return Err(Status::invalid_argument(format!("ar node rpc is empty")));
         }
-        let network = MutationUtil::get_str_field(&data, "network", "0")
+        let network = MutationUtil::get_str_field(&data, "networkId", "0")
             .parse::<u64>()
             .map_err(|e| Status::invalid_argument(format!("fail to parse network id {e}")))?;
         if network == 0 {

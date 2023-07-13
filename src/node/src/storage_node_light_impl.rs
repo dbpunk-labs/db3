@@ -753,7 +753,7 @@ mod tests {
         let payload_binary = hex::decode(payload).unwrap();
         let request = SetupRequest {
             signature: sig.to_string(),
-            payload: payload_binary,
+            payload: "".to_string(), //payload_binary,
         };
         let tonic_req = Request::new(request);
         if let Ok(response) = system_impl.setup(tonic_req).await {

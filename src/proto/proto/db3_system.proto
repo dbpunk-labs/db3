@@ -22,7 +22,7 @@ import "db3_base.proto";
 
 message SetupRequest {
   string signature = 1;
-  bytes payload = 2;
+  string payload = 2;
 }
 
 message SetupResponse {

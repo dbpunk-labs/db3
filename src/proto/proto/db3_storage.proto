@@ -57,7 +57,7 @@ message SubscribeRequest {
   // a hex signature string
   string signature = 1;
   // the payload of topic
-  bytes payload = 2;
+  string payload = 2;
 }
 
 // the node will dispatch a block event when a new block has been proposed

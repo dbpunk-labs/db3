@@ -29,11 +29,11 @@ export async function generate_config_sig(
             Message: [
                 { name: 'rollupInterval', type: 'string' },
                 { name: 'minRollupSize', type: 'string' },
-                { name: 'network', type: 'string' },
+                { name: 'networkId', type: 'string' },
                 { name: 'chainId', type: 'string' },
-                { name: 'contractAddress', type: 'string' },
+                { name: 'contractAddr', type: 'address' },
                 { name: 'rollupMaxInterval', type: 'string' },
-                { name: 'evmNodeRpc', type: 'string' },
+                { name: 'evmNodeUrl', type: 'string' },
                 { name: 'arNodeUrl', type: 'string' },
                 { name: 'minGcOffset', type: 'string' },
             ],
@@ -41,11 +41,19 @@ export async function generate_config_sig(
         domain: {},
         primaryType: 'Message',
         message: {
-            ...config,
+            rollupInterval: config.rollupInterval,
+            minRollupSize: config.minRollupSize,
+            networkId: config.networkId,
+            chainId: config.chainId.toString(),
+            contractAddr: config.contractAddr,
+            rollupMaxInterval: config.rollupMaxInterval,
+            evmNodeUrl: config.evmNodeUrl,
+            arNodeUrl: config.arNodeUrl,
+            minGcOffset: config.minGcOffset,
         },
     }
+
     const signature = await signTypedData(account, message)
-    const msgParams = JSON.stringify(message)
-    const payload = new TextEncoder().encode(msgParams)
-    return [signature, payload] as const
+    const payload = JSON.stringify(message)
+    return [signature, payload]
 }

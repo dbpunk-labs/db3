@@ -60,7 +60,7 @@ export class IndexerProvider {
             throw new DB3Error(e as RpcError)
         }
     }
-    async setup(signature: string, payload: Uint8Array) {
+    async setup(signature: string, payload: string) {
         try {
             const request: SetupRequest = {
                 signature,

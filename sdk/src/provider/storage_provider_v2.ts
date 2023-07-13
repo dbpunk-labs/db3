@@ -224,7 +224,7 @@ export class StorageProviderV2 {
         }
     }
 
-    async setup(signature: string, payload: Uint8Array) {
+    async setup(signature: string, payload: string) {
         try {
             const request: SetupRequest = {
                 signature,
