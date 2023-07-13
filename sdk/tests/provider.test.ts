@@ -30,7 +30,6 @@ import {
 } from '../src/account/db3_account'
 
 describe('test db3.js provider module', () => {
-
     test('provider send mutation test', async () => {
         const privateKey =
             '0xad689d9b7751da07b0fb39c5091672cbfe50f59131db015f8a0e76c9790a6fcc'

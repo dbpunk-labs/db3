@@ -67,7 +67,7 @@ export class StorageProviderV2 {
 
     private async wrapTypedRequest(mutation: Uint8Array, nonce: string) {
         if (!this.account) {
-            throw new SDKError("account is undefined")
+            throw new SDKError('account is undefined')
         }
         const hexMutation = toHEX(mutation)
         const message = {
@@ -97,7 +97,7 @@ export class StorageProviderV2 {
 
     async getNonce() {
         if (!this.account) {
-            throw new SDKError("the account is undefined")
+            throw new SDKError('the account is undefined')
         }
         try {
             const request: GetNonceRequest = {
@@ -115,7 +115,7 @@ export class StorageProviderV2 {
      */
     async sendMutation(mutation: Uint8Array, nonce: string) {
         if (!this.account) {
-            throw new SDKError("the account is undefined")
+            throw new SDKError('the account is undefined')
         }
         try {
             const request = await this.wrapTypedRequest(mutation, nonce)

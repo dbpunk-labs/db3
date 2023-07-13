@@ -24,7 +24,7 @@ export type { DB3Account } from './account/types'
 export type { Client, ReadClient } from './client/types'
 export { addDoc, updateDoc, deleteDoc, queryDoc } from './store/document_v2'
 
-export { SystemConfig } from './proto/db3_base'
+export { SystemConfig, SystemStatus } from './proto/db3_base'
 export {
     createClient,
     createReadonlyClient,

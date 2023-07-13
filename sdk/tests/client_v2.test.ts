@@ -50,7 +50,7 @@ import {
     getCollection,
 } from '../src/store/database_v2'
 import { Index, IndexType } from '../src/proto/db3_database_v2'
-import {SystemConfig} from '../src/proto/db3_base'
+import { SystemConfig } from '../src/proto/db3_base'
 
 interface Profile {
     city: string
@@ -98,49 +98,43 @@ describe('test db3.js client module', () => {
         expect(true).toBe(parseInt(view.totalMutationBytes) >= 0)
     })
 
-    test("test no permission setup",  async () => {
+    test('test no permission setup', async () => {
         const client = await createTestClient()
-         const config: SystemConfig = {
-              rollupInterval: "600000",
-              minRollupSize: "1048576",
-              network: "1",
-              chainId: "80000",
-              contractAddress: "0xb9709cE5E749b80978182db1bEdfb8c7340039A9",
-              rollupMaxInterval: "6000000",
-              evmNodeRpc: "ws://127.0.0.1:8585",
-              arNodeUrl: "https://arweave.net",
-              minGcOffset: "864000"
-          }
-          try {
-            const [rollupCode, indexCode] = await setup(
-                client,
-                config
-            )
-            expect("0").toBe("1")
-          } catch(e) {
-            expect(e.message).toBe("You are not the admin")
-          }
+        const config: SystemConfig = {
+            rollupInterval: '600000',
+            minRollupSize: '1048576',
+            network: '1',
+            chainId: '80000',
+            contractAddress: '0xb9709cE5E749b80978182db1bEdfb8c7340039A9',
+            rollupMaxInterval: '6000000',
+            evmNodeRpc: 'ws://127.0.0.1:8585',
+            arNodeUrl: 'https://arweave.net',
+            minGcOffset: '864000',
+        }
+        try {
+            const [rollupCode, indexCode] = await setup(client, config)
+            expect('0').toBe('1')
+        } catch (e) {
+            expect(e.message).toBe('You are not the admin')
+        }
     })
 
     test('test setup system status', async () => {
         const client = await createAdminClient()
-          const config: SystemConfig = {
-              rollupInterval: "600000",
-              minRollupSize: "1048576",
-              network: "1",
-              chainId: "80000",
-              contractAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-              rollupMaxInterval: "6000000",
-              evmNodeRpc: "ws://127.0.0.1:8545",
-              arNodeUrl: "http://127.0.0.1:1984",
-              minGcOffset: "864000"
-          }
-        const [rollupCode, indexCode] = await setup(
-            client,
-            config
-        )
-        expect("0").toBe(rollupCode)
-        expect("0").toBe(indexCode)
+        const config: SystemConfig = {
+            rollupInterval: '600000',
+            minRollupSize: '1048576',
+            network: '1',
+            chainId: '80000',
+            contractAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+            rollupMaxInterval: '6000000',
+            evmNodeRpc: 'ws://127.0.0.1:8545',
+            arNodeUrl: 'http://127.0.0.1:1984',
+            minGcOffset: '864000',
+        }
+        const [rollupCode, indexCode] = await setup(client, config)
+        expect('0').toBe(rollupCode)
+        expect('0').toBe(indexCode)
         const status = await getStorageNodeStatus(client)
         expect(true).toBe(status.hasInited)
         expect('1').toBe(status.config?.networkId)
