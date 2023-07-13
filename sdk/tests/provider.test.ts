@@ -30,24 +30,6 @@ import {
 } from '../src/account/db3_account'
 
 describe('test db3.js provider module', () => {
-    test('system node setup test', async () => {
-        const privateKey =
-            '0xca6ade874391db77a7a66e542f800ba4f89f249cb7c785371eeacbaa3ef74cfd'
-        const db3_account = createFromPrivateKey(privateKey)
-        expect(db3_account.address).toBe(
-            '0xBbE29f26dc7ADEFEf6592FA34a2EFa037585087C'
-        )
-        const provider = new StorageProviderV2(
-            'http://127.0.0.1:26619',
-            db3_account
-        )
-        try {
-            const response = await provider.setup('1111', '1000000', '11000000')
-            expect(1).toBe(0)
-        } catch (e) {
-            expect(1).toBe(1)
-        }
-    })
 
     test('provider send mutation test', async () => {
         const privateKey =

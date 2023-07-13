@@ -15,7 +15,6 @@
 // limitations under the License.
 //
 
-use bytes::BytesMut;
 use db3_proto::db3_system_proto::SetupResponse;
 use db3_proto::db3_system_proto::{system_client::SystemClient, SetupRequest};
 use ethers::core::types::{

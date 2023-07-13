@@ -77,7 +77,7 @@ impl System for SystemImpl {
         // verify the typed data signature
         let (address, data) = MutationUtil::verify_setup(&r.payload, r.signature.as_str())
             .map_err(|e| Status::invalid_argument(format!("invalid signature {e}")))?;
-        info!("setup with config {:?}", data);
+        info!("setup with config {:?} from address {}", data, address);
         // only admin can request the setup function
         if self.admin_addr != address {
             return Err(Status::permission_denied(
@@ -98,7 +98,6 @@ impl System for SystemImpl {
                 "contract address is empty"
             )));
         }
-
         let rollup_interval = MutationUtil::get_u64_field(&data, "rollupInterval", 10 * 60 * 1000);
         let rollup_max_interval =
             MutationUtil::get_u64_field(&data, "rollupMaxInterval", 24 * 60 * 60 * 1000);

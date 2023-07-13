@@ -10,8 +10,8 @@ EVM_NODE_URL='ws://127.0.0.1:8545'
 ADMIN_ADDR='0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 echo "start to clean"
 ## clean local process
-ps -ef | grep db3 | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
-ps -ef | grep db3 | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep db3 | grep rollup | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep db3 | grep index | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep arlocal | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do kill $line;done

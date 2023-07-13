@@ -24,3 +24,9 @@ export class DB3Error extends Error {
         this.e = e
     }
 }
+
+export class SDKError extends Error {
+    constructor(message:string) {
+        super(message)
+    }
+}

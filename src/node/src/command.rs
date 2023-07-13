@@ -318,7 +318,7 @@ impl DB3Command {
                     info!("start syncing data from storage node");
                     indexer_for_syncing.start(store_sdk).await.unwrap();
                 });
-                info!("start db3 indexer node on public {}", public_url);
+                info!("start db3 indexer node on public {} and listen addr {}", public_url, addr);
                 let cors_layer = CorsLayer::new()
                     .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
                     .allow_headers(Any)
@@ -353,7 +353,6 @@ impl DB3Command {
         doc_start_id: i64,
     ) {
         let listen_addr = format!("{bind_host}:{listening_port}");
-
         let rollup_config = RollupExecutorConfig {
             temp_data_path: rollup_data_path.to_string(),
             key_root_path: key_root_path.to_string(),
@@ -417,7 +416,7 @@ impl DB3Command {
             StorageNodeV2Impl::new(config, system_store.clone(), state_store.clone(), sender)
                 .await
                 .unwrap();
-        info!("start db3 store node on public addr {}", public_url);
+        info!("start db3 store node on public addr {} and listen_addr {}", public_url, listen_addr);
         std::fs::create_dir_all(rollup_data_path).unwrap();
         storage_node.recover().unwrap();
         let system_impl = SystemImpl::new(
