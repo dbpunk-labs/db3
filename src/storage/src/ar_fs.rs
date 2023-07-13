@@ -286,6 +286,13 @@ mod tests {
         let balance = ar_filesystem.get_balance().await.unwrap();
         println!("balance: {:?}", balance);
     }
+    #[tokio::test]
+    async fn test_get_ar_account() {
+        let arweave_url = "http://127.0.0.1:1984".to_string();
+        let ar_filesystem = build_arweave(arweave_url);
+        let addr = ar_filesystem.get_address();
+        println!("ar addr : {}", addr);
+    }
 
     #[tokio::test]
     async fn test_upload_ut() {

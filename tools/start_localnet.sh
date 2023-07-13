@@ -13,6 +13,7 @@ echo "start to clean"
 ps -ef | grep db3 | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep db3 | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep arlocal |grep node | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 echo "start the all process"
 
@@ -50,14 +51,14 @@ fi
 mkdir -p ./keys
 echo "start db3 store..."
 ../target/${BUILD_MODE}/db3 store --admin-addr=${ADMIN_ADDR}\
-            --rollup-interval 60000 --block-interval=500\
+            --rollup-interval 20000 --rollup-min-data-size 10240 --block-interval=500\
             --contract-addr=${CONTRACT_ADDR} --evm-node-url=${EVM_NODE_URL}>store.log 2>&1 &
-sleep 1
+sleep 2
 AR_ADDRESS=`less store.log | grep filestore | awk '{print $NF}'`
 STORE_EVM_ADDRESS=`less store.log | grep evm | grep address | awk '{print $NF}'`
 echo "start ar miner..."
 bash ./ar_miner.sh> miner.log 2>&1 &
-sleep 1
+sleep 3
 echo "request ar token to rollup node"
 curl http://127.0.0.1:1984/mint/${AR_ADDRESS}/10000000000000000
 echo "done!"
