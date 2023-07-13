@@ -267,10 +267,11 @@ impl RollupExecutor {
         let memory_size = recordbatch.get_array_memory_size();
         self.pending_data_size
             .store(memory_size as u64, Ordering::Relaxed);
-        if memory_size < self.min_rollup_size.load(Ordering::Relaxed) as usize {
+        if memory_size < self.get_min_rollup_size() as usize {
             info!(
                 "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
-                self.config.min_rollup_size, memory_size
+                self.get_min_rollup_size(),
+                memory_size
             );
             return Ok(());
         } else {

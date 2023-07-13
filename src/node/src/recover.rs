@@ -108,12 +108,20 @@ impl Recover {
 
     /// recover from start_block to latest arweave tx
     pub async fn recover_from_block(&self, start_block: u64) -> Result<u64> {
-        let txs = self.fetch_arweave_tx_from_block(start_block).await?;
-        for (tx, version) in txs.iter().rev() {
-            self.recover_from_arweave_tx(tx.as_str(), version.clone())
-                .await?;
+        let mut from_block = start_block;
+        loop {
+            let txs = self.fetch_arweave_tx_from_block(from_block).await?;
+            if txs.is_empty() {
+                break;
+            }
+            for (tx, end_block, version) in txs.iter().rev() {
+                self.recover_from_arweave_tx(tx.as_str(), version.clone())
+                    .await?;
+            }
+            from_block = txs[0].1 + 1;
         }
-        Ok(start_block)
+
+        Ok(from_block)
     }
 
     /// recover from arweave tx
@@ -150,7 +158,7 @@ impl Recover {
     async fn fetch_arweave_tx_from_block(
         &self,
         block: u64,
-    ) -> Result<Vec<(String, Option<String>)>> {
+    ) -> Result<Vec<(String, u64, Option<String>)>> {
         let mut txs = vec![];
         // 1. get latest arweave tx id from meta store
         let mut tx = self.get_latest_arweave_tx().await?;
@@ -161,7 +169,7 @@ impl Recover {
             if end_block < block {
                 return Ok(txs);
             }
-            txs.push((tx.clone(), version));
+            txs.push((tx.clone(), end_block, version));
             // stop if last_rollup_tx is None
             if let Some(t) = last_rollup_tx {
                 tx = t;
@@ -250,7 +258,8 @@ mod tests {
         assert!(res.is_ok());
         let txs = res.unwrap();
         assert!(txs.len() > 0);
+        println!("end_block: {}", txs[0].1);
         println!("txs {:?}", txs);
-        assert!(txs[0].1.is_none());
+        assert!(txs[0].2.is_none());
     }
 }
