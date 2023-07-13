@@ -51,7 +51,7 @@ fi
 mkdir -p ./keys
 echo "start db3 store..."
 ../target/${BUILD_MODE}/db3 store --admin-addr=${ADMIN_ADDR}\
-            --rollup-interval 20000 --rollup-min-data-size 10240 --block-interval=500\
+            --rollup-interval 60000 --block-interval=500\
             --contract-addr=${CONTRACT_ADDR} --evm-node-url=${EVM_NODE_URL}>store.log 2>&1 &
 sleep 2
 AR_ADDRESS=`less store.log | grep filestore | awk '{print $NF}'`
