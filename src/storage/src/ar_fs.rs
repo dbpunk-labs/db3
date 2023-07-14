@@ -284,7 +284,6 @@ mod tests {
         let arweave_url = "http://127.0.0.1:1984".to_string();
         let ar_filesystem = build_arweave(arweave_url);
         let balance = ar_filesystem.get_balance().await.unwrap();
-        println!("balance: {:?}", balance);
     }
     #[tokio::test]
     async fn test_get_ar_account() {
@@ -311,8 +310,13 @@ mod tests {
                 "37829_37968.gz.parquet",
             )
             .await;
+        let balance = ar_filesystem.get_balance().await;
         println!("res: {:?}", res);
-        assert!(res.is_ok());
+        assert!(
+            res.is_ok(),
+            "upload file failed with balance : {:?}",
+            balance
+        );
         let (tx_id, reward) = res.unwrap();
         assert!(!tx_id.is_empty());
     }
