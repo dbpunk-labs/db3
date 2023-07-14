@@ -58,12 +58,6 @@ jobs:
           cd ${ROOT_DIR}/tools && bash start_localnet.sh
           sleep 2
           export RUST_BACKTRACE=1
-      - uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: db3-log-artifact
-          path: |
-            tools/*.log
       - name: Run Typescript sdk test
         run: |
           ROOT_DIR=`pwd`
@@ -77,6 +71,12 @@ jobs:
         run: |
           export RUST_BACKTRACE=1
           cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: db3-log-artifact
+          path: |
+            tools/*.log
       - uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.COV_TOKEN}}
