@@ -124,11 +124,11 @@ describe('test db3.js client module', () => {
         const config: SystemConfig = {
             rollupInterval: '600000',
             minRollupSize: '1048576',
-            network: '1',
+            networkId: '1',
             chainId: '80000',
-            contractAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+            contractAddr: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
             rollupMaxInterval: '6000000',
-            evmNodeRpc: 'ws://127.0.0.1:8545',
+            evmNodeUrl: 'ws://127.0.0.1:8545',
             arNodeUrl: 'http://127.0.0.1:1984',
             minGcOffset: '864000',
         }

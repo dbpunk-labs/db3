@@ -235,6 +235,7 @@ mod tests {
             let result = system_store.update_config(&SystemRole::DataIndexNode, &system_config);
             assert!(result.is_ok());
         }
+
         {
             let state_config = StateStoreConfig {
                 db_path: real_path2.to_string(),

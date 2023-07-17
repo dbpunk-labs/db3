@@ -437,8 +437,7 @@ impl DB3Command {
             .keep_subscription(receiver, update_receiver)
             .await
             .unwrap();
-        storage_node.start_to_produce_block().await;
-        storage_node.start_to_rollup().await;
+        storage_node.start_bg_task().await;
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(Any)

@@ -22,6 +22,7 @@ import "db3_base.proto";
 import "db3_database_v2.proto";
 import "db3_mutation_v2.proto";
 import "db3_rollup.proto";
+
 message SendMutationRequest {
   // a hex signature string
   string signature = 1;

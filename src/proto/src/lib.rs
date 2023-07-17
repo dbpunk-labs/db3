@@ -39,7 +39,6 @@ pub mod db3_rollup_proto {
     tonic::include_proto!("db3_rollup_proto");
 }
 
-// the system proto module
 pub mod db3_system_proto {
     tonic::include_proto!("db3_system_proto");
 }

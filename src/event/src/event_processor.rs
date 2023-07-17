@@ -52,6 +52,7 @@ pub struct EventProcessor {
 
 unsafe impl Sync for EventProcessor {}
 unsafe impl Send for EventProcessor {}
+
 impl EventProcessor {
     pub async fn new(config: EventProcessorConfig, db_store: DBStoreV2) -> Result<Self> {
         info!("new event processor with config {:?}", config);
