@@ -10,7 +10,7 @@ jobs:
 
   rustfmt:
     name: Rustfmt
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -31,7 +31,7 @@ jobs:
 
   coverage:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
