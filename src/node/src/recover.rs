@@ -24,7 +24,7 @@ use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
 use ethers::prelude::{LocalWallet, Signer};
 use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::info;
 
@@ -46,14 +46,18 @@ pub struct Recover {
 }
 
 impl Recover {
-    pub async fn new(config: RecoverConfig, network_id: Arc<AtomicU64>) -> Result<Self> {
+    pub async fn new(
+        config: RecoverConfig,
+        network_id: Arc<AtomicU64>,
+        chain_id: Arc<AtomicU32>,
+    ) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
             "evm address {}",
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
         //TODO config the chain id
-        let wallet = wallet.with_chain_id(80001_u32);
+        let wallet = wallet.with_chain_id(chain_id.load(Ordering::Relaxed));
         let meta_store = Arc::new(
             MetaStoreClient::new(
                 config.contract_addr.as_str(),
@@ -209,6 +213,7 @@ mod tests {
             .unwrap()
             .to_string();
         let network_id: u64 = 1;
+        let chain_id: u32 = 31337_u32;
         let real_path = temp_dir.path().to_str().unwrap().to_string();
         let db_store_config = DBStoreV2Config {
             db_path: real_path,
@@ -235,6 +240,7 @@ mod tests {
                 enable_mutation_recover: true,
             },
             Arc::new(AtomicU64::new(network_id)),
+            Arc::new(AtomicU32::new(chain_id)),
         )
         .await
         .unwrap();

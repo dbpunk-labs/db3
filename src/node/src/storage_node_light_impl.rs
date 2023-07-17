@@ -50,7 +50,7 @@ use db3_storage::state_store::{StateStore, StateStoreConfig};
 use ethers::abi::Address;
 use prost::Message;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -69,6 +69,7 @@ pub struct StorageNodeV2Config {
     pub rollup_config: RollupExecutorConfig,
     pub db_store_config: DBStoreV2Config,
     pub network_id: u64,
+    pub chain_id: u32,
     pub block_interval: u64,
     pub node_url: String,
     pub evm_node_url: String,
@@ -91,6 +92,7 @@ pub struct StorageNodeV2Impl {
     rollup_executor: Arc<RollupExecutor>,
     rollup_interval: Arc<AtomicU64>,
     network_id: Arc<AtomicU64>,
+    chain_id: Arc<AtomicU32>,
 }
 
 impl StorageNodeV2Impl {
@@ -109,11 +111,13 @@ impl StorageNodeV2Impl {
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
         let network_id = Arc::new(AtomicU64::new(config.network_id));
+        let chain_id = Arc::new(AtomicU32::new(config.chain_id));
         let rollup_executor = Arc::new(
             RollupExecutor::new(
                 config.rollup_config.clone(),
                 storage.clone(),
                 network_id.clone(),
+                chain_id.clone(),
             )
             .await?,
         );
@@ -129,6 +133,7 @@ impl StorageNodeV2Impl {
             rollup_executor,
             rollup_interval: Arc::new(AtomicU64::new(rollup_interval)),
             network_id,
+            chain_id,
         })
     }
 
@@ -753,7 +758,8 @@ mod tests {
             state_config,
             rollup_config,
             db_store_config,
-            network_id: 10,
+            network_id: 1,
+            chain_id: 31337,
             block_interval: 10000,
             node_url: "http://127.0.0.1:26639".to_string(),
             contract_addr: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),

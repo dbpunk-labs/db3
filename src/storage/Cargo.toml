@@ -39,3 +39,5 @@ rsa = "0.6.1"
 rand = "0.8.5"
 tokio = { version = "1.17.0", features = ["full"] }
 chashmap = "2.2.2"
+[features]
+ci = []
