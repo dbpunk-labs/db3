@@ -18,9 +18,9 @@ ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do ki
 echo "start the all process"
 
 cd ${test_dir}/../metadata/ && npx hardhat node >${test_dir}/evm.log 2>&1 &
-sleep 5
-cd ${test_dir}/../metadata/ && bash deploy_to_local.sh >${test_dir}/contract.log 2>&1 &
-sleep 5
+sleep 2
+cd ${test_dir}/../metadata/ && bash deploy_to_local.sh >${test_dir}/contract.log
+sleep 2
 CONTRACT_ADDR=`cat ${test_dir}/contract.log | grep 'store address' | awk '{print $3}'`
 cd ${test_dir}
 
