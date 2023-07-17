@@ -12,5 +12,5 @@ serde_json = { workspace=true}
 db3-storage={path="../storage", version="0.1.0"}
 ethabi = { version = "18.0.0", default-features = false, features = ["full-serde", "rlp"] }
 hex = "0.4.3"
-[dev-dependencies]
 tokio = { version = "1.17.0", features = ["full"] }
+arc-swap = "1.6.0"

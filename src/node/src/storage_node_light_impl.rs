@@ -21,7 +21,6 @@ use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::Result;
-use db3_proto::db3_base_proto::SystemConfig;
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
@@ -36,9 +35,7 @@ use db3_proto::db3_storage_proto::{
     SendMutationRequest, SendMutationResponse, SubscribeRequest,
 };
 
-use arc_swap::ArcSwapOption;
 use db3_event::meta_store_event_processor::MetaStoreEventProcessor;
-use db3_event::meta_store_event_processor::MetaStoreEventProcessorConfig;
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
     Subscription as SubscriptionV2,
@@ -87,7 +84,7 @@ pub struct StorageNodeV2Impl {
     rollup_interval: Arc<AtomicU64>,
     network_id: Arc<AtomicU64>,
     system_store: Arc<SystemStore>,
-    event_processor: ArcSwapOption<MetaStoreEventProcessor>,
+    event_processor: Arc<MetaStoreEventProcessor>,
 }
 
 impl StorageNodeV2Impl {
@@ -106,6 +103,7 @@ impl StorageNodeV2Impl {
         storage.recover()?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
+        let event_processor = Arc::new(MetaStoreEventProcessor::new(state_store.clone()));
         if let Some(c) = system_store.get_config(&SystemRole::DataRollupNode)? {
             info!("init storage node from persistence config {:?}", c);
             let network_id = Arc::new(AtomicU64::new(c.network_id));
@@ -117,9 +115,10 @@ impl StorageNodeV2Impl {
                 )
                 .await?,
             );
+            event_processor
+                .start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0)
+                .await?;
             let rollup_interval = c.rollup_interval;
-            let event_processor =
-                ArcSwapOption::from(Self::rebuild_event_processor(&c, state_store.clone()).await?);
             Ok(Self {
                 storage,
                 state_store,
@@ -157,7 +156,7 @@ impl StorageNodeV2Impl {
                 rollup_interval: Arc::new(AtomicU64::new(1000 * 10 * 60)),
                 network_id,
                 system_store,
-                event_processor: ArcSwapOption::from(None),
+                event_processor,
             })
         }
     }
@@ -167,56 +166,9 @@ impl StorageNodeV2Impl {
         Ok(())
     }
 
-    async fn rebuild_event_processor(
-        config: &SystemConfig,
-        state_store: Arc<StateStore>,
-    ) -> Result<Option<Arc<MetaStoreEventProcessor>>> {
-        let config = MetaStoreEventProcessorConfig {
-            evm_node_url: config.evm_node_url.to_string(),
-            contract_addr: config.contract_addr.to_string(),
-            network_id: config.network_id,
-            start_block: 0,
-        };
-        let processor = Some(Arc::new(
-            MetaStoreEventProcessor::new(config, state_store).await?,
-        ));
-        Ok(processor)
-    }
-
     pub async fn start_bg_task(&self) {
         self.start_to_produce_block().await;
         self.start_to_rollup().await;
-        self.start_event_processor().await;
-    }
-
-    async fn start_event_processor(&self) {
-        let local_event_processor = &self.event_processor;
-        task::spawn(async move {
-            if let Some(ref processor) = local_event_processor.load_full() {
-                processor.start().await;
-            }
-        });
-    }
-
-    pub async fn restart_event_processor(
-        config: &SystemConfig,
-        event_processor: Arc<MetaStoreEventProcessor>,
-        state_store: Arc<StateStore>,
-    ) {
-        if let Some(ref processor) = event_processor.load_full() {
-            processor.close();
-        }
-        if let Ok(new_processor) = Self::rebuild_event_processor(config, state_store).await {
-            event_processor.store(new_processor);
-            task::spawn(async move {
-                if let Some(ref processor) = event_processor.load_full() {
-                    processor.start().await;
-                }
-            });
-        } else {
-            warn!("fail to rebuild the event processor");
-            todo!();
-        }
     }
 
     async fn start_to_produce_block(&self) {
@@ -299,7 +251,7 @@ impl StorageNodeV2Impl {
         let local_rollup_executor = self.rollup_executor.clone();
         let local_system_store = self.system_store.clone();
         let local_network_id = self.network_id.clone();
-        let local_state_store = self.state_store.clone();
+        let local_event_processor = self.event_processor.clone();
         tokio::spawn(async move {
             info!("listen to subscription update event and event message broadcaster");
             while local_running.load(Ordering::Relaxed) {
@@ -322,6 +274,9 @@ impl StorageNodeV2Impl {
                                 info!("update the network {} and rollup interval {}", local_network_id.load(Ordering::Relaxed),
                                 local_rollup_interval.load(Ordering::Relaxed)
                                 );
+                                if let Err(e) = local_event_processor.start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0).await {
+                                    warn!("fail update the event processor with error {e}");
+                                }
                             }
                             if let Err(e) = local_rollup_executor.update_config().await {
                                 warn!("fail update rollup executor config for {e}");
