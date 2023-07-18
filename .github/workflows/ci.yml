@@ -59,6 +59,7 @@ jobs:
           cd ${ROOT_DIR}/tools && bash start_localnet.sh
           sleep 2
           export RUST_BACKTRACE=1
+          cat ${ROOT_DIR}/tools/evm.log
           cargo test register_a_data_network_test
       - name: Run Typescript sdk test
         run: |

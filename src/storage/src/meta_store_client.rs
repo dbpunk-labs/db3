@@ -183,18 +183,10 @@ mod tests {
 
     #[tokio::test]
     async fn register_a_data_network_test() {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let key_root_path = path
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("tools/keys")
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        let wallet = build_wallet(key_root_path.as_str()).unwrap();
+        let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+            .unwrap();
+        let data_ref: &[u8] = data.as_ref();
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
         let wallet = wallet.with_chain_id(31337_u32);
         let rollup_node_address = wallet.address();
         let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
