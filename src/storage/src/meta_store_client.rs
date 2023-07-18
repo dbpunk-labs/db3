@@ -41,7 +41,7 @@ impl MetaStoreClient {
     pub async fn new(contract_addr: &str, rpc_url: &str, wallet: LocalWallet) -> Result<Self> {
         let address = contract_addr
             .parse::<Address>()
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|_| DB3Error::InvalidAddress)?;
         let provider = Provider::<Http>::connect(rpc_url).await;
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
