@@ -11,5 +11,5 @@ sleep 1
 while true
 do
     curl http://127.0.0.1:1984/mine
-    sleep 2
+    sleep 10
 done

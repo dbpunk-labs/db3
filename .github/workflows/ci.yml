@@ -60,6 +60,7 @@ jobs:
           sleep 2
           export RUST_BACKTRACE=1
           cat ${ROOT_DIR}/tools/evm.log
+          cat ${ROOT_DIR}/tools/arlocal.log
           cargo test register_a_data_network_test
       - name: Run Typescript sdk test
         run: |
