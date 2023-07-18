@@ -52,7 +52,7 @@ jobs:
         run: |
           ROOT_DIR=`pwd`
           sudo apt-get install protobuf-compiler -y
-          yarn global add arlocal
+          yarn global add arlocal_db3
           cd ${ROOT_DIR}/metadata && yarn install
           cd ${ROOT_DIR}/metadata && npx hardhat test
           test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
@@ -60,26 +60,20 @@ jobs:
           cd ${ROOT_DIR}/tools && bash start_localnet.sh
           sleep 2
           export RUST_BACKTRACE=1
-          ps xf
-          cat ${ROOT_DIR}/tools/evm.log
-          cat ${ROOT_DIR}/tools/arlocal.log
           cargo test register_a_data_network_test
       - name: Run Typescript sdk test
         run: |
           ROOT_DIR=`pwd`
-          ps xf
           cd $ROOT_DIR/sdk && yarn && make
           cd $ROOT_DIR/sdk && yarn test --coverage
       - name: Rust Java sdk test
         run: |
           ROOT_DIR=`pwd`
-          ps xf
           cd ${ROOT_DIR}/java && mvn test
       - name: Run rust test with coverage
         run: |
           export RUST_BACKTRACE=1
-          ps xf
-          cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast --features ci
+          cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
