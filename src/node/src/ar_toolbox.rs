@@ -182,6 +182,8 @@ impl ArToolBox {
         let (num_rows, size) = Self::dump_recordbatch(&file_path, recordbatch)?;
         let filename = format!("{}_{}.gz.parquet", last_end_block, current_block);
         //TODO add tx status confirmation
+        let balance = self.ar_filesystem.get_balance().await?;
+        info!("Start to upload_file with balance: {:?}", balance);
         let (id, reward) = self
             .ar_filesystem
             .upload_file(

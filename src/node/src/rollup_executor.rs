@@ -24,7 +24,7 @@ use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::mutation_store::MutationStore;
 use ethers::prelude::{LocalWallet, Signer};
 use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{info, warn};
@@ -53,6 +53,7 @@ pub struct RollupExecutor {
     pending_start_block: Arc<AtomicU64>,
     pending_end_block: Arc<AtomicU64>,
     network_id: Arc<AtomicU64>,
+    chain_id: Arc<AtomicU32>,
 }
 
 unsafe impl Sync for RollupExecutor {}
@@ -63,6 +64,7 @@ impl RollupExecutor {
         config: RollupExecutorConfig,
         storage: MutationStore,
         network_id: Arc<AtomicU64>,
+        chain_id: Arc<AtomicU32>,
     ) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
@@ -71,7 +73,7 @@ impl RollupExecutor {
         );
         let wallet2 = Self::build_wallet(config.key_root_path.as_str())?;
         //TODO config the chain id
-        let wallet2 = wallet2.with_chain_id(80001_u32);
+        let wallet2 = wallet2.with_chain_id(chain_id.load(Ordering::Relaxed));
         let min_rollup_size = config.min_rollup_size;
         let meta_store = Arc::new(
             MetaStoreClient::new(
@@ -98,6 +100,7 @@ impl RollupExecutor {
             pending_start_block: Arc::new(AtomicU64::new(0)),
             pending_end_block: Arc::new(AtomicU64::new(0)),
             network_id,
+            chain_id,
         })
     }
 
@@ -267,10 +270,11 @@ impl RollupExecutor {
         let memory_size = recordbatch.get_array_memory_size();
         self.pending_data_size
             .store(memory_size as u64, Ordering::Relaxed);
-        if memory_size < self.min_rollup_size.load(Ordering::Relaxed) as usize {
+        if memory_size < self.get_min_rollup_size() as usize {
             info!(
                 "there not enough data to trigger rollup, the min_rollup_size {}, current size {}",
-                self.config.min_rollup_size, memory_size
+                self.get_min_rollup_size(),
+                memory_size
             );
             return Ok(());
         } else {
