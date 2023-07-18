@@ -31,7 +31,8 @@ jobs:
 
   coverage:
     name: test
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
+    #runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
