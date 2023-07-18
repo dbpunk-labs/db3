@@ -60,7 +60,7 @@ echo "start ar miner..."
 bash ./ar_miner.sh> miner.log 2>&1 &
 sleep 3
 echo "request ar token to rollup node"
-curl http://127.0.0.1:1984/mint/${AR_ADDRESS}/10000000000000000
+curl --connect-timeout 5 http://127.0.0.1:1984/mint/${AR_ADDRESS}/10000000000000000
 echo "done!"
 sleep 1
 
