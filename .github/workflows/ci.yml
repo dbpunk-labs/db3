@@ -74,7 +74,7 @@ jobs:
         run: |
           export RUST_BACKTRACE=1
           #cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
-          cargo nextest  --exclude merkdb
+          cargo test
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
