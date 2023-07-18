@@ -6,7 +6,7 @@
 # Distributed under terms of the MIT license.
 #
 
-npx arlocal >arlocal.log 2>&1 &
+npx arlocal_db3 >arlocal.log 2>&1 &
 sleep 1
 while true
 do

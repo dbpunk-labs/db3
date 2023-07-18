@@ -13,7 +13,7 @@ echo "start to clean"
 ps -ef | grep db3 | grep store | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep db3 | grep indexer | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep ar_miner | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
-ps -ef | grep arlocal | grep node | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
+ps -ef | grep arlocal_db3 | grep node | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 ps -ef | grep hardhat | grep -v grep | awk '{print $2}' | while read line; do kill $line;done
 echo "start the all process"
 

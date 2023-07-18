@@ -208,6 +208,11 @@ mod tests {
         let result = client.update_rollup_step(tx, 1).await;
         assert!(result.is_ok(), "update rollup step failed {:?}", result);
         sleep(TokioDuration::from_millis(5 * 1000)).await;
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
+            .await
+            .unwrap();
         let tx_ret = client.get_latest_arweave_tx(1).await;
         assert!(tx_ret.is_ok());
         let tx_remote = tx_ret.unwrap();
