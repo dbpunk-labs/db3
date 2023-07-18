@@ -71,7 +71,7 @@ impl MetaStoreClient {
         );
         tx.send()
             .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
         Ok(())
     }
 
@@ -117,10 +117,9 @@ impl MetaStoreClient {
         );
         let tx = store.update_rollup_steps(network_id, ar_tx_binary);
         //TODO set gas limit
-        let pending_tx = tx
-            .send()
-            .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        let pending_tx = tx.send().await.map_err(|e| {
+            DB3Error::StoreEventError(format!("fail to send update rollup request with error {e}"))
+        })?;
         let tx_hash = pending_tx.tx_hash();
         info!("update rollup step done! tx hash: {}", tx_hash);
         let mut count_down: i32 = 5;
@@ -200,6 +199,11 @@ mod tests {
             .await;
         assert!(result.is_ok(), "register data network failed {:?}", result);
         sleep(TokioDuration::from_millis(5 * 1000)).await;
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
+            .await
+            .unwrap();
         let tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
         let result = client.update_rollup_step(tx, 1).await;
         assert!(result.is_ok(), "update rollup step failed {:?}", result);
