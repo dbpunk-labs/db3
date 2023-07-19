@@ -26,7 +26,7 @@ use rsa::{pkcs8::DecodePrivateKey, pkcs8::EncodePrivateKey, RsaPrivateKey};
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 
 /// the node role of db3 network
 /// 1. DataRollupNode , rollup the data to arweave

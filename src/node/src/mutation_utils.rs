@@ -181,9 +181,6 @@ impl MutationUtil {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bytes::BytesMut;
-    use chrono::Utc;
-    use ethers::types::transaction::eip712::Eip712;
 
     #[test]
     pub fn convert_doc_ids_map_to_vec_ut() {
@@ -222,10 +219,6 @@ mod tests {
         });
         let doc_ids = MutationUtil::get_create_doc_ids_map(&items);
         assert_eq!(doc_ids, "");
-
-        let mut items = Vec::new();
-        let doc_ids = MutationUtil::get_create_doc_ids_map(&items);
-        assert_eq!(doc_ids, "");
     }
     #[test]
     pub fn test_java_sdk_verfiy_ut() {
@@ -234,7 +227,7 @@ mod tests {
         {"types":{"EIP712Domain":[],"Message":[{"name":"rollupInterval","type":"string"},{"name":"minRollupSize","type":"string"},{"name":"networkId","type":"string"},{"name":"chainId","type":"string"},{"name":"contractAddr","type":"string"},{"name":"rollupMaxInterval","type":"string"},{"name":"evmNodeUrl","type":"string"},{"name":"arNodeUrl","type":"string"},{"name":"minGcOffset","type":"string"}]},"domain":{},"primaryType":"Message","message":{"rollupInterval":"600000","rollupMaxInterval":"172800000","minRollupSize":"1048576","evmNodeUrl":"xxx","arNodeUrl":"xxx","chainId":"31337","networkId":"1","contractAddr":"0x5FbDB2315678afecb367f032d93F642f64180aa3","minGcOffset":"864000"}}
         "#;
         let signature = "0xffe078c204181dca7166d0809576de3e7b43aa25448b48ab9b62efadb9873bc62935d1bcc4366e919616108e0b41ff46e44297994b81bdc9c73c87cbd069befc1b";
-        let (addr, typed_obj) = MutationUtil::verify_setup(typed_data, signature).unwrap();
+        let (addr, _typed_obj) = MutationUtil::verify_setup(typed_data, signature).unwrap();
         println!("{}", addr)
     }
 }

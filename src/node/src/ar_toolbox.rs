@@ -339,8 +339,7 @@ impl ArToolBox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::{Array, AsArray, BinaryArray, StringArray, UInt32Array, UInt64Array};
-    use arrow::compute::or;
+    use arrow::array::{Array, BinaryArray, StringArray, UInt32Array, UInt64Array};
     use arrow::datatypes::{BinaryType, DataType, Field, Schema};
     use std::env;
     use std::path::PathBuf;
@@ -467,7 +466,7 @@ mod tests {
         let record_batch = mock_batch_record();
         let temp_dir = TempDir::new("upload_arware_tx_ut").expect("create temp dir");
         let arweave_url = "http://127.0.0.1:1984";
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
             .unwrap()
@@ -503,7 +502,7 @@ mod tests {
         let rec1 = res[0].clone();
         assert_eq!(rows, rec1.num_rows() as u64);
         {
-            let (start_block, end_block, last_rollup_tx, version) =
+            let (start_block, end_block, last_rollup_tx, _) =
                 ar_toolbox.get_tx_tags(tx.as_str()).await.unwrap();
             assert_eq!(start_block, last_end_block);
             assert_eq!(end_block, current_block);

@@ -744,8 +744,10 @@ mod tests {
             generate_rand_node_config(real_path.as_str());
         let state_store = Arc::new(StateStore::new(state_config).unwrap());
         let system_store = Arc::new(SystemStore::new(system_store_config, state_store.clone()));
-        let sig:&str = "0xcdc5b45e3c632bbffb3950cd1ac301909a91c53e40749da455a6c4720330c60f727ab4fcb96efc11bf9f1b72111ae29ec234c3af63beb81f59057f7c191630201b";
-        let payload:&str = "7b227479706573223a7b22454950373132446f6d61696e223a5b5d2c224d657373616765223a5b7b226e616d65223a22726f6c6c7570496e74657276616c222c2274797065223a22737472696e67227d2c7b226e616d65223a226d696e526f6c6c757053697a65222c2274797065223a22737472696e67227d2c7b226e616d65223a226e6574776f726b222c2274797065223a22737472696e67227d2c7b226e616d65223a22636861696e4964222c2274797065223a22737472696e67227d2c7b226e616d65223a22636f6e747261637441646472657373222c2274797065223a22737472696e67227d2c7b226e616d65223a22726f6c6c75704d6178496e74657276616c222c2274797065223a22737472696e67227d2c7b226e616d65223a2265766d4e6f6465527063222c2274797065223a22737472696e67227d2c7b226e616d65223a2261724e6f646555726c222c2274797065223a22737472696e67227d5d7d2c22646f6d61696e223a7b7d2c227072696d61727954797065223a224d657373616765222c226d657373616765223a7b22726f6c6c7570496e74657276616c223a2231303030303030222c226d696e526f6c6c757053697a65223a223131303030303030222c226e6574776f726b223a2231313131222c22636861696e4964223a2231222c22636f6e747261637441646472657373223a22307831323133222c22726f6c6c75704d6178496e74657276616c223a22313131313131313131222c2265766d4e6f6465527063223a2277733a2f2f3132372e302e302e313a38303830222c2261724e6f646555726c223a22687474703a2f2f3132372e302e302e313a39353237227d7d";
+        let sig:&str = "0x279beccf8d7309fe6bdb2ca692cfd61278ab9166052d05297c74fcde5e2a345940b8b5b91fa646117e71c26c9a02d2b0f6f88904242919e64826a4e577aa6e0c1c";
+        let payload: &str = r#"
+        {"types":{"EIP712Domain":[],"Message":[{"name":"rollupInterval","type":"string"},{"name":"minRollupSize","type":"string"},{"name":"networkId","type":"string"},{"name":"chainId","type":"string"},{"name":"contractAddr","type":"address"},{"name":"rollupMaxInterval","type":"string"},{"name":"evmNodeUrl","type":"string"},{"name":"arNodeUrl","type":"string"},{"name":"minGcOffset","type":"string"}]},"domain":{},"primaryType":"Message","message":{"rollupInterval":"600000","minRollupSize":"1048576","networkId":"1","chainId":"80000","contractAddr":"0x5FbDB2315678afecb367f032d93F642f64180aa3","rollupMaxInterval":"6000000","evmNodeUrl":"ws://127.0.0.1:8545","arNodeUrl":"http://127.0.0.1:1984","minGcOffset":"864000"}}
+            "#;
         let storage_node = StorageNodeV2Impl::new(
             config.clone(),
             system_store.clone(),
@@ -758,7 +760,7 @@ mod tests {
             .keep_subscription(receiver, update_receiver)
             .await
             .unwrap();
-        let admin_addr = "0xBbE29f26dc7ADEFEf6592FA34a2EFa037585087C";
+        let admin_addr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
         let public_url = "http://127.0.0.1:8080";
         let system_impl = SystemImpl::new(
             update_sender,
@@ -768,10 +770,9 @@ mod tests {
             admin_addr,
         )
         .unwrap();
-        let payload_binary = hex::decode(payload).unwrap();
         let request = SetupRequest {
             signature: sig.to_string(),
-            payload: "".to_string(), //payload_binary,
+            payload: payload.to_string(), //payload_binary,
         };
         let tonic_req = Request::new(request);
         if let Ok(response) = system_impl.setup(tonic_req).await {

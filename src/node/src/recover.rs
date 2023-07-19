@@ -194,7 +194,6 @@ impl Recover {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arweave_rs::crypto::base64;
     use db3_storage::doc_store::DocStoreConfig;
     use std::path::PathBuf;
     use tempdir::TempDir;
@@ -212,8 +211,6 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        let network_id: u64 = 1;
-        let chain_id: u32 = 31337_u32;
         let real_path = temp_dir.path().to_str().unwrap().to_string();
         let db_store_config = DBStoreV2Config {
             db_path: real_path,

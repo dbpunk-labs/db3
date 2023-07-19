@@ -52,11 +52,11 @@ impl SystemSDK {
           "Message":[
           {"name":"rollupInterval", "type":"string"},
           {"name":"minRollupSize", "type":"string"},
-          {"name":"network", "type":"string"},
+          {"name":"networkId", "type":"string"},
           {"name":"chainId", "type":"string"},
-          {"name":"contractAddress", "type":"string"},
+          {"name":"contractAddr", "type":"address"},
           {"name":"rollupMaxInterval", "type":"string"},
-          {"name":"evmNodeRpc", "type":"string"},
+          {"name":"evmNodeUrl", "type":"string"},
           {"name":"arNodeUrl", "type":"string"},
           {"name":"minGcOffset", "type":"string"}
           ]
@@ -86,7 +86,7 @@ impl SystemSDK {
         );
 
         message.insert(
-            "network".to_string(),
+            "networkId".to_string(),
             serde_json::Value::String(config.network.to_string()),
         );
 
@@ -96,7 +96,7 @@ impl SystemSDK {
         );
 
         message.insert(
-            "contractAddress".to_string(),
+            "contractAddr".to_string(),
             serde_json::Value::String(config.contract_address.to_string()),
         );
 
@@ -106,7 +106,7 @@ impl SystemSDK {
         );
 
         message.insert(
-            "evmNodeRpc".to_string(),
+            "evmNodeUrl".to_string(),
             serde_json::Value::String(config.evm_node_rpc.to_string()),
         );
 
@@ -178,7 +178,7 @@ mod tests {
             contract_address: "0xBbE29f26dc7ADEFEf6592FA34a2EFa037585087C".to_string(),
             rollup_max_interval: 24 * 60 * 60 * 1000,
             evm_node_rpc: "ws://127.0.0.1:8545".to_string(),
-            ar_node_url: "https://arweave.net".to_string(),
+            ar_node_url: "http://127.0.0.1:1984".to_string(),
             min_gc_offset: 10 * 24 * 60 * 60,
         };
         let response = system_sdk.setup(&config).await.unwrap().into_inner();

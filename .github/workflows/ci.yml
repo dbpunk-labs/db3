@@ -60,6 +60,7 @@ jobs:
           cd ${ROOT_DIR}/tools && bash start_localnet.sh
           sleep 2
           export RUST_BACKTRACE=1
+          cargo test test_test_data_rollup_node_setup
           cargo test register_a_data_network_test
       - name: Run Typescript sdk test
         run: |
