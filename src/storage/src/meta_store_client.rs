@@ -84,10 +84,9 @@ impl MetaStoreClient {
         if desc_bytes.len() > 32 {
             return Err(DB3Error::InvalidDescError("bad desc len".to_string()));
         }
-        let desc_binary: [u8; 32] = desc_bytes.try_into().map_err(|_| {
-            DB3Error::StoreEventError("fail to convert tx bytes to bytes32".to_string())
-        })?;
-        let tx = store.create_doc_database(network.into(), desc_binary);
+        let mut desc_bytes32: [u8; 32] = Default::default();
+        desc_bytes32[..desc_bytes.len()].clone_from_slice(desc_bytes);
+        let tx = store.create_doc_database(network.into(), desc_bytes32);
         let pending_tx = tx.send().await.map_err(|e| {
             DB3Error::StoreEventError(format!(
                 "fail to send create doc database request with error {e}"
