@@ -5,8 +5,8 @@
 #
 # Distributed under terms of the MIT license.
 #
-
-npx arlocal_db3 >arlocal.log 2>&1 &
+export PATH=`yarn global bin`:$PATH
+arlocal_db3 >arlocal.log 2>&1 &
 sleep 1
 while true
 do
