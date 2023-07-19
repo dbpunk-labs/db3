@@ -89,7 +89,6 @@ pub enum DB3Command {
         /// The database path for doc db
         #[clap(long, default_value = "./doc_db")]
         doc_db_path: String,
-        /// The network id
         #[clap(long, default_value = "2000")]
         block_interval: u64,
         /// The data path of rollup

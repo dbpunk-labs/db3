@@ -24,7 +24,7 @@ use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
 use ethers::prelude::{LocalWallet, Signer};
 use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::info;
 
@@ -46,14 +46,18 @@ pub struct Recover {
 }
 
 impl Recover {
-    pub async fn new(config: RecoverConfig, network_id: Arc<AtomicU64>) -> Result<Self> {
+    pub async fn new(
+        config: RecoverConfig,
+        network_id: Arc<AtomicU64>,
+        chain_id: Arc<AtomicU32>,
+    ) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
             "evm address {}",
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
         //TODO config the chain id
-        let wallet = wallet.with_chain_id(80001_u32);
+        let wallet = wallet.with_chain_id(chain_id.load(Ordering::Relaxed));
         let meta_store = Arc::new(
             MetaStoreClient::new(
                 config.contract_addr.as_str(),
@@ -107,12 +111,20 @@ impl Recover {
 
     /// recover from start_block to latest arweave tx
     pub async fn recover_from_block(&self, start_block: u64) -> Result<u64> {
-        let txs = self.fetch_arweave_tx_from_block(start_block).await?;
-        for (tx, version) in txs.iter().rev() {
-            self.recover_from_arweave_tx(tx.as_str(), version.clone())
-                .await?;
+        let mut from_block = start_block;
+        loop {
+            let txs = self.fetch_arweave_tx_from_block(from_block).await?;
+            if txs.is_empty() {
+                break;
+            }
+            for (tx, _end_block, version) in txs.iter().rev() {
+                self.recover_from_arweave_tx(tx.as_str(), version.clone())
+                    .await?;
+            }
+            from_block = txs[0].1 + 1;
         }
-        Ok(start_block)
+
+        Ok(from_block)
     }
 
     /// recover from arweave tx
@@ -149,7 +161,7 @@ impl Recover {
     async fn fetch_arweave_tx_from_block(
         &self,
         block: u64,
-    ) -> Result<Vec<(String, Option<String>)>> {
+    ) -> Result<Vec<(String, u64, Option<String>)>> {
         let mut txs = vec![];
         // 1. get latest arweave tx id from meta store
         let mut tx = self.get_latest_arweave_tx().await?;
@@ -160,7 +172,7 @@ impl Recover {
             if end_block < block {
                 return Ok(txs);
             }
-            txs.push((tx.clone(), version));
+            txs.push((tx.clone(), end_block, version));
             // stop if last_rollup_tx is None
             if let Some(t) = last_rollup_tx {
                 tx = t;
@@ -189,7 +201,7 @@ mod tests {
 
     async fn build_recover_instance(temp_dir: &TempDir) -> Recover {
         let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-        let rpc_url = "http://127.0.0.1:8545";
+        let rpc_url = "ws://127.0.0.1:8545";
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
@@ -201,6 +213,7 @@ mod tests {
             .unwrap()
             .to_string();
         let network_id: u64 = 1;
+        let chain_id: u32 = 31337_u32;
         let real_path = temp_dir.path().to_str().unwrap().to_string();
         let db_store_config = DBStoreV2Config {
             db_path: real_path,
@@ -220,19 +233,21 @@ mod tests {
             RecoverConfig {
                 db_store_config,
                 key_root_path,
-                ar_node_url: "https://arweave.net".to_string(),
+                ar_node_url: "http://127.0.0.1:1984".to_string(),
                 temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
                 contract_addr: contract_addr.to_string(),
                 evm_node_url: rpc_url.to_string(),
                 enable_mutation_recover: true,
             },
-            Arc::new(AtomicU64::new(network_id)),
+            Arc::new(AtomicU64::new(1)),
+            Arc::new(AtomicU32::new(31337)),
         )
         .await
         .unwrap();
         recover
     }
-    //#[tokio::test]
+
+    #[tokio::test]
     async fn test_get_latest_arweave_tx() {
         let temp_dir = TempDir::new("test_get_latest_arweave_tx").unwrap();
         let recover = build_recover_instance(&temp_dir).await;
@@ -241,7 +256,7 @@ mod tests {
         println!("res {:?}", res);
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
         let temp_dir = TempDir::new("test_fetch_arware_tx_from_block").unwrap();
         let recover = build_recover_instance(&temp_dir).await;
@@ -249,7 +264,8 @@ mod tests {
         assert!(res.is_ok());
         let txs = res.unwrap();
         assert!(txs.len() > 0);
+        println!("end_block: {}", txs[0].1);
         println!("txs {:?}", txs);
-        assert!(txs[0].1.is_none());
+        assert!(txs[0].2.is_none());
     }
 }

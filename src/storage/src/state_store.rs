@@ -47,19 +47,35 @@ impl StateStore {
         let mut db_builder = DB::new();
         db_builder.set_max_tables(8);
         let db = Arc::new(db_builder.open(path).map_err(|e| {
-            DB3Error::OpenStoreError(config.db_path.to_string(), format!("state_store {e}"))
+            DB3Error::OpenStoreError(
+                config.db_path.to_string(),
+                format!("fail to open db path for state_store with error {e}"),
+            )
         })?);
         let txn = db
             .begin_rw_txn()
-            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+            .map_err(|e| DB3Error::WriteStoreError(format!("open tx {e}")))?;
         txn.create_table(Some(ACCOUNT_META_TABLE), TableFlags::CREATE)
-            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+            .map_err(|e| {
+                DB3Error::WriteStoreError(format!(
+                    "fail to create account meta table with error {e}"
+                ))
+            })?;
         txn.create_table(Some(CONFIG_META_TABLE), TableFlags::CREATE)
-            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+            .map_err(|e| {
+                DB3Error::WriteStoreError(format!(
+                    "fail to create config meta table with error {e}"
+                ))
+            })?;
         txn.create_table(Some(CONTRACT_EVENT_TABLE), TableFlags::CREATE)
-            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
-        txn.commit()
-            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+            .map_err(|e| {
+                DB3Error::WriteStoreError(format!(
+                    "fail to create config event table with error {e}"
+                ))
+            })?;
+        txn.commit().map_err(|e| {
+            DB3Error::WriteStoreError(format!("fail to commit the transaction with error {e}"))
+        })?;
         Ok(Self { db })
     }
 

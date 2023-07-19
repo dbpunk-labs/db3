@@ -181,6 +181,7 @@ impl ArFileSystem {
             .get_fee_by_size(metadata.len())
             .await
             .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
+        info!("fee: {}", fee);
         self.arweave
             .upload_file_from_path(path, tags, fee)
             .await
@@ -239,4 +240,85 @@ impl ArFileSystem {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::ar_fs::{ArFileSystem, ArFileSystemConfig};
+    use std::path::PathBuf;
+
+    fn build_arweave(arweave_url: String) -> ArFileSystem {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let key_root_path = path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("tools/keys")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let ar_fs_config = ArFileSystemConfig {
+            arweave_url,
+            key_root_path,
+        };
+        let ar_filesystem = ArFileSystem::new(ar_fs_config).unwrap();
+        ar_filesystem
+    }
+    #[tokio::test]
+    async fn test_get_tx_status_ut() {
+        let arweave_url = "https://arweave.net".to_string();
+        let ar_filesystem = build_arweave(arweave_url);
+        let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
+        let status = ar_filesystem.get_tx_status(tx_id).await.unwrap().unwrap();
+        assert_eq!(status.block_height, 1209127);
+        assert_eq!(
+            status.block_indep_hash.to_string(),
+            "W4UIrIyx_cuMWWjgrlwKLE_luf85mwMYr-ABOAq1b8RvkasQ3LHmX6gLUD0Cbef-"
+        );
+        println!(
+            "status: {}, {}, {}",
+            status.block_height, status.block_indep_hash, status.number_of_confirmations
+        );
+    }
+    #[tokio::test]
+    async fn test_get_balance_ut() {
+        let arweave_url = "http://127.0.0.1:1984".to_string();
+        let ar_filesystem = build_arweave(arweave_url);
+        let balance = ar_filesystem.get_balance().await.unwrap();
+    }
+    #[tokio::test]
+    async fn test_get_ar_account() {
+        let arweave_url = "http://127.0.0.1:1984".to_string();
+        let ar_filesystem = build_arweave(arweave_url);
+        let addr = ar_filesystem.get_address();
+        println!("ar addr : {}", addr);
+    }
+
+    // skip to improve cicd stability
+    #[tokio::test]
+    #[cfg_attr(feature = "ci", ignore)]
+    async fn test_upload_ut() {
+        let arweave_url = "http://127.0.0.1:1984".to_string();
+        let ar_filesystem = build_arweave(arweave_url);
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/test/37829_37968.gz.parquet");
+
+        let res = ar_filesystem
+            .upload_file(
+                path.as_path(),
+                "",
+                37829,
+                37968,
+                10,
+                "37829_37968.gz.parquet",
+            )
+            .await;
+        let balance = ar_filesystem.get_balance().await;
+        println!("res: {:?}", res);
+        assert!(
+            res.is_ok(),
+            "upload file failed with balance : {:?}",
+            balance
+        );
+        let (tx_id, reward) = res.unwrap();
+        assert!(!tx_id.is_empty());
+    }
+}

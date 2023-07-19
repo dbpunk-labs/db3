@@ -74,6 +74,7 @@ impl ArToolBox {
             .await?;
         Self::parse_gzip_file(file_path.as_path())
     }
+
     pub async fn get_tx_tags(
         &self,
         tx_id: &str,
@@ -181,6 +182,8 @@ impl ArToolBox {
         let (num_rows, size) = Self::dump_recordbatch(&file_path, recordbatch)?;
         let filename = format!("{}_{}.gz.parquet", last_end_block, current_block);
         //TODO add tx status confirmation
+        let balance = self.ar_filesystem.get_balance().await?;
+        info!("Start to upload_file with balance: {:?}", balance);
         let (id, reward) = self
             .ar_filesystem
             .upload_file(
@@ -342,6 +345,7 @@ mod tests {
     use std::env;
     use std::path::PathBuf;
     use tempdir::TempDir;
+    use tokio::time::{sleep, Duration as TokioDuration};
 
     #[test]
     fn it_works() {}
@@ -375,7 +379,6 @@ mod tests {
     #[test]
     fn dump_recordbatch_ut() {
         let tmp_dir_path = TempDir::new("dump_recordbatch_ut").expect("create temp dir");
-
         let record_batch = mock_batch_record();
         let (num_rows, size) = ArToolBox::dump_recordbatch(
             Path::new(tmp_dir_path.path().join("test.parquet").to_str().unwrap()),
@@ -385,10 +388,10 @@ mod tests {
         assert_eq!(num_rows, 10);
         assert_eq!(size, 1862);
     }
+
     #[test]
     fn parse_gzip_file_ut() {
         let tmp_dir_path = TempDir::new("dump_recordbatch_ut").expect("create temp dir");
-
         let parquet_file = tmp_dir_path.path().join("test.parquet");
         let record_batch = mock_batch_record();
         let (num_rows, size) = ArToolBox::dump_recordbatch(&parquet_file, &record_batch).unwrap();
@@ -440,7 +443,6 @@ mod tests {
     fn parse_sample_ar_parquet_ut() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/test/37829_37968.gz.parquet");
-
         let res = ArToolBox::parse_gzip_file(path.as_path()).unwrap();
         assert_eq!(res.len(), 1);
         let rec = res[0].clone();
@@ -457,9 +459,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn download_arware_tx_ut() {
-        let temp_dir = TempDir::new("download_arware_tx_ut").expect("create temp dir");
-        let arweave_url = "https://arweave.net";
+    async fn upload_to_ar_test() {
+        let last_tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
+        let last_end_block: u64 = 0;
+        let current_block: u64 = 1000;
+        let network_id: u64 = 1;
+        let record_batch = mock_batch_record();
+        let temp_dir = TempDir::new("upload_arware_tx_ut").expect("create temp dir");
+        let arweave_url = "http://127.0.0.1:1984";
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
@@ -470,60 +477,37 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-
         let ar_toolbox = ArToolBox::new(
             key_root_path.to_string(),
             arweave_url.to_string(),
             temp_dir.path().to_str().unwrap().to_string(),
         )
         .unwrap();
-        let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
+        let result = ar_toolbox
+            .compress_and_upload_record_batch(
+                last_tx.to_string(),
+                last_end_block,
+                current_block,
+                &record_batch,
+                network_id,
+            )
+            .await;
+        assert_eq!(true, result.is_ok());
+        let (tx, _, rows, _) = result.unwrap();
+        println!("{tx}");
+        sleep(TokioDuration::from_millis(5 * 1000)).await;
         let res = ar_toolbox
-            .download_and_parse_record_batch(tx_id)
+            .download_and_parse_record_batch(tx.as_str())
             .await
             .unwrap();
         let rec1 = res[0].clone();
-        let mutations = ArToolBox::convert_recordbatch_to_mutation(&rec1, None).unwrap();
-        assert_eq!(mutations.len(), 8192);
-        let (mutation, block, order, doc_ids) = mutations[0].clone();
-        assert_eq!(block, 3712);
-        assert_eq!(order, 1);
-        assert_eq!(doc_ids, "");
-    }
-
-    #[tokio::test]
-    async fn get_tx_tags_ut_for_v0_data() {
-        let temp_dir = TempDir::new("download_arware_tx_ut").expect("create temp dir");
-        let arweave_url = "https://arweave.net";
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let key_root_path = path
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("tools/keys")
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        let ar_toolbox = ArToolBox::new(
-            key_root_path.to_string(),
-            arweave_url.to_string(),
-            temp_dir.path().to_str().unwrap().to_string(),
-        )
-        .unwrap();
-        let tx_id = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
-        let (start_block, end_block, last_rollup_tx, version) =
-            ar_toolbox.get_tx_tags(tx_id).await.unwrap();
-        assert_eq!(start_block, 3712);
-        assert!(last_rollup_tx.is_some());
-        assert!(version.is_none());
-        assert_eq!(
-            last_rollup_tx.unwrap(),
-            "ld2W-KnmHhmgYcSgc_DcqjjoU_ke9gkwrQEWk0A2Fpg"
-        );
-
-        let version = ar_toolbox.get_version_id(tx_id).await.unwrap();
-        assert!(version.is_none());
+        assert_eq!(rows, rec1.num_rows() as u64);
+        {
+            let (start_block, end_block, last_rollup_tx, version) =
+                ar_toolbox.get_tx_tags(tx.as_str()).await.unwrap();
+            assert_eq!(start_block, last_end_block);
+            assert_eq!(end_block, current_block);
+            assert_eq!(last_rollup_tx, Some(last_tx.to_string()));
+        }
     }
 }

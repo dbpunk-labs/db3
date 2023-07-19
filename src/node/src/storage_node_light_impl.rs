@@ -20,7 +20,7 @@ use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
 use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
-use db3_error::Result;
+use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
@@ -98,7 +98,8 @@ impl StorageNodeV2Impl {
             Sender<std::result::Result<EventMessageV2, Status>>,
         )>,
     ) -> Result<Self> {
-        if let Err(_e) = std::fs::create_dir_all(config.rollup_config.key_root_path.as_str()) {}
+        std::fs::create_dir_all(config.rollup_config.key_root_path.as_str())
+            .map_err(|e| DB3Error::InvalidKeyPathError(format!("{e}")))?;
         let storage = MutationStore::new(config.store_config.clone())?;
         storage.recover()?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;

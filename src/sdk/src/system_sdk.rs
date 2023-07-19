@@ -148,6 +148,7 @@ impl SystemSDK {
             signature: sig,
             payload: message_str,
         };
+
         let mut client = self.client.as_ref().clone();
         client.setup(req).await
     }
