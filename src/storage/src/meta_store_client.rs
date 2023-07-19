@@ -41,7 +41,7 @@ impl MetaStoreClient {
     pub async fn new(contract_addr: &str, rpc_url: &str, wallet: LocalWallet) -> Result<Self> {
         let address = contract_addr
             .parse::<Address>()
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|_| DB3Error::InvalidAddress)?;
         let provider = Provider::<Http>::connect(rpc_url).await;
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
@@ -71,7 +71,7 @@ impl MetaStoreClient {
         );
         tx.send()
             .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
         Ok(())
     }
 
@@ -117,10 +117,9 @@ impl MetaStoreClient {
         );
         let tx = store.update_rollup_steps(network_id, ar_tx_binary);
         //TODO set gas limit
-        let pending_tx = tx
-            .send()
-            .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        let pending_tx = tx.send().await.map_err(|e| {
+            DB3Error::StoreEventError(format!("fail to send update rollup request with error {e}"))
+        })?;
         let tx_hash = pending_tx.tx_hash();
         info!("update rollup step done! tx hash: {}", tx_hash);
         let mut count_down: i32 = 5;
@@ -180,21 +179,13 @@ mod tests {
             }
         }
     }
-    // skip to improve cicd stability
-    // #[tokio::test]
-    async fn register_a_data_network_test() {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let key_root_path = path
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("tools/keys")
-            .to_str()
-            .unwrap()
-            .to_string();
 
-        let wallet = build_wallet(key_root_path.as_str()).unwrap();
+    #[tokio::test]
+    async fn register_a_data_network_test() {
+        let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+            .unwrap();
+        let data_ref: &[u8] = data.as_ref();
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
         let wallet = wallet.with_chain_id(31337_u32);
         let rollup_node_address = wallet.address();
         let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
@@ -208,10 +199,20 @@ mod tests {
             .await;
         assert!(result.is_ok(), "register data network failed {:?}", result);
         sleep(TokioDuration::from_millis(5 * 1000)).await;
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
+            .await
+            .unwrap();
         let tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
         let result = client.update_rollup_step(tx, 1).await;
         assert!(result.is_ok(), "update rollup step failed {:?}", result);
         sleep(TokioDuration::from_millis(5 * 1000)).await;
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
+            .await
+            .unwrap();
         let tx_ret = client.get_latest_arweave_tx(1).await;
         assert!(tx_ret.is_ok());
         let tx_remote = tx_ret.unwrap();

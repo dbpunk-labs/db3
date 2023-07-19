@@ -21,8 +21,6 @@ use thiserror::Error;
 pub enum DB3Error {
     #[error("invalid db3 address")]
     InvalidAddress,
-    #[error("fail to require lock from state")]
-    StateLockBusyError,
     #[error("fail to load key pair {0}")]
     LoadKeyPairError(String),
     #[error("fail to sign a message with error {0}")]
@@ -135,6 +133,8 @@ pub enum DB3Error {
     InvalidCollectionNameError(String),
     #[error("invalid mutation for error {0}")]
     InvalidMutationError(String),
+    #[error("invalid key path for error {0}")]
+    InvalidKeyPathError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;
