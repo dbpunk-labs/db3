@@ -105,7 +105,7 @@ pub enum DB3Command {
         doc_id_start: i64,
     },
 
-    /// Start data index node
+    /// Start the data index node
     #[clap(name = "index")]
     Index {
         /// the public address
