@@ -62,16 +62,19 @@ STORE_EVM_ADDRESS=`less store.log | grep evm | grep address | awk '{print $NF}'`
 
 echo "start ar miner..."
 bash ./ar_miner.sh> miner.log 2>&1 &
-sleep 3
-echo "request ar token to rollup node"
-curl --connect-timeout 5 http://127.0.0.1:1984/mint/${AR_ADDRESS}/10000000000000000
-echo "done!"
-sleep 1
+sleep 5
 
 echo "start db3 indexer..."
 ../target/${BUILD_MODE}/db3 indexer  --admin-addr=${ADMIN_ADDR}\
     --contract-addr=${CONTRACT_ADDR}\
     --evm-node-url=${EVM_NODE_URL}> indexer.log 2>&1  &
+sleep 5
+
+AR_ADDRESS=`less store.log | grep filestore | awk '{print $NF}'`
+STORE_EVM_ADDRESS=`less store.log | grep evm | grep address | awk '{print $NF}'`
+echo "request ar token to rollup node"
+curl --connect-timeout 5 http://127.0.0.1:1984/mint/${AR_ADDRESS}/10000000000000000
+echo "done!"
 sleep 1
 
 echo "===========the account information=============="
@@ -85,3 +88,4 @@ echo "rollup node http://127.0.0.1:26619"
 echo "index node http://127.0.0.1:26639"
 echo "ar mock server http://127.0.0.1:1984"
 echo "evm node ${EVM_NODE_URL}"
+
