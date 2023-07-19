@@ -103,12 +103,12 @@ describe('test db3.js client module', () => {
         const config: SystemConfig = {
             rollupInterval: '600000',
             minRollupSize: '1048576',
-            network: '1',
-            chainId: '80000',
-            contractAddress: '0xb9709cE5E749b80978182db1bEdfb8c7340039A9',
+            networkId: '1',
+            chainId: 80000,
+            contractAddr: '0xb9709cE5E749b80978182db1bEdfb8c7340039A9',
             rollupMaxInterval: '6000000',
-            evmNodeRpc: 'ws://127.0.0.1:8585',
-            arNodeUrl: 'https://arweave.net',
+            evmNodeUrl: 'ws://127.0.0.1:8585',
+            arNodeUrl: 'http://127.0.0.1:1984',
             minGcOffset: '864000',
         }
         try {
@@ -125,7 +125,7 @@ describe('test db3.js client module', () => {
             rollupInterval: '600000',
             minRollupSize: '1048576',
             networkId: '1',
-            chainId: '80000',
+            chainId: 80000,
             contractAddr: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
             rollupMaxInterval: '6000000',
             evmNodeUrl: 'ws://127.0.0.1:8545',

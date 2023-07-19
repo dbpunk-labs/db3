@@ -78,6 +78,45 @@ impl MetaStoreClient {
             .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
         Ok(())
     }
+    pub async fn create_database(&self, network: u64, desc: &str) -> Result<(U256, TxHash)> {
+        let store = DB3MetaStore::new(self.address, self.client.clone());
+        let desc_bytes = desc.as_bytes();
+        if desc_bytes.len() > 32 {
+            return Err(DB3Error::InvalidDescError("bad desc len".to_string()));
+        }
+        let desc_binary: [u8; 32] = desc_bytes.try_into().map_err(|_| {
+            DB3Error::StoreEventError("fail to convert tx bytes to bytes32".to_string())
+        })?;
+        let tx = store.create_doc_database(network.into(), desc_binary);
+        let pending_tx = tx.send().await.map_err(|e| {
+            DB3Error::StoreEventError(format!(
+                "fail to send create doc database request with error {e}"
+            ))
+        })?;
+        let tx_hash = pending_tx.tx_hash();
+        let mut count_down: i32 = 5;
+        loop {
+            if count_down <= 0 {
+                break;
+            }
+            sleep(Duration::from_millis(1000 * 5)).await;
+            if let Some(tx) = self
+                .client
+                .get_transaction(tx_hash)
+                .await
+                .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?
+            {
+                if let Some(price) = tx.gas_price {
+                    if let Some(fee) = price.checked_mul(tx.gas) {
+                        return Ok((fee, tx_hash));
+                    }
+                }
+                break;
+            }
+            count_down = count_down - 1;
+        }
+        Ok((U256::zero(), tx_hash))
+    }
 
     pub async fn get_latest_arweave_tx(&self, network: u64) -> Result<String> {
         let store = DB3MetaStore::new(self.address, self.client.clone());
@@ -211,6 +250,8 @@ mod tests {
         assert!(tx_ret.is_ok());
         let tx_remote = tx_ret.unwrap();
         assert_eq!(tx, tx_remote);
+        let result = client.create_database(1, "test create db").await;
+        assert!(result.is_ok(), "create database {:?}", result);
     }
 
     fn hex_to_base64(hex_str: &str) -> String {

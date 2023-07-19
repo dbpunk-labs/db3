@@ -101,11 +101,11 @@ export function createClient(
  *  const config: SystemConfig = {
  *      rollupInterval: "600000",
  *      minRollupSize: "1048576",
- *      network: "1",
- *      chainId: "80000",
- *      contractAddress: "0xb9709cE5E749b80978182db1bEdfb8c7340039A9",
+ *      networkId: "1",
+ *      chainId: 80000,
+ *      contractAddr: "0xb9709cE5E749b80978182db1bEdfb8c7340039A9",
  *      rollupMaxInterval: "6000000",
- *      evmNodeRpc: "ws://127.0.0.1:8585",
+ *      evmNodeUrl: "ws://127.0.0.1:8585",
  *      arNodeUrl: "https://arweave.net",
  *      minGcOffset: "864000"
  *  }

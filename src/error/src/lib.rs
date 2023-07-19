@@ -137,6 +137,8 @@ pub enum DB3Error {
     InvalidKeyPathError(String),
     #[error("invalid arweave url for error {0}")]
     InvalidArUrlError(String),
+    #[error("invalid database desc for error {0}")]
+    InvalidDescError(String),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

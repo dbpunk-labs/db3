@@ -56,7 +56,7 @@ then
 fi
 mkdir -p ./keys
 echo "start data rollup node..."
-../target/${BUILD_MODE}/db3 rollup --admin-addr=${ADMIN_ADDR}>rollup.log 2>&1 &
+../target/${BUILD_MODE}/db3 rollup --block-interval=500 --admin-addr=${ADMIN_ADDR}>rollup.log 2>&1 &
 sleep 1
 AR_ADDRESS=`less rollup.log | grep Arweave | awk '{print $NF}'`
 STORE_EVM_ADDRESS=`less rollup.log | grep Evm | grep address | awk '{print $NF}'`
