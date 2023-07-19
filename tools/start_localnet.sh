@@ -62,7 +62,7 @@ AR_ADDRESS=`less rollup.log | grep Arweave | awk '{print $NF}'`
 STORE_EVM_ADDRESS=`less rollup.log | grep Evm | grep address | awk '{print $NF}'`
 echo "start ar miner..."
 bash ./ar_miner.sh> miner.log 2>&1 &
-sleep 1
+sleep 5
 echo "start data index node..."
 ../target/${BUILD_MODE}/db3 index  --admin-addr=${ADMIN_ADDR} > index.log 2>&1  &
 curl --connect-timeout 5 http://127.0.0.1:1984/mint/gXJVsUCAmDqv9XeZui0MB2EdGPQEhN86QEnKY0_7vPc/10000000000000000
