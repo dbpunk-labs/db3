@@ -16,12 +16,14 @@
 //
 
 use crate::mutation_utils::MutationUtil;
+use crate::recover::{Recover, RecoverConfig};
 use crate::version_util;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
 use db3_event::event_processor::EventProcessorConfig;
 use db3_proto::db3_base_proto::SystemStatus;
+use db3_proto::db3_database_v2_proto::BlockState;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
@@ -34,21 +36,25 @@ use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
+use db3_storage::state_store::{StateStore, StateStoreConfig};
 use ethers::abi::Address;
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::task;
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
 
+const MAX_BLOCK_ID: u64 = u64::MAX;
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
+    recover_config: RecoverConfig,
     network_id: Arc<AtomicU64>,
+    chain_id: Arc<AtomicU32>,
     node_url: String,
     key_root_path: String,
     contract_addr: String,
@@ -58,19 +64,34 @@ pub struct IndexerNodeImpl {
 }
 
 impl IndexerNodeImpl {
-    pub fn new(
+    pub async fn new(
         config: DBStoreV2Config,
         network_id: u64,
+        chain_id: u32,
         node_url: String,
         key_root_path: String,
         contract_addr: String,
         evm_node_url: String,
         admin_addr: String,
+        recover_data_path: String,
     ) -> Result<Self> {
-        let db_store = DBStoreV2::new(config)?;
+        let db_store = DBStoreV2::new(config.clone())?;
+        let network_id = Arc::new(AtomicU64::new(network_id));
+        let chain_id = Arc::new(AtomicU32::new(chain_id));
+        let recover_config = RecoverConfig {
+            db_store_config: config.clone(),
+            key_root_path: key_root_path.clone(),
+            ar_node_url: node_url.clone(),
+            temp_data_path: recover_data_path,
+            contract_addr: contract_addr.to_string(),
+            evm_node_url: evm_node_url.to_string(),
+            enable_mutation_recover: true,
+        };
         Ok(Self {
             db_store,
-            network_id: Arc::new(AtomicU64::new(network_id)),
+            recover_config,
+            network_id: network_id.clone(),
+            chain_id: chain_id.clone(),
             node_url,
             key_root_path,
             contract_addr,
@@ -81,7 +102,7 @@ impl IndexerNodeImpl {
         })
     }
 
-    pub async fn recover(&self) -> Result<()> {
+    pub async fn recover_state(&self) -> Result<()> {
         self.db_store.recover_db_state()?;
         let databases = self.db_store.get_all_event_db()?;
         for database in databases {
@@ -112,6 +133,9 @@ impl IndexerNodeImpl {
     /// 1. subscribe db3 event
     /// 2. handle event to sync db3 node block
     pub async fn start(&self, store_sdk: StoreSDKV2) -> Result<()> {
+        self.recover_state().await?;
+        self.recover_from_ar().await?;
+        self.recover_from_fetched_blocks(&store_sdk).await?;
         info!("start subscribe...");
         loop {
             match store_sdk.subscribe_event_message().await {
@@ -135,6 +159,68 @@ impl IndexerNodeImpl {
         }
     }
 
+    pub async fn recover_from_ar(&self) -> Result<()> {
+        let recover = Recover::new(
+            self.recover_config.clone(),
+            self.network_id.clone(),
+            self.chain_id.clone(),
+        )
+        .await?;
+
+        info!("start recover from arweave");
+        let last_block = self.db_store.recover_block_state()?;
+        let (block, order) = match last_block {
+            Some(block_state) => {
+                info!(
+                    "recover the block state done, last block is {:?}",
+                    block_state
+                );
+                (block_state.block, block_state.order)
+            }
+            None => {
+                info!("recover the block state done, last block is 0");
+                (0, 0)
+            }
+        };
+        recover.recover_from_arweave(block).await;
+        info!("recover from arweave done!");
+        Ok(())
+    }
+    /// recover from fetched blocks
+    pub async fn recover_from_fetched_blocks(&self, store_sdk: &StoreSDKV2) -> Result<()> {
+        info!("start recover from fetched blocks");
+        let (mut start_block, mut order) = match self.db_store.recover_block_state()? {
+            Some(block_state) => (block_state.block, block_state.order),
+            None => (0, 0),
+        };
+        info!("start block is {}, order is {}", start_block, order);
+        loop {
+            let response = store_sdk
+                .get_blocks(start_block, start_block + 1000)
+                .await
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?
+                .into_inner();
+            info!(
+                "fetch blocks from {} to {}",
+                start_block,
+                start_block + 1000
+            );
+            let mutations = response.mutations;
+            info!(
+                "Cold start with block mutations size: {:?}",
+                mutations.len()
+            );
+            if mutations.is_empty() {
+                info!("Stop fetching blocks, no more blocks to fetch");
+                break;
+            }
+            self.parse_and_apply_mutations(&mutations).await?;
+            start_block += 100;
+        }
+        info!("recover from fetched blocks done!");
+        Ok(())
+    }
+
     /// handle event message
     async fn handle_event(&self, event: EventMessageV2, store_sdk: &StoreSDKV2) -> Result<()> {
         match event.event {
@@ -143,8 +229,13 @@ impl IndexerNodeImpl {
                     "Receive BlockEvent: Block\t{}\tMutationCount\t{}",
                     be.block_id, be.mutation_count,
                 );
+                let block_state = match self.db_store.recover_block_state()? {
+                    Some(block_state) => block_state,
+                    None => BlockState { block: 0, order: 0 },
+                };
+
                 let response = store_sdk
-                    .get_block_by_height(be.block_id)
+                    .get_blocks(block_state.block, be.block_id)
                     .await
                     .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?
                     .into_inner();

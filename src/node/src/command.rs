@@ -159,6 +159,11 @@ pub enum DB3Command {
         evm_node_url: String,
         #[clap(long, default_value = "1")]
         network_id: u64,
+        #[clap(long, default_value = "31337")]
+        chain_id: u32,
+        /// The data path of recover
+        #[clap(long, default_value = "./index_recover_data")]
+        recover_data_path: String,
         #[clap(short, long)]
         verbose: bool,
         /// this is just for upgrade the node
@@ -290,6 +295,8 @@ impl DB3Command {
                 contract_addr,
                 evm_node_url,
                 network_id,
+                chain_id,
+                recover_data_path,
                 verbose,
                 admin_addr,
                 doc_id_start,
@@ -323,20 +330,21 @@ impl DB3Command {
                     doc_store_conf,
                     doc_start_id: doc_id_start,
                 };
-
                 let addr = format!("{public_host}:{public_grpc_port}");
                 let indexer = IndexerNodeImpl::new(
                     db_store_config,
                     network_id,
+                    chain_id,
                     addr.to_string(),
                     key_root_path,
                     contract_addr,
                     evm_node_url,
                     admin_addr,
+                    recover_data_path,
                 )
+                .await
                 .unwrap();
                 let indexer_for_syncing = indexer.clone();
-                if let Err(_e) = indexer.recover().await {}
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
                     indexer_for_syncing.start(store_sdk).await.unwrap();

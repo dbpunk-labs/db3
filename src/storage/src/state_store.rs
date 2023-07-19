@@ -27,6 +27,7 @@ use tracing::info;
 
 const ACCOUNT_META_TABLE: &str = "ACCOUNT_META_TABLE";
 const CONFIG_META_TABLE: &str = "CONFIG_META_TABLE";
+const BLOCK_META_TABLE: &str = "BLOCK_META_TABLE";
 
 type DB = Database<NoWriteMap>;
 
@@ -55,11 +56,44 @@ impl StateStore {
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
         txn.create_table(Some(CONFIG_META_TABLE), TableFlags::CREATE)
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+        txn.create_table(Some(BLOCK_META_TABLE), TableFlags::CREATE)
+            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
         txn.commit()
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
         Ok(Self { db })
     }
-
+    pub fn get_block(&self) -> Result<u64> {
+        let tx = self
+            .db
+            .begin_ro_txn()
+            .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
+        let table = tx
+            .open_table(Some(BLOCK_META_TABLE))
+            .map_err(|e| DB3Error::ReadStoreError(format!("open table {e}")))?;
+        let value = tx
+            .get::<[u8; 8]>(&table, "BLOCK_KEY".as_ref())
+            .map_err(|e| DB3Error::ReadStoreError(format!("get value with key {e}")))?;
+        if let Some(v) = value {
+            Ok(u64::from_be_bytes(v))
+        } else {
+            Ok(0)
+        }
+    }
+    pub fn store_block(&self, block: u64) -> Result<()> {
+        let txn = self
+            .db
+            .begin_rw_txn()
+            .map_err(|e| DB3Error::WriteStoreError(format!("open tx {e}")))?;
+        let table = txn
+            .open_table(Some(BLOCK_META_TABLE))
+            .map_err(|e| DB3Error::WriteStoreError(format!("open table {e}")))?;
+        let buffer = block.to_be_bytes();
+        txn.put(&table, "BLOCK_KEY", &buffer, WriteFlags::UPSERT)
+            .map_err(|e| DB3Error::WriteStoreError(format!("put value with key {e}")))?;
+        txn.commit()
+            .map_err(|e| DB3Error::WriteStoreError(format!("put value with key {e}")))?;
+        Ok(())
+    }
     pub fn get_nonce(&self, id: &DB3Address) -> Result<u64> {
         let tx = self
             .db

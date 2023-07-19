@@ -28,6 +28,7 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::info;
 
+#[derive(Clone)]
 pub struct RecoverConfig {
     pub db_store_config: DBStoreV2Config,
     pub key_root_path: String,
@@ -110,7 +111,7 @@ impl Recover {
     }
 
     /// recover from start_block to latest arweave tx
-    pub async fn recover_from_block(&self, start_block: u64) -> Result<u64> {
+    pub async fn recover_from_arweave(&self, start_block: u64) -> Result<u64> {
         let mut from_block = start_block;
         loop {
             let txs = self.fetch_arweave_tx_from_block(from_block).await?;
