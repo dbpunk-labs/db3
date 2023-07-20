@@ -141,6 +141,9 @@ pub enum DB3Command {
         meta_db_path: String,
         #[clap(short, long, default_value = "./index_doc_db")]
         doc_db_path: String,
+        /// The Ar miner node
+        #[clap(long, default_value = "http://127.0.0.1:1984/")]
+        ar_node_url: String,
         #[clap(short, long, default_value = "./keys")]
         key_root_path: String,
         #[clap(
@@ -291,6 +294,7 @@ impl DB3Command {
                 db3_storage_grpc_url,
                 meta_db_path,
                 doc_db_path,
+                ar_node_url,
                 key_root_path,
                 contract_addr,
                 evm_node_url,
@@ -336,6 +340,7 @@ impl DB3Command {
                     network_id,
                     chain_id,
                     addr.to_string(),
+                    ar_node_url,
                     key_root_path,
                     contract_addr,
                     evm_node_url,

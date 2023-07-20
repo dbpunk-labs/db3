@@ -181,7 +181,7 @@ mod tests {
         }
     }
     // skip to improve cicd stability
-    // #[tokio::test]
+    #[tokio::test]
     async fn register_a_data_network_test() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path

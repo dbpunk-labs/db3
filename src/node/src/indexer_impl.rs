@@ -69,6 +69,7 @@ impl IndexerNodeImpl {
         network_id: u64,
         chain_id: u32,
         node_url: String,
+        ar_node_url: String,
         key_root_path: String,
         contract_addr: String,
         evm_node_url: String,
@@ -79,9 +80,8 @@ impl IndexerNodeImpl {
         let network_id = Arc::new(AtomicU64::new(network_id));
         let chain_id = Arc::new(AtomicU32::new(chain_id));
         let recover_config = RecoverConfig {
-            db_store_config: config.clone(),
             key_root_path: key_root_path.clone(),
-            ar_node_url: node_url.clone(),
+            ar_node_url: ar_node_url.clone(),
             temp_data_path: recover_data_path,
             contract_addr: contract_addr.to_string(),
             evm_node_url: evm_node_url.to_string(),
@@ -164,6 +164,7 @@ impl IndexerNodeImpl {
             self.recover_config.clone(),
             self.network_id.clone(),
             self.chain_id.clone(),
+            self.db_store.clone(),
         )
         .await?;
 

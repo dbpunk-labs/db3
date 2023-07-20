@@ -30,7 +30,6 @@ use tracing::info;
 
 #[derive(Clone)]
 pub struct RecoverConfig {
-    pub db_store_config: DBStoreV2Config,
     pub key_root_path: String,
     pub ar_node_url: String,
     pub temp_data_path: String,
@@ -51,6 +50,7 @@ impl Recover {
         config: RecoverConfig,
         network_id: Arc<AtomicU64>,
         chain_id: Arc<AtomicU32>,
+        db_store: DBStoreV2,
     ) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
@@ -72,12 +72,11 @@ impl Recover {
             config.ar_node_url.clone(),
             config.temp_data_path.clone(),
         )?);
-        let db_store = Arc::new(DBStoreV2::new(config.db_store_config.clone())?);
         Ok(Self {
             config,
             ar_toolbox,
             meta_store,
-            db_store,
+            db_store: Arc::new(db_store),
             network_id,
         })
     }
@@ -230,9 +229,10 @@ mod tests {
             doc_start_id: 1000,
         };
 
+        let db_store = DBStoreV2::new(db_store_config.clone()).unwrap();
+
         let recover = Recover::new(
             RecoverConfig {
-                db_store_config,
                 key_root_path,
                 ar_node_url: "https://arweave.net".to_string(),
                 temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
@@ -242,6 +242,7 @@ mod tests {
             },
             Arc::new(AtomicU64::new(network_id)),
             Arc::new(AtomicU32::new(chain_id)),
+            db_store,
         )
         .await
         .unwrap();
