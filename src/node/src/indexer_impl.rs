@@ -230,13 +230,12 @@ impl IndexerNodeImpl {
                     "Receive BlockEvent: Block\t{}\tMutationCount\t{}",
                     be.block_id, be.mutation_count,
                 );
-                let block_state = match self.db_store.recover_block_state()? {
-                    Some(block_state) => block_state,
-                    None => BlockState { block: 0, order: 0 },
-                };
-
+                if be.mutation_count == 0 {
+                    debug!("Skip handle block with 0 mutations");
+                    return Ok(());
+                }
                 let response = store_sdk
-                    .get_blocks(block_state.block, be.block_id)
+                    .get_block_by_height(be.block_id)
                     .await
                     .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?
                     .into_inner();
