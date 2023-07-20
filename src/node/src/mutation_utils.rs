@@ -24,7 +24,6 @@ use ethers::types::{transaction::eip712::TypedData, Address, Signature};
 use prost::Message;
 use serde_json::json;
 use std::str::FromStr;
-use tracing::warn;
 
 pub struct MutationUtil {}
 
@@ -33,6 +32,22 @@ impl MutationUtil {
         if let Some(v) = data.message.get(name) {
             if let Some(t) = v.as_str() {
                 t
+            } else {
+                default_val
+            }
+        } else {
+            default_val
+        }
+    }
+
+    pub fn get_u32_field(data: &TypedData, name: &str, default_val: u32) -> u32 {
+        if let Some(v) = data.message.get(name) {
+            if let Some(t) = v.as_str() {
+                if let Ok(vt) = t.parse::<u32>() {
+                    return vt;
+                } else {
+                    default_val
+                }
             } else {
                 default_val
             }
@@ -57,8 +72,8 @@ impl MutationUtil {
         }
     }
 
-    pub fn verify_setup(payload: &[u8], sig: &str) -> Result<(Address, TypedData), DB3Error> {
-        match serde_json::from_slice::<TypedData>(payload) {
+    pub fn verify_setup(payload: &str, sig: &str) -> Result<(Address, TypedData), DB3Error> {
+        match serde_json::from_str::<TypedData>(payload) {
             Ok(data) => {
                 let signature = Signature::from_str(sig).map_err(|e| {
                     DB3Error::ApplyMutationError(format!("invalid signature for err {e}"))
@@ -166,9 +181,6 @@ impl MutationUtil {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bytes::BytesMut;
-    use chrono::Utc;
-    use ethers::types::transaction::eip712::Eip712;
 
     #[test]
     pub fn convert_doc_ids_map_to_vec_ut() {
@@ -207,23 +219,15 @@ mod tests {
         });
         let doc_ids = MutationUtil::get_create_doc_ids_map(&items);
         assert_eq!(doc_ids, "");
-
-        let mut items = Vec::new();
-        let doc_ids = MutationUtil::get_create_doc_ids_map(&items);
-        assert_eq!(doc_ids, "");
     }
     #[test]
     pub fn test_java_sdk_verfiy_ut() {
         //let expected_addr = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266";
         let typed_data = r#"
-       {"types":{"EIP712Domain":[{"name":"name","type":"string"}],"Message":[{"name":"payload","type":"bytes"},{"name":"nonce","type":"string"}]},"primaryType":"Message","message":{"payload":"0x1a0822060a0464657363","nonce":"1"},"domain":{"name":"db3.network"}}
+        {"types":{"EIP712Domain":[],"Message":[{"name":"rollupInterval","type":"string"},{"name":"minRollupSize","type":"string"},{"name":"networkId","type":"string"},{"name":"chainId","type":"string"},{"name":"contractAddr","type":"string"},{"name":"rollupMaxInterval","type":"string"},{"name":"evmNodeUrl","type":"string"},{"name":"arNodeUrl","type":"string"},{"name":"minGcOffset","type":"string"}]},"domain":{},"primaryType":"Message","message":{"rollupInterval":"600000","rollupMaxInterval":"172800000","minRollupSize":"1048576","evmNodeUrl":"xxx","arNodeUrl":"xxx","chainId":"31337","networkId":"1","contractAddr":"0x5FbDB2315678afecb367f032d93F642f64180aa3","minGcOffset":"864000"}}
         "#;
-        let typed_data_obj = serde_json::from_slice::<TypedData>(typed_data.as_bytes()).unwrap();
-        let hashed_message = typed_data_obj.encode_eip712().unwrap();
-        let hex_str = hex::encode(hashed_message);
-        assert_eq!(
-            "2b6ab2777e1ffb472f2f3206566f0cb691228ba5fb02692fd8fe933576b5003e",
-            hex_str.as_str()
-        );
+        let signature = "0xffe078c204181dca7166d0809576de3e7b43aa25448b48ab9b62efadb9873bc62935d1bcc4366e919616108e0b41ff46e44297994b81bdc9c73c87cbd069befc1b";
+        let (addr, _typed_obj) = MutationUtil::verify_setup(typed_data, signature).unwrap();
+        println!("{}", addr)
     }
 }

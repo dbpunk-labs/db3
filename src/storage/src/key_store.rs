@@ -81,10 +81,14 @@ impl KeyStore {
         let path = path_buf.as_path();
         let data = std::fs::read(path)
             .map_err(|e| DB3Error::ReadStoreError(format!("fail to open file {e}")))?;
-        let b64_str = std::str::from_utf8(data.as_ref())
-            .map_err(|e| DB3Error::ReadStoreError(format!("fail to open file {e}")))?;
-        let bytes = Base64::decode(b64_str)
-            .map_err(|e| DB3Error::ReadStoreError(format!("fail to open file {e}")))?;
+        let b64_str = std::str::from_utf8(data.as_ref()).map_err(|e| {
+            DB3Error::ReadStoreError(format!("decode content with key {key}  with error {e}"))
+        })?;
+        let bytes = Base64::decode(b64_str).map_err(|e| {
+            DB3Error::ReadStoreError(format!(
+                "fail to b64 decode with {key}, {b64_str} and error {e}"
+            ))
+        })?;
         Ok(bytes)
     }
 }

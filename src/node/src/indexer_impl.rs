@@ -17,17 +17,15 @@
 
 use crate::mutation_utils::MutationUtil;
 use crate::recover::{Recover, RecoverConfig};
-use crate::version_util;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
 use db3_event::event_processor::EventProcessorConfig;
-use db3_proto::db3_base_proto::SystemStatus;
 use db3_proto::db3_database_v2_proto::BlockState;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
-    GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
+    RunQueryRequest, RunQueryResponse,
 };
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
@@ -35,6 +33,7 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
+use db3_storage::system_store::SystemStore;
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use ethers::abi::Address;
@@ -43,6 +42,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc::Receiver;
 use tokio::task;
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
@@ -52,56 +52,26 @@ const MAX_BLOCK_ID: u64 = u64::MAX;
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
-    recover_config: RecoverConfig,
-    network_id: Arc<AtomicU64>,
-    chain_id: Arc<AtomicU32>,
-    node_url: String,
-    key_root_path: String,
-    contract_addr: String,
-    evm_node_url: String,
     processor_mapping: Arc<Mutex<HashMap<String, Arc<EventProcessor>>>>,
-    admin_addr: String,
+    system_store: Arc<SystemStore>,
 }
 
 impl IndexerNodeImpl {
-    pub async fn new(
-        config: DBStoreV2Config,
-        network_id: u64,
-        chain_id: u32,
-        node_url: String,
-        ar_node_url: String,
-        key_root_path: String,
-        contract_addr: String,
-        evm_node_url: String,
-        admin_addr: String,
-        recover_data_path: String,
-    ) -> Result<Self> {
-        let db_store = DBStoreV2::new(config.clone())?;
-        let network_id = Arc::new(AtomicU64::new(network_id));
-        let chain_id = Arc::new(AtomicU32::new(chain_id));
-        let recover_config = RecoverConfig {
-            key_root_path: key_root_path.clone(),
-            ar_node_url: ar_node_url.clone(),
-            temp_data_path: recover_data_path,
-            contract_addr: contract_addr.to_string(),
-            evm_node_url: evm_node_url.to_string(),
-            enable_mutation_recover: true,
-        };
+    pub fn new(db_store: DBStoreV2,
+               system_store: Arc<SystemStore>) -> Result<Self> {
         Ok(Self {
             db_store,
-            recover_config,
-            network_id: network_id.clone(),
-            chain_id: chain_id.clone(),
-            node_url,
-            key_root_path,
-            contract_addr,
-            evm_node_url,
-            //TODO recover from the database
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
-            admin_addr,
+            system_store,
         })
     }
 
+    pub async fn subscribe_update(&self, _update_receiver: Receiver<()>) {}
+    pub async fn recover(&self, store_sdk: &StoreSDKV2) -> Result<()> {
+        self.recover_state().await?;
+        self.recover_from_fetched_blocks(store_sdk).await?;
+        Ok(())
+    }
     pub async fn recover_state(&self) -> Result<()> {
         self.db_store.recover_db_state()?;
         let databases = self.db_store.get_all_event_db()?;
@@ -126,65 +96,6 @@ impl IndexerNodeImpl {
                 info!("recover the event db {} done", db_address.to_hex());
             }
         }
-        Ok(())
-    }
-
-    /// start standalone indexer block syncer
-    /// 1. subscribe db3 event
-    /// 2. handle event to sync db3 node block
-    pub async fn start(&self, store_sdk: StoreSDKV2) -> Result<()> {
-        self.recover_state().await?;
-        self.recover_from_ar().await?;
-        self.recover_from_fetched_blocks(&store_sdk).await?;
-        info!("start subscribe...");
-        loop {
-            match store_sdk.subscribe_event_message().await {
-                Ok(handle) => {
-                    info!("listen and handle event message");
-                    let mut stream = handle.into_inner();
-                    while let Some(event) = stream.message().await.unwrap() {
-                        match self.handle_event(event, &store_sdk).await {
-                            Err(e) => {
-                                warn!("[IndexerBlockSyncer] handle event error: {:?}", e);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!("fail to subscribe block event for {e} and retry in 5 seconds");
-                    sleep(Duration::from_millis(1000 * 5)).await;
-                }
-            }
-        }
-    }
-
-    pub async fn recover_from_ar(&self) -> Result<()> {
-        let recover = Recover::new(
-            self.recover_config.clone(),
-            self.network_id.clone(),
-            self.chain_id.clone(),
-            self.db_store.clone(),
-        )
-        .await?;
-
-        info!("start recover from arweave");
-        let last_block = self.db_store.recover_block_state()?;
-        let (block, order) = match last_block {
-            Some(block_state) => {
-                info!(
-                    "recover the block state done, last block is {:?}",
-                    block_state
-                );
-                (block_state.block, block_state.order)
-            }
-            None => {
-                info!("recover the block state done, last block is 0");
-                (0, 0)
-            }
-        };
-        recover.recover_from_arweave(block).await;
-        info!("recover from arweave done!");
         Ok(())
     }
     /// recover from fetched blocks
@@ -222,6 +133,33 @@ impl IndexerNodeImpl {
         Ok(())
     }
 
+    /// start standalone indexer block syncer
+    /// 1. subscribe db3 event
+    /// 2. handle event to sync db3 node block
+    pub async fn start(&self, store_sdk: StoreSDKV2) -> Result<()> {
+        info!("start subscribe...");
+        loop {
+            match store_sdk.subscribe_event_message().await {
+                Ok(handle) => {
+                    info!("listen and handle event message");
+                    let mut stream = handle.into_inner();
+                    while let Some(event) = stream.message().await.unwrap() {
+                        match self.handle_event(event, &store_sdk).await {
+                            Err(e) => {
+                                warn!("[IndexerBlockSyncer] handle event error: {:?}", e);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("fail to subscribe block event for {e} and retry in 5 seconds");
+                    sleep(Duration::from_millis(1000 * 5)).await;
+                }
+            }
+        }
+    }
+
     /// handle event message
     async fn handle_event(&self, event: EventMessageV2, store_sdk: &StoreSDKV2) -> Result<()> {
         match event.event {
@@ -247,30 +185,6 @@ impl IndexerNodeImpl {
         }
         Ok(())
     }
-    fn build_wallet(key_root_path: &str) -> Result<LocalWallet> {
-        let config = KeyStoreConfig {
-            key_root_path: key_root_path.to_string(),
-        };
-        let key_store = KeyStore::new(config);
-        match key_store.has_key("evm") {
-            true => {
-                let data = key_store.get_key("evm")?;
-                let data_ref: &[u8] = &data;
-                let wallet = LocalWallet::from_bytes(data_ref)
-                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-                Ok(wallet)
-            }
-
-            false => {
-                let mut rng = rand::thread_rng();
-                let wallet = LocalWallet::new(&mut rng);
-                let data = wallet.signer().to_bytes();
-                key_store.write_key("evm", data.deref())?;
-                Ok(wallet)
-            }
-        }
-    }
-
     async fn start_an_event_task(
         &self,
         db: &DB3Address,
@@ -372,52 +286,6 @@ impl IndexerNode for IndexerNodeImpl {
             _ => todo!(),
         };
         Ok(Response::new(GetContractSyncStatusResponse { status_list }))
-    }
-
-    async fn setup(
-        &self,
-        request: Request<SetupRequest>,
-    ) -> std::result::Result<Response<SetupResponse>, Status> {
-        let r = request.into_inner();
-        let (addr, data) =
-            MutationUtil::verify_setup(&r.payload, r.signature.as_str()).map_err(|e| {
-                Status::invalid_argument(format!("fail to parse the payload and signature {e}"))
-            })?;
-        let admin_addr = self
-            .admin_addr
-            .parse::<Address>()
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        if admin_addr != addr {
-            return Err(Status::permission_denied(
-                "You are not the admin".to_string(),
-            ));
-        }
-        let network = MutationUtil::get_u64_field(&data, "network", 0_u64);
-        self.network_id.store(network, Ordering::Relaxed);
-        return Ok(Response::new(SetupResponse {
-            code: 0,
-            msg: "ok".to_string(),
-        }));
-    }
-
-    async fn get_system_status(
-        &self,
-        _request: Request<GetSystemStatusRequest>,
-    ) -> std::result::Result<Response<SystemStatus>, Status> {
-        let wallet = Self::build_wallet(self.key_root_path.as_str())
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let addr = format!("0x{}", hex::encode(wallet.address().as_bytes()));
-        Ok(Response::new(SystemStatus {
-            evm_account: addr,
-            evm_balance: "0".to_string(),
-            ar_account: "".to_string(),
-            ar_balance: "".to_string(),
-            node_url: self.node_url.to_string(),
-            config: None,
-            has_inited: false,
-            admin_addr: self.admin_addr.to_string(),
-            version: Some(version_util::build_version()),
-        }))
     }
 
     async fn run_query(

@@ -14,22 +14,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+//@ts-nocheck
 import {
     GrpcWebFetchTransport,
     GrpcWebOptions,
 } from '@protobuf-ts/grpcweb-transport'
 import { IndexerNodeClient } from '../proto/db3_indexer.client'
+import { SystemClient } from '../proto/db3_system.client'
 import {
     RunQueryRequest,
-    GetSystemStatusRequest,
     GetContractSyncStatusRequest,
 } from '../proto/db3_indexer'
+import { SetupRequest, GetSystemStatusRequest } from '../proto/db3_system'
 import { Query } from '../proto/db3_database_v2'
 import { DB3Error } from './error'
 import { RpcError } from '@protobuf-ts/runtime-rpc'
 
 export class IndexerProvider {
     readonly client: IndexerNodeClient
+    readonly system: SystemClient
     constructor(url: string) {
         const goptions: GrpcWebOptions = {
             baseUrl: url,
@@ -41,6 +44,7 @@ export class IndexerProvider {
         }
         const transport = new GrpcWebFetchTransport(goptions)
         this.client = new IndexerNodeClient(transport)
+        this.system = new SystemClient(transport)
     }
 
     async runQuery(db: string, colName: string, query: Query) {
@@ -56,17 +60,28 @@ export class IndexerProvider {
             throw new DB3Error(e as RpcError)
         }
     }
+    async setup(signature: string, payload: string) {
+        try {
+            const request: SetupRequest = {
+                signature,
+                payload,
+            }
+            const { response } = await this.system.setup(request)
+            return response
+        } catch (e) {
+            throw new DB3Error(e)
+        }
+    }
 
     async getSystemStatus() {
         const request: GetSystemStatusRequest = {}
         try {
-            const { response } = await this.client.getSystemStatus(request)
+            const { response } = await this.system.getSystemStatus(request)
             return response
         } catch (e) {
-            throw new DB3Error(e as RpcError)
+            throw new DB3Error(e)
         }
     }
-
     async getContractSyncStatus() {
         const request: GetContractSyncStatusRequest = {}
 

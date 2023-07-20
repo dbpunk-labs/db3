@@ -19,35 +19,10 @@
 pub mod db3_base_proto {
     tonic::include_proto!("db3_base_proto");
 }
-pub mod db3_session_proto {
-    tonic::include_proto!("db3_session_proto");
-}
-pub mod db3_mutation_proto {
-    tonic::include_proto!("db3_mutation_proto");
-}
-pub mod db3_bill_proto {
-    tonic::include_proto!("db3_bill_proto");
-}
-pub mod db3_account_proto {
-    tonic::include_proto!("db3_account_proto");
-}
-pub mod db3_node_proto {
-    tonic::include_proto!("db3_node_proto");
-}
-pub mod db3_database_proto {
-    tonic::include_proto!("db3_database_proto");
-}
-pub mod db3_message_proto {
-    tonic::include_proto!("db3_message_proto");
-}
 
-pub mod db3_event_proto {
-    tonic::include_proto!("db3_event_proto");
-}
 pub mod db3_indexer_proto {
     tonic::include_proto!("db3_indexer_proto");
 }
-
 pub mod db3_storage_proto {
     tonic::include_proto!("db3_storage_proto");
 }
@@ -55,10 +30,15 @@ pub mod db3_storage_proto {
 pub mod db3_mutation_v2_proto {
     tonic::include_proto!("db3_mutation_v2_proto");
 }
+
 pub mod db3_database_v2_proto {
     tonic::include_proto!("db3_database_v2_proto");
 }
 
 pub mod db3_rollup_proto {
     tonic::include_proto!("db3_rollup_proto");
+}
+
+pub mod db3_system_proto {
+    tonic::include_proto!("db3_system_proto");
 }

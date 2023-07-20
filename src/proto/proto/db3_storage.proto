@@ -22,6 +22,7 @@ import "db3_base.proto";
 import "db3_database_v2.proto";
 import "db3_mutation_v2.proto";
 import "db3_rollup.proto";
+
 message SendMutationRequest {
   // a hex signature string
   string signature = 1;
@@ -57,7 +58,7 @@ message SubscribeRequest {
   // a hex signature string
   string signature = 1;
   // the payload of topic
-  bytes payload = 2;
+  string payload = 2;
 }
 
 // the node will dispatch a block event when a new block has been proposed
@@ -163,19 +164,6 @@ message BlockResponse {
   }
   repeated MutationWrapper mutations = 3;
 }
-
-message GetSystemStatusRequest {}
-
-message SetupRequest {
-  string signature = 1;
-  bytes payload = 2;
-}
-
-message SetupResponse {
-  int64 code = 1;
-  string msg = 2;
-}
-
 message GetMutationStateRequest {}
 
 message MutationStateView {
@@ -211,7 +199,5 @@ service StorageNode {
   rpc Subscribe(SubscribeRequest) returns (stream EventMessage) {}
   // method for get block
   rpc GetBlock(BlockRequest) returns (BlockResponse) {}
-  rpc GetSystemStatus(GetSystemStatusRequest) returns (db3_base_proto.SystemStatus) {}
-  rpc Setup(SetupRequest) returns (SetupResponse) {}
   rpc GetMutationState(GetMutationStateRequest) returns (GetMutationStateResponse) {}
 }

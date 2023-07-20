@@ -17,3 +17,4 @@
 
 pub mod indexer_sdk;
 pub mod store_sdk_v2;
+pub mod system_sdk;

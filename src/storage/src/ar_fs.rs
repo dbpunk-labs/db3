@@ -56,7 +56,6 @@ impl ArFileSystem {
         );
         let arweave_url = url::Url::from_str(config.arweave_url.as_str())
             .map_err(|e| DB3Error::ArwareOpError(format!("{e}")))?;
-
         let wallet = WalletInfoClient::new(arweave_url);
         Ok(Self { arweave, wallet })
     }
@@ -246,7 +245,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn build_arweave(arweave_url: String) -> ArFileSystem {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
             .unwrap()
@@ -283,7 +282,7 @@ mod tests {
     async fn test_get_balance_ut() {
         let arweave_url = "http://127.0.0.1:1984".to_string();
         let ar_filesystem = build_arweave(arweave_url);
-        let balance = ar_filesystem.get_balance().await.unwrap();
+        let _balance = ar_filesystem.get_balance().await.unwrap();
     }
     #[tokio::test]
     async fn test_get_ar_account() {
@@ -319,7 +318,7 @@ mod tests {
             "upload file failed with balance : {:?}",
             balance
         );
-        let (tx_id, reward) = res.unwrap();
+        let (tx_id, _reward) = res.unwrap();
         assert!(!tx_id.is_empty());
     }
 }

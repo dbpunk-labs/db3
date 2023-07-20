@@ -19,32 +19,17 @@
 syntax = "proto3";
 package db3_base_proto;
 
-enum ChainRole {
-  SettlementChain = 0;
-  StorageShardChain = 10;
-  DvmComputingChain = 20;
-}
-
-enum ChainId {
-  MainNet = 0;
-  TestNet = 10;
-  DevNet = 20;
-}
-
-message BroadcastMeta {
-  uint64 nonce = 1;
-  // the chain id of db3
-  ChainId chain_id = 2;
-  // the chain role of db3
-  ChainRole chain_role = 3;
-}
-
 message SystemConfig {
   uint64 min_rollup_size = 1;
   uint64 rollup_interval = 2;
   uint64 network_id = 3;
   string evm_node_url = 4;
   string ar_node_url = 5;
+  uint32 chain_id = 6;
+  // rollup at once of max time
+  uint64 rollup_max_interval = 7;
+  string contract_addr = 8;
+  uint64 min_gc_offset = 9;
 }
 
 message Version {

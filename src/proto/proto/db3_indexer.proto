@@ -40,17 +40,6 @@ message RunQueryResponse {
   uint64 count = 3;
 }
 
-message GetSystemStatusRequest {}
-
-message SetupRequest {
-  string signature = 1;
-  bytes payload = 2;
-}
-
-message SetupResponse {
-  int64 code = 1;
-  string msg = 2;
-}
 
 message ContractSyncStatus {
   string addr = 1;
@@ -65,9 +54,7 @@ message GetContractSyncStatusResponse {
 message GetContractSyncStatusRequest {}
 
 service IndexerNode {
-  rpc GetSystemStatus(GetSystemStatusRequest) returns (db3_base_proto.SystemStatus) {}
   rpc GetContractSyncStatus(GetContractSyncStatusRequest) returns (GetContractSyncStatusResponse) {}
-  //  // method for query document
+  // method for query document
   rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
-  rpc Setup(SetupRequest) returns (SetupResponse) {}
 }

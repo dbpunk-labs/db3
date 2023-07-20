@@ -9,8 +9,8 @@ const config: HardhatUserConfig = {
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
-    scrollPrealpha: {
-      url: "https://prealpha-rpc.scroll.io/l2" || "",
+    scrollalpha: {
+      url: "https://alpha-rpc.scroll.io/l2" || "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },

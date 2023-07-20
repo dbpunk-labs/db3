@@ -27,6 +27,7 @@ use tracing::info;
 
 const ACCOUNT_META_TABLE: &str = "ACCOUNT_META_TABLE";
 const CONFIG_META_TABLE: &str = "CONFIG_META_TABLE";
+const CONTRACT_EVENT_TABLE: &str = "CONTRACT_EVENT_TABLE";
 const BLOCK_META_TABLE: &str = "BLOCK_META_TABLE";
 
 type DB = Database<NoWriteMap>;
@@ -69,6 +70,12 @@ impl StateStore {
                     "fail to create config meta table with error {e}"
                 ))
             })?;
+        txn.create_table(Some(CONTRACT_EVENT_TABLE), TableFlags::CREATE)
+            .map_err(|e| {
+                DB3Error::WriteStoreError(format!(
+                    "fail to create config event table with error {e}"
+                ))
+            })?;
         txn.commit().map_err(|e| {
             DB3Error::WriteStoreError(format!("fail to commit the transaction with error {e}"))
         })?;
@@ -106,19 +113,47 @@ impl StateStore {
             .map_err(|e| DB3Error::WriteStoreError(format!("put value with key {e}")))?;
         Ok(())
     }
-    pub fn get_nonce(&self, id: &DB3Address) -> Result<u64> {
+    pub fn get_event_progress(&self, address: &DB3Address) -> Result<Option<u64>> {
+        self.get_u64_value(address.as_ref(), CONTRACT_EVENT_TABLE)
+    }
+
+    pub fn store_event_progress(&self, address: &DB3Address, block: u64) -> Result<()> {
+        let txn = self
+            .db
+            .begin_rw_txn()
+            .map_err(|e| DB3Error::WriteStoreError(format!("open tx {e}")))?;
+        let table = txn
+            .open_table(Some(CONTRACT_EVENT_TABLE))
+            .map_err(|e| DB3Error::WriteStoreError(format!("open table {e}")))?;
+        let buffer = block.to_be_bytes();
+        txn.put(&table, address.as_ref(), &buffer, WriteFlags::UPSERT)
+            .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+        txn.commit()
+            .map_err(|e| DB3Error::WriteStoreError(format!("get value with key {e}")))?;
+        Ok(())
+    }
+
+    fn get_u64_value(&self, key: &[u8], table: &str) -> Result<Option<u64>> {
         let tx = self
             .db
             .begin_ro_txn()
             .map_err(|e| DB3Error::ReadStoreError(format!("open tx {e}")))?;
-        let table = tx
-            .open_table(Some(ACCOUNT_META_TABLE))
+        let table_handle = tx
+            .open_table(Some(table))
             .map_err(|e| DB3Error::ReadStoreError(format!("open table {e}")))?;
         let value = tx
-            .get::<[u8; 8]>(&table, id.as_ref())
+            .get::<[u8; 8]>(&table_handle, key)
             .map_err(|e| DB3Error::ReadStoreError(format!("get value with key {e}")))?;
         if let Some(v) = value {
-            Ok(u64::from_be_bytes(v))
+            Ok(Some(u64::from_be_bytes(v)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_nonce(&self, id: &DB3Address) -> Result<u64> {
+        if let Ok(Some(v)) = self.get_u64_value(id.as_ref(), ACCOUNT_META_TABLE) {
+            Ok(v)
         } else {
             Ok(0)
         }
