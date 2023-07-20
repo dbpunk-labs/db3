@@ -14,19 +14,19 @@ With Db3 network, you can get both advantages of the above two choices.
 # **Advantages**
 ---
 ## Decentralization
-The DB3 network is totally decentralized and permissionless, allowing anyone in the world to spin up a node to provide storage, compute, and bandwidth resources to users and applications built on the network. All the nodes on the network are connected to each other and syncronize data among each other. Users or dApps could write and read data from every node. 
+The DB3 network is totally decentralized and permissionless, allowing anyone in the world to spin up a node to provide storage, compute, and bandwidth resources to users and applications built on the network. All the nodes on the network are connected to each other and synchronize data among each other. Users or dApps could write and read data from every node. 
 <p align="center">
   <img width="500px" src="../../../images/db3_network.png" align="center"/>  
 </p>
 
 ## Data Ownership
-As a decentralized and permissionless network, we guarrantee the ownship of the data. No one but the user who hold the privte key can change and update their data. 
+As a decentralized and permissionless network, we guarrantee the ownship of the data. No one but the user who hold the private key can change and update their data. 
 <p align="center">
   <img width="500px" src="../../../images/data_control.png" align="center"/>  
 </p>
 
 ## Developer Experience
-DB3 network provide the best developer experience. We design a well structured database and can be easilly interact with, the same as using centralized database. 
+DB3 network provide the best developer experience. We design a well structured database and can be easily interact with, the same as using centralized database. 
 ### Web2 familiar 
 Since user-generated data is not the same as on-chain token. The way we storage them can be quite different. Most concepts on centralized databases apply to DB3 network, such as namespace, table, indexing.
 Life is short ,you don't have so much time to learn redundant new concepts

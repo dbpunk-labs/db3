@@ -41,7 +41,7 @@ impl MetaStoreClient {
     pub async fn new(contract_addr: &str, rpc_url: &str, wallet: LocalWallet) -> Result<Self> {
         let address = contract_addr
             .parse::<Address>()
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|_| DB3Error::InvalidAddress)?;
         let provider = Provider::<Http>::connect(rpc_url).await;
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
@@ -71,7 +71,7 @@ impl MetaStoreClient {
         );
         tx.send()
             .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
         Ok(())
     }
 
@@ -117,10 +117,9 @@ impl MetaStoreClient {
         );
         let tx = store.update_rollup_steps(network_id, ar_tx_binary);
         //TODO set gas limit
-        let pending_tx = tx
-            .send()
-            .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        let pending_tx = tx.send().await.map_err(|e| {
+            DB3Error::StoreEventError(format!("fail to send update rollup request with error {e}"))
+        })?;
         let tx_hash = pending_tx.tx_hash();
         info!("update rollup step done! tx hash: {}", tx_hash);
         let mut count_down: i32 = 5;

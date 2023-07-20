@@ -26,7 +26,6 @@ use db3_proto::db3_rollup_proto::{GcRecord as GCRecord, RollupRecord};
 use ethers::types::U256;
 use prost::Message;
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, WriteBatch};
-use serde_json::json;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -109,7 +108,10 @@ impl MutationStore {
                 ],
             )
             .map_err(|e| {
-                DB3Error::OpenStoreError(config.db_path.to_string(), format!("mutation store {e}"))
+                DB3Error::OpenStoreError(
+                    config.db_path.to_string(),
+                    format!("fail to open column family for mutation store with error {e}"),
+                )
             })?,
         );
         Ok(Self {
@@ -135,12 +137,14 @@ impl MutationStore {
         let cf_handle = self
             .se
             .cf_handle(self.config.block_state_cf_name.as_str())
-            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+            .ok_or(DB3Error::ReadStoreError(
+                "cf is not found when recovering mutation store".to_string(),
+            ))?;
         let block_key: &str = "block_key";
         let value = self
             .se
             .get_cf(&cf_handle, block_key.as_bytes())
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+            .map_err(|e| DB3Error::ReadStoreError(format!("fail to read block key value {e}")))?;
         if let Some(v) = value {
             let data_array: [u8; 8] = v
                 .try_into()

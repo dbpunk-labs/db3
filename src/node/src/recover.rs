@@ -50,7 +50,7 @@ impl Recover {
         config: RecoverConfig,
         network_id: Arc<AtomicU64>,
         chain_id: Arc<AtomicU32>,
-        db_store: DBStoreV2,
+        db_store: DBStoreV2
     ) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
@@ -248,7 +248,7 @@ mod tests {
         .unwrap();
         recover
     }
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_get_latest_arweave_tx() {
         let temp_dir = TempDir::new("test_get_latest_arweave_tx").unwrap();
         let recover = build_recover_instance(&temp_dir).await;
@@ -257,7 +257,7 @@ mod tests {
         println!("res {:?}", res);
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
         let temp_dir = TempDir::new("test_fetch_arware_tx_from_block").unwrap();
         let recover = build_recover_instance(&temp_dir).await;

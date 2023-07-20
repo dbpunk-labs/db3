@@ -13,7 +13,7 @@ Here is a Demo example you may refer to **[Message_wall](https://github.com/dbpu
 
 Or try **[On line Website](https://message-wall-iota.vercel.app/)** of the demo
 
-## **Chosing Nodes**
+## **Choosing Nodes**
 
 DB3 network is composed by a group of nodes. You can chose what ever node to connect when building a dApp, or you can run self-running a node.
 
