@@ -40,7 +40,6 @@ message RunQueryResponse {
   uint64 count = 3;
 }
 
-
 message ContractSyncStatus {
   string addr = 1;
   string evm_node_url = 2;

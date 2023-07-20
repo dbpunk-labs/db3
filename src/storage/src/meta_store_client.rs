@@ -202,7 +202,7 @@ mod tests {
         let wallet = LocalWallet::from_bytes(data_ref).unwrap();
         let wallet = wallet.with_chain_id(31337_u32);
         let rollup_node_address = wallet.address();
-        let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+        let contract_addr = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
         let rpc_url = "ws://127.0.0.1:8545";
         let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
             .await

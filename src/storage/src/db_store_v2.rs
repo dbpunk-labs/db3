@@ -846,16 +846,20 @@ impl DBStoreV2 {
         Ok(db_addr)
     }
 
-    pub fn create_doc_database(
+    pub fn create_predefined_doc_database(
         &self,
         sender: &DB3Address,
-        mutation: &DocumentDatabaseMutation,
-        nonce: u64,
-        network_id: u64,
+        db_addr: &DbId,
+        desc: &str,
         block: u64,
         order: u32,
-    ) -> Result<DbId> {
-        let db_addr = DbId::from((sender, nonce, network_id));
+    ) -> Result<()> {
+        if let Ok(Some(_)) = self.get_database(db_addr.address()) {
+            return Err(DB3Error::WriteStoreError(format!(
+                "database with address {} exists",
+                db_addr.to_hex()
+            )));
+        }
         let db_store_cf_handle = self
             .se
             .cf_handle(self.config.db_store_cf_name.as_str())
@@ -869,7 +873,7 @@ impl DBStoreV2 {
         let database = DocumentDatabase {
             address: db_addr.as_ref().to_vec(),
             sender: sender.as_ref().to_vec(),
-            desc: mutation.db_desc.to_string(),
+            desc: desc.to_string(),
         };
         let database_msg = DatabaseMessage {
             database: Some(database_message::Database::DocDb(database)),
@@ -896,6 +900,26 @@ impl DBStoreV2 {
                 .create_database(db_addr.address())
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         }
+        Ok(())
+    }
+
+    pub fn create_doc_database(
+        &self,
+        sender: &DB3Address,
+        mutation: &DocumentDatabaseMutation,
+        nonce: u64,
+        network_id: u64,
+        block: u64,
+        order: u32,
+    ) -> Result<DbId> {
+        let db_addr = DbId::from((sender, nonce, network_id));
+        self.create_predefined_doc_database(
+            sender,
+            &db_addr,
+            mutation.db_desc.as_str(),
+            block,
+            order,
+        )?;
         Ok(db_addr)
     }
 
@@ -912,6 +936,40 @@ impl DBStoreV2 {
     ) -> Result<Vec<ExtraItem>> {
         let mut items: Vec<ExtraItem> = Vec::new();
         match action {
+            MutationAction::MintDocumentDb => {
+                for body in dm.bodies {
+                    if let Some(Body::MintDocDatabaseMutation(ref min_doc_db_mutation)) = &body.body
+                    {
+                        let sender = DB3Address::try_from(min_doc_db_mutation.sender.as_str())?;
+                        let db_id =
+                            DbId::from(DB3Address::try_from(min_doc_db_mutation.db_addr.as_str())?);
+                        self.create_predefined_doc_database(
+                            &sender,
+                            &db_id,
+                            min_doc_db_mutation.desc.as_str(),
+                            block,
+                            order,
+                        )
+                        .map_err(|e| {
+                            DB3Error::ApplyMutationError(format!(
+                                "fail to create predefined database {e}"
+                            ))
+                        })?;
+                        let db_id_hex = db_id.to_hex();
+                        info!(
+                            "mint database with addr {} from owner {}",
+                            db_id_hex.as_str(),
+                            address.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "db_addr".to_string(),
+                            value: db_id_hex,
+                        };
+                        items.push(item);
+                        break;
+                    }
+                }
+            }
             MutationAction::CreateEventDb => {
                 for body in dm.bodies {
                     if let Some(Body::EventDatabaseMutation(ref mutation)) = &body.body {
@@ -1091,6 +1149,7 @@ impl DBStoreV2 {
                     }
                 }
             }
+            _ => todo!(),
         };
         Ok(items)
     }

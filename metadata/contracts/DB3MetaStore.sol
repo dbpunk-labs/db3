@@ -149,7 +149,7 @@ contract DB3MetaStore is IDB3MetaStore {
         database.db = db;
         database.description = description;
         database.counter = 0;
-        emit Events.CreateDatabase(msg.sender, networkId, db);
+        emit Events.CreateDatabase(msg.sender, networkId, db, description);
     }
 
     function createCollection(
