@@ -17,7 +17,7 @@
 
 use arweave_rs::crypto::base64::Base64;
 use db3_error::{DB3Error, Result};
-use ethers::prelude::{LocalWallet};
+use ethers::prelude::LocalWallet;
 use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},
@@ -192,9 +192,9 @@ impl MetaStoreClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ethers::prelude::Signer;
     use fastcrypto::encoding::{Base64, Encoding};
     use tokio::time::{sleep, Duration as TokioDuration};
-    use ethers::prelude::{Signer};
     #[tokio::test]
     async fn register_no1_data_network() {
         let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
