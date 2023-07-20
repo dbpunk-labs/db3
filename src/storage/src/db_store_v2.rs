@@ -107,7 +107,10 @@ impl DBStoreV2 {
                 ],
             )
             .map_err(|e| {
-                DB3Error::OpenStoreError(config.db_path.to_string(), format!("db_store_v2 {e}"))
+                DB3Error::OpenStoreError(
+                    config.db_path.to_string(),
+                    format!("fail to open column family for db store v2 with error {e}"),
+                )
             })?,
         );
         let doc_store = match config.enable_doc_store {

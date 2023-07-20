@@ -84,8 +84,11 @@ pub enum DB3Command {
         #[clap(long, default_value = "./doc_db")]
         doc_db_path: String,
         /// The network id
-        #[clap(long, default_value = "10")]
+        #[clap(long, default_value = "1")]
         network_id: u64,
+        /// The chain id
+        #[clap(long, default_value = "31337")]
+        chain_id: u32,
         /// The block interval
         #[clap(long, default_value = "2000")]
         block_interval: u64,
@@ -154,7 +157,7 @@ pub enum DB3Command {
         admin_addr: String,
         #[clap(long, default_value = "http://127.0.0.1:8545")]
         evm_node_url: String,
-        #[clap(long, default_value = "10")]
+        #[clap(long, default_value = "1")]
         network_id: u64,
         #[clap(short, long)]
         verbose: bool,
@@ -219,6 +222,7 @@ impl DB3Command {
                 state_db_path,
                 doc_db_path,
                 network_id,
+                chain_id,
                 block_interval,
                 rollup_interval,
                 rollup_min_data_size,
@@ -245,6 +249,7 @@ impl DB3Command {
                     state_db_path.as_str(),
                     doc_db_path.as_str(),
                     network_id,
+                    chain_id,
                     block_interval,
                     rollup_interval,
                     rollup_min_data_size,
@@ -363,6 +368,7 @@ impl DB3Command {
         state_db_path: &str,
         doc_db_path: &str,
         network_id: u64,
+        chain_id: u32,
         block_interval: u64,
         rollup_interval: u64,
         rollup_min_data_size: u64,
@@ -428,6 +434,7 @@ impl DB3Command {
             rollup_config,
             db_store_config,
             network_id,
+            chain_id,
             block_interval,
             node_url: addr.to_string(),
             contract_addr: contract_addr.to_string(),

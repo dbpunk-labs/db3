@@ -27,6 +27,7 @@ use ethers::{
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
+use tracing::info;
 abigen!(DB3MetaStore, "abi/DB3MetaStore.json");
 
 pub struct MetaStoreClient {
@@ -40,7 +41,7 @@ impl MetaStoreClient {
     pub async fn new(contract_addr: &str, rpc_url: &str, wallet: LocalWallet) -> Result<Self> {
         let address = contract_addr
             .parse::<Address>()
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|_| DB3Error::InvalidAddress)?;
         let provider = Provider::<Http>::connect(rpc_url).await;
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
@@ -53,6 +54,10 @@ impl MetaStoreClient {
         rollup_node_address: &Address,
         rollup_node_url: &str,
     ) -> Result<()> {
+        info!(
+            "register data network with rollup node address: {}, rollup node url: {}",
+            rollup_node_address, rollup_node_url
+        );
         let store = DB3MetaStore::new(self.address, self.client.clone());
         let empty_index_urls: Vec<String> = vec![];
         let empty_index_addresses: Vec<Address> = vec![];
@@ -66,7 +71,7 @@ impl MetaStoreClient {
         );
         tx.send()
             .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
         Ok(())
     }
 
@@ -95,6 +100,7 @@ impl MetaStoreClient {
     }
 
     pub async fn update_rollup_step(&self, ar_tx: &str, network: u64) -> Result<(U256, TxHash)> {
+        info!("update rollup step with tx {}, network: {}", ar_tx, network);
         let b64: Base64 = Base64::from_str(ar_tx).map_err(|e| {
             DB3Error::StoreEventError(format!(
                 "fail to decode arweave tx from base64 for error {e}"
@@ -105,13 +111,17 @@ impl MetaStoreClient {
         })?;
         let store = DB3MetaStore::new(self.address, self.client.clone());
         let network_id = U256::from(network);
+        info!(
+            "start update rollup step with tx {}, network: {}",
+            ar_tx, network
+        );
         let tx = store.update_rollup_steps(network_id, ar_tx_binary);
         //TODO set gas limit
-        let pending_tx = tx
-            .send()
-            .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+        let pending_tx = tx.send().await.map_err(|e| {
+            DB3Error::StoreEventError(format!("fail to send update rollup request with error {e}"))
+        })?;
         let tx_hash = pending_tx.tx_hash();
+        info!("update rollup step done! tx hash: {}", tx_hash);
         let mut count_down: i32 = 5;
         loop {
             if count_down <= 0 {
@@ -140,9 +150,37 @@ impl MetaStoreClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::key_store::{KeyStore, KeyStoreConfig};
+    use fastcrypto::encoding::{Base64, Encoding};
+    use std::ops::Deref;
+    use std::path::PathBuf;
     use tempdir::TempDir;
     use tokio::time::{sleep, Duration as TokioDuration};
-    //#[tokio::test]
+    fn build_wallet(key_root_path: &str) -> std::result::Result<LocalWallet, DB3Error> {
+        let config = KeyStoreConfig {
+            key_root_path: key_root_path.to_string(),
+        };
+        let key_store = KeyStore::new(config);
+        match key_store.has_key("evm") {
+            true => {
+                let data = key_store.get_key("evm")?;
+                let data_ref: &[u8] = &data;
+                println!("data_hex: {:?}", hex::encode(data_ref));
+                let wallet = LocalWallet::from_bytes(data_ref)
+                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
+                Ok(wallet)
+            }
+            false => {
+                let mut rng = rand::thread_rng();
+                let wallet = LocalWallet::new(&mut rng);
+                let data = wallet.signer().to_bytes();
+                key_store.write_key("evm", data.deref())?;
+                Ok(wallet)
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn register_a_data_network_test() {
         let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
             .unwrap();
@@ -159,15 +197,46 @@ mod tests {
         let result = client
             .register_data_network(&rollup_node_address, rpc_url)
             .await;
-        assert!(result.is_ok());
-        sleep(TokioDuration::from_millis(2 * 1000)).await;
+        assert!(result.is_ok(), "register data network failed {:?}", result);
+        sleep(TokioDuration::from_millis(5 * 1000)).await;
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
+            .await
+            .unwrap();
         let tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
         let result = client.update_rollup_step(tx, 1).await;
-        assert!(result.is_ok());
-        sleep(TokioDuration::from_millis(2 * 1000)).await;
+        assert!(result.is_ok(), "update rollup step failed {:?}", result);
+        sleep(TokioDuration::from_millis(5 * 1000)).await;
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
+            .await
+            .unwrap();
         let tx_ret = client.get_latest_arweave_tx(1).await;
         assert!(tx_ret.is_ok());
         let tx_remote = tx_ret.unwrap();
         assert_eq!(tx, tx_remote);
+    }
+
+    fn hex_to_base64(hex_str: &str) -> String {
+        let data = hex::decode(hex_str).unwrap();
+        let base64_instance = Base64::from_bytes(data.as_slice());
+        base64_instance.encoded()
+    }
+
+    #[test]
+    fn hex_base_64_convert_ut() {
+        let base64_str = "rAl0vsOaF+NrpKa00jj/lEustHjL7V78rnhNe/Ty/4A=";
+        let data = Base64::decode(base64_str)
+            .map_err(|e| DB3Error::ReadStoreError(format!("fail to open file {e}")))
+            .unwrap();
+        let data_ref: &[u8] = &data;
+        let hex_str = hex::encode(data_ref);
+        assert_eq!(
+            "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+            hex_str
+        );
+        assert_eq!(base64_str, hex_to_base64(hex_str.as_str()));
     }
 }
