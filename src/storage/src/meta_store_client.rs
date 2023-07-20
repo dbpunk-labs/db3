@@ -17,7 +17,7 @@
 
 use arweave_rs::crypto::base64::Base64;
 use db3_error::{DB3Error, Result};
-use ethers::prelude::{LocalWallet, Signer};
+use ethers::prelude::LocalWallet;
 use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},

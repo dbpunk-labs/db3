@@ -211,7 +211,8 @@ describe("DB3MetaStore", function () {
         .withArgs(
           deployer.address,
           1,
-          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A"
+          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A",
+          hello
         );
 
       await expect(
@@ -252,7 +253,8 @@ describe("DB3MetaStore", function () {
         .withArgs(
           deployer.address,
           1,
-          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A"
+          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A",
+          hello
         );
       const binaryData = ethers.utils.base64.decode(
         "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4"

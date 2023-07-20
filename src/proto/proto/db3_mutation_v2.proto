@@ -36,6 +36,7 @@ message MintCollectionMutation {
   string tx = 2;
   string db_addr = 3;
   string name = 4;
+  string sender = 5;
 }
 
 message MintDocumentDatabaseMutation {

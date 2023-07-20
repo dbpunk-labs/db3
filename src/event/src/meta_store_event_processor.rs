@@ -20,8 +20,8 @@ use bytes::BytesMut;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{
-    mutation::body_wrapper::Body, mutation::BodyWrapper, MintDocumentDatabaseMutation, Mutation,
-    MutationAction,
+    mutation::body_wrapper::Body, mutation::BodyWrapper, MintCollectionMutation,
+    MintDocumentDatabaseMutation, Mutation, MutationAction,
 };
 use db3_storage::db_store_v2::DBStoreV2;
 use db3_storage::mutation_store::MutationStore;
@@ -89,7 +89,7 @@ impl MetaStoreEventProcessor {
         }
     }
 
-    async fn handle_create_doc_database(
+    async fn handle_create_collection(
         log: &Log,
         t: &Transaction,
         network: u64,
@@ -103,40 +103,120 @@ impl MetaStoreEventProcessor {
             topics: log.topics.clone(),
             data: log.data.to_vec(),
         };
-        let event = CreateDatabaseFilter::decode_log(&row_log).map_err(|e| {
+        let event = CreateCollectionFilter::decode_log(&row_log).map_err(|e| {
             DB3Error::StoreEventError(format!("fail to decode the create database event {e}"))
         })?;
+        // jude the network
+        if event.network_id.as_u64() != network {
+            warn!("ignore the mismatch network event");
+            return Ok(());
+        }
 
         let typed_tx: TypedTransaction = t.into();
         let tx_bytes = typed_tx.rlp();
         let tx_hex_str = hex::encode(tx_bytes);
-        let db3_addr = DB3Address::from(&event.database_address.0);
+        let db3_addr = DB3Address::from(&event.db.0);
         let sender_addr = DB3Address::from(&event.sender.0);
-
+        let name = String::from_utf8(event.name.to_vec()).map_err(|e| {
+            DB3Error::StoreEventError(format!("fail to decode collection name for error {e}"))
+        })?;
+        let name = name.trim_matches(char::from(0));
         let signature = Signature {
             r: t.r,
             s: t.s,
             v: t.v.as_u64(),
         };
-
-        let desc = String::from_utf8(event.desc.to_vec()).map_err(|e| {
-            DB3Error::StoreEventError(format!("fail to decode description for error {e}"))
-        })?;
-        let desc = desc.trim_matches(char::from(0));
-        let mint = MintDocumentDatabaseMutation {
+        let mint = MintCollectionMutation {
             signature: format!("{signature}"),
             tx: tx_hex_str,
             db_addr: db3_addr.to_hex(),
-            desc: desc.to_string(),
+            name: name.to_string(),
             sender: sender_addr.to_hex(),
         };
+        let body = Body::MintCollectionMutation(mint);
+        let (signature, mutation, nonce, payload) = Self::sign_mutation(
+            wallet,
+            state_store,
+            body,
+            MutationAction::MintCollection,
+            mutation_type,
+        )
+        .await?;
+        Self::apply_mutation(
+            signature.as_str(),
+            &payload,
+            MutationAction::MintCollection,
+            mutation,
+            storage,
+            db_store,
+            nonce,
+            network,
+            &sender_addr,
+        )
+    }
+
+    fn apply_mutation(
+        signature: &str,
+        payload: &[u8],
+        action: MutationAction,
+        mutation: Mutation,
+        storage: &MutationStore,
+        db_store: &DBStoreV2,
+        nonce: u64,
+        network: u64,
+        sender_addr: &DB3Address,
+    ) -> Result<()> {
+        let (_, block, order) = storage
+            .generate_mutation_block_and_order(payload, signature)
+            .map_err(|e| DB3Error::StoreEventError(format!("fail to generate tx for {e}")))?;
+        if let Ok(_) = db_store.apply_mutation(
+            action,
+            mutation,
+            sender_addr,
+            network,
+            nonce,
+            block,
+            order,
+            &HashMap::new(),
+        ) {
+            match storage.add_mutation(
+                &payload,
+                signature,
+                "",
+                sender_addr,
+                nonce,
+                block,
+                order,
+                network,
+                action,
+            ) {
+                Ok(_) => {
+                    info!("mint event with from sender {} done", sender_addr.to_hex());
+                }
+                Err(e) => {
+                    warn!(
+                        "fail to mint evemt with from address {} for {e}",
+                        sender_addr.to_hex()
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+    async fn sign_mutation(
+        wallet: &LocalWallet,
+        state_store: &Arc<StateStore>,
+        body: Body,
+        action: MutationAction,
+        mutation_type: &Types,
+    ) -> Result<(String, Mutation, u64, Vec<u8>)> {
         let my_addr = DB3Address::from(&wallet.address().0);
         let nonce = state_store.get_nonce(&my_addr)? + 1;
         let mutation = Mutation {
-            action: MutationAction::MintDocumentDb.into(),
+            action: action.into(),
             bodies: vec![BodyWrapper {
                 db_address: vec![],
-                body: Some(Body::MintDocDatabaseMutation(mint)),
+                body: Some(body),
             }],
         };
         let mut mbuf = BytesMut::with_capacity(1024 * 4);
@@ -170,47 +250,76 @@ impl MetaStoreEventProcessor {
         let signature = wallet.sign_typed_data(&typed_data).await.map_err(|e| {
             DB3Error::StoreEventError(format!("fail to sign mint event request {e}"))
         })?;
-        let signature = format!("{signature}");
         let payload = serde_json::to_vec(&typed_data).map_err(|_| {
             DB3Error::StoreEventError("fail to convert typed data to json".to_string())
         })?;
+        Ok((format!("{signature}"), mutation, nonce, payload))
+    }
 
-        let (_, block, order) = storage
-            .generate_mutation_block_and_order(&payload, signature.as_str())
-            .map_err(|e| DB3Error::StoreEventError(format!("fail to generate tx for {e}")))?;
-        if let Ok(_) = db_store.apply_mutation(
+    async fn handle_create_doc_database(
+        log: &Log,
+        t: &Transaction,
+        network: u64,
+        wallet: &LocalWallet,
+        state_store: &Arc<StateStore>,
+        storage: &MutationStore,
+        db_store: &DBStoreV2,
+        mutation_type: &Types,
+    ) -> Result<()> {
+        let row_log = RawLog {
+            topics: log.topics.clone(),
+            data: log.data.to_vec(),
+        };
+        let event = CreateDatabaseFilter::decode_log(&row_log).map_err(|e| {
+            DB3Error::StoreEventError(format!("fail to decode the create database event {e}"))
+        })?;
+        // jude the network
+        if event.network_id.as_u64() != network {
+            warn!("ignore the mismatch network event");
+            return Ok(());
+        }
+        let typed_tx: TypedTransaction = t.into();
+        let tx_bytes = typed_tx.rlp();
+        let tx_hex_str = hex::encode(tx_bytes);
+        let signature = Signature {
+            r: t.r,
+            s: t.s,
+            v: t.v.as_u64(),
+        };
+
+        let desc = String::from_utf8(event.desc.to_vec()).map_err(|e| {
+            DB3Error::StoreEventError(format!("fail to decode description for error {e}"))
+        })?;
+        let desc = desc.trim_matches(char::from(0));
+        let db3_addr = DB3Address::from(&event.database_address.0);
+        let sender_addr = DB3Address::from(&event.sender.0);
+        let mint = MintDocumentDatabaseMutation {
+            signature: format!("{signature}"),
+            tx: tx_hex_str,
+            db_addr: db3_addr.to_hex(),
+            desc: desc.to_string(),
+            sender: sender_addr.to_hex(),
+        };
+        let body = Body::MintDocDatabaseMutation(mint);
+        let (signature, mutation, nonce, payload) = Self::sign_mutation(
+            wallet,
+            state_store,
+            body,
+            MutationAction::MintDocumentDb,
+            mutation_type,
+        )
+        .await?;
+        Self::apply_mutation(
+            signature.as_str(),
+            &payload,
             MutationAction::MintDocumentDb,
             mutation,
-            &sender_addr,
-            network,
+            storage,
+            db_store,
             nonce,
-            block,
-            order,
-            &HashMap::new(),
-        ) {
-            match storage.add_mutation(
-                &payload,
-                signature.as_str(),
-                "",
-                &sender_addr,
-                nonce,
-                block,
-                order,
-                network,
-                MutationAction::MintDocumentDb,
-            ) {
-                Ok(_) => {
-                    info!("mint database with address {} done", db3_addr.to_hex());
-                }
-                Err(e) => {
-                    warn!(
-                        "fail to mint database with address {} for {e}",
-                        db3_addr.to_hex()
-                    );
-                }
-            }
-        }
-        Ok(())
+            network,
+            &sender_addr,
+        )
     }
 
     pub async fn start(
@@ -225,6 +334,11 @@ impl MetaStoreEventProcessor {
             // stop last job
             last_running.store(false, Ordering::Relaxed);
         }
+        let wallet = self.system_store.get_evm_wallet(chain_id)?;
+        let local_state_store = self.state_store.clone();
+        let local_storage = self.storage.clone();
+        let local_db_store = self.db_store.clone();
+        let mutation_type = self.mutation_type.clone();
         let running = Arc::new(AtomicBool::new(true));
         info!(
             "start meta store event processor with evm node url {}",
@@ -267,7 +381,10 @@ impl MetaStoreEventProcessor {
                     contract_addr
                 );
                 Filter::new()
-                    .events(vec!["CreateDatabase", "CreateCollection"])
+                    .events(vec![
+                        CreateDatabaseFilter::abi_signature().as_bytes(),
+                        CreateCollectionFilter::abi_signature().as_bytes(),
+                    ])
                     .address(address)
             }
         };
@@ -287,6 +404,47 @@ impl MetaStoreEventProcessor {
                             "block number {:?} transacion {:?} sender address {:?} ",
                             log.block_number, log.transaction_hash, log.address
                         );
+                        if let (Ok(Some(transaction)), Ok(event_signature)) = (
+                            provider
+                                .get_transaction(log.transaction_hash.unwrap())
+                                .await
+                                .map_err(|e| {
+                                    DB3Error::StoreEventError(format!(
+                                        "fail to get transaction {e}"
+                                    ))
+                                }),
+                            log.topics
+                                .get(0)
+                                .ok_or(DB3Error::StoreEventError(format!("fail to get topics"))),
+                        ) {
+                            if event_signature == &(CreateDatabaseFilter::signature()) {
+                                if let Ok(_) = Self::handle_create_doc_database(
+                                    &log,
+                                    &transaction,
+                                    network,
+                                    &wallet,
+                                    &local_state_store,
+                                    &local_storage,
+                                    &local_db_store,
+                                    &mutation_type,
+                                )
+                                .await
+                                {}
+                            } else if event_signature == &(CreateCollectionFilter::signature()) {
+                                if let Ok(_) = Self::handle_create_collection(
+                                    &log,
+                                    &transaction,
+                                    network,
+                                    &wallet,
+                                    &local_state_store,
+                                    &local_storage,
+                                    &local_db_store,
+                                    &mutation_type,
+                                )
+                                .await
+                                {}
+                            }
+                        }
                     }
                 },
                 Err(e) => {

@@ -171,7 +171,7 @@ mod tests {
             rollup_interval: 10 * 60 * 1000,
             min_rollup_size: 1024 * 1024,
             network: 1,
-            chain_id: 111,
+            chain_id: 31337_u32,
             contract_address: "0x5fbdb2315678afecb367f032d93f642f64180aa3".to_string(),
             rollup_max_interval: 24 * 60 * 60 * 1000,
             evm_node_rpc: "ws://127.0.0.1:8545".to_string(),
