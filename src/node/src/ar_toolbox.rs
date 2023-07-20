@@ -23,7 +23,7 @@ use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
-use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
+use db3_storage::ar_fs::ArFileSystem;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, GzipLevel};
@@ -44,12 +44,7 @@ unsafe impl Send for ArToolBox {}
 unsafe impl Sync for ArToolBox {}
 
 impl ArToolBox {
-    pub fn new(key_root_path: String, arweave_url: String, temp_data_path: String) -> Result<Self> {
-        let ar_fs_config = ArFileSystemConfig {
-            key_root_path,
-            arweave_url,
-        };
-        let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
+    pub fn new(ar_filesystem: ArFileSystem, temp_data_path: String) -> Result<Self> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("payload", DataType::Binary, true),
             Field::new("signature", DataType::Utf8, true),
@@ -57,7 +52,6 @@ impl ArToolBox {
             Field::new("order", DataType::UInt32, true),
             Field::new("doc_ids", DataType::Utf8, true),
         ]));
-
         Ok(Self {
             schema,
             ar_filesystem,
@@ -340,14 +334,12 @@ impl ArToolBox {
 mod tests {
     use super::*;
     use arrow::array::{Array, BinaryArray, StringArray, UInt32Array, UInt64Array};
-    use arrow::datatypes::{BinaryType, DataType, Field, Schema};
+    use arrow::datatypes::{DataType, Field, Schema};
+    use db3_storage::ar_fs::ArFileSystemConfig;
     use std::env;
     use std::path::PathBuf;
     use tempdir::TempDir;
     use tokio::time::{sleep, Duration as TokioDuration};
-
-    #[test]
-    fn it_works() {}
 
     fn mock_batch_record() -> RecordBatch {
         let schema = Arc::new(Schema::new(vec![
@@ -476,12 +468,14 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        let ar_toolbox = ArToolBox::new(
-            key_root_path.to_string(),
-            arweave_url.to_string(),
-            temp_dir.path().to_str().unwrap().to_string(),
-        )
-        .unwrap();
+        let config = ArFileSystemConfig {
+            arweave_url: arweave_url.to_string(),
+            key_root_path,
+        };
+        let ar_filesystem = ArFileSystem::new(config).unwrap();
+        println!("ar address {}", ar_filesystem.get_address());
+        let ar_toolbox =
+            ArToolBox::new(ar_filesystem, temp_dir.path().to_str().unwrap().to_string()).unwrap();
         let result = ar_toolbox
             .compress_and_upload_record_batch(
                 last_tx.to_string(),

@@ -62,6 +62,11 @@ jobs:
           export RUST_BACKTRACE=1
           cargo test test_test_data_rollup_node_setup
           cargo test register_a_data_network_test
+      - name: Run rust test with coverage
+        run: |
+          export RUST_BACKTRACE=1
+          #cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
+          cargo nextest run
       - name: Run Typescript sdk test
         run: |
           ROOT_DIR=`pwd`
@@ -71,11 +76,6 @@ jobs:
         run: |
           ROOT_DIR=`pwd`
           cd ${ROOT_DIR}/java && mvn test
-      - name: Run rust test with coverage
-        run: |
-          export RUST_BACKTRACE=1
-          #cargo llvm-cov nextest --workspace --exclude merkdb  --lcov --output-path lcov.info --no-fail-fast
-          cargo nextest run
       - uses: actions/upload-artifact@v3
         if: failure()
         with:

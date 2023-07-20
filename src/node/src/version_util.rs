@@ -26,11 +26,3 @@ pub fn build_version() -> Version {
         build_time: build::COMMIT_DATE.to_string(),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {}
-}

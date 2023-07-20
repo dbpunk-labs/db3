@@ -205,7 +205,6 @@ mod tests {
         let tmp_dir_path2 = TempDir::new("mutation_store_path").expect("create temp dir");
         let real_path2 = tmp_dir_path2.path().to_str().unwrap().to_string();
 
-        let mut address: Vec<String> = Vec::new();
         {
             let state_config = StateStoreConfig {
                 db_path: real_path2.to_string(),
@@ -217,7 +216,7 @@ mod tests {
                 ar_wallet_key: "ar".to_string(),
             };
             let system_store = SystemStore::new(config, store);
-            if let Ok(Some(c)) = system_store.get_config(&SystemRole::DataIndexNode) {
+            if let Ok(Some(_)) = system_store.get_config(&SystemRole::DataIndexNode) {
                 assert!(false);
             }
 

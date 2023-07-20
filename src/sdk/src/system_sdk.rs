@@ -17,10 +17,7 @@
 
 use db3_proto::db3_system_proto::SetupResponse;
 use db3_proto::db3_system_proto::{system_client::SystemClient, SetupRequest};
-use ethers::core::types::{
-    transaction::eip712::{EIP712Domain, TypedData, Types},
-    Bytes,
-};
+use ethers::core::types::transaction::eip712::{EIP712Domain, TypedData, Types};
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::BTreeMap;
 use std::sync::Arc;

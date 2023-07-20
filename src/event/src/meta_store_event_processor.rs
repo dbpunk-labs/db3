@@ -19,15 +19,12 @@ use arc_swap::ArcSwapOption;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_storage::state_store::StateStore;
-use ethabi::{Log as EthLog, Token};
-use ethers::abi::RawLog;
-use ethers::prelude::{LocalWallet, Signer};
+use ethers::prelude::Signer;
 use ethers::types::Address;
 use ethers::types::Filter;
 use ethers::{
-    contract::{abigen, EthEvent},
-    core::abi::Abi,
-    core::types::{transaction::eip2718::TypedTransaction, Log, Signature, Transaction},
+    contract::abigen,
+    // core::types::{transaction::eip2718::TypedTransaction, Log, Signature, Transaction},
     providers::{Middleware, Provider, StreamExt, Ws},
 };
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -138,11 +135,4 @@ impl MetaStoreEventProcessor {
         });
         Ok(())
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[tokio::test]
-    async fn test_event_processor() {}
 }

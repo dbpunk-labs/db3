@@ -20,6 +20,7 @@ use arc_swap::ArcSwapOption;
 use db3_base::times;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_rollup_proto::{GcRecord, RollupRecord};
+use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::mutation_store::MutationStore;
 use db3_storage::system_store::{SystemRole, SystemStore};
@@ -70,9 +71,13 @@ impl RollupExecutor {
                 MetaStoreClient::new(c.contract_addr.as_str(), c.evm_node_url.as_str(), wallet)
                     .await?,
             )));
+            let ar_fs_config = ArFileSystemConfig {
+                arweave_url: c.ar_node_url.clone(),
+                key_root_path: config.key_root_path.clone(),
+            };
+            let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
             let ar_toolbox = ArcSwapOption::from(Some(Arc::new(ArToolBox::new(
-                config.key_root_path.clone(),
-                c.ar_node_url.clone(),
+                ar_filesystem,
                 config.temp_data_path.clone(),
             )?)));
             let rollup_max_interval = Arc::new(AtomicU64::new(c.rollup_max_interval));
@@ -132,9 +137,13 @@ impl RollupExecutor {
             self.min_gc_round_offset
                 .store(c.min_gc_offset, Ordering::Relaxed);
             self.meta_store.store(meta_store);
+            let ar_fs_config = ArFileSystemConfig {
+                arweave_url: c.ar_node_url.clone(),
+                key_root_path: self.config.key_root_path.clone(),
+            };
+            let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
             let ar_toolbox = Some(Arc::new(ArToolBox::new(
-                self.config.key_root_path.clone(),
-                c.ar_node_url.clone(),
+                ar_filesystem,
                 self.config.temp_data_path.clone(),
             )?));
             self.ar_toolbox.store(ar_toolbox);

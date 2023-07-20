@@ -126,7 +126,6 @@ mod tests {
 
     async fn subscribe_event_message_flow(
         client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
-        counter: i64,
     ) {
         let mut rng = rand::thread_rng();
         let wallet = LocalWallet::new(&mut rng);
@@ -150,7 +149,6 @@ mod tests {
 
     async fn get_block_by_height_flow(
         client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
-        counter: i64,
         height: u64,
     ) {
         let mut rng = rand::thread_rng();
@@ -168,7 +166,7 @@ mod tests {
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeV2Client::new(channel));
 
-        subscribe_event_message_flow(client.clone(), 300).await;
+        subscribe_event_message_flow(client.clone()).await;
     }
     #[tokio::test]
     async fn get_block_by_height_ut() {
@@ -176,6 +174,6 @@ mod tests {
         let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
         let channel = rpc_endpoint.connect_lazy();
         let client = Arc::new(StorageNodeV2Client::new(channel));
-        get_block_by_height_flow(client.clone(), 301, 1).await;
+        get_block_by_height_flow(client.clone(), 1).await;
     }
 }

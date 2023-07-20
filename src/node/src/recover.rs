@@ -19,6 +19,7 @@ use crate::ar_toolbox::ArToolBox;
 use crate::mutation_utils::MutationUtil;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::MutationAction;
+use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
@@ -66,9 +67,14 @@ impl Recover {
             )
             .await?,
         );
+        let ar_fs_config = ArFileSystemConfig {
+            arweave_url: config.ar_node_url.clone(),
+            key_root_path: config.key_root_path.clone(),
+        };
+        let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
+
         let ar_toolbox = Arc::new(ArToolBox::new(
-            config.key_root_path.clone(),
-            config.ar_node_url.clone(),
+            ar_filesystem,
             config.temp_data_path.clone(),
         )?);
         let db_store = Arc::new(DBStoreV2::new(config.db_store_config.clone())?);
@@ -197,11 +203,10 @@ mod tests {
     use db3_storage::doc_store::DocStoreConfig;
     use std::path::PathBuf;
     use tempdir::TempDir;
-
     async fn build_recover_instance(temp_dir: &TempDir) -> Recover {
         let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
         let rpc_url = "ws://127.0.0.1:8545";
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
             .unwrap()

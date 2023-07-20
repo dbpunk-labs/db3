@@ -192,35 +192,8 @@ impl MetaStoreClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::key_store::{KeyStore, KeyStoreConfig};
     use fastcrypto::encoding::{Base64, Encoding};
-    use std::ops::Deref;
-    use std::path::PathBuf;
-    use tempdir::TempDir;
     use tokio::time::{sleep, Duration as TokioDuration};
-    fn build_wallet(key_root_path: &str) -> std::result::Result<LocalWallet, DB3Error> {
-        let config = KeyStoreConfig {
-            key_root_path: key_root_path.to_string(),
-        };
-        let key_store = KeyStore::new(config);
-        match key_store.has_key("evm") {
-            true => {
-                let data = key_store.get_key("evm")?;
-                let data_ref: &[u8] = &data;
-                println!("data_hex: {:?}", hex::encode(data_ref));
-                let wallet = LocalWallet::from_bytes(data_ref)
-                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-                Ok(wallet)
-            }
-            false => {
-                let mut rng = rand::thread_rng();
-                let wallet = LocalWallet::new(&mut rng);
-                let data = wallet.signer().to_bytes();
-                key_store.write_key("evm", data.deref())?;
-                Ok(wallet)
-            }
-        }
-    }
 
     #[tokio::test]
     async fn register_a_data_network_test() {
@@ -231,7 +204,6 @@ mod tests {
         let wallet = wallet.with_chain_id(31337_u32);
         let rollup_node_address = wallet.address();
         let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-        let address = contract_addr.parse::<Address>().unwrap();
         let rpc_url = "ws://127.0.0.1:8545";
         let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
             .await
