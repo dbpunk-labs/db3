@@ -17,11 +17,11 @@
 
 use arweave_rs::crypto::base64::Base64;
 use db3_error::{DB3Error, Result};
-use ethers::prelude::LocalWallet;
+use ethers::prelude::{LocalWallet, Signer};
 use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},
-    middleware::SignerMiddleware,
+    middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
     providers::{Middleware, Provider, Ws},
 };
 use std::str::FromStr;
@@ -33,7 +33,7 @@ abigen!(Events, "abi/Events.json");
 
 pub struct MetaStoreClient {
     address: Address,
-    client: Arc<SignerMiddleware<Arc<Provider<Ws>>, LocalWallet>>,
+    client: Arc<SignerMiddleware<Arc<NonceManagerMiddleware<Provider<Ws>>>, LocalWallet>>,
 }
 
 unsafe impl Sync for MetaStoreClient {}
@@ -47,6 +47,7 @@ impl MetaStoreClient {
         let provider = Provider::<Ws>::connect(rpc_url).await.map_err(|e| {
             DB3Error::InvalidArUrlError(format!("fail to connect rpc url for error {e}"))
         })?;
+        let provider = provider.nonce_manager(wallet.address());
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
         let client = Arc::new(signable_client);
@@ -192,7 +193,6 @@ impl MetaStoreClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ethers::prelude::Signer;
     use fastcrypto::encoding::{Base64, Encoding};
     use tokio::time::{sleep, Duration as TokioDuration};
     #[tokio::test]
