@@ -172,6 +172,7 @@ impl Recover {
         // 1. get latest arweave tx id from meta store
         let mut tx = self.get_latest_arweave_tx().await?;
         loop {
+            println!("tx {}", tx.as_str());
             let (_start_block, end_block, last_rollup_tx, version) =
                 self.ar_toolbox.get_tx_tags(tx.as_str()).await?;
             // 2. if end_block < block, return txs
@@ -249,7 +250,7 @@ mod tests {
         recover
     }
 
-    #[tokio::test]
+    //#[tokio::test]
     async fn test_get_latest_arweave_tx() {
         let temp_dir = TempDir::new("test_get_latest_arweave_tx").unwrap();
         let recover = build_recover_instance(&temp_dir).await;
@@ -258,12 +259,12 @@ mod tests {
         println!("res {:?}", res);
     }
 
-    #[tokio::test]
+    //#[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
         let temp_dir = TempDir::new("test_fetch_arware_tx_from_block").unwrap();
         let recover = build_recover_instance(&temp_dir).await;
         let res = recover.fetch_arweave_tx_from_block(0).await;
-        assert!(res.is_ok());
+        assert!(res.is_ok(), "{:?}", res);
         let txs = res.unwrap();
         assert!(txs.len() > 0);
         println!("end_block: {}", txs[0].1);

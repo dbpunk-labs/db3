@@ -19,7 +19,6 @@ use arc_swap::ArcSwapOption;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_storage::state_store::StateStore;
-use ethers::prelude::Signer;
 use ethers::types::Address;
 use ethers::types::Filter;
 use ethers::{

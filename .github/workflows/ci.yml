@@ -61,7 +61,7 @@ jobs:
           sleep 2
           export RUST_BACKTRACE=1
           cargo test test_test_data_rollup_node_setup
-          cargo test register_a_data_network_test
+          cargo test register_no1_data_network
       - name: Run rust test with coverage
         run: |
           export RUST_BACKTRACE=1

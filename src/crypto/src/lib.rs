@@ -1,4 +1,3 @@
-#![feature(cursor_remaining)]
 //
 //
 // lib.rs
