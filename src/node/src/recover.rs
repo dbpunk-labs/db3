@@ -50,7 +50,7 @@ impl Recover {
         config: RecoverConfig,
         network_id: Arc<AtomicU64>,
         chain_id: Arc<AtomicU32>,
-        db_store: DBStoreV2
+        db_store: DBStoreV2,
     ) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
