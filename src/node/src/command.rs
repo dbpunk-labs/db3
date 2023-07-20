@@ -18,6 +18,7 @@
 use crate::indexer_impl::IndexerNodeImpl;
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
+use crate::system_impl::SystemImpl;
 use clap::Parser;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::DB3Error;
@@ -27,13 +28,15 @@ use db3_proto::db3_storage_proto::storage_node_server::StorageNodeServer as Stor
 use db3_proto::db3_storage_proto::{
     EventMessage as EventMessageV2, Subscription as SubscriptionV2,
 };
+use db3_proto::db3_system_proto::system_server::SystemServer;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::DBStoreV2Config;
 use db3_storage::doc_store::DocStoreConfig;
 use db3_storage::key_store::KeyStore;
 use db3_storage::key_store::KeyStoreConfig;
 use db3_storage::mutation_store::MutationStoreConfig;
-use db3_storage::state_store::StateStoreConfig;
+use db3_storage::state_store::{StateStore, StateStoreConfig};
+use db3_storage::system_store::{SystemRole, SystemStore, SystemStoreConfig};
 use ethers::prelude::LocalWallet;
 use http::Uri;
 use std::ops::Deref;
@@ -62,15 +65,18 @@ const ABOUT: &str = "
 #[clap(name = "db3")]
 #[clap(about = ABOUT, long_about = None)]
 pub enum DB3Command {
-    /// Start the store node
-    #[clap(name = "store")]
-    Store {
+    /// Start the data rollup node
+    #[clap(name = "rollup")]
+    Rollup {
+        /// the public address
+        #[clap(long, default_value = "http://127.0.0.1:26619")]
+        public_url: String,
         /// Bind the gprc server to this .
         #[clap(long, default_value = "127.0.0.1")]
-        public_host: String,
+        bind_host: String,
         /// The port of grpc api
         #[clap(long, default_value = "26619")]
-        public_grpc_port: u16,
+        listening_port: u16,
         /// Log more logs
         #[clap(short, long)]
         verbose: bool,
@@ -83,37 +89,14 @@ pub enum DB3Command {
         /// The database path for doc db
         #[clap(long, default_value = "./doc_db")]
         doc_db_path: String,
-        /// The network id
-        #[clap(long, default_value = "1")]
-        network_id: u64,
-        /// The chain id
-        #[clap(long, default_value = "31337")]
-        chain_id: u32,
-        /// The block interval
         #[clap(long, default_value = "2000")]
         block_interval: u64,
-        /// The interval of rollup
-        #[clap(long, default_value = "60000")]
-        rollup_interval: u64,
-        /// The min data byte size for rollup
-        #[clap(long, default_value = "102400")]
-        rollup_min_data_size: u64,
         /// The data path of rollup
         #[clap(long, default_value = "./rollup_data")]
         rollup_data_path: String,
-        /// The Ar miner node
-        #[clap(long, default_value = "http://127.0.0.1:1984/")]
-        ar_node_url: String,
-        /// The Ar wallet path
+        /// The wallet path
         #[clap(long, default_value = "./keys")]
         key_root_path: String,
-        /// The min gc round offset
-        #[clap(long, default_value = "8")]
-        min_gc_round_offset: u64,
-        #[clap(long, default_value = "0x7b68E10c80474DD93bD8C1ad53D4463c60a3AB7c")]
-        contract_addr: String,
-        #[clap(long, default_value = "http://127.0.0.1:8545")]
-        evm_node_url: String,
         /// the admin address which can change the configuration this node
         #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
         admin_addr: String,
@@ -122,43 +105,37 @@ pub enum DB3Command {
         doc_id_start: i64,
     },
 
-    /// Start db3 indexer
-    #[clap(name = "indexer")]
-    Indexer {
+    /// Start the data index node
+    #[clap(name = "index")]
+    Index {
+        /// the public address
+        #[clap(long, default_value = "http://127.0.0.1:26639")]
+        public_url: String,
         /// Bind the gprc server to this .
         #[clap(long, default_value = "127.0.0.1")]
-        public_host: String,
+        bind_host: String,
         /// The port of grpc api
         #[clap(long, default_value = "26639")]
-        public_grpc_port: u16,
-        /// the store grpc url
-        #[clap(
-            long = "db3_storage_grpc_url",
-            default_value = "http://127.0.0.1:26619"
-        )]
-        db3_storage_grpc_url: String,
+        listening_port: u16,
         #[clap(short, long, default_value = "./index_meta_db")]
         meta_db_path: String,
+        #[clap(long, default_value = "./index_state_db")]
+        state_db_path: String,
         #[clap(short, long, default_value = "./index_doc_db")]
         doc_db_path: String,
         #[clap(short, long, default_value = "./keys")]
         key_root_path: String,
         #[clap(
-            short,
-            long,
-            default_value = "0x7b68E10c80474DD93bD8C1ad53D4463c60a3AB7c"
+            long = "db3_storage_grpc_url",
+            default_value = "http://127.0.0.1:26619"
         )]
-        contract_addr: String,
+        db3_storage_grpc_url: String,
         #[clap(
             short,
             long,
             default_value = "0x0000000000000000000000000000000000000000"
         )]
         admin_addr: String,
-        #[clap(long, default_value = "http://127.0.0.1:8545")]
-        evm_node_url: String,
-        #[clap(long, default_value = "1")]
-        network_id: u64,
         #[clap(short, long)]
         verbose: bool,
         /// this is just for upgrade the node
@@ -214,24 +191,17 @@ impl DB3Command {
 
     pub async fn execute(self) {
         match self {
-            DB3Command::Store {
-                public_host,
-                public_grpc_port,
+            DB3Command::Rollup {
+                public_url,
+                bind_host,
+                listening_port,
                 verbose,
                 mutation_db_path,
                 state_db_path,
                 doc_db_path,
-                network_id,
-                chain_id,
                 block_interval,
-                rollup_interval,
-                rollup_min_data_size,
                 rollup_data_path,
-                ar_node_url,
                 key_root_path,
-                min_gc_round_offset,
-                contract_addr,
-                evm_node_url,
                 admin_addr,
                 doc_id_start,
             } => {
@@ -242,23 +212,16 @@ impl DB3Command {
                 };
                 tracing_subscriber::fmt().with_max_level(log_level).init();
                 info!("{ABOUT}");
-                Self::start_store_grpc_service(
-                    public_host.as_str(),
-                    public_grpc_port,
+                Self::start_rollup_grpc_service(
+                    public_url.as_str(),
+                    bind_host.as_str(),
+                    listening_port,
                     mutation_db_path.as_str(),
                     state_db_path.as_str(),
                     doc_db_path.as_str(),
-                    network_id,
-                    chain_id,
                     block_interval,
-                    rollup_interval,
-                    rollup_min_data_size,
                     rollup_data_path.as_str(),
-                    ar_node_url.as_str(),
                     key_root_path.as_str(),
-                    min_gc_round_offset,
-                    contract_addr.as_str(),
-                    evm_node_url.as_str(),
                     admin_addr.as_str(),
                     doc_id_start,
                 )
@@ -280,16 +243,15 @@ impl DB3Command {
                 }
             }
 
-            DB3Command::Indexer {
-                public_host,
-                public_grpc_port,
-                db3_storage_grpc_url,
+            DB3Command::Index {
+                public_url,
+                bind_host,
+                listening_port,
                 meta_db_path,
+                state_db_path,
                 doc_db_path,
                 key_root_path,
-                contract_addr,
-                evm_node_url,
-                network_id,
+                db3_storage_grpc_url,
                 verbose,
                 admin_addr,
                 doc_id_start,
@@ -304,6 +266,28 @@ impl DB3Command {
                 info!("{ABOUT}");
                 let store_sdk =
                     Self::build_store_sdk(db3_storage_grpc_url.as_ref(), key_root_path.as_str());
+                let system_store_config = SystemStoreConfig {
+                    key_root_path: key_root_path.to_string(),
+                    evm_wallet_key: "evm".to_string(),
+                    ar_wallet_key: "ar".to_string(),
+                };
+
+                let state_config = StateStoreConfig {
+                    db_path: state_db_path.to_string(),
+                };
+                let (update_sender, update_receiver) = tokio::sync::mpsc::channel::<()>(8);
+                let state_store = Arc::new(StateStore::new(state_config).unwrap());
+                let system_store = Arc::new(SystemStore::new(system_store_config, state_store));
+                info!("Arweave address {}", system_store.get_ar_address().unwrap());
+                info!("Evm address 0x{}", system_store.get_evm_address().unwrap());
+                let system_impl = SystemImpl::new(
+                    update_sender,
+                    system_store.clone(),
+                    SystemRole::DataIndexNode,
+                    public_url.to_string(),
+                    admin_addr.as_str(),
+                )
+                .unwrap();
 
                 let doc_store_conf = DocStoreConfig {
                     db_root_path: doc_db_path,
@@ -324,24 +308,19 @@ impl DB3Command {
                     doc_start_id: doc_id_start,
                 };
 
-                let addr = format!("{public_host}:{public_grpc_port}");
-                let indexer = IndexerNodeImpl::new(
-                    db_store_config,
-                    network_id,
-                    addr.to_string(),
-                    key_root_path,
-                    contract_addr,
-                    evm_node_url,
-                    admin_addr,
-                )
-                .unwrap();
+                let addr = format!("{bind_host}:{listening_port}");
+                let indexer = IndexerNodeImpl::new(db_store_config, system_store).unwrap();
                 let indexer_for_syncing = indexer.clone();
                 if let Err(_e) = indexer.recover().await {}
+                indexer.subscribe_update(update_receiver).await;
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
                     indexer_for_syncing.start(store_sdk).await.unwrap();
                 });
-                info!("start db3 indexer node on public addr {}", addr);
+                info!(
+                    "start db3 indexer node on public {} and listen addr {}",
+                    public_url, addr
+                );
                 let cors_layer = CorsLayer::new()
                     .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
                     .allow_headers(Any)
@@ -351,6 +330,7 @@ impl DB3Command {
                     .layer(cors_layer)
                     .layer(tonic_web::GrpcWebLayer::new())
                     .add_service(IndexerNodeServer::new(indexer))
+                    .add_service(SystemServer::new(system_impl))
                     .serve(addr.parse().unwrap())
                     .await
                     .unwrap();
@@ -360,38 +340,24 @@ impl DB3Command {
             }
         }
     }
-    /// Start store grpc service
-    async fn start_store_grpc_service(
-        public_host: &str,
-        public_grpc_port: u16,
+    /// Start rollup grpc service
+    async fn start_rollup_grpc_service(
+        public_url: &str,
+        bind_host: &str,
+        listening_port: u16,
         mutation_db_path: &str,
         state_db_path: &str,
         doc_db_path: &str,
-        network_id: u64,
-        chain_id: u32,
         block_interval: u64,
-        rollup_interval: u64,
-        rollup_min_data_size: u64,
         rollup_data_path: &str,
-        ar_node_url: &str,
         key_root_path: &str,
-        min_gc_round_offset: u64,
-        contract_addr: &str,
-        evm_node_url: &str,
         admin_addr: &str,
         doc_start_id: i64,
     ) {
-        let addr = format!("{public_host}:{public_grpc_port}");
-
+        let listen_addr = format!("{bind_host}:{listening_port}");
         let rollup_config = RollupExecutorConfig {
-            rollup_interval,
             temp_data_path: rollup_data_path.to_string(),
-            ar_node_url: ar_node_url.to_string(),
             key_root_path: key_root_path.to_string(),
-            min_rollup_size: rollup_min_data_size,
-            min_gc_round_offset,
-            evm_node_url: evm_node_url.to_string(),
-            contract_addr: contract_addr.to_string(),
         };
 
         let store_config = MutationStoreConfig {
@@ -408,7 +374,20 @@ impl DB3Command {
         let state_config = StateStoreConfig {
             db_path: state_db_path.to_string(),
         };
+        let state_store = Arc::new(StateStore::new(state_config).unwrap());
 
+        let system_store_config = SystemStoreConfig {
+            key_root_path: key_root_path.to_string(),
+            evm_wallet_key: "evm".to_string(),
+            ar_wallet_key: "ar".to_string(),
+        };
+
+        let system_store = Arc::new(SystemStore::new(system_store_config, state_store.clone()));
+        info!("Arweave address {}", system_store.get_ar_address().unwrap());
+        info!(
+            "Evm address 0x{}",
+            hex::encode(system_store.get_evm_address().unwrap())
+        );
         let db_store_config = DBStoreV2Config {
             db_path: doc_db_path.to_string(),
             db_store_cf_name: "db_store_cf".to_string(),
@@ -422,35 +401,42 @@ impl DB3Command {
             doc_store_conf: DocStoreConfig::default(),
             doc_start_id,
         };
-
+        let (update_sender, update_receiver) = tokio::sync::mpsc::channel::<()>(8);
         let (sender, receiver) = tokio::sync::mpsc::channel::<(
             DB3Address,
             SubscriptionV2,
             Sender<std::result::Result<EventMessageV2, Status>>,
         )>(1024);
+
         let config = StorageNodeV2Config {
             store_config,
-            state_config,
             rollup_config,
             db_store_config,
-            network_id,
-            chain_id,
             block_interval,
-            node_url: addr.to_string(),
-            contract_addr: contract_addr.to_string(),
-            evm_node_url: evm_node_url.to_string(),
-            admin_addr: admin_addr.to_string(),
         };
-        let storage_node = StorageNodeV2Impl::new(config, sender).await.unwrap();
+        let storage_node =
+            StorageNodeV2Impl::new(config, system_store.clone(), state_store.clone(), sender)
+                .await
+                .unwrap();
         info!(
-            "start db3 store node on public addr {} and network {}",
-            addr, network_id
+            "start db3 store node on public addr {} and listen_addr {}",
+            public_url, listen_addr
         );
         std::fs::create_dir_all(rollup_data_path).unwrap();
         storage_node.recover().unwrap();
-        storage_node.keep_subscription(receiver).await.unwrap();
-        storage_node.start_to_produce_block().await;
-        storage_node.start_to_rollup().await;
+        let system_impl = SystemImpl::new(
+            update_sender,
+            system_store.clone(),
+            SystemRole::DataRollupNode,
+            public_url.to_string(),
+            admin_addr,
+        )
+        .unwrap();
+        storage_node
+            .keep_subscription(receiver, update_receiver)
+            .await
+            .unwrap();
+        storage_node.start_bg_task().await;
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(Any)
@@ -460,7 +446,8 @@ impl DB3Command {
             .layer(cors_layer)
             .layer(tonic_web::GrpcWebLayer::new())
             .add_service(StorageNodeV2Server::new(storage_node))
-            .serve(addr.parse().unwrap())
+            .add_service(SystemServer::new(system_impl))
+            .serve(listen_addr.parse().unwrap())
             .await
             .unwrap();
     }

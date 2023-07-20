@@ -392,6 +392,7 @@ mod tests {
         let id = doc_store
             .add_str_doc(&DB3Address::ZERO, "col1", doc_str)
             .unwrap();
+        assert!(id > 0);
 
         {
             let query_str = "/[f1=\"f1\"] and /[f2=\"f2\"]";
@@ -399,7 +400,7 @@ mod tests {
                 query_str: query_str.to_string(),
                 parameters: vec![],
             };
-            let (result, count) = doc_store
+            let (_result, count) = doc_store
                 .execute_query(&DB3Address::ZERO, "col1", &query)
                 .unwrap();
             assert_eq!(1, count);
@@ -424,7 +425,6 @@ mod tests {
     #[test]
     fn doc_store_smoke_test() {
         let (doc_store, id) = prepare_the_dataset();
-        let doc_str = r#"{"test":"v1", "f1":"f1"}"#;
         let db_id = DB3Address::ZERO;
         if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
             println!("{}", value.as_str());
@@ -462,7 +462,7 @@ mod tests {
                 idx: 0,
             }],
         };
-        if let Ok((result, count)) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
+        if let Ok((_result, count)) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
             assert_eq!(0, count);
         }
 
@@ -475,7 +475,7 @@ mod tests {
             }],
         };
 
-        if let Ok((result, count)) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
+        if let Ok((_result, count)) = doc_store.execute_query(&DB3Address::ZERO, "col1", &query) {
             assert_eq!(1, count);
         }
 

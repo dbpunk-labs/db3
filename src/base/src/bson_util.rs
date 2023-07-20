@@ -2,14 +2,13 @@ use bson::Document;
 use bson::RawDocumentBuf;
 use bson::{Array, Bson};
 use db3_error::DB3Error;
-use db3_proto::db3_database_proto::structured_query::composite_filter::Operator as CompositeOp;
-use db3_proto::db3_database_proto::structured_query::field_filter::Operator;
-use db3_proto::db3_database_proto::structured_query::filter::FilterType;
-use db3_proto::db3_database_proto::structured_query::value::ValueType;
-use db3_proto::db3_database_proto::structured_query::Filter;
-use db3_proto::db3_database_proto::structured_query::Value;
-use db3_proto::db3_database_proto::structured_query::{CompositeFilter, FieldFilter};
-use db3_proto::db3_database_proto::{index::IndexField, Index};
+use db3_proto::db3_database_v2_proto::structured_query::composite_filter::Operator as CompositeOp;
+use db3_proto::db3_database_v2_proto::structured_query::field_filter::Operator;
+use db3_proto::db3_database_v2_proto::structured_query::filter::FilterType;
+use db3_proto::db3_database_v2_proto::structured_query::value::ValueType;
+use db3_proto::db3_database_v2_proto::structured_query::Filter;
+use db3_proto::db3_database_v2_proto::structured_query::Value;
+use db3_proto::db3_database_v2_proto::structured_query::{CompositeFilter, FieldFilter};
 use serde_json::Value as JsonValue;
 
 /// convert json string to Bson::Document
@@ -19,27 +18,6 @@ pub fn json_str_to_bson_document(json_str: &str) -> std::result::Result<Document
     let bson_document =
         bson::to_document(&value).map_err(|e| DB3Error::InvalidDocumentBytes(format!("{}", e)))?;
     Ok(bson_document)
-}
-
-pub fn json_str_to_index(json_str: &str, idx: u32) -> std::result::Result<Index, DB3Error> {
-    let value: JsonValue =
-        serde_json::from_str(json_str).map_err(|e| DB3Error::InvalidJson(format!("{}", e)))?;
-
-    if let Some(name) = value.get("name") {
-        if let Some(fields) = value.get("fields") {
-            return Ok(Index {
-                id: idx,
-                name: name.as_str().unwrap().to_string(),
-                fields: fields
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|field| serde_json::from_value::<IndexField>(field.clone()).unwrap())
-                    .collect(),
-            });
-        }
-    }
-    Err(DB3Error::InvalidJson(format!("")))
 }
 
 pub fn json_str_to_bson_bytes(json_str: &str) -> std::result::Result<Vec<u8>, DB3Error> {
@@ -227,8 +205,6 @@ mod tests {
         bson_document_into_bytes, bytes_to_bson_document, json_str_to_bson_document,
     };
     use bson::Bson;
-    use db3_proto::db3_database_proto::index::index_field::{Order, ValueMode};
-
     #[test]
     fn json_str_to_bson_document_ut() {
         let data = r#"
@@ -428,43 +404,5 @@ mod tests {
             })
             .unwrap()
         );
-    }
-
-    #[test]
-    fn json_str_to_index_ut() {
-        let json_str = r#"{"name":"idx1","fields":[{"field_path":"name","value_mode":{"Order":1}}, {"field_path":"age","value_mode":{"Order":1}}]}"#;
-        let res = json_str_to_index(json_str, 1);
-        assert!(res.is_ok());
-        let index = res.unwrap();
-        println!("{:?}", index);
-        let expect = Index {
-            id: 1,
-            name: "idx1".to_string(),
-            fields: vec![
-                IndexField {
-                    field_path: "name".to_string(),
-                    value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
-                },
-                IndexField {
-                    field_path: "age".to_string(),
-                    value_mode: Some(ValueMode::Order(Order::Ascending as i32)),
-                },
-            ],
-        };
-        assert_eq!(expect, index);
-    }
-
-    #[test]
-    fn json_str_to_index_wrong_path_1_ut() {
-        let json_str = r#"{"fields":[{"field_path":"name","value_mode":{"Order":1}}, {"field_path":"age","value_mode":{"Order":1}}]}"#;
-        let res = json_str_to_index(json_str, 1);
-        assert!(res.is_err());
-    }
-
-    #[test]
-    fn json_str_to_index_wrong_path_2_ut() {
-        let json_str = r#"{"name": "idx1""#;
-        let res = json_str_to_index(json_str, 1);
-        assert!(res.is_err());
     }
 }

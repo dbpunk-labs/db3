@@ -16,3 +16,4 @@
 //
 
 pub mod event_processor;
+pub mod meta_store_event_processor;

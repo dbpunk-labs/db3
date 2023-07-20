@@ -22,18 +22,20 @@ use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},
     middleware::SignerMiddleware,
-    providers::{Http, Middleware, Provider, ProviderExt},
+    providers::{Middleware, Provider, Ws},
 };
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use tracing::info;
 abigen!(DB3MetaStore, "abi/DB3MetaStore.json");
+abigen!(Events, "abi/Events.json");
 
 pub struct MetaStoreClient {
     address: Address,
-    client: Arc<SignerMiddleware<Arc<Provider<Http>>, LocalWallet>>,
+    client: Arc<SignerMiddleware<Arc<Provider<Ws>>, LocalWallet>>,
 }
+
 unsafe impl Sync for MetaStoreClient {}
 unsafe impl Send for MetaStoreClient {}
 
@@ -42,7 +44,9 @@ impl MetaStoreClient {
         let address = contract_addr
             .parse::<Address>()
             .map_err(|_| DB3Error::InvalidAddress)?;
-        let provider = Provider::<Http>::connect(rpc_url).await;
+        let provider = Provider::<Ws>::connect(rpc_url).await.map_err(|e| {
+            DB3Error::InvalidArUrlError(format!("fail to connect rpc url for error {e}"))
+        })?;
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
         let client = Arc::new(signable_client);
@@ -73,6 +77,44 @@ impl MetaStoreClient {
             .await
             .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
         Ok(())
+    }
+    pub async fn create_database(&self, network: u64, desc: &str) -> Result<(U256, TxHash)> {
+        let store = DB3MetaStore::new(self.address, self.client.clone());
+        let desc_bytes = desc.as_bytes();
+        if desc_bytes.len() > 32 {
+            return Err(DB3Error::InvalidDescError("bad desc len".to_string()));
+        }
+        let mut desc_bytes32: [u8; 32] = Default::default();
+        desc_bytes32[..desc_bytes.len()].clone_from_slice(desc_bytes);
+        let tx = store.create_doc_database(network.into(), desc_bytes32);
+        let pending_tx = tx.send().await.map_err(|e| {
+            DB3Error::StoreEventError(format!(
+                "fail to send create doc database request with error {e}"
+            ))
+        })?;
+        let tx_hash = pending_tx.tx_hash();
+        let mut count_down: i32 = 5;
+        loop {
+            if count_down <= 0 {
+                break;
+            }
+            sleep(Duration::from_millis(1000 * 5)).await;
+            if let Some(tx) = self
+                .client
+                .get_transaction(tx_hash)
+                .await
+                .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?
+            {
+                if let Some(price) = tx.gas_price {
+                    if let Some(fee) = price.checked_mul(tx.gas) {
+                        return Ok((fee, tx_hash));
+                    }
+                }
+                break;
+            }
+            count_down = count_down - 1;
+        }
+        Ok((U256::zero(), tx_hash))
     }
 
     pub async fn get_latest_arweave_tx(&self, network: u64) -> Result<String> {
@@ -150,38 +192,10 @@ impl MetaStoreClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::key_store::{KeyStore, KeyStoreConfig};
     use fastcrypto::encoding::{Base64, Encoding};
-    use std::ops::Deref;
-    use std::path::PathBuf;
-    use tempdir::TempDir;
     use tokio::time::{sleep, Duration as TokioDuration};
-    fn build_wallet(key_root_path: &str) -> std::result::Result<LocalWallet, DB3Error> {
-        let config = KeyStoreConfig {
-            key_root_path: key_root_path.to_string(),
-        };
-        let key_store = KeyStore::new(config);
-        match key_store.has_key("evm") {
-            true => {
-                let data = key_store.get_key("evm")?;
-                let data_ref: &[u8] = &data;
-                println!("data_hex: {:?}", hex::encode(data_ref));
-                let wallet = LocalWallet::from_bytes(data_ref)
-                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-                Ok(wallet)
-            }
-            false => {
-                let mut rng = rand::thread_rng();
-                let wallet = LocalWallet::new(&mut rng);
-                let data = wallet.signer().to_bytes();
-                key_store.write_key("evm", data.deref())?;
-                Ok(wallet)
-            }
-        }
-    }
-
     #[tokio::test]
-    async fn register_a_data_network_test() {
+    async fn register_no1_data_network() {
         let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
             .unwrap();
         let data_ref: &[u8] = data.as_ref();
@@ -189,8 +203,7 @@ mod tests {
         let wallet = wallet.with_chain_id(31337_u32);
         let rollup_node_address = wallet.address();
         let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-        let address = contract_addr.parse::<Address>().unwrap();
-        let rpc_url = "http://127.0.0.1:8545";
+        let rpc_url = "ws://127.0.0.1:8545";
         let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
             .await
             .unwrap();
@@ -199,24 +212,36 @@ mod tests {
             .await;
         assert!(result.is_ok(), "register data network failed {:?}", result);
         sleep(TokioDuration::from_millis(5 * 1000)).await;
+    }
+
+    #[tokio::test]
+    async fn metastore_smoke_test() {
+        let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+            .unwrap();
+        let data_ref: &[u8] = data.as_ref();
         let wallet = LocalWallet::from_bytes(data_ref).unwrap();
         let wallet = wallet.with_chain_id(31337_u32);
+        let rollup_node_address = wallet.address();
+        let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+        let rpc_url = "ws://127.0.0.1:8545";
         let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
             .await
             .unwrap();
+        let result = client
+            .register_data_network(&rollup_node_address, rpc_url)
+            .await;
+        assert!(result.is_ok(), "register data network failed {:?}", result);
+        sleep(TokioDuration::from_millis(5 * 1000)).await;
         let tx = "TY5SMaPPRk_TMvSDROaQWyc_WHyJrEL760-UhiNnHG4";
-        let result = client.update_rollup_step(tx, 1).await;
+        let result = client.update_rollup_step(tx, 2).await;
         assert!(result.is_ok(), "update rollup step failed {:?}", result);
         sleep(TokioDuration::from_millis(5 * 1000)).await;
-        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
-        let wallet = wallet.with_chain_id(31337_u32);
-        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
-            .await
-            .unwrap();
-        let tx_ret = client.get_latest_arweave_tx(1).await;
+        let tx_ret = client.get_latest_arweave_tx(2).await;
         assert!(tx_ret.is_ok());
         let tx_remote = tx_ret.unwrap();
         assert_eq!(tx, tx_remote);
+        let result = client.create_database(2, "test create db").await;
+        assert!(result.is_ok(), "create database {:?}", result);
     }
 
     fn hex_to_base64(hex_str: &str) -> String {

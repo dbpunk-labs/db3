@@ -28,10 +28,13 @@ import type { DocumentData, DocumentEntry } from './base'
 import type { DB3Account } from '../account/types'
 import type { Client, ReadClient } from './types'
 import { Index } from '../proto/db3_database_v2'
+import { SystemConfig } from '../proto/db3_base'
 import { StorageProviderV2 } from '../provider/storage_provider_v2'
 import { IndexerProvider } from '../provider/indexer_provider'
 import { fromHEX } from '../crypto/crypto_utils'
 import { BSON } from 'db3-bson'
+import { signTypedData } from '../account/db3_account'
+import { generate_config_sig } from '../crypto/sig_utils'
 
 /**
  *
@@ -47,7 +50,6 @@ import { BSON } from 'db3-bson'
  * @returns the client instance
  *
  **/
-
 export function createReadonlyClient(
     rollupNodeUrl: string,
     indexNodeUrl: string
@@ -93,24 +95,36 @@ export function createClient(
 
 /**
  *
- * Setup the storage node with system parameters and only the admin can request the method
+ * Setup the data rollup node and data index node with system parameters and only the admin can request the method
  *
  * ```ts
- *  const status = setupStorageNode(client, "1111", "1000", "10240000")
+ *  const config: SystemConfig = {
+ *      rollupInterval: "600000",
+ *      minRollupSize: "1048576",
+ *      networkId: "1",
+ *      chainId: 80000,
+ *      contractAddr: "0xb9709cE5E749b80978182db1bEdfb8c7340039A9",
+ *      rollupMaxInterval: "6000000",
+ *      evmNodeUrl: "ws://127.0.0.1:8585",
+ *      arNodeUrl: "https://arweave.net",
+ *      minGcOffset: "864000"
+ *  }
+ *  const [rollupCode, indexCode] = await setup(client, config)
  * ```
  *
  * @param client     - the client of db3 network
- * @returns the storage system status
+ * @param config     - the config of System
+ * @returns the response code for data rollup node and data index node
  *
  **/
-
-export async function setupStorageNode(
-    client: Client,
-    network: string,
-    rollupInterval: string,
-    minRollupSize: string
-) {
-    return await client.provider.setup(network, rollupInterval, minRollupSize)
+export async function setup(client: Client, config: SystemConfig) {
+    const [signature, payload] = await generate_config_sig(
+        client.account,
+        config
+    )
+    const rollup_response = await client.provider.setup(signature, payload)
+    const index_response = await client.indexer.setup(signature, payload)
+    return [rollup_response.code, index_response.code] as const
 }
 
 /**
