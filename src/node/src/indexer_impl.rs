@@ -16,16 +16,14 @@
 //
 
 use crate::mutation_utils::MutationUtil;
-use crate::version_util;
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
 use db3_event::event_processor::EventProcessorConfig;
-use db3_proto::db3_base_proto::SystemStatus;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
-    GetSystemStatusRequest, RunQueryRequest, RunQueryResponse, SetupRequest, SetupResponse,
+    RunQueryRequest, RunQueryResponse,
 };
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
@@ -33,13 +31,10 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::key_store::{KeyStore, KeyStoreConfig};
-use ethers::abi::Address;
-use ethers::prelude::{LocalWallet, Signer};
+use db3_storage::system_store::SystemStore;
 use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc::Receiver;
 use tokio::task;
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
@@ -48,38 +43,21 @@ use tracing::{debug, info, warn};
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
-    network_id: Arc<AtomicU64>,
-    node_url: String,
-    key_root_path: String,
-    contract_addr: String,
-    evm_node_url: String,
     processor_mapping: Arc<Mutex<HashMap<String, Arc<EventProcessor>>>>,
-    admin_addr: String,
+    system_store: Arc<SystemStore>,
 }
 
 impl IndexerNodeImpl {
-    pub fn new(
-        config: DBStoreV2Config,
-        network_id: u64,
-        node_url: String,
-        key_root_path: String,
-        contract_addr: String,
-        evm_node_url: String,
-        admin_addr: String,
-    ) -> Result<Self> {
+    pub fn new(config: DBStoreV2Config, system_store: Arc<SystemStore>) -> Result<Self> {
         let db_store = DBStoreV2::new(config)?;
         Ok(Self {
             db_store,
-            network_id: Arc::new(AtomicU64::new(network_id)),
-            node_url,
-            key_root_path,
-            contract_addr,
-            evm_node_url,
-            //TODO recover from the database
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
-            admin_addr,
+            system_store,
         })
     }
+
+    pub async fn subscribe_update(&self, _update_receiver: Receiver<()>) {}
 
     pub async fn recover(&self) -> Result<()> {
         self.db_store.recover_db_state()?;
@@ -156,30 +134,6 @@ impl IndexerNodeImpl {
         }
         Ok(())
     }
-    fn build_wallet(key_root_path: &str) -> Result<LocalWallet> {
-        let config = KeyStoreConfig {
-            key_root_path: key_root_path.to_string(),
-        };
-        let key_store = KeyStore::new(config);
-        match key_store.has_key("evm") {
-            true => {
-                let data = key_store.get_key("evm")?;
-                let data_ref: &[u8] = &data;
-                let wallet = LocalWallet::from_bytes(data_ref)
-                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-                Ok(wallet)
-            }
-
-            false => {
-                let mut rng = rand::thread_rng();
-                let wallet = LocalWallet::new(&mut rng);
-                let data = wallet.signer().to_bytes();
-                key_store.write_key("evm", data.deref())?;
-                Ok(wallet)
-            }
-        }
-    }
-
     async fn start_an_event_task(
         &self,
         db: &DB3Address,
@@ -281,52 +235,6 @@ impl IndexerNode for IndexerNodeImpl {
             _ => todo!(),
         };
         Ok(Response::new(GetContractSyncStatusResponse { status_list }))
-    }
-
-    async fn setup(
-        &self,
-        request: Request<SetupRequest>,
-    ) -> std::result::Result<Response<SetupResponse>, Status> {
-        let r = request.into_inner();
-        let (addr, data) =
-            MutationUtil::verify_setup(&r.payload, r.signature.as_str()).map_err(|e| {
-                Status::invalid_argument(format!("fail to parse the payload and signature {e}"))
-            })?;
-        let admin_addr = self
-            .admin_addr
-            .parse::<Address>()
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        if admin_addr != addr {
-            return Err(Status::permission_denied(
-                "You are not the admin".to_string(),
-            ));
-        }
-        let network = MutationUtil::get_u64_field(&data, "network", 0_u64);
-        self.network_id.store(network, Ordering::Relaxed);
-        return Ok(Response::new(SetupResponse {
-            code: 0,
-            msg: "ok".to_string(),
-        }));
-    }
-
-    async fn get_system_status(
-        &self,
-        _request: Request<GetSystemStatusRequest>,
-    ) -> std::result::Result<Response<SystemStatus>, Status> {
-        let wallet = Self::build_wallet(self.key_root_path.as_str())
-            .map_err(|e| Status::internal(format!("{e}")))?;
-        let addr = format!("0x{}", hex::encode(wallet.address().as_bytes()));
-        Ok(Response::new(SystemStatus {
-            evm_account: addr,
-            evm_balance: "0".to_string(),
-            ar_account: "".to_string(),
-            ar_balance: "".to_string(),
-            node_url: self.node_url.to_string(),
-            config: None,
-            has_inited: false,
-            admin_addr: self.admin_addr.to_string(),
-            version: Some(version_util::build_version()),
-        }))
     }
 
     async fn run_query(

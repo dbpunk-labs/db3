@@ -49,4 +49,3 @@ cd tools && bash start_localnet.sh
 ```
 cargo test
 ```
-

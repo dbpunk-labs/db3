@@ -21,6 +21,7 @@ import {
     GrpcWebOptions,
 } from '@protobuf-ts/grpcweb-transport'
 import { StorageNodeClient } from '../proto/db3_storage.client'
+import { SystemClient } from '../proto/db3_system.client'
 import { MutationBody, Mutation } from '../proto/db3_mutation_v2'
 import {
     SendMutationRequest,
@@ -32,19 +33,19 @@ import {
     GetDatabaseOfOwnerRequest,
     GetCollectionOfDatabaseRequest,
     ScanGcRecordRequest,
-    GetSystemStatusRequest,
-    SetupRequest,
     GetDatabaseRequest,
     GetMutationStateRequest,
 } from '../proto/db3_storage'
+import { SetupRequest, GetSystemStatusRequest } from '../proto/db3_system'
 import { fromHEX, toHEX } from '../crypto/crypto_utils'
 import { DB3Account } from '../account/types'
 import { signTypedData } from '../account/db3_account'
-import { DB3Error } from './error'
+import { DB3Error, SDKError } from './error'
 import type { SignTypedDataParameters } from 'viem'
 
 export class StorageProviderV2 {
     readonly client: StorageNodeClient
+    readonly system: SystemClient
     readonly account: DB3Account | undefined
     /**
      * new a storage provider with db3 storage grpc url
@@ -60,10 +61,14 @@ export class StorageProviderV2 {
         }
         const transport = new GrpcWebFetchTransport(goptions)
         this.client = new StorageNodeClient(transport)
+        this.system = new SystemClient(transport)
         this.account = account
     }
 
     private async wrapTypedRequest(mutation: Uint8Array, nonce: string) {
+        if (!this.account) {
+            throw new SDKError('account is undefined')
+        }
         const hexMutation = toHEX(mutation)
         const message = {
             types: {
@@ -91,6 +96,9 @@ export class StorageProviderV2 {
     }
 
     async getNonce() {
+        if (!this.account) {
+            throw new SDKError('the account is undefined')
+        }
         try {
             const request: GetNonceRequest = {
                 address: this.account.address,
@@ -106,6 +114,9 @@ export class StorageProviderV2 {
      * send mutation to db3 network
      */
     async sendMutation(mutation: Uint8Array, nonce: string) {
+        if (!this.account) {
+            throw new SDKError('the account is undefined')
+        }
         try {
             const request = await this.wrapTypedRequest(mutation, nonce)
             const { response } = await this.client.sendMutation(request)
@@ -176,7 +187,6 @@ export class StorageProviderV2 {
             start,
             limit,
         }
-
         try {
             const { response } = await this.client.scanGcRecord(request)
             return response
@@ -208,44 +218,19 @@ export class StorageProviderV2 {
             const { response } = await this.client.getCollectionOfDatabase(
                 request
             )
-
             return response
         } catch (e) {
             throw new DB3Error(e)
         }
     }
 
-    async setup(
-        network: string,
-        rollupInterval: string,
-        minRollupSize: string
-    ) {
-        const message = {
-            types: {
-                EIP712Domain: [],
-                Message: [
-                    { name: 'rollupInterval', type: 'string' },
-                    { name: 'minRollupSize', type: 'string' },
-                    { name: 'network', type: 'string' },
-                ],
-            },
-            domain: {},
-            primaryType: 'Message',
-            message: {
-                rollupInterval,
-                minRollupSize,
-                network,
-            },
-        }
-        const signature = await signTypedData(this.account, message)
-        const msgParams = JSON.stringify(message)
-        const payload = new TextEncoder().encode(msgParams)
-        const request: SetupRequest = {
-            signature,
-            payload,
-        }
+    async setup(signature: string, payload: string) {
         try {
-            const { response } = await this.client.setup(request)
+            const request: SetupRequest = {
+                signature,
+                payload,
+            }
+            const { response } = await this.system.setup(request)
             return response
         } catch (e) {
             throw new DB3Error(e)
@@ -255,7 +240,7 @@ export class StorageProviderV2 {
     async getSystemStatus() {
         const request: GetSystemStatusRequest = {}
         try {
-            const { response } = await this.client.getSystemStatus(request)
+            const { response } = await this.system.getSystemStatus(request)
             return response
         } catch (e) {
             throw new DB3Error(e)

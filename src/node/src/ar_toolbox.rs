@@ -23,7 +23,7 @@ use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::{MutationBody, MutationHeader};
-use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
+use db3_storage::ar_fs::ArFileSystem;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, GzipLevel};
@@ -33,19 +33,18 @@ use std::path::Path;
 use std::sync::Arc;
 use tempdir::TempDir;
 use tracing::info;
+
 pub struct ArToolBox {
     pub schema: SchemaRef,
     pub ar_filesystem: ArFileSystem,
     pub temp_data_path: String,
 }
 
+unsafe impl Send for ArToolBox {}
+unsafe impl Sync for ArToolBox {}
+
 impl ArToolBox {
-    pub fn new(key_root_path: String, arweave_url: String, temp_data_path: String) -> Result<Self> {
-        let ar_fs_config = ArFileSystemConfig {
-            key_root_path,
-            arweave_url,
-        };
-        let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
+    pub fn new(ar_filesystem: ArFileSystem, temp_data_path: String) -> Result<Self> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("payload", DataType::Binary, true),
             Field::new("signature", DataType::Utf8, true),
@@ -53,17 +52,11 @@ impl ArToolBox {
             Field::new("order", DataType::UInt32, true),
             Field::new("doc_ids", DataType::Utf8, true),
         ]));
-
         Ok(Self {
             schema,
             ar_filesystem,
             temp_data_path,
         })
-    }
-    pub async fn get_ar_account(&self) -> Result<(String, String)> {
-        let addr = self.ar_filesystem.get_address();
-        let balance = self.ar_filesystem.get_balance().await?;
-        Ok((addr, balance.to_string()))
     }
 
     pub async fn download_and_parse_record_batch(&self, tx: &str) -> Result<Vec<RecordBatch>> {
@@ -340,16 +333,13 @@ impl ArToolBox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::{Array, AsArray, BinaryArray, StringArray, UInt32Array, UInt64Array};
-    use arrow::compute::or;
-    use arrow::datatypes::{BinaryType, DataType, Field, Schema};
+    use arrow::array::{Array, BinaryArray, StringArray, UInt32Array, UInt64Array};
+    use arrow::datatypes::{DataType, Field, Schema};
+    use db3_storage::ar_fs::ArFileSystemConfig;
     use std::env;
     use std::path::PathBuf;
     use tempdir::TempDir;
     use tokio::time::{sleep, Duration as TokioDuration};
-
-    #[test]
-    fn it_works() {}
 
     fn mock_batch_record() -> RecordBatch {
         let schema = Arc::new(Schema::new(vec![
@@ -468,7 +458,7 @@ mod tests {
         let record_batch = mock_batch_record();
         let temp_dir = TempDir::new("upload_arware_tx_ut").expect("create temp dir");
         let arweave_url = "http://127.0.0.1:1984";
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
             .unwrap()
@@ -478,12 +468,14 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        let ar_toolbox = ArToolBox::new(
-            key_root_path.to_string(),
-            arweave_url.to_string(),
-            temp_dir.path().to_str().unwrap().to_string(),
-        )
-        .unwrap();
+        let config = ArFileSystemConfig {
+            arweave_url: arweave_url.to_string(),
+            key_root_path,
+        };
+        let ar_filesystem = ArFileSystem::new(config).unwrap();
+        println!("ar address {}", ar_filesystem.get_address());
+        let ar_toolbox =
+            ArToolBox::new(ar_filesystem, temp_dir.path().to_str().unwrap().to_string()).unwrap();
         let result = ar_toolbox
             .compress_and_upload_record_batch(
                 last_tx.to_string(),
@@ -504,7 +496,7 @@ mod tests {
         let rec1 = res[0].clone();
         assert_eq!(rows, rec1.num_rows() as u64);
         {
-            let (start_block, end_block, last_rollup_tx, version) =
+            let (start_block, end_block, last_rollup_tx, _) =
                 ar_toolbox.get_tx_tags(tx.as_str()).await.unwrap();
             assert_eq!(start_block, last_end_block);
             assert_eq!(end_block, current_block);

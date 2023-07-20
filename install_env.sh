@@ -26,4 +26,4 @@ echo "install yarn "
 corepack enable
 corepack prepare yarn@stable --activate
 echo "install ar local"
-yarn global add arlocal
+yarn global add arlocal_db3
