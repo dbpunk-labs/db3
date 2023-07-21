@@ -461,6 +461,7 @@ impl MetaStoreEventProcessor {
                             }
                             None => {
                                 warn!("empty log from stream");
+                                sleep(Duration::from_millis(5 * 1000)).await;
                             }
                         }
                     },

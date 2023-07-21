@@ -223,6 +223,7 @@ impl Recover {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use db3_storage::db_store_v2::DBStoreV2Config;
     use db3_storage::doc_store::DocStoreConfig;
     use std::path::PathBuf;
     use tempdir::TempDir;
