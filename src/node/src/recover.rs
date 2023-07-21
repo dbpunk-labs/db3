@@ -17,8 +17,10 @@
 
 use crate::ar_toolbox::ArToolBox;
 use crate::mutation_utils::MutationUtil;
+use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::MutationAction;
+use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
@@ -29,8 +31,8 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::info;
 
+#[derive(Clone)]
 pub struct RecoverConfig {
-    pub db_store_config: DBStoreV2Config,
     pub key_root_path: String,
     pub ar_node_url: String,
     pub temp_data_path: String,
@@ -51,6 +53,7 @@ impl Recover {
         config: RecoverConfig,
         network_id: Arc<AtomicU64>,
         chain_id: Arc<AtomicU32>,
+        db_store: DBStoreV2,
     ) -> Result<Self> {
         let wallet = Self::build_wallet(config.key_root_path.as_str())?;
         info!(
@@ -77,12 +80,11 @@ impl Recover {
             ar_filesystem,
             config.temp_data_path.clone(),
         )?);
-        let db_store = Arc::new(DBStoreV2::new(config.db_store_config.clone())?);
         Ok(Self {
             config,
             ar_toolbox,
             meta_store,
-            db_store,
+            db_store: Arc::new(db_store),
             network_id,
         })
     }
@@ -115,8 +117,29 @@ impl Recover {
         Ok(())
     }
 
+    pub async fn recover_from_ar(&self) -> Result<()> {
+        info!("start recover from arweave");
+        let last_block = self.db_store.recover_block_state()?;
+        let (block, order) = match last_block {
+            Some(block_state) => {
+                info!(
+                    "recover the block state done, last block is {:?}",
+                    block_state
+                );
+                (block_state.block, block_state.order)
+            }
+            None => {
+                info!("recover the block state done, last block is 0");
+                (0, 0)
+            }
+        };
+        self.recover_from_arweave(block).await?;
+        info!("recover from arweave done!");
+        Ok(())
+    }
+
     /// recover from start_block to latest arweave tx
-    pub async fn recover_from_block(&self, start_block: u64) -> Result<u64> {
+    pub async fn recover_from_arweave(&self, start_block: u64) -> Result<u64> {
         let mut from_block = start_block;
         loop {
             let txs = self.fetch_arweave_tx_from_block(from_block).await?;
@@ -232,9 +255,10 @@ mod tests {
             doc_start_id: 1000,
         };
 
+        let db_store = DBStoreV2::new(db_store_config.clone()).unwrap();
+
         let recover = Recover::new(
             RecoverConfig {
-                db_store_config,
                 key_root_path,
                 ar_node_url: "http://127.0.0.1:1984".to_string(),
                 temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
@@ -244,6 +268,7 @@ mod tests {
             },
             Arc::new(AtomicU64::new(1)),
             Arc::new(AtomicU32::new(31337)),
+            db_store,
         )
         .await
         .unwrap();

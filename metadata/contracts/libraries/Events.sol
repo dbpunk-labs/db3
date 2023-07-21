@@ -47,7 +47,8 @@ library Events {
     event CreateDatabase(
         address indexed sender,
         uint256 networkId,
-        address databaseAddress
+        address databaseAddress,
+        bytes32 desc
     );
 
     /**

@@ -50,7 +50,8 @@ describe("DB3MetaStore", function () {
         .withArgs(
           deployer.address,
           1,
-          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A"
+          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A",
+          hello
         );
       await expect(
         metaStore
@@ -88,7 +89,8 @@ describe("DB3MetaStore", function () {
         .withArgs(
           deployer.address,
           1,
-          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A"
+          "0xF935E45C32C7DCc54bDDEcE5309c4313368A598A",
+          hello
         );
       await expect(
         metaStore

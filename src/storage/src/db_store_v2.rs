@@ -27,9 +27,9 @@ use db3_crypto::id::DbId;
 use db3_crypto::id_v2::OpEntryId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
-    database_message, Collection, CollectionState as CollectionStateProto, DatabaseMessage,
-    DatabaseState as DatabaseStateProto, DatabaseStatePersistence, Document, DocumentDatabase,
-    EventDatabase, Query,
+    database_message, BlockState, Collection, CollectionState as CollectionStateProto,
+    DatabaseMessage, DatabaseState as DatabaseStateProto, DatabaseStatePersistence, Document,
+    DocumentDatabase, EventDatabase, Index, Query,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::{
@@ -48,7 +48,8 @@ type StorageEngine = DBWithThreadMode<MultiThreaded>;
 type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, StorageEngine>;
 
 const STATE_CF: &str = "DB_STATE_CF";
-
+const BLOCK_STATE_CF: &str = "BLOCK_STATE_CF";
+const BLOCK_STATE_KEY: &str = "BLOCK_STATE_KEY";
 #[derive(Clone)]
 pub struct DBStoreV2Config {
     pub db_path: String,
@@ -104,6 +105,7 @@ impl DBStoreV2 {
                     config.doc_owner_store_cf_name.as_str(),
                     config.db_owner_store_cf_name.as_str(),
                     STATE_CF,
+                    BLOCK_STATE_CF,
                 ],
             )
             .map_err(|e| {
@@ -259,6 +261,12 @@ impl DBStoreV2 {
         Ok(())
     }
 
+    pub fn recover_block_state(&self) -> Result<Option<BlockState>> {
+        self.get_entry::<BlockState>(BLOCK_STATE_CF, BLOCK_STATE_KEY.as_ref())
+    }
+    fn store_block_state(&self, state: BlockState) -> Result<()> {
+        self.put_entry(BLOCK_STATE_CF, BLOCK_STATE_KEY.as_ref(), state)
+    }
     fn recover_from_state(&self, address: &DB3Address) -> Result<Option<DatabaseStatePersistence>> {
         self.get_entry::<DatabaseStatePersistence>(STATE_CF, address.as_ref())
     }
@@ -445,6 +453,26 @@ impl DBStoreV2 {
         Ok(entries)
     }
 
+    fn put_entry<T>(&self, cf: &str, ck_ref: &[u8], value: T) -> Result<()>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
+            .se
+            .cf_handle(cf)
+            .ok_or(DB3Error::WriteStoreError("cf is not found".to_string()))?;
+        let mut buf = BytesMut::with_capacity(1024);
+        value
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let buf = buf.freeze();
+        let mut batch = WriteBatch::default();
+        batch.put_cf(&cf_handle, ck_ref, buf.as_ref());
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
+    }
     fn get_entry<T>(&self, cf: &str, id: &[u8]) -> Result<Option<T>>
     where
         T: Message + std::default::Default,
@@ -474,11 +502,12 @@ impl DBStoreV2 {
         self.get_entry::<Collection>(self.config.collection_store_cf_name.as_str(), ck_ref)
     }
 
-    pub fn create_collection(
+    fn create_collection_internal(
         &self,
         sender: &DB3Address,
         db_addr: &DB3Address,
-        collection: &CollectionMutation,
+        name: &str,
+        indexes: &Vec<Index>,
         block: u64,
         order: u32,
         idx: u16,
@@ -489,12 +518,12 @@ impl DBStoreV2 {
                 "fail to find database".to_string(),
             ));
         }
-        if self.is_db_collection_exist(db_addr, collection.collection_name.as_str())? {
+        if self.is_db_collection_exist(db_addr, name)? {
             return Err(DB3Error::ReadStoreError(
                 "collection with name exist".to_string(),
             ));
         }
-        let ck = collection_key::build_collection_key(db_addr, collection.collection_name.as_str())
+        let ck = collection_key::build_collection_key(db_addr, name)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         let collection_store_cf_handle = self
             .se
@@ -506,8 +535,8 @@ impl DBStoreV2 {
         // validate the index
         let col = Collection {
             id: id.as_ref().to_vec(),
-            name: collection.collection_name.to_string(),
-            index_fields: collection.index_fields.to_vec(),
+            name: name.to_string(),
+            index_fields: indexes.to_vec(),
             sender: sender.as_ref().to_vec(),
         };
         let mut buf = BytesMut::with_capacity(1024);
@@ -520,16 +549,33 @@ impl DBStoreV2 {
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         let db_addr_hex = db_addr.to_hex();
-        self.update_db_state_for_new_collection(
-            db_addr_hex.as_str(),
-            collection.collection_name.as_str(),
-        );
+        self.update_db_state_for_new_collection(db_addr_hex.as_str(), name);
         if self.config.enable_doc_store {
             self.doc_store
-                .create_collection(db_addr, collection)
+                .create_collection(db_addr, name, indexes)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         }
         Ok(())
+    }
+
+    pub fn create_collection(
+        &self,
+        sender: &DB3Address,
+        db_addr: &DB3Address,
+        collection: &CollectionMutation,
+        block: u64,
+        order: u32,
+        idx: u16,
+    ) -> Result<()> {
+        self.create_collection_internal(
+            sender,
+            db_addr,
+            collection.collection_name.as_str(),
+            &collection.index_fields,
+            block,
+            order,
+            idx,
+        )
     }
 
     pub fn get_database(&self, db_addr: &DB3Address) -> Result<Option<DatabaseMessage>> {
@@ -846,16 +892,20 @@ impl DBStoreV2 {
         Ok(db_addr)
     }
 
-    pub fn create_doc_database(
+    pub fn create_predefined_doc_database(
         &self,
         sender: &DB3Address,
-        mutation: &DocumentDatabaseMutation,
-        nonce: u64,
-        network_id: u64,
+        db_addr: &DbId,
+        desc: &str,
         block: u64,
         order: u32,
-    ) -> Result<DbId> {
-        let db_addr = DbId::from((sender, nonce, network_id));
+    ) -> Result<()> {
+        if let Ok(Some(_)) = self.get_database(db_addr.address()) {
+            return Err(DB3Error::WriteStoreError(format!(
+                "database with address {} exists",
+                db_addr.to_hex()
+            )));
+        }
         let db_store_cf_handle = self
             .se
             .cf_handle(self.config.db_store_cf_name.as_str())
@@ -869,7 +919,7 @@ impl DBStoreV2 {
         let database = DocumentDatabase {
             address: db_addr.as_ref().to_vec(),
             sender: sender.as_ref().to_vec(),
-            desc: mutation.db_desc.to_string(),
+            desc: desc.to_string(),
         };
         let database_msg = DatabaseMessage {
             database: Some(database_message::Database::DocDb(database)),
@@ -896,6 +946,26 @@ impl DBStoreV2 {
                 .create_database(db_addr.address())
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         }
+        Ok(())
+    }
+
+    pub fn create_doc_database(
+        &self,
+        sender: &DB3Address,
+        mutation: &DocumentDatabaseMutation,
+        nonce: u64,
+        network_id: u64,
+        block: u64,
+        order: u32,
+    ) -> Result<DbId> {
+        let db_addr = DbId::from((sender, nonce, network_id));
+        self.create_predefined_doc_database(
+            sender,
+            &db_addr,
+            mutation.db_desc.as_str(),
+            block,
+            order,
+        )?;
         Ok(db_addr)
     }
 
@@ -912,6 +982,69 @@ impl DBStoreV2 {
     ) -> Result<Vec<ExtraItem>> {
         let mut items: Vec<ExtraItem> = Vec::new();
         match action {
+            MutationAction::MintCollection => {
+                for body in dm.bodies {
+                    if let Some(Body::MintCollectionMutation(ref mint_col_mutation)) = &body.body {
+                        let sender = DB3Address::try_from(mint_col_mutation.sender.as_str())?;
+                        let db_addr = DB3Address::try_from(mint_col_mutation.db_addr.as_str())?;
+                        self.create_collection_internal(
+                            &sender,
+                            &db_addr,
+                            mint_col_mutation.name.as_str(),
+                            &vec![],
+                            block,
+                            order,
+                            0,
+                        )?;
+                        info!(
+                            "add collection with db_addr {}, collection_name: {}, from owner {}",
+                            db_addr.to_hex().as_str(),
+                            mint_col_mutation.name.as_str(),
+                            sender.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "collection".to_string(),
+                            value: mint_col_mutation.name.to_string(),
+                        };
+                        items.push(item);
+                        break;
+                    }
+                }
+            }
+            MutationAction::MintDocumentDb => {
+                for body in dm.bodies {
+                    if let Some(Body::MintDocDatabaseMutation(ref min_doc_db_mutation)) = &body.body
+                    {
+                        let sender = DB3Address::try_from(min_doc_db_mutation.sender.as_str())?;
+                        let db_id =
+                            DbId::from(DB3Address::try_from(min_doc_db_mutation.db_addr.as_str())?);
+                        self.create_predefined_doc_database(
+                            &sender,
+                            &db_id,
+                            min_doc_db_mutation.desc.as_str(),
+                            block,
+                            order,
+                        )
+                        .map_err(|e| {
+                            DB3Error::ApplyMutationError(format!(
+                                "fail to create predefined database {e}"
+                            ))
+                        })?;
+                        let db_id_hex = db_id.to_hex();
+                        info!(
+                            "mint database with addr {} from owner {}",
+                            db_id_hex.as_str(),
+                            address.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "db_addr".to_string(),
+                            value: db_id_hex,
+                        };
+                        items.push(item);
+                        break;
+                    }
+                }
+            }
             MutationAction::CreateEventDb => {
                 for body in dm.bodies {
                     if let Some(Body::EventDatabaseMutation(ref mutation)) = &body.body {
@@ -1092,6 +1225,7 @@ impl DBStoreV2 {
                 }
             }
         };
+        self.store_block_state(BlockState { block, order })?;
         Ok(items)
     }
 }
@@ -1294,6 +1428,41 @@ mod tests {
         assert_eq!(result, Some(vec![1, 2, 3]));
     }
 
+    #[test]
+    fn recover_and_store_block_state_ut() {
+        let tmp_dir_path = TempDir::new("recover_block_state_ut").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        {
+            let config = DBStoreV2Config {
+                db_path: real_path.to_string(),
+                db_store_cf_name: "db".to_string(),
+                doc_store_cf_name: "doc".to_string(),
+                collection_store_cf_name: "cf2".to_string(),
+                index_store_cf_name: "index".to_string(),
+                doc_owner_store_cf_name: "doc_owner".to_string(),
+                db_owner_store_cf_name: "db_owner".to_string(),
+                scan_max_limit: 50,
+                enable_doc_store: false,
+                doc_store_conf: DocStoreConfig::default(),
+                doc_start_id: 1000,
+            };
+            let result = DBStoreV2::new(config);
+            assert_eq!(result.is_ok(), true);
+            let db3_store = result.unwrap();
+
+            // recover from empty block state
+            let block_state_none = db3_store.recover_block_state().unwrap();
+            assert!(block_state_none.is_none());
+
+            // store block state
+            let res = db3_store.store_block_state(BlockState { block: 1, order: 2 });
+            assert!(res.is_ok());
+
+            // recover block state
+            let block_state = db3_store.recover_block_state().unwrap();
+            assert_eq!(block_state, Some(BlockState { block: 1, order: 2 }));
+        }
+    }
     #[test]
     fn test_recover_db_state() {
         let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");

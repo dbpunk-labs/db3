@@ -44,7 +44,7 @@ jobs:
           make
           npx typedoc --out docs src/index.ts
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: './sdk/docs'
       - name: Deploy to GitHub Pages
