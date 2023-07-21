@@ -33,9 +33,9 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::system_store::SystemStore;
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
+use db3_storage::system_store::SystemStore;
 use ethers::abi::Address;
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
@@ -57,8 +57,7 @@ pub struct IndexerNodeImpl {
 }
 
 impl IndexerNodeImpl {
-    pub fn new(db_store: DBStoreV2,
-               system_store: Arc<SystemStore>) -> Result<Self> {
+    pub fn new(db_store: DBStoreV2, system_store: Arc<SystemStore>) -> Result<Self> {
         Ok(Self {
             db_store,
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),

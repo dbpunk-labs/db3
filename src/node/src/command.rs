@@ -16,6 +16,7 @@
 //
 
 use crate::indexer_impl::IndexerNodeImpl;
+use crate::recover::Recover;
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use crate::system_impl::SystemImpl;
@@ -51,7 +52,6 @@ use tonic::Status;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
-use crate::recover::Recover;
 
 const ABOUT: &str = "
 ██████╗ ██████╗ ██████╗ 
@@ -124,9 +124,6 @@ pub enum DB3Command {
         state_db_path: String,
         #[clap(short, long, default_value = "./index_doc_db")]
         doc_db_path: String,
-        /// The Ar miner node
-        #[clap(long, default_value = "http://127.0.0.1:1984/")]
-        ar_node_url: String,
         #[clap(short, long, default_value = "./keys")]
         key_root_path: String,
         #[clap(
@@ -254,7 +251,6 @@ impl DB3Command {
                 meta_db_path,
                 state_db_path,
                 doc_db_path,
-                ar_node_url,
                 key_root_path,
                 db3_storage_grpc_url,
                 verbose,
