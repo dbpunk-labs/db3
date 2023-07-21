@@ -16,7 +16,6 @@
 //
 
 use crate::mutation_utils::MutationUtil;
-use crate::recover::{Recover, RecoverConfig};
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
@@ -33,14 +32,11 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
 use db3_storage::system_store::SystemStore;
 use ethers::abi::Address;
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
 use tokio::task;
@@ -100,7 +96,7 @@ impl IndexerNodeImpl {
     /// recover from fetched blocks
     pub async fn recover_from_fetched_blocks(&self, store_sdk: &StoreSDKV2) -> Result<()> {
         info!("start recover from fetched blocks");
-        let (mut start_block, mut order) = match self.db_store.recover_block_state()? {
+        let (mut start_block, order) = match self.db_store.recover_block_state()? {
             Some(block_state) => (block_state.block, block_state.order),
             None => (0, 0),
         };

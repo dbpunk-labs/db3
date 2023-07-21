@@ -422,6 +422,12 @@ export const db3MetaStoreContractConfig = {
                     name: 'databaseAddress',
                     type: 'address',
                 },
+                {
+                    indexed: false,
+                    internalType: 'bytes32',
+                    name: 'desc',
+                    type: 'bytes32',
+                },
             ],
             name: 'CreateDatabase',
             type: 'event',

@@ -38,11 +38,13 @@ use ethers::{
     },
     providers::{Middleware, Provider, StreamExt, Ws},
 };
+
 use prost::Message;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::task;
+use tokio::time::{sleep, Duration};
 use tracing::{info, warn};
 
 abigen!(DB3MetaStoreEvents, "abi/Events.json");
@@ -275,7 +277,11 @@ impl MetaStoreEventProcessor {
         })?;
         // jude the network
         if event.network_id.as_u64() != network {
-            warn!("ignore the mismatch network event");
+            warn!(
+                "ignore the mismatch network event received network {} but expect {}",
+                event.network_id.as_u64(),
+                network
+            );
             return Ok(());
         }
         let typed_tx: TypedTransaction = t.into();
@@ -345,7 +351,7 @@ impl MetaStoreEventProcessor {
             evm_node_url
         );
         self.last_running.store(Some(running.clone()));
-        let provider = Provider::<Ws>::connect(evm_node_url)
+        let provider = Provider::<Ws>::connect_with_reconnects(evm_node_url, 100)
             .await
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         let provider = Arc::new(provider);
@@ -390,67 +396,81 @@ impl MetaStoreEventProcessor {
         };
         let local_contract_addr = contract_addr.to_string();
         task::spawn(async move {
-            match provider.subscribe_logs(&filter).await {
-                Ok(mut stream) => loop {
-                    if !running.load(Ordering::Relaxed) {
-                        info!(
-                            "stop event processor for contract {}",
-                            local_contract_addr.as_str()
-                        );
-                        break;
-                    }
-                    if let Some(log) = stream.next().await {
-                        info!(
-                            "block number {:?} transacion {:?} sender address {:?} ",
-                            log.block_number, log.transaction_hash, log.address
-                        );
-                        if let (Ok(Some(transaction)), Ok(event_signature)) = (
-                            provider
-                                .get_transaction(log.transaction_hash.unwrap())
-                                .await
-                                .map_err(|e| {
-                                    DB3Error::StoreEventError(format!(
-                                        "fail to get transaction {e}"
-                                    ))
-                                }),
-                            log.topics
-                                .get(0)
-                                .ok_or(DB3Error::StoreEventError(format!("fail to get topics"))),
-                        ) {
-                            if event_signature == &(CreateDatabaseFilter::signature()) {
-                                if let Ok(_) = Self::handle_create_doc_database(
-                                    &log,
-                                    &transaction,
-                                    network,
-                                    &wallet,
-                                    &local_state_store,
-                                    &local_storage,
-                                    &local_db_store,
-                                    &mutation_type,
-                                )
-                                .await
-                                {}
-                            } else if event_signature == &(CreateCollectionFilter::signature()) {
-                                if let Ok(_) = Self::handle_create_collection(
-                                    &log,
-                                    &transaction,
-                                    network,
-                                    &wallet,
-                                    &local_state_store,
-                                    &local_storage,
-                                    &local_db_store,
-                                    &mutation_type,
-                                )
-                                .await
-                                {}
+            loop {
+                if !running.load(Ordering::Relaxed) {
+                    break;
+                }
+                match provider.subscribe_logs(&filter).await {
+                    Ok(mut stream) => loop {
+                        if !running.load(Ordering::Relaxed) {
+                            info!(
+                                "stop event processor for contract {}",
+                                local_contract_addr.as_str()
+                            );
+                            break;
+                        }
+                        match stream.next().await {
+                            Some(log) => {
+                                info!(
+                                    "block number {:?} transacion {:?} sender address {:?} ",
+                                    log.block_number, log.transaction_hash, log.address
+                                );
+                                if let (Ok(Some(transaction)), Ok(event_signature)) = (
+                                    provider
+                                        .get_transaction(log.transaction_hash.unwrap())
+                                        .await
+                                        .map_err(|e| {
+                                            DB3Error::StoreEventError(format!(
+                                                "fail to get transaction {e}"
+                                            ))
+                                        }),
+                                    log.topics.get(0).ok_or(DB3Error::StoreEventError(format!(
+                                        "fail to get topics"
+                                    ))),
+                                ) {
+                                    if event_signature == &(CreateDatabaseFilter::signature()) {
+                                        if let Ok(_) = Self::handle_create_doc_database(
+                                            &log,
+                                            &transaction,
+                                            network,
+                                            &wallet,
+                                            &local_state_store,
+                                            &local_storage,
+                                            &local_db_store,
+                                            &mutation_type,
+                                        )
+                                        .await
+                                        {}
+                                    } else if event_signature
+                                        == &(CreateCollectionFilter::signature())
+                                    {
+                                        if let Ok(_) = Self::handle_create_collection(
+                                            &log,
+                                            &transaction,
+                                            network,
+                                            &wallet,
+                                            &local_state_store,
+                                            &local_storage,
+                                            &local_db_store,
+                                            &mutation_type,
+                                        )
+                                        .await
+                                        {}
+                                    }
+                                }
+                            }
+                            None => {
+                                warn!("empty log from stream");
                             }
                         }
+                    },
+                    Err(e) => {
+                        warn!("fail get stream for error {e}");
                     }
-                },
-                Err(e) => {
-                    warn!("fail get stream for error {e}");
                 }
+                sleep(Duration::from_millis(5 * 1000)).await;
             }
+            warn!("the meta contract event listener exits");
         });
         Ok(())
     }
