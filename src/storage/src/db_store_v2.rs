@@ -27,9 +27,9 @@ use db3_crypto::id::DbId;
 use db3_crypto::id_v2::OpEntryId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
-    database_message, Collection, CollectionState as CollectionStateProto, DatabaseMessage,
-    DatabaseState as DatabaseStateProto, DatabaseStatePersistence, Document, DocumentDatabase,
-    EventDatabase, Index, Query,
+    database_message, BlockState, Collection, CollectionState as CollectionStateProto,
+    DatabaseMessage, DatabaseState as DatabaseStateProto, DatabaseStatePersistence, Document,
+    DocumentDatabase, EventDatabase, Index, Query,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::{
@@ -48,7 +48,8 @@ type StorageEngine = DBWithThreadMode<MultiThreaded>;
 type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, StorageEngine>;
 
 const STATE_CF: &str = "DB_STATE_CF";
-
+const BLOCK_STATE_CF: &str = "BLOCK_STATE_CF";
+const BLOCK_STATE_KEY: &str = "BLOCK_STATE_KEY";
 #[derive(Clone)]
 pub struct DBStoreV2Config {
     pub db_path: String,
@@ -104,6 +105,7 @@ impl DBStoreV2 {
                     config.doc_owner_store_cf_name.as_str(),
                     config.db_owner_store_cf_name.as_str(),
                     STATE_CF,
+                    BLOCK_STATE_CF,
                 ],
             )
             .map_err(|e| {
@@ -259,6 +261,12 @@ impl DBStoreV2 {
         Ok(())
     }
 
+    pub fn recover_block_state(&self) -> Result<Option<BlockState>> {
+        self.get_entry::<BlockState>(BLOCK_STATE_CF, BLOCK_STATE_KEY.as_ref())
+    }
+    fn store_block_state(&self, state: BlockState) -> Result<()> {
+        self.put_entry(BLOCK_STATE_CF, BLOCK_STATE_KEY.as_ref(), state)
+    }
     fn recover_from_state(&self, address: &DB3Address) -> Result<Option<DatabaseStatePersistence>> {
         self.get_entry::<DatabaseStatePersistence>(STATE_CF, address.as_ref())
     }
@@ -445,6 +453,26 @@ impl DBStoreV2 {
         Ok(entries)
     }
 
+    fn put_entry<T>(&self, cf: &str, ck_ref: &[u8], value: T) -> Result<()>
+    where
+        T: Message + std::default::Default,
+    {
+        let cf_handle = self
+            .se
+            .cf_handle(cf)
+            .ok_or(DB3Error::WriteStoreError("cf is not found".to_string()))?;
+        let mut buf = BytesMut::with_capacity(1024);
+        value
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        let buf = buf.freeze();
+        let mut batch = WriteBatch::default();
+        batch.put_cf(&cf_handle, ck_ref, buf.as_ref());
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
+    }
     fn get_entry<T>(&self, cf: &str, id: &[u8]) -> Result<Option<T>>
     where
         T: Message + std::default::Default,
@@ -1197,6 +1225,7 @@ impl DBStoreV2 {
                 }
             }
         };
+        self.store_block_state(BlockState { block, order })?;
         Ok(items)
     }
 }
@@ -1399,6 +1428,41 @@ mod tests {
         assert_eq!(result, Some(vec![1, 2, 3]));
     }
 
+    #[test]
+    fn recover_and_store_block_state_ut() {
+        let tmp_dir_path = TempDir::new("recover_block_state_ut").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        {
+            let config = DBStoreV2Config {
+                db_path: real_path.to_string(),
+                db_store_cf_name: "db".to_string(),
+                doc_store_cf_name: "doc".to_string(),
+                collection_store_cf_name: "cf2".to_string(),
+                index_store_cf_name: "index".to_string(),
+                doc_owner_store_cf_name: "doc_owner".to_string(),
+                db_owner_store_cf_name: "db_owner".to_string(),
+                scan_max_limit: 50,
+                enable_doc_store: false,
+                doc_store_conf: DocStoreConfig::default(),
+                doc_start_id: 1000,
+            };
+            let result = DBStoreV2::new(config);
+            assert_eq!(result.is_ok(), true);
+            let db3_store = result.unwrap();
+
+            // recover from empty block state
+            let block_state_none = db3_store.recover_block_state().unwrap();
+            assert!(block_state_none.is_none());
+
+            // store block state
+            let res = db3_store.store_block_state(BlockState { block: 1, order: 2 });
+            assert!(res.is_ok());
+
+            // recover block state
+            let block_state = db3_store.recover_block_state().unwrap();
+            assert_eq!(block_state, Some(BlockState { block: 1, order: 2 }));
+        }
+    }
     #[test]
     fn test_recover_db_state() {
         let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");

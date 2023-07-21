@@ -16,10 +16,12 @@
 //
 
 use crate::mutation_utils::MutationUtil;
+use crate::recover::{Recover, RecoverConfig};
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
 use db3_event::event_processor::EventProcessorConfig;
+use db3_proto::db3_database_v2_proto::BlockState;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
@@ -31,8 +33,14 @@ use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
+use db3_storage::key_store::{KeyStore, KeyStoreConfig};
+use db3_storage::state_store::{StateStore, StateStoreConfig};
 use db3_storage::system_store::SystemStore;
+use ethers::abi::Address;
+use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
 use tokio::task;
@@ -40,6 +48,7 @@ use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
 
+const MAX_BLOCK_ID: u64 = u64::MAX;
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
@@ -48,8 +57,7 @@ pub struct IndexerNodeImpl {
 }
 
 impl IndexerNodeImpl {
-    pub fn new(config: DBStoreV2Config, system_store: Arc<SystemStore>) -> Result<Self> {
-        let db_store = DBStoreV2::new(config)?;
+    pub fn new(db_store: DBStoreV2, system_store: Arc<SystemStore>) -> Result<Self> {
         Ok(Self {
             db_store,
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
@@ -58,8 +66,12 @@ impl IndexerNodeImpl {
     }
 
     pub async fn subscribe_update(&self, _update_receiver: Receiver<()>) {}
-
-    pub async fn recover(&self) -> Result<()> {
+    pub async fn recover(&self, store_sdk: &StoreSDKV2) -> Result<()> {
+        self.recover_state().await?;
+        self.recover_from_fetched_blocks(store_sdk).await?;
+        Ok(())
+    }
+    pub async fn recover_state(&self) -> Result<()> {
         self.db_store.recover_db_state()?;
         let databases = self.db_store.get_all_event_db()?;
         for database in databases {
@@ -83,6 +95,40 @@ impl IndexerNodeImpl {
                 info!("recover the event db {} done", db_address.to_hex());
             }
         }
+        Ok(())
+    }
+    /// recover from fetched blocks
+    pub async fn recover_from_fetched_blocks(&self, store_sdk: &StoreSDKV2) -> Result<()> {
+        info!("start recover from fetched blocks");
+        let (mut start_block, mut order) = match self.db_store.recover_block_state()? {
+            Some(block_state) => (block_state.block, block_state.order),
+            None => (0, 0),
+        };
+        info!("start block is {}, order is {}", start_block, order);
+        loop {
+            let response = store_sdk
+                .get_blocks(start_block, start_block + 1000)
+                .await
+                .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?
+                .into_inner();
+            info!(
+                "fetch blocks from {} to {}",
+                start_block,
+                start_block + 1000
+            );
+            let mutations = response.mutations;
+            info!(
+                "Cold start with block mutations size: {:?}",
+                mutations.len()
+            );
+            if mutations.is_empty() {
+                info!("Stop fetching blocks, no more blocks to fetch");
+                break;
+            }
+            self.parse_and_apply_mutations(&mutations).await?;
+            start_block += 100;
+        }
+        info!("recover from fetched blocks done!");
         Ok(())
     }
 
@@ -121,6 +167,10 @@ impl IndexerNodeImpl {
                     "Receive BlockEvent: Block\t{}\tMutationCount\t{}",
                     be.block_id, be.mutation_count,
                 );
+                if be.mutation_count == 0 {
+                    debug!("Skip handle block with 0 mutations");
+                    return Ok(());
+                }
                 let response = store_sdk
                     .get_block_by_height(be.block_id)
                     .await

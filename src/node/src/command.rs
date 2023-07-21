@@ -16,6 +16,7 @@
 //
 
 use crate::indexer_impl::IndexerNodeImpl;
+use crate::recover::Recover;
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use crate::system_impl::SystemImpl;
@@ -30,7 +31,7 @@ use db3_proto::db3_storage_proto::{
 };
 use db3_proto::db3_system_proto::system_server::SystemServer;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
-use db3_storage::db_store_v2::DBStoreV2Config;
+use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::doc_store::DocStoreConfig;
 use db3_storage::key_store::KeyStore;
 use db3_storage::key_store::KeyStoreConfig;
@@ -309,9 +310,10 @@ impl DB3Command {
                 };
 
                 let addr = format!("{bind_host}:{listening_port}");
-                let indexer = IndexerNodeImpl::new(db_store_config, system_store).unwrap();
+                let db_store = DBStoreV2::new(db_store_config.clone()).unwrap();
+                let indexer = IndexerNodeImpl::new(db_store.clone(), system_store).unwrap();
                 let indexer_for_syncing = indexer.clone();
-                if let Err(_e) = indexer.recover().await {}
+                if let Err(_e) = indexer.recover(&store_sdk).await {}
                 indexer.subscribe_update(update_receiver).await;
                 let listen = tokio::spawn(async move {
                     info!("start syncing data from storage node");
