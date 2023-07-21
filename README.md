@@ -123,12 +123,15 @@ Now building a fully on-chain application is an easy thing. You can create a ful
 # FAQ
 
 Q: Is the DB3 Network a blockchain?
+
 A: No, the DB3 Network is not a blockchain. It is simply a developer tool that can be hosted locally or used through our cloud service.
 
 Q: What are the differences between MongoDB and DB3 Network?
+
 A: MongoDB uses centralized data storage, whereas DB3 Network uses decentralized data storage. Additionally, DB3 Network ensures that data is permanently available.
 
 Q: Will my data be lost if the Data Rollup Node or Data Index Node is not available?
+
 A: No, you can set up your data index node and recover your data from the blockchain.
 
 # License
