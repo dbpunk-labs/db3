@@ -21,6 +21,7 @@ use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
+use db3_event::meta_store_event_processor::MetaStoreEventProcessor;
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
@@ -34,8 +35,6 @@ use db3_proto::db3_storage_proto::{
     ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
     SendMutationRequest, SendMutationResponse, SubscribeRequest,
 };
-
-use db3_event::meta_store_event_processor::MetaStoreEventProcessor;
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
     Subscription as SubscriptionV2,
@@ -104,7 +103,12 @@ impl StorageNodeV2Impl {
         storage.recover()?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
-        let event_processor = Arc::new(MetaStoreEventProcessor::new(state_store.clone()));
+        let event_processor = Arc::new(MetaStoreEventProcessor::new(
+            state_store.clone(),
+            db_store.clone(),
+            storage.clone(),
+            system_store.clone(),
+        ));
         if let Some(c) = system_store.get_config(&SystemRole::DataRollupNode)? {
             info!("init storage node from persistence config {:?}", c);
             let network_id = Arc::new(AtomicU64::new(c.network_id));
@@ -117,7 +121,13 @@ impl StorageNodeV2Impl {
                 .await?,
             );
             event_processor
-                .start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0)
+                .start(
+                    c.contract_addr.as_str(),
+                    c.evm_node_url.as_str(),
+                    0,
+                    c.chain_id,
+                    c.network_id,
+                )
                 .await?;
             let rollup_interval = c.rollup_interval;
             Ok(Self {
@@ -275,7 +285,7 @@ impl StorageNodeV2Impl {
                                 info!("update the network {} and rollup interval {}", local_network_id.load(Ordering::Relaxed),
                                 local_rollup_interval.load(Ordering::Relaxed)
                                 );
-                                if let Err(e) = local_event_processor.start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0).await {
+                                if let Err(e) = local_event_processor.start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0, c.chain_id, c.network_id).await {
                                     warn!("fail update the event processor with error {e}");
                                 }
                             }

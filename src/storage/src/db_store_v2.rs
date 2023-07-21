@@ -29,7 +29,7 @@ use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
     database_message, BlockState, Collection, CollectionState as CollectionStateProto,
     DatabaseMessage, DatabaseState as DatabaseStateProto, DatabaseStatePersistence, Document,
-    DocumentDatabase, EventDatabase, Query,
+    DocumentDatabase, EventDatabase, Index, Query,
 };
 use db3_proto::db3_mutation_v2_proto::mutation::body_wrapper::Body;
 use db3_proto::db3_mutation_v2_proto::{
@@ -502,11 +502,12 @@ impl DBStoreV2 {
         self.get_entry::<Collection>(self.config.collection_store_cf_name.as_str(), ck_ref)
     }
 
-    pub fn create_collection(
+    fn create_collection_internal(
         &self,
         sender: &DB3Address,
         db_addr: &DB3Address,
-        collection: &CollectionMutation,
+        name: &str,
+        indexes: &Vec<Index>,
         block: u64,
         order: u32,
         idx: u16,
@@ -517,12 +518,12 @@ impl DBStoreV2 {
                 "fail to find database".to_string(),
             ));
         }
-        if self.is_db_collection_exist(db_addr, collection.collection_name.as_str())? {
+        if self.is_db_collection_exist(db_addr, name)? {
             return Err(DB3Error::ReadStoreError(
                 "collection with name exist".to_string(),
             ));
         }
-        let ck = collection_key::build_collection_key(db_addr, collection.collection_name.as_str())
+        let ck = collection_key::build_collection_key(db_addr, name)
             .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
         let collection_store_cf_handle = self
             .se
@@ -534,8 +535,8 @@ impl DBStoreV2 {
         // validate the index
         let col = Collection {
             id: id.as_ref().to_vec(),
-            name: collection.collection_name.to_string(),
-            index_fields: collection.index_fields.to_vec(),
+            name: name.to_string(),
+            index_fields: indexes.to_vec(),
             sender: sender.as_ref().to_vec(),
         };
         let mut buf = BytesMut::with_capacity(1024);
@@ -548,16 +549,33 @@ impl DBStoreV2 {
             .write(batch)
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         let db_addr_hex = db_addr.to_hex();
-        self.update_db_state_for_new_collection(
-            db_addr_hex.as_str(),
-            collection.collection_name.as_str(),
-        );
+        self.update_db_state_for_new_collection(db_addr_hex.as_str(), name);
         if self.config.enable_doc_store {
             self.doc_store
-                .create_collection(db_addr, collection)
+                .create_collection(db_addr, name, indexes)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         }
         Ok(())
+    }
+
+    pub fn create_collection(
+        &self,
+        sender: &DB3Address,
+        db_addr: &DB3Address,
+        collection: &CollectionMutation,
+        block: u64,
+        order: u32,
+        idx: u16,
+    ) -> Result<()> {
+        self.create_collection_internal(
+            sender,
+            db_addr,
+            collection.collection_name.as_str(),
+            &collection.index_fields,
+            block,
+            order,
+            idx,
+        )
     }
 
     pub fn get_database(&self, db_addr: &DB3Address) -> Result<Option<DatabaseMessage>> {
@@ -874,16 +892,20 @@ impl DBStoreV2 {
         Ok(db_addr)
     }
 
-    pub fn create_doc_database(
+    pub fn create_predefined_doc_database(
         &self,
         sender: &DB3Address,
-        mutation: &DocumentDatabaseMutation,
-        nonce: u64,
-        network_id: u64,
+        db_addr: &DbId,
+        desc: &str,
         block: u64,
         order: u32,
-    ) -> Result<DbId> {
-        let db_addr = DbId::from((sender, nonce, network_id));
+    ) -> Result<()> {
+        if let Ok(Some(_)) = self.get_database(db_addr.address()) {
+            return Err(DB3Error::WriteStoreError(format!(
+                "database with address {} exists",
+                db_addr.to_hex()
+            )));
+        }
         let db_store_cf_handle = self
             .se
             .cf_handle(self.config.db_store_cf_name.as_str())
@@ -897,7 +919,7 @@ impl DBStoreV2 {
         let database = DocumentDatabase {
             address: db_addr.as_ref().to_vec(),
             sender: sender.as_ref().to_vec(),
-            desc: mutation.db_desc.to_string(),
+            desc: desc.to_string(),
         };
         let database_msg = DatabaseMessage {
             database: Some(database_message::Database::DocDb(database)),
@@ -924,6 +946,26 @@ impl DBStoreV2 {
                 .create_database(db_addr.address())
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         }
+        Ok(())
+    }
+
+    pub fn create_doc_database(
+        &self,
+        sender: &DB3Address,
+        mutation: &DocumentDatabaseMutation,
+        nonce: u64,
+        network_id: u64,
+        block: u64,
+        order: u32,
+    ) -> Result<DbId> {
+        let db_addr = DbId::from((sender, nonce, network_id));
+        self.create_predefined_doc_database(
+            sender,
+            &db_addr,
+            mutation.db_desc.as_str(),
+            block,
+            order,
+        )?;
         Ok(db_addr)
     }
 
@@ -940,6 +982,69 @@ impl DBStoreV2 {
     ) -> Result<Vec<ExtraItem>> {
         let mut items: Vec<ExtraItem> = Vec::new();
         match action {
+            MutationAction::MintCollection => {
+                for body in dm.bodies {
+                    if let Some(Body::MintCollectionMutation(ref mint_col_mutation)) = &body.body {
+                        let sender = DB3Address::try_from(mint_col_mutation.sender.as_str())?;
+                        let db_addr = DB3Address::try_from(mint_col_mutation.db_addr.as_str())?;
+                        self.create_collection_internal(
+                            &sender,
+                            &db_addr,
+                            mint_col_mutation.name.as_str(),
+                            &vec![],
+                            block,
+                            order,
+                            0,
+                        )?;
+                        info!(
+                            "add collection with db_addr {}, collection_name: {}, from owner {}",
+                            db_addr.to_hex().as_str(),
+                            mint_col_mutation.name.as_str(),
+                            sender.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "collection".to_string(),
+                            value: mint_col_mutation.name.to_string(),
+                        };
+                        items.push(item);
+                        break;
+                    }
+                }
+            }
+            MutationAction::MintDocumentDb => {
+                for body in dm.bodies {
+                    if let Some(Body::MintDocDatabaseMutation(ref min_doc_db_mutation)) = &body.body
+                    {
+                        let sender = DB3Address::try_from(min_doc_db_mutation.sender.as_str())?;
+                        let db_id =
+                            DbId::from(DB3Address::try_from(min_doc_db_mutation.db_addr.as_str())?);
+                        self.create_predefined_doc_database(
+                            &sender,
+                            &db_id,
+                            min_doc_db_mutation.desc.as_str(),
+                            block,
+                            order,
+                        )
+                        .map_err(|e| {
+                            DB3Error::ApplyMutationError(format!(
+                                "fail to create predefined database {e}"
+                            ))
+                        })?;
+                        let db_id_hex = db_id.to_hex();
+                        info!(
+                            "mint database with addr {} from owner {}",
+                            db_id_hex.as_str(),
+                            address.to_hex().as_str()
+                        );
+                        let item = ExtraItem {
+                            key: "db_addr".to_string(),
+                            value: db_id_hex,
+                        };
+                        items.push(item);
+                        break;
+                    }
+                }
+            }
             MutationAction::CreateEventDb => {
                 for body in dm.bodies {
                     if let Some(Body::EventDatabaseMutation(ref mutation)) = &body.body {

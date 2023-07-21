@@ -17,8 +17,7 @@
 
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_v2_proto::{query_parameter, Query};
-use db3_proto::db3_mutation_v2_proto::CollectionMutation;
+use db3_proto::db3_database_v2_proto::{query_parameter, Index, Query};
 use ejdb2::SetPlaceholder;
 use ejdb2::{EJDBQuery, EJDB};
 use moka::sync::Cache;
@@ -105,10 +104,11 @@ impl DocStore {
     pub fn create_collection(
         &self,
         db_addr: &DB3Address,
-        collection: &CollectionMutation,
+        name: &str,
+        indexes: &Vec<Index>,
     ) -> Result<()> {
         //TODO validata the db address
-        if collection.index_fields.len() > 0 {
+        if indexes.len() > 0 {
             let key = db_addr.as_ref().to_vec();
             let add_addr_clone = db_addr.clone();
             let db_root_path = self.config.db_root_path.to_string();
@@ -120,11 +120,11 @@ impl DocStore {
                 }
             });
             if let Some(entry) = db_entry {
-                for field in &collection.index_fields {
+                for field in indexes {
                     entry
                         .value()
                         .ensure_index(
-                            collection.collection_name.as_str(),
+                            name,
                             field.path.as_str(),
                             EJDB_INDEX[field.index_type as usize],
                         )
@@ -338,14 +338,11 @@ mod tests {
         let doc_store = DocStore::new(config).unwrap();
         let db_id_ret = doc_store.create_database(&DB3Address::ZERO);
         assert!(db_id_ret.is_ok());
-        let collection = CollectionMutation {
-            index_fields: vec![Index {
-                path: "/f1".to_string(),
-                index_type: IndexType::StringKey.into(),
-            }],
-            collection_name: "col1".to_string(),
-        };
-        let result = doc_store.create_collection(&DB3Address::ZERO, &collection);
+        let indexes = vec![Index {
+            path: "/f1".to_string(),
+            index_type: IndexType::StringKey.into(),
+        }];
+        let result = doc_store.create_collection(&DB3Address::ZERO, "col1", &indexes);
         assert!(result.is_ok());
         let doc_str = r#"{"f2":"f2", "f1":"f1"}"#;
         let id = doc_store

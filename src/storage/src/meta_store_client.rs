@@ -21,7 +21,7 @@ use ethers::prelude::{LocalWallet, Signer};
 use ethers::{
     contract::abigen,
     core::types::{Address, TxHash, U256},
-    middleware::SignerMiddleware,
+    middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
     providers::{Middleware, Provider, Ws},
 };
 use std::str::FromStr;
@@ -33,7 +33,7 @@ abigen!(Events, "abi/Events.json");
 
 pub struct MetaStoreClient {
     address: Address,
-    client: Arc<SignerMiddleware<Arc<Provider<Ws>>, LocalWallet>>,
+    client: Arc<SignerMiddleware<Arc<NonceManagerMiddleware<Provider<Ws>>>, LocalWallet>>,
 }
 
 unsafe impl Sync for MetaStoreClient {}
@@ -47,6 +47,7 @@ impl MetaStoreClient {
         let provider = Provider::<Ws>::connect(rpc_url).await.map_err(|e| {
             DB3Error::InvalidArUrlError(format!("fail to connect rpc url for error {e}"))
         })?;
+        let provider = provider.nonce_manager(wallet.address());
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
         let client = Arc::new(signable_client);
@@ -202,8 +203,9 @@ mod tests {
         let wallet = LocalWallet::from_bytes(data_ref).unwrap();
         let wallet = wallet.with_chain_id(31337_u32);
         let rollup_node_address = wallet.address();
-        let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+        let contract_addr = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
         let rpc_url = "ws://127.0.0.1:8545";
+        sleep(TokioDuration::from_millis(10 * 1000)).await;
         let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
             .await
             .unwrap();
@@ -242,6 +244,7 @@ mod tests {
         assert_eq!(tx, tx_remote);
         let result = client.create_database(2, "test create db").await;
         assert!(result.is_ok(), "create database {:?}", result);
+        sleep(TokioDuration::from_millis(10 * 1000)).await;
     }
 
     fn hex_to_base64(hex_str: &str) -> String {
