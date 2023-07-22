@@ -25,6 +25,7 @@ use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::meta_store_client::MetaStoreClient;
+use db3_storage::system_store::{SystemRole, SystemStore};
 use ethers::prelude::{LocalWallet, Signer};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -34,11 +35,9 @@ use tracing::info;
 #[derive(Clone)]
 pub struct RecoverConfig {
     pub key_root_path: String,
-    pub ar_node_url: String,
     pub temp_data_path: String,
-    pub contract_addr: String,
-    pub evm_node_url: String,
     pub enable_mutation_recover: bool,
+    pub role: SystemRole,
 }
 pub struct Recover {
     pub config: RecoverConfig,
@@ -51,27 +50,33 @@ pub struct Recover {
 impl Recover {
     pub async fn new(
         config: RecoverConfig,
-        network_id: Arc<AtomicU64>,
-        chain_id: Arc<AtomicU32>,
         db_store: DBStoreV2,
+        system_store: Arc<SystemStore>,
     ) -> Result<Self> {
-        let wallet = Self::build_wallet(config.key_root_path.as_str())?;
+        let system_config = match system_store.get_config(&config.role) {
+            Ok(Some(system_config)) => system_config,
+            Ok(None) => {
+                return Err(DB3Error::StoreEventError(
+                    "system config not found".to_string(),
+                ))
+            }
+            Err(e) => return Err(e),
+        };
+        let chain_id = system_config.chain_id;
+        let wallet = system_store.get_evm_wallet(chain_id)?;
+        let contract_addr = system_config.contract_addr;
+        let evm_node_url = system_config.evm_node_url;
+        let ar_node_url = system_config.ar_node_url;
+        let network_id = Arc::new(AtomicU64::new(system_config.network_id));
         info!(
             "evm address {}",
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
-        //TODO config the chain id
-        let wallet = wallet.with_chain_id(chain_id.load(Ordering::Relaxed));
         let meta_store = Arc::new(
-            MetaStoreClient::new(
-                config.contract_addr.as_str(),
-                config.evm_node_url.as_str(),
-                wallet,
-            )
-            .await?,
+            MetaStoreClient::new(contract_addr.as_str(), evm_node_url.as_str(), wallet).await?,
         );
         let ar_fs_config = ArFileSystemConfig {
-            arweave_url: config.ar_node_url.clone(),
+            arweave_url: ar_node_url,
             key_root_path: config.key_root_path.clone(),
         };
         let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
@@ -87,30 +92,6 @@ impl Recover {
             db_store: Arc::new(db_store),
             network_id,
         })
-    }
-
-    fn build_wallet(key_root_path: &str) -> Result<LocalWallet> {
-        let config = KeyStoreConfig {
-            key_root_path: key_root_path.to_string(),
-        };
-        let key_store = KeyStore::new(config);
-        match key_store.has_key("evm") {
-            true => {
-                let data = key_store.get_key("evm")?;
-                let data_ref: &[u8] = &data;
-                let wallet = LocalWallet::from_bytes(data_ref)
-                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-                Ok(wallet)
-            }
-
-            false => {
-                let mut rng = rand::thread_rng();
-                let wallet = LocalWallet::new(&mut rng);
-                let data = wallet.signer().to_bytes();
-                key_store.write_key("evm", data.deref())?;
-                Ok(wallet)
-            }
-        }
     }
 
     pub async fn start() -> Result<()> {
@@ -224,12 +205,14 @@ impl Recover {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use db3_proto::db3_base_proto::SystemConfig;
     use db3_storage::doc_store::DocStoreConfig;
+    use db3_storage::state_store::{StateStore, StateStoreConfig};
+    use db3_storage::system_store::SystemStoreConfig;
     use std::path::PathBuf;
     use tempdir::TempDir;
+
     async fn build_recover_instance(temp_dir: &TempDir) -> Recover {
-        let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-        let rpc_url = "ws://127.0.0.1:8545";
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let key_root_path = path
             .parent()
@@ -242,7 +225,7 @@ mod tests {
             .to_string();
         let real_path = temp_dir.path().to_str().unwrap().to_string();
         let db_store_config = DBStoreV2Config {
-            db_path: real_path,
+            db_path: real_path.clone(),
             db_store_cf_name: "db".to_string(),
             doc_store_cf_name: "doc".to_string(),
             collection_store_cf_name: "cf2".to_string(),
@@ -257,25 +240,46 @@ mod tests {
 
         let db_store = DBStoreV2::new(db_store_config.clone()).unwrap();
 
+        let state_config = StateStoreConfig {
+            db_path: format!("{real_path}/state_store"),
+        };
+        let state_store = Arc::new(StateStore::new(state_config).unwrap());
+
+        let system_store_config = SystemStoreConfig {
+            key_root_path: key_root_path.to_string(),
+            evm_wallet_key: "evm".to_string(),
+            ar_wallet_key: "ar".to_string(),
+        };
+        let system_store = Arc::new(SystemStore::new(system_store_config, state_store.clone()));
+        let system_config = SystemConfig {
+            min_rollup_size: 1024,
+            rollup_interval: 1000,
+            network_id: 1,
+            evm_node_url: "ws://127.0.0.1:8545".to_string(),
+            ar_node_url: "http://127.0.0.1:1985".to_string(),
+            chain_id: 31337_u32,
+            rollup_max_interval: 2000,
+            contract_addr: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
+            min_gc_offset: 100,
+        };
+        let result = system_store.update_config(&SystemRole::DataIndexNode, &system_config);
+
         let recover = Recover::new(
             RecoverConfig {
                 key_root_path,
-                ar_node_url: "http://127.0.0.1:1984".to_string(),
                 temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
-                contract_addr: contract_addr.to_string(),
-                evm_node_url: rpc_url.to_string(),
                 enable_mutation_recover: true,
+                role: SystemRole::DataIndexNode,
             },
-            Arc::new(AtomicU64::new(1)),
-            Arc::new(AtomicU32::new(31337)),
             db_store,
+            system_store,
         )
         .await
         .unwrap();
         recover
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_get_latest_arweave_tx() {
         let temp_dir = TempDir::new("test_get_latest_arweave_tx").unwrap();
         let recover = build_recover_instance(&temp_dir).await;

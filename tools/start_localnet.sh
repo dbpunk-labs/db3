@@ -67,7 +67,7 @@ echo "start data index node..."
 ../target/${BUILD_MODE}/db3 index  --admin-addr=${ADMIN_ADDR} > index.log 2>&1  &
 curl --connect-timeout 5 http://127.0.0.1:1984/mint/gXJVsUCAmDqv9XeZui0MB2EdGPQEhN86QEnKY0_7vPc/10000000000000000
 sleep 1
-echo "===========the account information=============="
+echo "\n===========the account information=============="
 echo "the AR address ${AR_ADDRESS}"
 echo "the Admin address ${ADMIN_ADDR}"
 echo "the Contract address ${CONTRACT_ADDR}"
