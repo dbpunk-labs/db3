@@ -1,7 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import "@matterlabs/hardhat-zksync-deploy";
-import "@matterlabs/hardhat-zksync-solc";
+//import "@matterlabs/hardhat-zksync-deploy";
+//import "@matterlabs/hardhat-zksync-solc";
 
 const config: HardhatUserConfig = {
   solidity: "0.8.17",
@@ -9,7 +9,7 @@ const config: HardhatUserConfig = {
     version: "latest",
     settings: {},
   },
-  defaultNetwork: "zkSyncTest",
+  //defaultNetwork: "localhost",
   networks: {
     lineaTest: {
       url: "https://linea-goerli.infura.io/v3/1ff2ead2c89442d290c2b99ec01cbab8" || "",
