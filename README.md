@@ -110,9 +110,10 @@ JSON document must be signed by its owner. Only the owner can update or delete t
 | Arweave |  :heavy_check_mark: | :heavy_check_mark:|
 | Polygon |   :heavy_check_mark: [Mumbai](https://mumbai.polygonscan.com/address/0xb9709cE5E749b80978182db1bEdfb8c7340039A9) |   :soon: |
 | Zksync | :soon: |   :soon: |
-| Scroll | :soon: |   :soon: |
+| Scroll | :heavy_check_mark: [alpha](https://scroll.l2scan.co/address/0x91B4BB6c2e6F70F93D89B04c049bFB2D36839d9A) |   :soon: |
 | Arbitrum | :soon: |   :soon: |
 | Optimism | :soon: |   :soon: |
+| Linea| :heavy_check_mark: [testnet](https://goerli.lineascan.build/address/0xfFe5128735D2EFC1bFDF2eD18A99D1eD8d096D94) | :soon: |
 
 If you want us to support the other public chains, just give us an [issue](https://github.com/dbpunk-labs/db3/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.md&title=)
 

@@ -595,6 +595,7 @@ impl StorageNode for StorageNodeV2Impl {
     ) -> std::result::Result<Response<SendMutationResponse>, Status> {
         let network = self.network_id.load(Ordering::Relaxed);
         if network == 0 {
+            warn!("setup the node first");
             return Err(Status::internal(
                 "the system has not been setup".to_string(),
             ));
@@ -605,10 +606,11 @@ impl StorageNode for StorageNodeV2Impl {
             r.signature.as_str(),
         )
         .map_err(|e| {
+            warn!("invalid signature for error {e}");
             Status::invalid_argument(format!("fail to verify the payload and signature {e}"))
         })?;
         let action = MutationAction::from_i32(dm.action)
-            .ok_or(Status::internal("fail to convert action type".to_string()))?;
+            .ok_or(Status::invalid_argument("bad mutation action".to_string()))?;
         // TODO validate the database mutation
         match self.state_store.incr_nonce(&address, nonce) {
             Ok(_) => {
@@ -616,7 +618,10 @@ impl StorageNode for StorageNodeV2Impl {
                 let (id, block, order) = self
                     .storage
                     .generate_mutation_block_and_order(&r.payload, r.signature.as_str())
-                    .map_err(|e| Status::internal(format!("{e}")))?;
+                    .map_err(|e| {
+                        warn!("fail to generate the block and order for {e}");
+                        Status::internal(format!("{e}"))
+                    })?;
                 let response = match self.db_store.apply_mutation(
                     action,
                     dm,
@@ -629,7 +634,6 @@ impl StorageNode for StorageNodeV2Impl {
                 ) {
                     Ok(items) => {
                         let doc_ids_map = MutationUtil::get_create_doc_ids_map(&items);
-
                         self.storage
                             .add_mutation(
                                 &r.payload,
@@ -642,7 +646,10 @@ impl StorageNode for StorageNodeV2Impl {
                                 network,
                                 action,
                             )
-                            .map_err(|e| Status::internal(format!("{e}")))?;
+                            .map_err(|e| {
+                                warn!("fail to add mutation for error {e}");
+                                Status::internal(format!("{e}"))
+                            })?;
                         Response::new(SendMutationResponse {
                             id,
                             code: 0,
@@ -653,6 +660,7 @@ impl StorageNode for StorageNodeV2Impl {
                         })
                     }
                     Err(e) => {
+                        warn!("fail to apply mutation for error {e}");
                         return Err(Status::internal(format!("{e}")));
                     }
                 };
