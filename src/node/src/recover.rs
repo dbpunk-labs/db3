@@ -205,99 +205,54 @@ impl Recover {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node_test_base::NodeTestBase;
+    use crate::rollup_executor::RollupExecutor;
     use db3_proto::db3_base_proto::SystemConfig;
     use db3_storage::doc_store::DocStoreConfig;
+    use db3_storage::mutation_store::MutationStore;
     use db3_storage::state_store::{StateStore, StateStoreConfig};
     use db3_storage::system_store::SystemStoreConfig;
     use std::path::PathBuf;
+    use std::thread::sleep;
     use tempdir::TempDir;
-
-    async fn build_recover_instance(temp_dir: &TempDir) -> Recover {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let key_root_path = path
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("tools/keys")
-            .to_str()
-            .unwrap()
-            .to_string();
-        let real_path = temp_dir.path().to_str().unwrap().to_string();
-        let db_store_config = DBStoreV2Config {
-            db_path: real_path.clone(),
-            db_store_cf_name: "db".to_string(),
-            doc_store_cf_name: "doc".to_string(),
-            collection_store_cf_name: "cf2".to_string(),
-            index_store_cf_name: "index".to_string(),
-            doc_owner_store_cf_name: "doc_owner".to_string(),
-            db_owner_store_cf_name: "db_owner".to_string(),
-            scan_max_limit: 50,
-            enable_doc_store: false,
-            doc_store_conf: DocStoreConfig::default(),
-            doc_start_id: 1000,
-        };
-
-        let db_store = DBStoreV2::new(db_store_config.clone()).unwrap();
-
-        let state_config = StateStoreConfig {
-            db_path: format!("{real_path}/state_store"),
-        };
-        let state_store = Arc::new(StateStore::new(state_config).unwrap());
-
-        let system_store_config = SystemStoreConfig {
-            key_root_path: key_root_path.to_string(),
-            evm_wallet_key: "evm".to_string(),
-            ar_wallet_key: "ar".to_string(),
-        };
-        let system_store = Arc::new(SystemStore::new(system_store_config, state_store.clone()));
-        let system_config = SystemConfig {
-            min_rollup_size: 1024,
-            rollup_interval: 1000,
-            network_id: 1,
-            evm_node_url: "ws://127.0.0.1:8545".to_string(),
-            ar_node_url: "http://127.0.0.1:1985".to_string(),
-            chain_id: 31337_u32,
-            rollup_max_interval: 2000,
-            contract_addr: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
-            min_gc_offset: 100,
-        };
-        let result = system_store.update_config(&SystemRole::DataIndexNode, &system_config);
-
-        let recover = Recover::new(
-            RecoverConfig {
-                key_root_path,
-                temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
-                enable_mutation_recover: true,
-                role: SystemRole::DataIndexNode,
-            },
-            db_store,
-            system_store,
-        )
-        .await
-        .unwrap();
-        recover
-    }
 
     #[tokio::test]
     async fn test_get_latest_arweave_tx() {
-        let temp_dir = TempDir::new("test_get_latest_arweave_tx").unwrap();
-        let recover = build_recover_instance(&temp_dir).await;
-        let res = recover.get_latest_arweave_tx().await;
-        assert!(res.is_ok());
-        println!("res {:?}", res);
+        sleep(std::time::Duration::from_secs(1));
+        let tmp_dir_path = TempDir::new("test_get_latest_arweave_tx").expect("create temp dir");
+        match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
+            Ok((rollup_executor, recover)) => {
+                let result = rollup_executor.process().await;
+                assert_eq!(true, result.is_ok(), "{:?}", result);
+                let result = recover.get_latest_arweave_tx().await;
+                assert_eq!(true, result.is_ok(), "{:?}", result);
+                let tx = result.unwrap();
+                assert!(!tx.is_empty());
+            }
+            Err(e) => {
+                assert!(false, "{e}");
+            }
+        }
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
-        let temp_dir = TempDir::new("test_fetch_arware_tx_from_block").unwrap();
-        let recover = build_recover_instance(&temp_dir).await;
-        let res = recover.fetch_arweave_tx_from_block(0).await;
-        assert!(res.is_ok(), "{:?}", res);
-        let txs = res.unwrap();
-        assert!(txs.len() > 0);
-        println!("end_block: {}", txs[0].1);
-        println!("txs {:?}", txs);
-        assert!(txs[0].2.is_none());
+        sleep(std::time::Duration::from_secs(3));
+        let tmp_dir_path =
+            TempDir::new("test_fetch_arware_tx_from_block").expect("create temp dir");
+        match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
+            Ok((rollup_executor, recover)) => {
+                let result = rollup_executor.process().await;
+                assert_eq!(true, result.is_ok());
+                let result = recover.fetch_arweave_tx_from_block(0).await;
+                assert_eq!(true, result.is_ok());
+                let txs = result.unwrap();
+                assert!(txs.len() > 0);
+                println!("txs: {:?}", txs);
+            }
+            Err(e) => {
+                assert!(false, "{e}");
+            }
+        }
     }
 }
