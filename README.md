@@ -109,7 +109,7 @@ JSON document must be signed by its owner. Only the owner can update or delete t
 |----------|:-------------:|:------:|
 | Arweave |  :heavy_check_mark: | :heavy_check_mark:|
 | Polygon |   :heavy_check_mark: [Mumbai](https://mumbai.polygonscan.com/address/0xb9709cE5E749b80978182db1bEdfb8c7340039A9) |   :soon: |
-| Zksync | :soon: |   :soon: |
+| Zksync | :heavy_check_mark:[testnet](https://goerli.explorer.zksync.io/address/0xB4Ec19674A67dB002fFDeB83e14f9849DA3D1020) |   :soon: |
 | Scroll | :heavy_check_mark: [alpha](https://scroll.l2scan.co/address/0x91B4BB6c2e6F70F93D89B04c049bFB2D36839d9A) |   :soon: |
 | Arbitrum | :soon: |   :soon: |
 | Optimism | :soon: |   :soon: |
