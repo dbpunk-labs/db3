@@ -17,18 +17,14 @@
 
 use crate::ar_toolbox::ArToolBox;
 use crate::mutation_utils::MutationUtil;
-use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::MutationAction;
-use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
-use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::key_store::{KeyStore, KeyStoreConfig};
+use db3_storage::db_store_v2::DBStoreV2;
 use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::system_store::{SystemRole, SystemStore};
-use ethers::prelude::{LocalWallet, Signer};
-use std::ops::Deref;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use ethers::prelude::Signer;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -101,7 +97,7 @@ impl Recover {
     pub async fn recover_from_ar(&self) -> Result<()> {
         info!("start recover from arweave");
         let last_block = self.db_store.recover_block_state()?;
-        let (block, order) = match last_block {
+        let (block, _order) = match last_block {
             Some(block_state) => {
                 info!(
                     "recover the block state done, last block is {:?}",
@@ -205,15 +201,7 @@ impl Recover {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::node_test_base::NodeTestBase;
-    use crate::rollup_executor::RollupExecutor;
-    use db3_proto::db3_base_proto::SystemConfig;
-    use db3_storage::doc_store::DocStoreConfig;
-    use db3_storage::mutation_store::MutationStore;
-    use db3_storage::state_store::{StateStore, StateStoreConfig};
-    use db3_storage::system_store::SystemStoreConfig;
-    use std::path::PathBuf;
+    use crate::node_test_base::tests::NodeTestBase;
     use std::thread::sleep;
     use tempdir::TempDir;
 

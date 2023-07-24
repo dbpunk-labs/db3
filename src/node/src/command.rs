@@ -50,7 +50,7 @@ use tonic::codegen::http::Method;
 use tonic::transport::{ClientTlsConfig, Endpoint, Server};
 use tonic::Status;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{error, info};
+use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
 
 const ABOUT: &str = "
@@ -418,7 +418,7 @@ impl DB3Command {
         doc_db_path: String,
         key_root_path: String,
         recover_temp_path: String,
-        admin_addr: String,
+        _admin_addr: String,
         doc_id_start: i64,
         role: SystemRole,
     ) -> Recover {
@@ -431,7 +431,6 @@ impl DB3Command {
         let state_config = StateStoreConfig {
             db_path: state_db_path.to_string(),
         };
-        let (update_sender, update_receiver) = tokio::sync::mpsc::channel::<()>(8);
         let state_store = Arc::new(StateStore::new(state_config).unwrap());
         let system_store = Arc::new(SystemStore::new(system_store_config, state_store));
         info!("Arweave address {}", system_store.get_ar_address().unwrap());

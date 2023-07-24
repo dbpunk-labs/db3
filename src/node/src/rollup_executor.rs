@@ -337,9 +337,7 @@ impl RollupExecutor {
 }
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::node_test_base::NodeTestBase;
-    use crate::rollup_executor;
+    use crate::node_test_base::tests::NodeTestBase;
     use tempdir::TempDir;
 
     #[tokio::test]
