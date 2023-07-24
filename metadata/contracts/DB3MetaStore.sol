@@ -53,6 +53,7 @@ contract DB3MetaStore is IDB3MetaStore {
         string[] memory indexNodeUrls,
         address[] memory indexNodeAddresses
     ) public {
+        require(networkId != 0, "invalid data network");
         // Check the network must be registered
         require(networkId <= _networkCounter, "Network is not registered");
         Types.DataNetwork storage dataNetwork = _dataNetworks[networkId];
@@ -71,6 +72,7 @@ contract DB3MetaStore is IDB3MetaStore {
     function getDataNetwork(
         uint256 networkId
     ) external view returns (Types.DataNetwork memory dataNetwork) {
+        require(networkId != 0, "invalid data network");
         // Check the data network must be registered
         require(networkId <= _networkCounter, "Data Network is not registered");
         // Get data network struct
@@ -84,6 +86,7 @@ contract DB3MetaStore is IDB3MetaStore {
         string memory rollupNodeUrl,
         address rollupNodeAddress
     ) public {
+        require(networkId != 0, "invalid data network");
         // Check the data network must be registered
         require(networkId <= _networkCounter, "Data Network is not registered");
         // Check if network is registered
@@ -107,6 +110,7 @@ contract DB3MetaStore is IDB3MetaStore {
         uint256 networkId,
         bytes32 latestArweaveTx
     ) public {
+        require(networkId != 0, "invalid data network");
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
         // Check the latestarweavetx
@@ -127,6 +131,7 @@ contract DB3MetaStore is IDB3MetaStore {
 
     function createDocDatabase(uint256 networkId, bytes32 description) public {
         // Check if network is registered
+        require(networkId != 0, "invalid data network");
         require(networkId <= _networkCounter, "Data Network is not registered");
         // Everyone can create a database currently
         _databaseCounter++;
@@ -159,6 +164,7 @@ contract DB3MetaStore is IDB3MetaStore {
         bytes32 licenseName,
         bytes32 licenseContent
     ) public {
+        require(networkId != 0, "invalid data network");
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
         require(name != bytes32(0), "name is empty");
@@ -200,6 +206,7 @@ contract DB3MetaStore is IDB3MetaStore {
     }
 
     function transferNetwork(uint256 networkId, address to) public {
+        require(networkId != 0, "invalid data network");
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
         require(
@@ -221,6 +228,7 @@ contract DB3MetaStore is IDB3MetaStore {
         address db,
         address to
     ) public {
+        require(networkId != 0, "invalid data network");
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
         Types.Database storage database = _databases[networkId][db];
@@ -245,6 +253,7 @@ contract DB3MetaStore is IDB3MetaStore {
     }
 
     function forkNetwork(uint256 networkId) public {
+        require(networkId != 0, "invalid data network");
         // Check if network is registered
         require(networkId <= _networkCounter, "Data Network is not registered");
         Types.DataNetwork storage dataNetwork = _dataNetworks[_networkCounter];

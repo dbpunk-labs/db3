@@ -16,7 +16,7 @@
 //
 
 use crate::indexer_impl::IndexerNodeImpl;
-use crate::recover::Recover;
+use crate::recover::{Recover, RecoverConfig};
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use crate::system_impl::SystemImpl;
@@ -143,8 +143,44 @@ pub enum DB3Command {
         #[clap(long, default_value = "100000")]
         doc_id_start: i64,
     },
+
+    /// Recover rollup/index data
+    #[clap(name = "recover")]
+    Recover {
+        #[clap(subcommand)]
+        cmd: RecoverCommand,
+    },
 }
 
+#[derive(Debug, Parser)]
+#[clap(rename_all = "kebab-case")]
+pub enum RecoverCommand {
+    #[clap(name = "index")]
+    Index {
+        #[clap(short, long, default_value = "./index_meta_db")]
+        meta_db_path: String,
+        #[clap(long, default_value = "./index_state_db")]
+        state_db_path: String,
+        #[clap(short, long, default_value = "./index_doc_db")]
+        doc_db_path: String,
+        #[clap(short, long, default_value = "./keys")]
+        key_root_path: String,
+        #[clap(short, long, default_value = "./recover_index_temp")]
+        recover_temp_path: String,
+        #[clap(
+            short,
+            long,
+            default_value = "0x0000000000000000000000000000000000000000"
+        )]
+        admin_addr: String,
+        /// this is just for upgrade the node
+        #[clap(long, default_value = "100000")]
+        doc_id_start: i64,
+        #[clap(short, long)]
+        verbose: bool,
+    },
+    // TODO: support recover rollup
+}
 impl DB3Command {
     fn build_wallet(key_root_path: &str) -> std::result::Result<LocalWallet, DB3Error> {
         let config = KeyStoreConfig {
@@ -340,7 +376,95 @@ impl DB3Command {
                 r1.unwrap();
                 info!("exit standalone indexer")
             }
+            DB3Command::Recover { cmd } => match cmd {
+                RecoverCommand::Index {
+                    meta_db_path,
+                    state_db_path,
+                    doc_db_path,
+                    key_root_path,
+                    recover_temp_path,
+                    admin_addr,
+                    doc_id_start,
+                    verbose,
+                } => {
+                    let log_level = if verbose {
+                        LevelFilter::DEBUG
+                    } else {
+                        LevelFilter::INFO
+                    };
+
+                    tracing_subscriber::fmt().with_max_level(log_level).init();
+                    info!("{ABOUT}");
+                    let recover = Self::create_recover(
+                        meta_db_path,
+                        state_db_path,
+                        doc_db_path,
+                        key_root_path,
+                        recover_temp_path,
+                        admin_addr,
+                        doc_id_start,
+                        SystemRole::DataIndexNode,
+                    )
+                    .await;
+                    info!("start recovering index node");
+                    recover.recover_from_ar().await.unwrap();
+                }
+            },
         }
+    }
+    async fn create_recover(
+        meta_db_path: String,
+        state_db_path: String,
+        doc_db_path: String,
+        key_root_path: String,
+        recover_temp_path: String,
+        _admin_addr: String,
+        doc_id_start: i64,
+        role: SystemRole,
+    ) -> Recover {
+        let system_store_config = SystemStoreConfig {
+            key_root_path: key_root_path.to_string(),
+            evm_wallet_key: "evm".to_string(),
+            ar_wallet_key: "ar".to_string(),
+        };
+
+        let state_config = StateStoreConfig {
+            db_path: state_db_path.to_string(),
+        };
+        let state_store = Arc::new(StateStore::new(state_config).unwrap());
+        let system_store = Arc::new(SystemStore::new(system_store_config, state_store));
+        info!("Arweave address {}", system_store.get_ar_address().unwrap());
+        info!("Evm address 0x{}", system_store.get_evm_address().unwrap());
+        let doc_store_conf = DocStoreConfig {
+            db_root_path: doc_db_path,
+            in_memory_db_handle_limit: 16,
+        };
+
+        let db_store_config = DBStoreV2Config {
+            db_path: meta_db_path.to_string(),
+            db_store_cf_name: "db_store_cf".to_string(),
+            doc_store_cf_name: "doc_store_cf".to_string(),
+            collection_store_cf_name: "col_store_cf".to_string(),
+            index_store_cf_name: "idx_store_cf".to_string(),
+            doc_owner_store_cf_name: "doc_owner_store_cf".to_string(),
+            db_owner_store_cf_name: "db_owner_cf".to_string(),
+            scan_max_limit: 1000,
+            enable_doc_store: true,
+            doc_store_conf,
+            doc_start_id: doc_id_start,
+        };
+
+        let db_store = DBStoreV2::new(db_store_config.clone()).unwrap();
+        std::fs::create_dir_all(recover_temp_path.as_str()).unwrap();
+        let recover_config = RecoverConfig {
+            key_root_path: key_root_path.to_string(),
+            temp_data_path: recover_temp_path.to_string(),
+            enable_mutation_recover: false,
+            role,
+        };
+        Recover::new(recover_config, db_store, system_store)
+            .await
+            .unwrap()
     }
     /// Start rollup grpc service
     async fn start_rollup_grpc_service(

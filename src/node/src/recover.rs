@@ -17,28 +17,23 @@
 
 use crate::ar_toolbox::ArToolBox;
 use crate::mutation_utils::MutationUtil;
-use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_mutation_v2_proto::MutationAction;
-use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
-use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::key_store::{KeyStore, KeyStoreConfig};
+use db3_storage::db_store_v2::DBStoreV2;
 use db3_storage::meta_store_client::MetaStoreClient;
-use ethers::prelude::{LocalWallet, Signer};
-use std::ops::Deref;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use db3_storage::system_store::{SystemRole, SystemStore};
+use ethers::prelude::Signer;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, info};
 
 #[derive(Clone)]
 pub struct RecoverConfig {
     pub key_root_path: String,
-    pub ar_node_url: String,
     pub temp_data_path: String,
-    pub contract_addr: String,
-    pub evm_node_url: String,
     pub enable_mutation_recover: bool,
+    pub role: SystemRole,
 }
 pub struct Recover {
     pub config: RecoverConfig,
@@ -51,27 +46,33 @@ pub struct Recover {
 impl Recover {
     pub async fn new(
         config: RecoverConfig,
-        network_id: Arc<AtomicU64>,
-        chain_id: Arc<AtomicU32>,
         db_store: DBStoreV2,
+        system_store: Arc<SystemStore>,
     ) -> Result<Self> {
-        let wallet = Self::build_wallet(config.key_root_path.as_str())?;
+        let system_config = match system_store.get_config(&config.role) {
+            Ok(Some(system_config)) => system_config,
+            Ok(None) => {
+                return Err(DB3Error::StoreEventError(
+                    "system config not found".to_string(),
+                ))
+            }
+            Err(e) => return Err(e),
+        };
+        let chain_id = system_config.chain_id;
+        let wallet = system_store.get_evm_wallet(chain_id)?;
+        let contract_addr = system_config.contract_addr;
+        let evm_node_url = system_config.evm_node_url;
+        let ar_node_url = system_config.ar_node_url;
+        let network_id = Arc::new(AtomicU64::new(system_config.network_id));
         info!(
             "evm address {}",
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
-        //TODO config the chain id
-        let wallet = wallet.with_chain_id(chain_id.load(Ordering::Relaxed));
         let meta_store = Arc::new(
-            MetaStoreClient::new(
-                config.contract_addr.as_str(),
-                config.evm_node_url.as_str(),
-                wallet,
-            )
-            .await?,
+            MetaStoreClient::new(contract_addr.as_str(), evm_node_url.as_str(), wallet).await?,
         );
         let ar_fs_config = ArFileSystemConfig {
-            arweave_url: config.ar_node_url.clone(),
+            arweave_url: ar_node_url,
             key_root_path: config.key_root_path.clone(),
         };
         let ar_filesystem = ArFileSystem::new(ar_fs_config)?;
@@ -89,30 +90,6 @@ impl Recover {
         })
     }
 
-    fn build_wallet(key_root_path: &str) -> Result<LocalWallet> {
-        let config = KeyStoreConfig {
-            key_root_path: key_root_path.to_string(),
-        };
-        let key_store = KeyStore::new(config);
-        match key_store.has_key("evm") {
-            true => {
-                let data = key_store.get_key("evm")?;
-                let data_ref: &[u8] = &data;
-                let wallet = LocalWallet::from_bytes(data_ref)
-                    .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
-                Ok(wallet)
-            }
-
-            false => {
-                let mut rng = rand::thread_rng();
-                let wallet = LocalWallet::new(&mut rng);
-                let data = wallet.signer().to_bytes();
-                key_store.write_key("evm", data.deref())?;
-                Ok(wallet)
-            }
-        }
-    }
-
     pub async fn start() -> Result<()> {
         Ok(())
     }
@@ -120,7 +97,7 @@ impl Recover {
     pub async fn recover_from_ar(&self) -> Result<()> {
         info!("start recover from arweave");
         let last_block = self.db_store.recover_block_state()?;
-        let (block, order) = match last_block {
+        let (block, _order) = match last_block {
             Some(block_state) => {
                 info!(
                     "recover the block state done, last block is {:?}",
@@ -158,6 +135,7 @@ impl Recover {
 
     /// recover from arweave tx
     async fn recover_from_arweave_tx(&self, tx: &str, version: Option<String>) -> Result<()> {
+        debug!("recover_from_arweave_tx: {}, version {:?}", tx, version);
         let record_batch_vec = self.ar_toolbox.download_and_parse_record_batch(tx).await?;
         for record_batch in record_batch_vec.iter() {
             let mutations =
@@ -223,77 +201,47 @@ impl Recover {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use db3_storage::doc_store::DocStoreConfig;
-    use std::path::PathBuf;
+    use crate::node_test_base::tests::NodeTestBase;
+    use std::thread::sleep;
     use tempdir::TempDir;
-    async fn build_recover_instance(temp_dir: &TempDir) -> Recover {
-        let contract_addr = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-        let rpc_url = "ws://127.0.0.1:8545";
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let key_root_path = path
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("tools/keys")
-            .to_str()
-            .unwrap()
-            .to_string();
-        let real_path = temp_dir.path().to_str().unwrap().to_string();
-        let db_store_config = DBStoreV2Config {
-            db_path: real_path,
-            db_store_cf_name: "db".to_string(),
-            doc_store_cf_name: "doc".to_string(),
-            collection_store_cf_name: "cf2".to_string(),
-            index_store_cf_name: "index".to_string(),
-            doc_owner_store_cf_name: "doc_owner".to_string(),
-            db_owner_store_cf_name: "db_owner".to_string(),
-            scan_max_limit: 50,
-            enable_doc_store: false,
-            doc_store_conf: DocStoreConfig::default(),
-            doc_start_id: 1000,
-        };
 
-        let db_store = DBStoreV2::new(db_store_config.clone()).unwrap();
-
-        let recover = Recover::new(
-            RecoverConfig {
-                key_root_path,
-                ar_node_url: "http://127.0.0.1:1984".to_string(),
-                temp_data_path: temp_dir.path().to_str().unwrap().to_string(),
-                contract_addr: contract_addr.to_string(),
-                evm_node_url: rpc_url.to_string(),
-                enable_mutation_recover: true,
-            },
-            Arc::new(AtomicU64::new(1)),
-            Arc::new(AtomicU32::new(31337)),
-            db_store,
-        )
-        .await
-        .unwrap();
-        recover
-    }
-
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_get_latest_arweave_tx() {
-        let temp_dir = TempDir::new("test_get_latest_arweave_tx").unwrap();
-        let recover = build_recover_instance(&temp_dir).await;
-        let res = recover.get_latest_arweave_tx().await;
-        assert!(res.is_ok());
-        println!("res {:?}", res);
+        sleep(std::time::Duration::from_secs(1));
+        let tmp_dir_path = TempDir::new("test_get_latest_arweave_tx").expect("create temp dir");
+        match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
+            Ok((rollup_executor, recover)) => {
+                let result = rollup_executor.process().await;
+                assert_eq!(true, result.is_ok(), "{:?}", result);
+                let result = recover.get_latest_arweave_tx().await;
+                assert_eq!(true, result.is_ok(), "{:?}", result);
+                let tx = result.unwrap();
+                assert!(!tx.is_empty());
+            }
+            Err(e) => {
+                assert!(false, "{e}");
+            }
+        }
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
-        let temp_dir = TempDir::new("test_fetch_arware_tx_from_block").unwrap();
-        let recover = build_recover_instance(&temp_dir).await;
-        let res = recover.fetch_arweave_tx_from_block(0).await;
-        assert!(res.is_ok(), "{:?}", res);
-        let txs = res.unwrap();
-        assert!(txs.len() > 0);
-        println!("end_block: {}", txs[0].1);
-        println!("txs {:?}", txs);
-        assert!(txs[0].2.is_none());
+        sleep(std::time::Duration::from_secs(3));
+        let tmp_dir_path =
+            TempDir::new("test_fetch_arware_tx_from_block").expect("create temp dir");
+        match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
+            Ok((rollup_executor, recover)) => {
+                let result = rollup_executor.process().await;
+                assert_eq!(true, result.is_ok());
+                let result = recover.fetch_arweave_tx_from_block(0).await;
+                assert_eq!(true, result.is_ok());
+                let txs = result.unwrap();
+                assert!(txs.len() > 0);
+                println!("txs: {:?}", txs);
+            }
+            Err(e) => {
+                assert!(false, "{e}");
+            }
+        }
     }
 }

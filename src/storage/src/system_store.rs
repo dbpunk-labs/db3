@@ -27,7 +27,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::info;
-
+#[derive(Clone)]
 /// the node role of db3 network
 /// 1. DataRollupNode , rollup the data to arweave
 /// 2. DataIndexNode, index the data and serve the data

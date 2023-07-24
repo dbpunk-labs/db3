@@ -28,7 +28,6 @@ use ethers::core::types::{
 };
 use ethers::prelude::{LocalWallet, Signer};
 use prost::Message;
-use prost_types::field_descriptor_proto::Type::Int64;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tonic::{Status, Streaming};
@@ -39,7 +38,6 @@ pub struct StoreSDKV2 {
     types: Types,
 }
 
-const MAX_BLOCK_ID: u64 = u64::MAX;
 impl StoreSDKV2 {
     pub fn new(
         client: Arc<StorageNodeV2Client<tonic::transport::Channel>>,
