@@ -304,6 +304,17 @@ describe('test db3.js client module', () => {
             } catch (e) {
                 expect(1).toBe(2)
             }
+            const badIndex: Index = {
+                path: 'name',
+                indexType: IndexType.StringKey,
+            }
+            try {
+                const result = await addIndex(collection, [badIndex])
+                expect(1).toBe(2)
+            } catch (e) {
+                expect('the index path must start with /').toBe(e.message)
+            }
+
             const client2 = await createTestClient()
             const collection2 = await getCollection(db.addr, 'col', client2)
             expect(collection2).toBeDefined()
@@ -315,9 +326,18 @@ describe('test db3.js client module', () => {
                     e.message
                 )
             }
+            expect(collection2.indexFields.length).toBe(2)
+            expect(collection2.indexFields[0].path).toBe('/city')
+            expect(collection2.indexFields[0].indexType).toBe(
+                IndexType.StringKey
+            )
+            expect(collection2.indexFields[1].path).toBe('/name')
+            expect(collection2.indexFields[1].indexType).toBe(
+                IndexType.StringKey
+            )
         } catch (e) {
             console.log(e)
-            except(1).toBe(2)
+            expect(1).toBe(2)
         }
     })
     test('test create/update/delete document', async () => {

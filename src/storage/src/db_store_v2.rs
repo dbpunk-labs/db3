@@ -24,7 +24,6 @@ use chashmap::CHashMap;
 use db3_base::bson_util::bytes_to_bson_document;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::DbId;
-use db3_crypto::id_v2::OpEntryId;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_database_v2_proto::{
     database_message, BlockState, Collection, CollectionState as CollectionStateProto,
@@ -501,15 +500,12 @@ impl DBStoreV2 {
         self.get_entry::<Collection>(self.config.collection_store_cf_name.as_str(), ck_ref)
     }
 
-    fn create_collection_internal(
+    fn save_collection_internal(
         &self,
         sender: &DB3Address,
         db_addr: &DB3Address,
         name: &str,
         indexes: &Vec<Index>,
-        block: u64,
-        order: u32,
-        idx: u16,
     ) -> Result<()> {
         let db = self.get_database(db_addr)?;
         if db.is_none() {
@@ -517,18 +513,13 @@ impl DBStoreV2 {
                 "fail to find database".to_string(),
             ));
         }
-        let ck = collection_key::build_collection_key(db_addr, name)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let ck = collection_key::build_collection_key(db_addr, name)?;
         let collection_store_cf_handle = self
             .se
             .cf_handle(self.config.collection_store_cf_name.as_str())
             .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
         let ck_ref: &[u8] = ck.as_ref();
-        let id = OpEntryId::create(block, order, idx)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
-        // validate the index
         let col = Collection {
-            id: id.as_ref().to_vec(),
             name: name.to_string(),
             index_fields: indexes.to_vec(),
             sender: sender.as_ref().to_vec(),
@@ -557,9 +548,9 @@ impl DBStoreV2 {
         sender: &DB3Address,
         db_addr: &DB3Address,
         collection: &CollectionMutation,
-        block: u64,
-        order: u32,
-        idx: u16,
+        _block: u64,
+        _order: u32,
+        _idx: u16,
     ) -> Result<()> {
         if self.is_db_collection_exist(db_addr, collection.collection_name.as_str())? {
             return Err(DB3Error::CollectionAlreadyExist(
@@ -567,14 +558,11 @@ impl DBStoreV2 {
                 db_addr.to_hex(),
             ));
         }
-        self.create_collection_internal(
+        self.save_collection_internal(
             sender,
             db_addr,
             collection.collection_name.as_str(),
             &collection.index_fields,
-            block,
-            order,
-            idx,
         )
     }
 
@@ -998,6 +986,8 @@ impl DBStoreV2 {
                         exist_paths
                     )));
                 }
+                let new_indexes = [collection.index_fields, indexes.clone()].concat();
+                self.save_collection_internal(sender, db_addr, col, &new_indexes)?;
                 Ok(())
             }
             None => Err(DB3Error::CollectionNotFound(
@@ -1056,14 +1046,11 @@ impl DBStoreV2 {
                                 db_addr.to_hex(),
                             ));
                         }
-                        self.create_collection_internal(
+                        self.save_collection_internal(
                             &sender,
                             &db_addr,
                             mint_col_mutation.name.as_str(),
                             &vec![],
-                            block,
-                            order,
-                            0,
                         )?;
                         info!(
                             "add collection with db_addr {}, collection_name: {}, from owner {}",

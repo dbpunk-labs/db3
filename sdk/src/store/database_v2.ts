@@ -142,6 +142,9 @@ export async function createEventDatabase(
  *
  **/
 export async function addIndex(collection: Collection, indexes: Index[]) {
+    if (indexes.filter((item) => !item.path.startsWith('/')).length > 0) {
+        throw new Error('the index path must start with /')
+    }
     const addIndexMutation: AddIndexMutation = {
         collectionName: collection.name,
         indexFields: indexes,

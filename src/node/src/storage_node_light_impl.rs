@@ -665,7 +665,7 @@ impl StorageNode for StorageNodeV2Impl {
                 };
                 Ok(response)
             }
-            Err(e) => Ok(Response::new(SendMutationResponse {
+            Err(_e) => Ok(Response::new(SendMutationResponse {
                 id: "".to_string(),
                 code: 1,
                 msg: "bad nonce".to_string(),
