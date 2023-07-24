@@ -32,7 +32,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 use tempdir::TempDir;
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct ArToolBox {
     pub schema: SchemaRef,
@@ -60,6 +60,7 @@ impl ArToolBox {
     }
 
     pub async fn download_and_parse_record_batch(&self, tx: &str) -> Result<Vec<RecordBatch>> {
+        debug!("Downloading tx {}", tx);
         let tmp_dir = TempDir::new_in(&self.temp_data_path, "download")
             .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
         let file_path = tmp_dir.path().join(format!("{}.gz.parquet", tx));
@@ -237,6 +238,7 @@ impl ArToolBox {
         record_batch: &RecordBatch,
         version: Option<String>,
     ) -> Result<Vec<(MutationBody, u64, u32, String)>> {
+        debug!("convert_recordbatch_to_mutation version {:?}", version);
         let mut mutations = Vec::new();
         let payloads = record_batch
             .column_by_name("payload")

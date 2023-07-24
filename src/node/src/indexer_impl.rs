@@ -30,21 +30,21 @@ use db3_proto::db3_storage_proto::block_response::MutationWrapper;
 use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
-use db3_storage::db_store_v2::{DBStoreV2};
-use db3_storage::system_store::SystemStore;
+use db3_storage::db_store_v2::DBStoreV2;
+use db3_storage::system_store::{SystemRole, SystemStore};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
 use tokio::task;
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
-use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
     processor_mapping: Arc<Mutex<HashMap<String, Arc<EventProcessor>>>>,
-    _system_store: Arc<SystemStore>,
+    system_store: Arc<SystemStore>,
 }
 
 impl IndexerNodeImpl {
@@ -52,11 +52,28 @@ impl IndexerNodeImpl {
         Ok(Self {
             db_store,
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
-            _system_store: system_store,
+            system_store,
         })
     }
 
-    pub async fn subscribe_update(&self, _update_receiver: Receiver<()>) {}
+    pub async fn subscribe_update(&self, mut update_receiver: Receiver<()>) {
+        let local_system_store = self.system_store.clone();
+        tokio::spawn(async move {
+            info!("listen to subscription update event and event message broadcaster");
+            loop {
+                tokio::select! {
+                    Some(()) = update_receiver.recv() => {
+                        info!("receive update event");
+                        if let Ok(Some(c)) = local_system_store.get_config(&SystemRole::DataIndexNode) {
+                            info!("system config update {:?}", c);
+                            // TODO: update index local system config
+                        }
+
+                    }
+                }
+            }
+        });
+    }
     pub async fn recover(&self, store_sdk: &StoreSDKV2) -> Result<()> {
         self.recover_state().await?;
         self.recover_from_fetched_blocks(store_sdk).await?;
