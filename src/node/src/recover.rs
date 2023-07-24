@@ -30,7 +30,7 @@ use ethers::prelude::{LocalWallet, Signer};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, info};
 
 #[derive(Clone)]
 pub struct RecoverConfig {
@@ -139,6 +139,7 @@ impl Recover {
 
     /// recover from arweave tx
     async fn recover_from_arweave_tx(&self, tx: &str, version: Option<String>) -> Result<()> {
+        debug!("recover_from_arweave_tx: {}, version {:?}", tx, version);
         let record_batch_vec = self.ar_toolbox.download_and_parse_record_batch(tx).await?;
         for record_batch in record_batch_vec.iter() {
             let mutations =

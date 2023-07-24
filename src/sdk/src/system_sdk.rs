@@ -181,4 +181,30 @@ mod tests {
         let response = system_sdk.setup(&config).await.unwrap().into_inner();
         assert_eq!(0, response.code);
     }
+
+    #[tokio::test]
+    async fn test_test_data_index_node_setup() {
+        let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+            .unwrap();
+        let data_ref: &[u8] = data.as_ref();
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let ep = "http://127.0.0.1:26639";
+        let rpc_endpoint = Endpoint::new(ep.to_string()).unwrap();
+        let channel = rpc_endpoint.connect_lazy();
+        let client = Arc::new(SystemClient::new(channel));
+        let system_sdk = SystemSDK::new(client, wallet);
+        let config = SystemConfig {
+            rollup_interval: 10 * 60 * 1000,
+            min_rollup_size: 1024 * 1024,
+            network: 1,
+            chain_id: 31337_u32,
+            contract_address: "0x5fbdb2315678afecb367f032d93f642f64180aa3".to_string(),
+            rollup_max_interval: 24 * 60 * 60 * 1000,
+            evm_node_rpc: "ws://127.0.0.1:8545".to_string(),
+            ar_node_url: "http://127.0.0.1:1984".to_string(),
+            min_gc_offset: 10 * 24 * 60 * 60,
+        };
+        let response = system_sdk.setup(&config).await.unwrap().into_inner();
+        assert_eq!(0, response.code);
+    }
 }

@@ -35,7 +35,7 @@ use db3_sdk::store_sdk_v2::StoreSDKV2;
 use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
 use db3_storage::key_store::{KeyStore, KeyStoreConfig};
 use db3_storage::state_store::{StateStore, StateStoreConfig};
-use db3_storage::system_store::SystemStore;
+use db3_storage::system_store::{SystemRole, SystemStore};
 use ethers::abi::Address;
 use ethers::prelude::{LocalWallet, Signer};
 use std::collections::HashMap;
@@ -65,7 +65,24 @@ impl IndexerNodeImpl {
         })
     }
 
-    pub async fn subscribe_update(&self, _update_receiver: Receiver<()>) {}
+    pub async fn subscribe_update(&self, mut update_receiver: Receiver<()>) {
+        let local_system_store = self.system_store.clone();
+        tokio::spawn(async move {
+            info!("listen to subscription update event and event message broadcaster");
+            loop {
+                tokio::select! {
+                    Some(()) = update_receiver.recv() => {
+                        info!("receive update event");
+                        if let Ok(Some(c)) = local_system_store.get_config(&SystemRole::DataIndexNode) {
+                            info!("system config update {:?}", c);
+                            // TODO: update index local system config
+                        }
+
+                    }
+                }
+            }
+        });
+    }
     pub async fn recover(&self, store_sdk: &StoreSDKV2) -> Result<()> {
         self.recover_state().await?;
         self.recover_from_fetched_blocks(store_sdk).await?;
