@@ -41,7 +41,7 @@ use ethers::{
 
 use prost::Message;
 use std::collections::{BTreeMap, HashMap};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::task;
 use tokio::time::{sleep, Duration};
@@ -50,8 +50,6 @@ use tracing::{info, warn};
 abigen!(DB3MetaStoreEvents, "abi/Events.json");
 
 pub struct MetaStoreEventProcessor {
-    block_number: Arc<AtomicU64>,
-    event_number: Arc<AtomicU64>,
     state_store: Arc<StateStore>,
     last_running: ArcSwapOption<AtomicBool>,
     mutation_type: Types,
@@ -80,8 +78,6 @@ impl MetaStoreEventProcessor {
         });
         let mutation_type: Types = serde_json::from_value(mutation_type).unwrap();
         Self {
-            block_number: Arc::new(AtomicU64::new(0)),
-            event_number: Arc::new(AtomicU64::new(0)),
             state_store,
             last_running: ArcSwapOption::from(None),
             mutation_type,

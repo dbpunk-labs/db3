@@ -16,7 +16,6 @@
 //
 
 use crate::indexer_impl::IndexerNodeImpl;
-use crate::recover::Recover;
 use crate::rollup_executor::RollupExecutorConfig;
 use crate::storage_node_light_impl::{StorageNodeV2Config, StorageNodeV2Impl};
 use crate::system_impl::SystemImpl;

@@ -20,7 +20,6 @@ use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_event::event_processor::EventProcessor;
 use db3_event::event_processor::EventProcessorConfig;
-use db3_proto::db3_database_v2_proto::BlockState;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetContractSyncStatusRequest, GetContractSyncStatusResponse,
@@ -31,25 +30,21 @@ use db3_proto::db3_storage_proto::block_response::MutationWrapper;
 use db3_proto::db3_storage_proto::event_message;
 use db3_proto::db3_storage_proto::EventMessage as EventMessageV2;
 use db3_sdk::store_sdk_v2::StoreSDKV2;
-use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
-use db3_storage::state_store::{StateStore, StateStoreConfig};
+use db3_storage::db_store_v2::{DBStoreV2};
 use db3_storage::system_store::SystemStore;
-use ethers::abi::Address;
-use ethers::prelude::{LocalWallet, Signer};
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
 use tokio::task;
 use tokio::time::{sleep, Duration};
 use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
+use std::collections::HashMap;
 
-const MAX_BLOCK_ID: u64 = u64::MAX;
 #[derive(Clone)]
 pub struct IndexerNodeImpl {
     db_store: DBStoreV2,
     processor_mapping: Arc<Mutex<HashMap<String, Arc<EventProcessor>>>>,
-    system_store: Arc<SystemStore>,
+    _system_store: Arc<SystemStore>,
 }
 
 impl IndexerNodeImpl {
@@ -57,7 +52,7 @@ impl IndexerNodeImpl {
         Ok(Self {
             db_store,
             processor_mapping: Arc::new(Mutex::new(HashMap::new())),
-            system_store,
+            _system_store: system_store,
         })
     }
 
@@ -311,5 +306,3 @@ impl IndexerNode for IndexerNodeImpl {
         }
     }
 }
-#[cfg(test)]
-mod tests {}

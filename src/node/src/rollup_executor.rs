@@ -338,7 +338,7 @@ mod tests {
     use db3_crypto::db3_address::DB3Address;
     use db3_proto::db3_base_proto::SystemConfig;
     use db3_proto::db3_mutation_v2_proto::MutationAction;
-    use db3_storage::db_store_v2::{DBStoreV2, DBStoreV2Config};
+    use db3_storage::db_store_v2::{DBStoreV2Config};
     use db3_storage::doc_store::DocStoreConfig;
     use db3_storage::mutation_store::MutationStoreConfig;
     use db3_storage::state_store::StateStore;
