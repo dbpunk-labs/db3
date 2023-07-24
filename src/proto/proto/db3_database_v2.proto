@@ -75,7 +75,6 @@ message EventTable {
 }
 
 message Collection {
-  bytes id = 1;
   string name = 2;
   repeated Index index_fields = 3;
   bytes sender = 4;

@@ -36,7 +36,7 @@ import { toHEX } from '../crypto/crypto_utils'
  * const account = createFromPrivateKey("0x........")
  * ```
  * @param privatekey - a hex format private key string
- * @returns the instance of {@link DB3ACCOUNT}
+ * @returns the instance of {@link DB3Account}
  *
  **/
 export function createFromPrivateKey(privateKey: Hex) {
@@ -60,7 +60,7 @@ export function createFromPrivateKey(privateKey: Hex) {
  * ```ts
  * const account = createRandomAccount()
  * ```
- * @returns the instance of {@link DB3ACCOUNT}
+ * @returns the instance of {@link DB3Account}
  *
  **/
 export function createRandomAccount() {
@@ -75,7 +75,7 @@ export function createRandomAccount() {
  * ```ts
  * const account = createFromExternal()
  * ```
- * @returns the instance of {@link DB3ACCOUNT}
+ * @returns the instance of {@link DB3Account}
  *
  **/
 export async function createFromExternal(chain?: Chain) {
