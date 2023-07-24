@@ -611,7 +611,6 @@ impl StorageNode for StorageNodeV2Impl {
         })?;
         let action = MutationAction::from_i32(dm.action)
             .ok_or(Status::invalid_argument("bad mutation action".to_string()))?;
-        // TODO validate the database mutation
         match self.state_store.incr_nonce(&address, nonce) {
             Ok(_) => {
                 // mutation id
@@ -666,7 +665,7 @@ impl StorageNode for StorageNodeV2Impl {
                 };
                 Ok(response)
             }
-            Err(_e) => Ok(Response::new(SendMutationResponse {
+            Err(e) => Ok(Response::new(SendMutationResponse {
                 id: "".to_string(),
                 code: 1,
                 msg: "bad nonce".to_string(),

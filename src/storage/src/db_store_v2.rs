@@ -38,7 +38,7 @@ use db3_proto::db3_mutation_v2_proto::{
 use db3_proto::db3_storage_proto::ExtraItem;
 use prost::Message;
 use rocksdb::{DBRawIteratorWithThreadMode, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::path::Path;
@@ -496,8 +496,7 @@ impl DBStoreV2 {
     }
 
     pub fn get_collection(&self, db_addr: &DB3Address, name: &str) -> Result<Option<Collection>> {
-        let ck = collection_key::build_collection_key(db_addr, name)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let ck = collection_key::build_collection_key(db_addr, name)?;
         let ck_ref: &[u8] = ck.as_ref();
         self.get_entry::<Collection>(self.config.collection_store_cf_name.as_str(), ck_ref)
     }
@@ -516,11 +515,6 @@ impl DBStoreV2 {
         if db.is_none() {
             return Err(DB3Error::ReadStoreError(
                 "fail to find database".to_string(),
-            ));
-        }
-        if self.is_db_collection_exist(db_addr, name)? {
-            return Err(DB3Error::ReadStoreError(
-                "collection with name exist".to_string(),
             ));
         }
         let ck = collection_key::build_collection_key(db_addr, name)
@@ -552,7 +546,7 @@ impl DBStoreV2 {
         self.update_db_state_for_new_collection(db_addr_hex.as_str(), name);
         if self.config.enable_doc_store {
             self.doc_store
-                .create_collection(db_addr, name, indexes)
+                .add_index(db_addr, name, indexes)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         }
         Ok(())
@@ -567,6 +561,12 @@ impl DBStoreV2 {
         order: u32,
         idx: u16,
     ) -> Result<()> {
+        if self.is_db_collection_exist(db_addr, collection.collection_name.as_str())? {
+            return Err(DB3Error::CollectionAlreadyExist(
+                collection.collection_name.to_string(),
+                db_addr.to_hex(),
+            ));
+        }
         self.create_collection_internal(
             sender,
             db_addr,
@@ -643,10 +643,10 @@ impl DBStoreV2 {
         query: &Query,
     ) -> Result<(Vec<Document>, u64)> {
         if !self.is_db_collection_exist(db_addr, col_name)? {
-            return Err(DB3Error::ReadStoreError(format!(
-                "collection {col_name} does not exist in db {}",
-                db_addr.to_hex().as_str()
-            )));
+            return Err(DB3Error::CollectionNotFound(
+                col_name.to_string(),
+                db_addr.to_hex(),
+            ));
         }
         if self.config.enable_doc_store {
             let (result, count) = self.doc_store.execute_query(db_addr, col_name, query)?;
@@ -718,8 +718,7 @@ impl DBStoreV2 {
 
     /// verify if the collection exists in the given db
     pub fn is_db_collection_exist(&self, db_addr: &DB3Address, col_name: &str) -> Result<bool> {
-        let ck = collection_key::build_collection_key(db_addr, col_name)
-            .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+        let ck = collection_key::build_collection_key(db_addr, col_name)?;
         let collection_store_cf_handle = self
             .se
             .cf_handle(self.config.collection_store_cf_name.as_str())
@@ -969,6 +968,45 @@ impl DBStoreV2 {
         Ok(db_addr)
     }
 
+    fn add_index<'a>(
+        &self,
+        db_addr: &DB3Address,
+        col: &str,
+        indexes: &Vec<Index>,
+        sender: &DB3Address,
+    ) -> Result<()> {
+        let db = self.get_database(db_addr)?;
+        if db.is_none() {
+            return Err(DB3Error::DatabaseNotFound(db_addr.to_hex()));
+        }
+        match self.get_collection(db_addr, col)? {
+            Some(collection) => {
+                let collection_sender: &[u8] = collection.sender.as_ref();
+                if collection_sender != sender.as_ref() {
+                    return Err(DB3Error::CollectionPermssionDenied());
+                }
+                let path_set: HashSet<&String> =
+                    collection.index_fields.iter().map(|x| &x.path).collect();
+                let exist_paths: Vec<&String> = indexes
+                    .iter()
+                    .filter(|x| path_set.contains(&x.path))
+                    .map(|x| &x.path)
+                    .collect();
+                if exist_paths.len() > 0 {
+                    return Err(DB3Error::InvalidKeyPathError(format!(
+                        "the index paths {:?} exist",
+                        exist_paths
+                    )));
+                }
+                Ok(())
+            }
+            None => Err(DB3Error::CollectionNotFound(
+                col.to_string(),
+                db_addr.to_hex(),
+            )),
+        }
+    }
+
     pub fn apply_mutation(
         &self,
         action: MutationAction,
@@ -982,11 +1020,42 @@ impl DBStoreV2 {
     ) -> Result<Vec<ExtraItem>> {
         let mut items: Vec<ExtraItem> = Vec::new();
         match action {
+            MutationAction::AddIndex => {
+                for body in dm.bodies {
+                    if let Some(Body::AddIndexMutation(ref add_index_mutation)) = &body.body {
+                        let db_address_ref: &[u8] = body.db_address.as_ref();
+                        let db_addr = DB3Address::try_from(db_address_ref)?;
+                        self.add_index(
+                            &db_addr,
+                            add_index_mutation.collection_name.as_str(),
+                            &add_index_mutation.index_fields,
+                            address,
+                        )?;
+                        let item = ExtraItem {
+                            key: "collection".to_string(),
+                            value: add_index_mutation.collection_name.to_string(),
+                        };
+                        items.push(item);
+                        info!(
+                            "add index to collection {} done",
+                            add_index_mutation.collection_name.as_str()
+                        );
+                        break;
+                    }
+                }
+            }
+
             MutationAction::MintCollection => {
                 for body in dm.bodies {
                     if let Some(Body::MintCollectionMutation(ref mint_col_mutation)) = &body.body {
                         let sender = DB3Address::try_from(mint_col_mutation.sender.as_str())?;
                         let db_addr = DB3Address::try_from(mint_col_mutation.db_addr.as_str())?;
+                        if self.is_db_collection_exist(&db_addr, mint_col_mutation.name.as_str())? {
+                            return Err(DB3Error::CollectionAlreadyExist(
+                                mint_col_mutation.name.to_string(),
+                                db_addr.to_hex(),
+                            ));
+                        }
                         self.create_collection_internal(
                             &sender,
                             &db_addr,

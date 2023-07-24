@@ -14,18 +14,25 @@
  * limitations under the License.
  */
 
+export type { DB3Account } from './account/types'
 export {
     createFromPrivateKey,
     createRandomAccount,
     signTypedData,
     createFromExternal,
 } from './account/db3_account'
-export type { DB3Account } from './account/types'
 export type { Client, ReadClient } from './client/types'
-export type { Database, Collection } from './store/types'
+export type {
+    Database,
+    Collection,
+    CreateDBResult,
+    CreateCollectionResult,
+    MutationResult,
+    QueryResult,
+} from './store/types'
 export { addDoc, updateDoc, deleteDoc, queryDoc } from './store/document_v2'
 
-export { SystemConfig, SystemStatus } from './proto/db3_base'
+export { SystemConfig, SystemStatus, Version } from './proto/db3_base'
 export {
     createClient,
     createReadonlyClient,
