@@ -570,7 +570,6 @@ impl DBStoreV2 {
         self.get_entry::<DatabaseMessage>(self.config.db_store_cf_name.as_str(), db_addr.as_ref())
     }
 
-    pub fn get_state_summary(&self) -> Result<(u64, u64)> {}
     pub fn get_collection_state(
         &self,
         db_addr: &DB3Address,
@@ -1198,7 +1197,7 @@ impl DBStoreV2 {
                                 doc_ids_map.get(i.to_string().as_str()),
                             )
                             .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
-                        info!(
+                        debug!(
                                     "add documents with db_addr {}, collection_name: {}, from owner {}, document size: {}",
                                     db_addr.to_hex().as_str(),
                                     doc_mutation.collection_name.as_str(),
