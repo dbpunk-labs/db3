@@ -179,6 +179,9 @@ message MutationStateView {
   uint64 total_gc_bytes = 8;
   uint64 total_rollup_raw_bytes = 9;
   uint64 total_rollup_mutation_count = 10;
+  uint64 total_database_count = 11;
+  uint64 total_collection_count = 12;
+  uint64 total_documents = 13;
 }
 
 message GetMutationStateResponse {

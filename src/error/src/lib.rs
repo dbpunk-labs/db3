@@ -137,7 +137,8 @@ pub enum DB3Error {
 
     #[error("database with addr {0} was not found")]
     DatabaseNotFound(String),
-
+    #[error("database with addr {0} already exist")]
+    DatabaseAlreadyExist(String),
     #[error("collection with name {0} was not found in db {1}")]
     CollectionNotFound(String, String),
     #[error("collection {0} already exist in db {1}")]

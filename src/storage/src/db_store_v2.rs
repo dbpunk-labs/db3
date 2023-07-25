@@ -570,6 +570,7 @@ impl DBStoreV2 {
         self.get_entry::<DatabaseMessage>(self.config.db_store_cf_name.as_str(), db_addr.as_ref())
     }
 
+    pub fn get_state_summary(&self) -> Result<(u64, u64)> {}
     pub fn get_collection_state(
         &self,
         db_addr: &DB3Address,
@@ -888,10 +889,7 @@ impl DBStoreV2 {
         order: u32,
     ) -> Result<()> {
         if let Ok(Some(_)) = self.get_database(db_addr.address()) {
-            return Err(DB3Error::WriteStoreError(format!(
-                "database with address {} exists",
-                db_addr.to_hex()
-            )));
+            return Err(DB3Error::DatabaseAlreadyExist(db_addr.to_hex()));
         }
         let db_store_cf_handle = self
             .se
