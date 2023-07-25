@@ -888,10 +888,7 @@ impl DBStoreV2 {
         order: u32,
     ) -> Result<()> {
         if let Ok(Some(_)) = self.get_database(db_addr.address()) {
-            return Err(DB3Error::WriteStoreError(format!(
-                "database with address {} exists",
-                db_addr.to_hex()
-            )));
+            return Err(DB3Error::DatabaseAlreadyExist(db_addr.to_hex()));
         }
         let db_store_cf_handle = self
             .se
@@ -1200,7 +1197,7 @@ impl DBStoreV2 {
                                 doc_ids_map.get(i.to_string().as_str()),
                             )
                             .map_err(|e| DB3Error::ApplyMutationError(format!("{e}")))?;
-                        info!(
+                        debug!(
                                     "add documents with db_addr {}, collection_name: {}, from owner {}, document size: {}",
                                     db_addr.to_hex().as_str(),
                                     doc_mutation.collection_name.as_str(),
