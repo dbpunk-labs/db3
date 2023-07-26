@@ -131,6 +131,16 @@ impl DBStoreV2 {
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))
     }
 
+    pub fn get_event_db(&self, addr: &DB3Address) -> Result<Option<EventDatabase>> {
+        let database = self.get_database(addr)?;
+        if let Some(db) = database {
+            if let Some(database_message::Database::EventDb(event_db)) = db.database {
+                return Ok(Some(event_db));
+            }
+        }
+        return Ok(None);
+    }
+
     pub fn get_all_event_db(&self) -> Result<Vec<EventDatabase>> {
         let cf_handle = self
             .se
@@ -389,6 +399,14 @@ impl DBStoreV2 {
         &self,
         owner: &DB3Address,
     ) -> Result<(Vec<DatabaseMessage>, Vec<DatabaseStateProto>)> {
+        let (_keys, databases, states) = self.get_database_of_owner_internal(owner)?;
+        Ok((databases, states))
+    }
+
+    fn get_database_of_owner_internal(
+        &self,
+        owner: &DB3Address,
+    ) -> Result<(Vec<Vec<u8>>, Vec<DatabaseMessage>, Vec<DatabaseStateProto>)> {
         let cf_handle = self
             .se
             .cf_handle(self.config.db_owner_store_cf_name.as_str())
@@ -396,6 +414,7 @@ impl DBStoreV2 {
         let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, owner).into();
         let mut entries: Vec<DatabaseMessage> = Vec::new();
         let mut database_state: Vec<DatabaseStateProto> = Vec::new();
+        let mut keys: Vec<Vec<u8>> = Vec::new();
         while it.valid() {
             if let Some(k) = it.key() {
                 if &k[0..owner.as_ref().len()] != owner.as_ref() {
@@ -411,12 +430,15 @@ impl DBStoreV2 {
                     if let Some(state) = self.get_database_state(&addr) {
                         entries.push(d);
                         database_state.push(state);
+                        if let Some(key_ref) = it.key() {
+                            keys.push(key_ref.to_vec());
+                        }
                     }
                 }
             }
             it.next();
         }
-        Ok((entries, database_state))
+        Ok((keys, entries, database_state))
     }
 
     fn get_entries_with_prefix<T>(&self, prefix: &[u8], cf: &str) -> Result<Vec<T>>
@@ -879,6 +901,59 @@ impl DBStoreV2 {
         Ok(db_addr)
     }
 
+    pub fn delete_event_db(&self, sender: &DB3Address, db_addr: &DB3Address) -> Result<()> {
+        match self.get_event_db(db_addr)? {
+            Some(database) => {
+                let sender_ref: &[u8] = database.sender.as_ref();
+                if sender_ref != sender.as_ref() {
+                    return Err(DB3Error::DatabasePermissionDenied());
+                }
+                self.delete_event_db_internal(sender, db_addr)?;
+            }
+            None => return Err(DB3Error::DatabaseNotFound(db_addr.to_hex())),
+        }
+        Ok(())
+    }
+
+    // make sure the db is event db
+    fn delete_event_db_internal(&self, owner: &DB3Address, db_addr: &DB3Address) -> Result<()> {
+        let cf_handle = self
+            .se
+            .cf_handle(self.config.db_owner_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it: DBRawIterator = self.se.prefix_iterator_cf(&cf_handle, owner).into();
+        let mut batch = WriteBatch::default();
+        while it.valid() {
+            if let Some(k) = it.key() {
+                if &k[0..owner.as_ref().len()] != owner.as_ref() {
+                    break;
+                }
+            } else {
+                break;
+            }
+            if let Some(v) = it.value() {
+                let addr = DB3Address::try_from(v)
+                    .map_err(|e| DB3Error::ReadStoreError(format!("{e}")))?;
+                if addr.as_ref() == db_addr.as_ref() {
+                    if let Some(key_ref) = it.key() {
+                        batch.delete_cf(&cf_handle, key_ref);
+                    }
+                    break;
+                }
+            }
+            it.next();
+        }
+        let db_store_cf_handle = self
+            .se
+            .cf_handle(self.config.db_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        batch.delete_cf(&db_store_cf_handle, db_addr);
+        self.se
+            .write(batch)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(())
+    }
+
     pub fn create_predefined_doc_database(
         &self,
         sender: &DB3Address,
@@ -968,7 +1043,7 @@ impl DBStoreV2 {
             Some(collection) => {
                 let collection_sender: &[u8] = collection.sender.as_ref();
                 if collection_sender != sender.as_ref() {
-                    return Err(DB3Error::CollectionPermssionDenied());
+                    return Err(DB3Error::CollectionPermissionDenied());
                 }
                 let path_set: HashSet<&String> =
                     collection.index_fields.iter().map(|x| &x.path).collect();
@@ -1007,6 +1082,22 @@ impl DBStoreV2 {
     ) -> Result<Vec<ExtraItem>> {
         let mut items: Vec<ExtraItem> = Vec::new();
         match action {
+            MutationAction::DeleteEventDb => {
+                for body in dm.bodies {
+                    if let Some(Body::DeleteEventDatabaseMutation(ref _del_mutation)) = &body.body {
+                        let db_address_ref: &[u8] = body.db_address.as_ref();
+                        let db_addr = DB3Address::try_from(db_address_ref)?;
+                        self.delete_event_db(address, &db_addr)?;
+                        let item = ExtraItem {
+                            key: "db_addr".to_string(),
+                            value: db_addr.to_hex(),
+                        };
+                        items.push(item)
+                    }
+                    break;
+                }
+            }
+
             MutationAction::AddIndex => {
                 for body in dm.bodies {
                     if let Some(Body::AddIndexMutation(ref add_index_mutation)) = &body.body {
@@ -1414,6 +1505,49 @@ mod tests {
     }
 
     #[test]
+    fn event_db_smoke_test() {
+        let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let config = DBStoreV2Config {
+            db_path: real_path,
+            db_store_cf_name: "db".to_string(),
+            doc_store_cf_name: "doc".to_string(),
+            collection_store_cf_name: "cf2".to_string(),
+            index_store_cf_name: "index".to_string(),
+            doc_owner_store_cf_name: "doc_owner".to_string(),
+            db_owner_store_cf_name: "db_owner".to_string(),
+            scan_max_limit: 50,
+            enable_doc_store: false,
+            doc_store_conf: DocStoreConfig::default(),
+            doc_start_id: 1000,
+        };
+        let result = DBStoreV2::new(config);
+        assert_eq!(result.is_ok(), true);
+        let emutation = EventDatabaseMutation {
+            contract_address: "".to_string(),
+            ttl: 0,
+            desc: "desc".to_string(),
+            tables: vec![],
+            events_json_abi: "".to_string(),
+            evm_node_url: "".to_string(),
+            start_block: 0,
+        };
+        let db3_store = result.unwrap();
+        let result = db3_store.create_event_database(&DB3Address::ZERO, &emutation, 1, 1, 1, 1);
+        assert_eq!(result.is_ok(), true);
+        let db_id = result.unwrap();
+        if let Ok(Some(_d)) = db3_store.get_event_db(db_id.address()) {
+        } else {
+            assert!(false);
+        }
+        let result = db3_store.delete_event_db(&DB3Address::ZERO, db_id.address());
+        assert_eq!(result.is_ok(), true);
+        if let Ok(Some(_d)) = db3_store.get_event_db(db_id.address()) {
+            assert!(false);
+        }
+    }
+
+    #[test]
     fn test_increase_db_doc_order_ut() {
         let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");
         let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
@@ -1446,6 +1580,7 @@ mod tests {
             .unwrap();
         assert_eq!(result, Some(vec![1, 2, 3]));
     }
+
     #[test]
     fn test_update_db_state_for_add_docs_with_given_doc_ids() {
         let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");

@@ -33,11 +33,57 @@ import {
     DocumentDatabaseMutation,
     EventDatabaseMutation,
     AddIndexMutation,
+    DeleteEventDatabaseMutation,
 } from '../proto/db3_mutation_v2'
 
 import { Client, ReadClient } from '../client/types'
 import { toHEX, fromHEX } from '../crypto/crypto_utils'
 import { Index } from '../proto/db3_database_v2'
+
+/**
+ *
+ * Delete the event database
+ *
+ * ```ts
+ * const result = await deleteEventDatabase(client,
+ *                                          "0x....")
+ * ```
+ * @param client            - the client instance
+ * @param address           - the address of event database
+ * @returns the {@link MutationResult}
+ * @note only the owner of event database can delete the event database
+ *
+ **/
+export async function deleteEventDatabase(client: Client, dbAddress: string) {
+    const mutation: DeleteEventDatabaseMutation = {}
+    const body: Mutation_BodyWrapper = {
+        body: {
+            oneofKind: 'deleteEventDatabaseMutation',
+            deleteEventDatabaseMutation: mutation,
+        },
+        dbAddress: fromHEX(dbAddress),
+    }
+
+    const dm: Mutation = {
+        action: MutationAction.DeleteEventDB,
+        bodies: [body],
+    }
+    const payload = Mutation.toBinary(dm)
+    const response = await client.provider.sendMutation(
+        payload,
+        client.nonce.toString()
+    )
+    if (response.code == 0) {
+        client.nonce += 1
+        return {
+            id: response.id,
+            block: response.block,
+            order: response.order,
+        } as MutationResult
+    } else {
+        throw new Error('fail to create database')
+    }
+}
 
 /**
  *
@@ -413,6 +459,32 @@ export async function createCollection(
  **/
 export async function showCollection(db: Database) {
     const response = await db.client.provider.getCollectionOfDatabase(db.addr)
+    const collectionList = response.collections.map((c, index) => {
+        return {
+            name: c.name,
+            db,
+            indexFields: c.indexFields,
+            internal: c,
+            state: response.states[index],
+        } as Collection
+    })
+    return collectionList
+}
+
+/**
+ *
+ * Query collections in the database from the index
+ *
+ * ```ts
+ * const collections = await showCollectionFromIndex(db)
+ * ```
+ *
+ * @param db  - the instance of database
+ * @returns the {@link Collection[]}
+ *
+ **/
+export async function showCollectionFromIndex(db: Database) {
+    const response = await db.client.indexer.getCollectionOfDatabase(db.addr)
     const collectionList = response.collections.map((c, index) => {
         return {
             name: c.name,

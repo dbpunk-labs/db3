@@ -139,12 +139,14 @@ pub enum DB3Error {
     DatabaseNotFound(String),
     #[error("database with addr {0} already exist")]
     DatabaseAlreadyExist(String),
+    #[error("You have no permission to delete the database")]
+    DatabasePermissionDenied(),
     #[error("collection with name {0} was not found in db {1}")]
     CollectionNotFound(String, String),
     #[error("collection {0} already exist in db {1}")]
     CollectionAlreadyExist(String, String),
     #[error("You have no permission to modify the collection")]
-    CollectionPermssionDenied(),
+    CollectionPermissionDenied(),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

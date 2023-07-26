@@ -55,9 +55,11 @@ export {
     showDatabase,
     createCollection,
     showCollection,
+    showCollectionFromIndex,
     getDatabase,
     getCollection,
     addIndex,
+    deleteEventDatabase
 } from './store/database_v2'
 
 export { Index, IndexType } from './proto/db3_database_v2'
