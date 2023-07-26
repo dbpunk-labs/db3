@@ -24,6 +24,7 @@ import { SystemClient } from '../proto/db3_system.client'
 import {
     RunQueryRequest,
     GetContractSyncStatusRequest,
+    GetCollectionOfDatabaseRequest,
 } from '../proto/db3_indexer'
 import { SetupRequest, GetSystemStatusRequest } from '../proto/db3_system'
 import { Query } from '../proto/db3_database_v2'
@@ -84,7 +85,6 @@ export class IndexerProvider {
     }
     async getContractSyncStatus() {
         const request: GetContractSyncStatusRequest = {}
-
         try {
             const { response } = await this.client.getContractSyncStatus(
                 request
@@ -92,6 +92,20 @@ export class IndexerProvider {
             return response
         } catch (e) {
             throw new DB3Error(e as RpcError)
+        }
+    }
+
+    async getCollectionOfDatabase(db: string) {
+        const request: GetCollectionOfDatabaseRequest = {
+            dbAddr: db,
+        }
+        try {
+            const { response } = await this.client.getCollectionOfDatabase(
+                request
+            )
+            return response
+        } catch (e) {
+            throw new DB3Error(e)
         }
     }
 }

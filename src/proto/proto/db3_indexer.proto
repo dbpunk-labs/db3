@@ -47,13 +47,23 @@ message ContractSyncStatus {
   uint64 event_number = 4;
 }
 
+message GetCollectionOfDatabaseResponse {
+  repeated db3_database_v2_proto.Collection collections = 1;
+  repeated db3_database_v2_proto.CollectionState states = 2;
+}
+message GetCollectionOfDatabaseRequest {
+  string db_addr = 1;
+}
+
 message GetContractSyncStatusResponse {
   repeated ContractSyncStatus status_list = 1;
 }
+
 message GetContractSyncStatusRequest {}
 
 service IndexerNode {
   rpc GetContractSyncStatus(GetContractSyncStatusRequest) returns (GetContractSyncStatusResponse) {}
+  rpc GetCollectionOfDatabase(GetCollectionOfDatabaseRequest) returns (GetCollectionOfDatabaseResponse) {}
   // method for query document
   rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
 }
