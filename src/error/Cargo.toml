@@ -1,6 +1,6 @@
 [package]
 name = "db3-error"
-version = "0.1.0"
+version = "0.4.2"
 edition = "2021"
 authors = ["jack wang <jackwang@db3.network>"]
 description = "error module of db3"
