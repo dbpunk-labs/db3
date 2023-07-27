@@ -49,6 +49,7 @@ type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, StorageEngine>;
 const STATE_CF: &str = "DB_STATE_CF";
 const BLOCK_STATE_CF: &str = "BLOCK_STATE_CF";
 const BLOCK_STATE_KEY: &str = "BLOCK_STATE_KEY";
+
 #[derive(Clone)]
 pub struct DBStoreV2Config {
     pub db_path: String,
@@ -131,6 +132,28 @@ impl DBStoreV2 {
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))
     }
 
+    pub fn flush_database_state(&self) -> Result<()> {
+        let cf_handle = self
+            .se
+            .cf_handle(self.config.db_store_cf_name.as_str())
+            .ok_or(DB3Error::ReadStoreError("cf is not found".to_string()))?;
+        let mut it = self.se.raw_iterator_cf(&cf_handle);
+        it.seek_to_first();
+        loop {
+            if !it.valid() {
+                break;
+            }
+            if let Some(k) = it.key() {
+                let addr = DB3Address::try_from(k)?;
+                if let Some(state) = self.build_persistence_state(&addr) {
+                    self.put_entry::<DatabaseStatePersistence>(STATE_CF, k, state)?;
+                }
+            }
+            it.next();
+        }
+        Ok(())
+    }
+
     pub fn get_event_db(&self, addr: &DB3Address) -> Result<Option<EventDatabase>> {
         let database = self.get_database(addr)?;
         if let Some(db) = database {
@@ -211,7 +234,7 @@ impl DBStoreV2 {
                     self.db_state.insert(
                         address_str,
                         DatabaseState {
-                            doc_order: state.doc_order,
+                            doc_order: state.doc_order + 1,
                             collection_state,
                             total_doc_count: state.total_col_count,
                         },
@@ -276,6 +299,7 @@ impl DBStoreV2 {
     fn store_block_state(&self, state: BlockState) -> Result<()> {
         self.put_entry(BLOCK_STATE_CF, BLOCK_STATE_KEY.as_ref(), state)
     }
+
     fn recover_from_state(&self, address: &DB3Address) -> Result<Option<DatabaseStatePersistence>> {
         self.get_entry::<DatabaseStatePersistence>(STATE_CF, address.as_ref())
     }
@@ -494,6 +518,7 @@ impl DBStoreV2 {
             .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
         Ok(())
     }
+
     fn get_entry<T>(&self, cf: &str, id: &[u8]) -> Result<Option<T>>
     where
         T: Message + std::default::Default,
@@ -607,6 +632,34 @@ impl DBStoreV2 {
             }
         }
         None
+    }
+
+    fn build_persistence_state(&self, db_addr: &DB3Address) -> Option<DatabaseStatePersistence> {
+        let db_addr_hex = db_addr.to_hex();
+        if let Some(guard) = self.db_state.get(db_addr_hex.as_str()) {
+            let database_state = guard.deref();
+            let collection_states: HashMap<String, CollectionStateProto> = database_state
+                .collection_state
+                .iter()
+                .map(|(key, value)| {
+                    (
+                        key.to_string(),
+                        CollectionStateProto {
+                            total_doc_count: value.total_doc_count,
+                        },
+                    )
+                })
+                .collect();
+            Some(DatabaseStatePersistence {
+                addr: db_addr_hex,
+                total_doc_count: database_state.total_doc_count,
+                total_col_count: database_state.collection_state.len() as u64,
+                collection_states,
+                doc_order: database_state.doc_order,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn get_database_state(&self, db_addr: &DB3Address) -> Option<DatabaseStateProto> {
@@ -1651,6 +1704,104 @@ mod tests {
             assert_eq!(block_state, Some(BlockState { block: 1, order: 2 }));
         }
     }
+    #[test]
+    fn test_recover_db_state_with_persistence() {
+        let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let mut address: Vec<DB3Address> = Vec::new();
+
+        {
+            let config = DBStoreV2Config {
+                db_path: real_path.to_string(),
+                db_store_cf_name: "db".to_string(),
+                doc_store_cf_name: "doc".to_string(),
+                collection_store_cf_name: "cf2".to_string(),
+                index_store_cf_name: "index".to_string(),
+                doc_owner_store_cf_name: "doc_owner".to_string(),
+                db_owner_store_cf_name: "db_owner".to_string(),
+                scan_max_limit: 50,
+                enable_doc_store: false,
+                doc_store_conf: DocStoreConfig::default(),
+                doc_start_id: 1000,
+            };
+            let result = DBStoreV2::new(config);
+            assert_eq!(result.is_ok(), true);
+            let db_m = DocumentDatabaseMutation {
+                db_desc: "test_desc".to_string(),
+            };
+            let db3_store = result.unwrap();
+            let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 1, 1, 1, 1);
+            assert_eq!(result.is_ok(), true);
+            let db_id = result.unwrap();
+            let result = db3_store.create_doc_database(&DB3Address::ZERO, &db_m, 2, 2, 2, 2);
+            assert_eq!(result.is_ok(), true);
+            let db_id2 = result.unwrap();
+
+            let collection = CollectionMutation {
+                index_fields: vec![],
+                collection_name: "col1".to_string(),
+            };
+
+            let result = db3_store.create_collection(
+                &DB3Address::ZERO,
+                db_id.address(),
+                &collection,
+                1,
+                1,
+                1,
+            );
+            assert!(result.is_ok());
+            let result = db3_store.create_collection(
+                &DB3Address::ZERO,
+                db_id2.address(),
+                &collection,
+                1,
+                1,
+                1,
+            );
+            assert!(result.is_ok());
+            let docs = vec!["{\"test\":0}".to_string()];
+            address.push(db_id.address().clone());
+            for _n in 0..1003 {
+                db3_store
+                    .add_docs(db_id.address(), &DB3Address::ZERO, "col1", &docs, None)
+                    .unwrap();
+            }
+            for _n in 0..91 {
+                db3_store
+                    .add_docs(db_id2.address(), &DB3Address::ZERO, "col1", &docs, None)
+                    .unwrap();
+            }
+            let result = db3_store.flush_database_state();
+            assert_eq!(result.is_ok(), true);
+        }
+
+        {
+            let config = DBStoreV2Config {
+                db_path: real_path,
+                db_store_cf_name: "db".to_string(),
+                doc_store_cf_name: "doc".to_string(),
+                collection_store_cf_name: "cf2".to_string(),
+                index_store_cf_name: "index".to_string(),
+                doc_owner_store_cf_name: "doc_owner".to_string(),
+                db_owner_store_cf_name: "db_owner".to_string(),
+                scan_max_limit: 50,
+                enable_doc_store: false,
+                doc_store_conf: DocStoreConfig::default(),
+                doc_start_id: 1000,
+            };
+            let result = DBStoreV2::new(config);
+            let db3_store = result.unwrap();
+            let result = db3_store.recover_db_state();
+            println!("{:?}", result);
+            assert_eq!(result.is_ok(), true);
+            let database_state_ret = db3_store.get_database_state(&address[0]);
+            println!("{:?}", database_state_ret);
+            let database_state = database_state_ret.unwrap();
+            assert_eq!(database_state.doc_order, 1004);
+        }
+    }
+
     #[test]
     fn test_recover_db_state() {
         let tmp_dir_path = TempDir::new("new_database").expect("create temp dir");

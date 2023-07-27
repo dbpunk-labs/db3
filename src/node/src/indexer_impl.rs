@@ -150,7 +150,7 @@ impl IndexerNodeImpl {
                 Ok(handle) => {
                     info!("listen and handle event message");
                     let mut stream = handle.into_inner();
-                    while let Some(event) = stream.message().await.unwrap() {
+                    while let Ok(Some(event)) = stream.message().await {
                         match self.handle_event(event, &store_sdk).await {
                             Err(e) => {
                                 warn!("[IndexerBlockSyncer] handle event error: {:?}", e);
@@ -158,6 +158,7 @@ impl IndexerNodeImpl {
                             _ => {}
                         }
                     }
+                    sleep(Duration::from_millis(1000 * 5)).await;
                 }
                 Err(e) => {
                     warn!("fail to subscribe block event for {e} and retry in 5 seconds");
