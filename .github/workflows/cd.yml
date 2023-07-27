@@ -32,14 +32,15 @@ jobs:
             - name: Setup build env
               run: |
                   ROOT_DIR=`pwd`
+                  sudo apt-get install protobuf-compiler
+                  cargo install cargo-edit
                   cd ${ROOT_DIR}/metadata && yarn install && npx hardhat compile
                   test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
-                  if [[ ${{ matrix.job.target }} == x86_64-unknown-linux-gnu ]]; then
-                    sudo apt-get install protobuf-compiler
-                  fi
-                  if [[ ${{ matrix.job.target }} == x86_64-apple-darwin ]]; then
-                    brew install protobuf
-                  fi
+                  test -e ${ROOT_DIR}/metadata/artifacts/contracts/libraries/Events.sol/Events.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/libraries/Events.sol/Events.json ${ROOT_DIR}/abi/
+                  cd ${ROOT_DIR}
+                  TAG=${GITHUB_REF/refs\/tags\//}
+                  VERSION=${TAG#*v}
+                  cargo set-version --workspace ${VERSION}
             - name: Cargo build
               uses: actions-rs/cargo@v1
               with:
@@ -51,17 +52,14 @@ jobs:
               shell: bash
               run: |
                   cd target/${{ matrix.job.target }}/release
+                  TAG=${GITHUB_REF/refs\/tags\//}
+                  VERSION=${TAG#*v}
                   RELEASE_NAME=db3-${GITHUB_REF/refs\/tags\//}-${{ matrix.job.os-name }}-${{ matrix.job.architecture }}
                   mkdir -p $RELEASE_NAME/bin
                   DB3_BINARY_NAME=db3
                   mv $DB3_BINARY_NAME $TM_BINARY_NAME $RELEASE_NAME/bin/
                   tar czvf $RELEASE_NAME.tar.gz $RELEASE_NAME
-                  ########## create sha256 ##########
-                  if [[ ${{ runner.os }} == 'Windows' ]]; then
-                    certutil -hashfile $RELEASE_NAME.tar.gz sha256 | grep -E [A-Fa-f0-9]{64} > $RELEASE_NAME.sha256
-                  else
-                    shasum -a 256 $RELEASE_NAME.tar.gz > $RELEASE_NAME.sha256
-                  fi
+                  shasum -a 256 $RELEASE_NAME.tar.gz > $RELEASE_NAME.sha256
             - name: Releasing assets
               uses: softprops/action-gh-release@v1
               with:
