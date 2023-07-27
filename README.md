@@ -23,6 +23,8 @@ DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is
 
 # Have a try
 
+<img width="1200" src="./docs/images/986shots_so.jpg" align="center">
+
 ## Set up self-hosted Node
 
 **1. Start docker container**
