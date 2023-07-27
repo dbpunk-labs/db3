@@ -53,6 +53,8 @@ jobs:
               shell: bash
               run: |
                   cd target/${{ matrix.job.target }}/release
+                  TAG=${GITHUB_REF/refs\/tags\//}
+                  VERSION=${TAG#*v}
                   RELEASE_NAME=db3-${GITHUB_REF/refs\/tags\//}-${{ matrix.job.os-name }}-${{ matrix.job.architecture }}
                   mkdir -p $RELEASE_NAME/bin
                   DB3_BINARY_NAME=db3
