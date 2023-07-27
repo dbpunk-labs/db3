@@ -65,6 +65,7 @@ message DatabaseStatePersistence {
   map<string, CollectionState> collection_states = 4;
   int64 doc_order = 5;
 }
+
 message BlockState {
   uint64 block = 1;
   uint32 order = 2;

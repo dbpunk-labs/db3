@@ -180,6 +180,27 @@ impl StorageNodeV2Impl {
     pub async fn start_bg_task(&self) {
         self.start_to_produce_block().await;
         self.start_to_rollup().await;
+        self.start_flush_state().await;
+    }
+
+    async fn start_flush_state(&self) {
+        let local_db_store = self.db_store.clone();
+        let local_running = self.running.clone();
+        task::spawn(async move {
+            info!("start the database meta flush thread");
+            while local_running.load(Ordering::Relaxed) {
+                sleep(TokioDuration::from_millis(60000)).await;
+                match local_db_store.flush_database_state() {
+                    Ok(_) => {
+                        info!("flush database meta done");
+                    }
+                    Err(e) => {
+                        warn!("flush database meta error {e}");
+                    }
+                }
+            }
+            info!("exit the flush thread");
+        });
     }
 
     async fn start_to_produce_block(&self) {
