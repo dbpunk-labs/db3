@@ -85,7 +85,10 @@ if you have any questions, please feel free to ask us for help and you can find 
 
 # Try the testnet
 
+## Try the testnet console
+[https://testnet.db3.network/home](https://testnet.db3.network/home)
 
+## Try the sdk
 | Public Chains   |      Testnet      |  Mainnet |
 |----------|:-------------:|:------:|
 | zksync   |data rollup node:`https://zksync.rollup.testnet.db3.network` <br> data index node:`https://zksync.index.testnet.db3.network`  | :soon: |
