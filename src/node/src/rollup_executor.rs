@@ -36,6 +36,7 @@ use tracing::{info, warn}; // Workaround to use prinltn! for logs.
 pub struct RollupExecutorConfig {
     pub temp_data_path: String,
     pub key_root_path: String,
+    pub use_legacy_tx: bool,
 }
 
 pub struct RollupExecutor {
@@ -71,8 +72,13 @@ impl RollupExecutor {
             let wallet = system_store.get_evm_wallet(c.chain_id)?;
             let min_rollup_size = c.min_rollup_size;
             let meta_store = ArcSwapOption::from(Some(Arc::new(
-                MetaStoreClient::new(c.contract_addr.as_str(), c.evm_node_url.as_str(), wallet)
-                    .await?,
+                MetaStoreClient::new(
+                    c.contract_addr.as_str(),
+                    c.evm_node_url.as_str(),
+                    wallet,
+                    config.use_legacy_tx,
+                )
+                .await?,
             )));
             let ar_fs_config = ArFileSystemConfig {
                 arweave_url: c.ar_node_url.clone(),
@@ -134,8 +140,13 @@ impl RollupExecutor {
             self.rollup_max_interval
                 .store(c.rollup_max_interval, Ordering::Relaxed);
             let meta_store = Some(Arc::new(
-                MetaStoreClient::new(c.contract_addr.as_str(), c.evm_node_url.as_str(), wallet)
-                    .await?,
+                MetaStoreClient::new(
+                    c.contract_addr.as_str(),
+                    c.evm_node_url.as_str(),
+                    wallet,
+                    self.config.use_legacy_tx,
+                )
+                .await?,
             ));
             self.min_gc_round_offset
                 .store(c.min_gc_offset, Ordering::Relaxed);

@@ -104,6 +104,9 @@ pub enum DB3Command {
         /// this is just for upgrade the node
         #[clap(long, default_value = "100000")]
         doc_id_start: i64,
+        /// use the legacy transaction format
+        #[clap(long, default_value = "false")]
+        use_legacy_tx: bool,
     },
 
     /// Start the data index node
@@ -241,6 +244,7 @@ impl DB3Command {
                 key_root_path,
                 admin_addr,
                 doc_id_start,
+                use_legacy_tx,
             } => {
                 let log_level = if verbose {
                     LevelFilter::DEBUG
@@ -261,6 +265,7 @@ impl DB3Command {
                     key_root_path.as_str(),
                     admin_addr.as_str(),
                     doc_id_start,
+                    use_legacy_tx,
                 )
                 .await;
                 let running = Arc::new(AtomicBool::new(true));
@@ -479,11 +484,13 @@ impl DB3Command {
         key_root_path: &str,
         admin_addr: &str,
         doc_start_id: i64,
+        use_legacy_tx: bool,
     ) {
         let listen_addr = format!("{bind_host}:{listening_port}");
         let rollup_config = RollupExecutorConfig {
             temp_data_path: rollup_data_path.to_string(),
             key_root_path: key_root_path.to_string(),
+            use_legacy_tx,
         };
 
         let store_config = MutationStoreConfig {

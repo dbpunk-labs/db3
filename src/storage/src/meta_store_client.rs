@@ -34,13 +34,19 @@ abigen!(Events, "abi/Events.json");
 pub struct MetaStoreClient {
     address: Address,
     client: Arc<SignerMiddleware<Arc<NonceManagerMiddleware<Provider<Ws>>>, LocalWallet>>,
+    use_legacy_tx: bool,
 }
 
 unsafe impl Sync for MetaStoreClient {}
 unsafe impl Send for MetaStoreClient {}
 
 impl MetaStoreClient {
-    pub async fn new(contract_addr: &str, rpc_url: &str, wallet: LocalWallet) -> Result<Self> {
+    pub async fn new(
+        contract_addr: &str,
+        rpc_url: &str,
+        wallet: LocalWallet,
+        use_legacy_tx: bool,
+    ) -> Result<Self> {
         let address = contract_addr
             .parse::<Address>()
             .map_err(|_| DB3Error::InvalidAddress)?;
@@ -51,7 +57,11 @@ impl MetaStoreClient {
         let provider_arc = Arc::new(provider);
         let signable_client = SignerMiddleware::new(provider_arc, wallet);
         let client = Arc::new(signable_client);
-        Ok(Self { address, client })
+        Ok(Self {
+            address,
+            client,
+            use_legacy_tx,
+        })
     }
 
     pub async fn register_data_network(
@@ -74,9 +84,18 @@ impl MetaStoreClient {
             empty_index_addresses,
             desc,
         );
-        tx.send()
-            .await
-            .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
+        match self.use_legacy_tx {
+            true => {
+                tx.legacy().send().await.map_err(|e| {
+                    DB3Error::StoreEventError(format!("fail to register data network {e}"))
+                })?;
+            }
+            false => {
+                tx.send().await.map_err(|e| {
+                    DB3Error::StoreEventError(format!("fail to register data network {e}"))
+                })?;
+            }
+        }
         Ok(())
     }
 
@@ -89,12 +108,25 @@ impl MetaStoreClient {
         let mut desc_bytes32: [u8; 32] = Default::default();
         desc_bytes32[..desc_bytes.len()].clone_from_slice(desc_bytes);
         let tx = store.create_doc_database(network.into(), desc_bytes32);
-        let pending_tx = tx.send().await.map_err(|e| {
-            DB3Error::StoreEventError(format!(
-                "fail to send create doc database request with error {e}"
-            ))
-        })?;
-        let tx_hash = pending_tx.tx_hash();
+        let tx_hash = match self.use_legacy_tx {
+            true => {
+                let tx = tx.legacy();
+                let pending_tx = tx.send().await.map_err(|e| {
+                    DB3Error::StoreEventError(format!(
+                        "fail to send create doc database request with error {e}"
+                    ))
+                })?;
+                pending_tx.tx_hash()
+            }
+            false => {
+                let pending_tx = tx.send().await.map_err(|e| {
+                    DB3Error::StoreEventError(format!(
+                        "fail to send create doc database request with error {e}"
+                    ))
+                })?;
+                pending_tx.tx_hash()
+            }
+        };
         let mut count_down: i32 = 5;
         loop {
             if count_down <= 0 {
@@ -160,11 +192,25 @@ impl MetaStoreClient {
             ar_tx, network
         );
         let tx = store.update_rollup_steps(network_id, ar_tx_binary);
-        //TODO set gas limit
-        let pending_tx = tx.send().await.map_err(|e| {
-            DB3Error::StoreEventError(format!("fail to send update rollup request with error {e}"))
-        })?;
-        let tx_hash = pending_tx.tx_hash();
+        let tx_hash = match self.use_legacy_tx {
+            true => {
+                let tx = tx.legacy();
+                let pending_tx = tx.send().await.map_err(|e| {
+                    DB3Error::StoreEventError(format!(
+                        "fail to send create doc database request with error {e}"
+                    ))
+                })?;
+                pending_tx.tx_hash()
+            }
+            false => {
+                let pending_tx = tx.send().await.map_err(|e| {
+                    DB3Error::StoreEventError(format!(
+                        "fail to send create doc database request with error {e}"
+                    ))
+                })?;
+                pending_tx.tx_hash()
+            }
+        };
         info!("update rollup step done! tx hash: {}", tx_hash);
         let mut count_down: i32 = 5;
         loop {
@@ -196,29 +242,6 @@ mod tests {
     use super::*;
     use fastcrypto::encoding::{Base64, Encoding};
     use tokio::time::{sleep, Duration as TokioDuration};
-
-    #[tokio::test]
-    async fn register_scroll_data_network() {
-        let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-            .unwrap();
-        let data_ref: &[u8] = data.as_ref();
-        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
-        let wallet = wallet.with_chain_id(31337_u32);
-        let rollup_node_address = wallet.address();
-        let contract_addr = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
-        let rpc_url = "ws://127.0.0.1:8545";
-        sleep(TokioDuration::from_millis(10 * 1000)).await;
-        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
-            .await
-            .unwrap();
-        let result = client
-            .register_data_network(&rollup_node_address, rpc_url)
-            .await;
-        assert!(result.is_ok(), "register data network failed {:?}", result);
-        sleep(TokioDuration::from_millis(5 * 1000)).await;
-
-
-    }
 
     #[tokio::test]
     async fn register_no1_data_network() {

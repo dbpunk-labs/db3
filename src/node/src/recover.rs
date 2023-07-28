@@ -69,7 +69,8 @@ impl Recover {
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
         let meta_store = Arc::new(
-            MetaStoreClient::new(contract_addr.as_str(), evm_node_url.as_str(), wallet).await?,
+            MetaStoreClient::new(contract_addr.as_str(), evm_node_url.as_str(), wallet, false)
+                .await?,
         );
         let ar_fs_config = ArFileSystemConfig {
             arweave_url: ar_node_url,

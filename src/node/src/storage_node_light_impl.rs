@@ -718,6 +718,7 @@ mod tests {
         let rollup_config = RollupExecutorConfig {
             temp_data_path: format!("{real_path}/data_path"),
             key_root_path: format!("{real_path}/keys"),
+            use_legacy_tx: false,
         };
 
         let system_store_config = SystemStoreConfig {
