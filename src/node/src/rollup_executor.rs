@@ -303,10 +303,12 @@ impl RollupExecutor {
                     network_id,
                 )
                 .await?;
+
             let (evm_cost, tx_hash) = meta_store
                 .update_rollup_step(id.as_str(), network_id)
                 .await?;
             let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
+
             info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} ar cost {} and evm tx {} and cost {}", now.elapsed().as_secs(),
                 id.as_str(), reward,
                 tx_str.as_str(),

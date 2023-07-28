@@ -79,6 +79,7 @@ impl MetaStoreClient {
             .map_err(|e| DB3Error::StoreEventError(format!("fail to register data network {e}")))?;
         Ok(())
     }
+
     pub async fn create_database(&self, network: u64, desc: &str) -> Result<(U256, TxHash)> {
         let store = DB3MetaStore::new(self.address, self.client.clone());
         let desc_bytes = desc.as_bytes();
@@ -195,6 +196,30 @@ mod tests {
     use super::*;
     use fastcrypto::encoding::{Base64, Encoding};
     use tokio::time::{sleep, Duration as TokioDuration};
+
+    #[tokio::test]
+    async fn register_scroll_data_network() {
+        let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+            .unwrap();
+        let data_ref: &[u8] = data.as_ref();
+        let wallet = LocalWallet::from_bytes(data_ref).unwrap();
+        let wallet = wallet.with_chain_id(31337_u32);
+        let rollup_node_address = wallet.address();
+        let contract_addr = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
+        let rpc_url = "ws://127.0.0.1:8545";
+        sleep(TokioDuration::from_millis(10 * 1000)).await;
+        let client = MetaStoreClient::new(contract_addr, rpc_url, wallet)
+            .await
+            .unwrap();
+        let result = client
+            .register_data_network(&rollup_node_address, rpc_url)
+            .await;
+        assert!(result.is_ok(), "register data network failed {:?}", result);
+        sleep(TokioDuration::from_millis(5 * 1000)).await;
+
+
+    }
+
     #[tokio::test]
     async fn register_no1_data_network() {
         let data = hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
