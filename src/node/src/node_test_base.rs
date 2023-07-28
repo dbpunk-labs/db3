@@ -59,6 +59,7 @@ pub mod tests {
             let rollup_config = RollupExecutorConfig {
                 temp_data_path: format!("{real_path}/rollup_data_path"),
                 key_root_path: key_root_path.to_string(),
+                use_legacy_tx: false,
             };
             if let Err(_e) = std::fs::create_dir_all(rollup_config.temp_data_path.as_str()) {
                 println!("create dir error");
