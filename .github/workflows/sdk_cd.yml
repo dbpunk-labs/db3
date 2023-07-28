@@ -15,8 +15,8 @@ jobs:
             - uses: actions/setup-node@v3.7.0
               with:
                   node-version: "16.x"
-            - uses: CultureHQ/actions-yarn@v1.0.1
-            - run: |
+            - name: build sdk
+              run: |
                 TAG=${GITHUB_REF/refs\/tags\//}
                 VERSION=${TAG#*v}
                 echo ${VERSION}
