@@ -69,12 +69,7 @@ pub enum DB3Error {
     QuerySessionVerifyError(String),
     #[error("fail to query database {0}")]
     QueryDatabaseError(String),
-    #[error("database with addr {0} was not found")]
-    DatabaseNotFound(String),
-    #[error("collection with name {0} was not found in db {1}")]
-    CollectionNotFound(String, String),
-    #[error("collection {0} already exist in db {1}")]
-    CollectionAlreadyExist(String, String),
+
     #[error("the address does not match the public key")]
     InvalidSigner,
     #[error("fail to generate key for {0}")]
@@ -139,6 +134,19 @@ pub enum DB3Error {
     InvalidArUrlError(String),
     #[error("invalid database desc for error {0}")]
     InvalidDescError(String),
+
+    #[error("database with addr {0} was not found")]
+    DatabaseNotFound(String),
+    #[error("database with addr {0} already exist")]
+    DatabaseAlreadyExist(String),
+    #[error("You have no permission to delete the database")]
+    DatabasePermissionDenied(),
+    #[error("collection with name {0} was not found in db {1}")]
+    CollectionNotFound(String, String),
+    #[error("collection {0} already exist in db {1}")]
+    CollectionAlreadyExist(String, String),
+    #[error("You have no permission to modify the collection")]
+    CollectionPermissionDenied(),
 }
 
 pub type Result<T> = std::result::Result<T, DB3Error>;

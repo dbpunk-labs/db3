@@ -92,7 +92,7 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
  * @param col        - the instance of collection
  * @param queryStr   - a document query string
  * @param parameters - an optional query parameters
- * @returns the {@link Queryresult}
+ * @returns the {@link QueryResult}
  *
  **/
 export async function queryDoc<T = DocumentData>(

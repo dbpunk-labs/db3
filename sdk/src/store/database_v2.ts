@@ -32,6 +32,8 @@ import {
     Mutation_BodyWrapper,
     DocumentDatabaseMutation,
     EventDatabaseMutation,
+    AddIndexMutation,
+    DeleteEventDatabaseMutation,
 } from '../proto/db3_mutation_v2'
 
 import { Client, ReadClient } from '../client/types'
@@ -40,13 +42,70 @@ import { Index } from '../proto/db3_database_v2'
 
 /**
  *
+ * Delete the event database
+ *
+ * ```ts
+ * const result = await deleteEventDatabase(client,
+ *                                          "0x....")
+ * ```
+ * @param client            - the client instance
+ * @param address           - the address of event database
+ * @returns the {@link MutationResult}
+ * @note only the owner of event database can delete the event database
+ *
+ **/
+export async function deleteEventDatabase(client: Client, dbAddress: string) {
+    const mutation: DeleteEventDatabaseMutation = {}
+    const body: Mutation_BodyWrapper = {
+        body: {
+            oneofKind: 'deleteEventDatabaseMutation',
+            deleteEventDatabaseMutation: mutation,
+        },
+        dbAddress: fromHEX(dbAddress),
+    }
+
+    const dm: Mutation = {
+        action: MutationAction.DeleteEventDB,
+        bodies: [body],
+    }
+    const payload = Mutation.toBinary(dm)
+    const response = await client.provider.sendMutation(
+        payload,
+        client.nonce.toString()
+    )
+    if (response.code == 0) {
+        client.nonce += 1
+        return {
+            id: response.id,
+            block: response.block,
+            order: response.order,
+        } as MutationResult
+    } else {
+        throw new Error('fail to create database')
+    }
+}
+
+/**
+ *
  * Create an event database to store contract events
  *
  * ```ts
- * const {db, result} = await createEventDatabase(client, "my_db")
+ * const {db, result} = await createEventDatabase(client,
+ *        "my contract event db",
+ *        "0x...",
+ *        ["DepositEvent"],
+ *        "{...}",
+ *        "wss://xxxxx",
+ *        "100000"
+ *        )
  * ```
- * @param client - the db3 client instance
- * @param desc   - the description for the database
+ * @param client            - the client instance
+ * @param desc              - the description for the event database
+ * @param contractAddress   - the contract address
+ * @param tables            - the contract event list
+ * @param abi               - the json abi of contract
+ * @param evmNodeUrl        - the websocket url of evm node
+ * @param startBlock        - the start block to subscribe, 0 start from the latest block
  * @returns the {@link CreateDBResult}
  *
  **/
@@ -113,6 +172,65 @@ export async function createEventDatabase(
 }
 /**
  *
+ * Add index the existing Collection
+ *
+ * ```ts
+ *
+ *  const index:Index = {
+ *    path:'/city', // a top level field name 'city' and the path will be '/city'
+ *    indexType: IndexType.StringKey
+ *  }
+ *  const result = await addIndex(collection, [index])
+ * ```
+ * @param client    - the db3 client instance
+ * @param indexes   - the index list of {@link Index}
+ * @returns the {@link MutationResult}
+ *
+ **/
+export async function addIndex(collection: Collection, indexes: Index[]) {
+    if (indexes.filter((item) => !item.path.startsWith('/')).length > 0) {
+        throw new Error('the index path must start with /')
+    }
+    const addIndexMutation: AddIndexMutation = {
+        collectionName: collection.name,
+        indexFields: indexes,
+    }
+
+    const body: Mutation_BodyWrapper = {
+        body: { oneofKind: 'addIndexMutation', addIndexMutation },
+        dbAddress: fromHEX(collection.db.addr),
+    }
+
+    const dm: Mutation = {
+        action: MutationAction.AddIndex,
+        bodies: [body],
+    }
+    const payload = Mutation.toBinary(dm)
+    try {
+        const response = await collection.db.client.provider.sendMutation(
+            payload,
+            collection.db.client.nonce.toString()
+        )
+        if (response.code == 0) {
+            return {
+                result: {
+                    id: response.id,
+                    block: response.block,
+                    order: response.order,
+                } as MutationResult,
+            }
+        } else {
+            throw new Error('fail to add index with err ' + response.msg)
+        }
+    } catch (e) {
+        throw e
+    } finally {
+        collection.db.client.nonce += 1
+    }
+}
+
+/**
+ *
  * Create a document database to group the collections
  *
  * ```ts
@@ -163,12 +281,12 @@ export async function createDocumentDatabase(client: Client, desc: string) {
  * Get the collection by an db address and collection name
  *
  * ```ts
- * const database = await getCollection("0x....", "col1", client)
+ * const collection = await getCollection("0x....", "col1", client)
  * ```
- * @param addr  - a hex format string address
+ * @param addr  - a hex format string database address
  * @param name  - the name of collection
- * @param client- the db3 client instance
- * @returns the {@link Database}[]
+ * @param client- the client instance
+ * @returns the {@link Collection}
  *
  **/
 export async function getCollection(
@@ -187,6 +305,7 @@ export async function getCollection(
         )
     }
 }
+
 /**
  *
  * Get the database by an address
@@ -271,7 +390,7 @@ export async function showDatabase(owner: string, client: Client | ReadClient) {
  *
  * @param db          - the instance of database
  * @param name        - the name of collection
- * @param indexFields - the fields for index
+ * @param indexFields - the fields for {@link Index}
  * @returns the {@link CreateCollectionResult}
  *
  **/
@@ -340,6 +459,32 @@ export async function createCollection(
  **/
 export async function showCollection(db: Database) {
     const response = await db.client.provider.getCollectionOfDatabase(db.addr)
+    const collectionList = response.collections.map((c, index) => {
+        return {
+            name: c.name,
+            db,
+            indexFields: c.indexFields,
+            internal: c,
+            state: response.states[index],
+        } as Collection
+    })
+    return collectionList
+}
+
+/**
+ *
+ * Query collections in the database from the index
+ *
+ * ```ts
+ * const collections = await showCollectionFromIndex(db)
+ * ```
+ *
+ * @param db  - the instance of database
+ * @returns the {@link Collection[]}
+ *
+ **/
+export async function showCollectionFromIndex(db: Database) {
+    const response = await db.client.indexer.getCollectionOfDatabase(db.addr)
     const collectionList = response.collections.map((c, index) => {
         return {
             name: c.name,

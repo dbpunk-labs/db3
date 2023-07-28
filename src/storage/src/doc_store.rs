@@ -101,13 +101,7 @@ impl DocStore {
         }
     }
 
-    pub fn create_collection(
-        &self,
-        db_addr: &DB3Address,
-        name: &str,
-        indexes: &Vec<Index>,
-    ) -> Result<()> {
-        //TODO validata the db address
+    pub fn add_index(&self, db_addr: &DB3Address, name: &str, indexes: &Vec<Index>) -> Result<()> {
         if indexes.len() > 0 {
             let key = db_addr.as_ref().to_vec();
             let add_addr_clone = db_addr.clone();
@@ -342,7 +336,7 @@ mod tests {
             path: "/f1".to_string(),
             index_type: IndexType::StringKey.into(),
         }];
-        let result = doc_store.create_collection(&DB3Address::ZERO, "col1", &indexes);
+        let result = doc_store.add_index(&DB3Address::ZERO, "col1", &indexes);
         assert!(result.is_ok());
         let doc_str = r#"{"f2":"f2", "f1":"f1"}"#;
         let id = doc_store

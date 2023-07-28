@@ -48,6 +48,7 @@ import {
     createCollection,
     getDatabase,
     getCollection,
+    addIndex,
 } from '../src/store/database_v2'
 import { Index, IndexType } from '../src/proto/db3_database_v2'
 import { SystemConfig } from '../src/proto/db3_base'
@@ -62,7 +63,8 @@ describe('test db3.js client module', () => {
     async function createTestClient() {
         const db3_account = createRandomAccount()
         const client = createClient(
-            'http://127.0.0.1:26619',
+            //'http://127.0.0.1:26619',
+            'https://testnet.db3.network:26100',
             'http://127.0.0.1:26639',
             db3_account
         )
@@ -269,6 +271,74 @@ describe('test db3.js client module', () => {
         } catch (e) {
             console.log(e)
             expect(1).toBe(0)
+        }
+    })
+
+    test('test add index', async () => {
+        const client = await createTestClient()
+        try {
+            const { db } = await createDocumentDatabase(
+                client,
+                'db_for_add index'
+            )
+            expect(db).toBeDefined()
+            const index: Index = {
+                path: '/city',
+                indexType: IndexType.StringKey,
+            }
+            const { collection } = await createCollection(db, 'col', [index])
+            expect(collection).toBeDefined()
+            try {
+                await addIndex(collection, [index])
+            } catch (e) {
+                expect(
+                    'invalid key path for error the index paths ["/city"] exist'
+                ).toBe(e.message)
+            }
+            const index2: Index = {
+                path: '/name',
+                indexType: IndexType.StringKey,
+            }
+            try {
+                const result = await addIndex(collection, [index2])
+                expect(result).toBeDefined()
+            } catch (e) {
+                expect(1).toBe(2)
+            }
+            const badIndex: Index = {
+                path: 'name',
+                indexType: IndexType.StringKey,
+            }
+            try {
+                const result = await addIndex(collection, [badIndex])
+                expect(1).toBe(2)
+            } catch (e) {
+                expect('the index path must start with /').toBe(e.message)
+            }
+
+            const client2 = await createTestClient()
+            const collection2 = await getCollection(db.addr, 'col', client2)
+            expect(collection2).toBeDefined()
+            try {
+                const result = await addIndex(collection2, [index2])
+                expect(1).toBe(2)
+            } catch (e) {
+                expect('You have no permission to modify the collection').toBe(
+                    e.message
+                )
+            }
+            expect(collection2.indexFields.length).toBe(2)
+            expect(collection2.indexFields[0].path).toBe('/city')
+            expect(collection2.indexFields[0].indexType).toBe(
+                IndexType.StringKey
+            )
+            expect(collection2.indexFields[1].path).toBe('/name')
+            expect(collection2.indexFields[1].indexType).toBe(
+                IndexType.StringKey
+            )
+        } catch (e) {
+            console.log(e)
+            expect(1).toBe(2)
         }
     })
     test('test create/update/delete document', async () => {

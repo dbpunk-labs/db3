@@ -1,6 +1,6 @@
 [package]
 name = "db3-sdk"
-version = "0.1.0"
+version = "0.4.2"
 edition = "2021"
 authors = ["jack wang <jackwang@db3.network>"]
 description = "sdk module of db3"
@@ -10,9 +10,9 @@ keywords = ["database", "web3", "db3"]
 
 [dependencies]
 ethers = { workspace = true }
-db3-proto={path="../proto", version="0.1.0"}
-db3-error={path="../error", version="0.1.0"}
-db3-crypto={path="../crypto", version="0.1.0"}
+db3-proto={path="../proto"}
+db3-error={path="../error"}
+db3-crypto={path="../crypto"}
 bytes = { version = "1.0", default-features = false }
 tokio = { version = "1.17.0", features = ["full"] }
 tonic = { workspace=true, features = ["tls-roots"]}
@@ -24,8 +24,8 @@ rand = "0.8.5"
 serde_json = {workspace=true}
 hex = "0.4.3"
 [dev-dependencies]
-db3-base={path="../base", version="0.1.0"}
-db3-cmd={path="../cmd", version="0.1.0"}
+db3-base={path="../base"}
+db3-cmd={path="../cmd" }
 criterion = { version = "0.3.4", default-features = false,features = ["async_futures", "async_tokio"]}
 [[bench]]
 name = "sdk_benchmark"

@@ -17,6 +17,7 @@
 
 use crate::mutation_utils::MutationUtil;
 use crate::version_util;
+use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
 use db3_proto::db3_base_proto::SystemConfig;
 use db3_proto::db3_base_proto::SystemStatus;
@@ -186,6 +187,8 @@ impl System for SystemImpl {
             .get_ar_address()
             .map_err(|e| Status::internal(format!("fail to get ar address {e}")))?;
         let readable_addr = hex::encode(evm_address);
+        let db3_addr = DB3Address::try_from(self.admin_addr.0.as_ref())
+            .map_err(|e| Status::internal(format!("fail to convert the admin address {e}")))?;
         Ok(Response::new(SystemStatus {
             evm_account: format!("0x{}", readable_addr),
             evm_balance: "".to_string(),
@@ -194,7 +197,7 @@ impl System for SystemImpl {
             node_url: self.public_node_url.to_string(),
             config: system_config,
             has_inited,
-            admin_addr: self.admin_addr.to_string(),
+            admin_addr: db3_addr.to_hex(),
             version: Some(version_util::build_version()),
         }))
     }

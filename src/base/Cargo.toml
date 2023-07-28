@@ -1,6 +1,6 @@
 [package]
 name = "db3-base"
-version = "0.1.0"
+version = "0.4.2"
 edition = "2021"
 authors = ["jack wang <jackwang@db3.network>"]
 description = "base module of db3"
@@ -12,8 +12,8 @@ keywords = ["database", "web3", "db3"]
 ethereum-types = { version = "0.14.0", default-features = false }
 hex = "0.4.3"
 fastcrypto="0.1.3"
-db3-proto={path="../proto", version="0.1.0"}
-db3-error={path="../error", version="0.1.0"}
+db3-proto={path="../proto"}
+db3-error={path="../error"}
 rand = "0.8.5"
 bson = "2.5.0"
 serde_json = {workspace=true}

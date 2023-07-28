@@ -23,6 +23,8 @@ DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is
 
 # Have a try
 
+<img width="1200" src="./docs/images/986shots_so.jpg" align="center">
+
 ## Set up self-hosted Node
 
 **1. Start docker container**
@@ -32,6 +34,7 @@ sudo docker run -p 26639:26639 -p 26619:26619 -p 26629:26629 \
                 -e ADMIN_ADDR=0xF78c...29679 \ # use your own wallet address
                 -it ghcr.io/dbpunk-labs/db3:latest 
 ```
+
 you should see the following output
 ```
 start store node...
@@ -41,19 +44,18 @@ start ar testnet ...
 10000000000000Start the local db3 nodes successfully
 The storage node url: http://127.0.0.1:26619
 The index node url: http://127.0.0.1:26639
-The console node url: http://127.0.0.1:26629/console
-The setup url: http://127.0.0.1:26629/welcome
+The console url: http://127.0.0.1:26629
 ```
 
 **2. Setup the node**
 
-* open the `http://127.0.0.1:26629/welcome` to setup your node
-* open the `http://127.0.0.1:26629/console/database` to create database or collection
-* open the `http://127.0.0.1:26629/console/node/dashboard` to vist the dashboard
+* open the `http://127.0.0.1:26629/` to setup your node for the first time
+* open the `http://127.0.0.1:26629/database` to create database or collection
+* open the `http://127.0.0.1:26629/node/dashboard` to vist the dashboard
 
 **3. Playground**
 
-open the `http://127.0.0.1:26629/console/database` to create database or collection, then use the playgound `http://127.0.0.1:26629/console/database/playground` with the following code
+open the `http://127.0.0.1:26629/database` to create database or collection, then go the playgound
 
 ```typescript
 // create a account

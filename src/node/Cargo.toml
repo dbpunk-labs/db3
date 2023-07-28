@@ -1,6 +1,6 @@
 [package]
 name = "db3-node"
-version = "0.1.0"
+version = "0.4.2"
 edition = "2021"
 
 [[bin]]
@@ -10,14 +10,14 @@ path = "src/main.rs"
 [dependencies]
 bytes = { version = "1.4", default-features = false }
 flex-error = { version = "0.4.4", default-features = false }
-db3-proto={path="../proto", version="0.1.0"}
-db3-crypto={path="../crypto", version="0.1.0"}
-db3-storage={path="../storage", version="0.1.0"}
-db3-base={path="../base", version="0.1.0"}
-db3-error={path="../error", version="0.1.0"}
-db3-cmd={path="../cmd", version="0.1.0"}
-db3-sdk={path="../sdk", version="0.1.0"}
-db3-event={path="../event", version="0.1.0"}
+db3-proto={path="../proto"}
+db3-crypto={path="../crypto"}
+db3-storage={path="../storage"}
+db3-base={path="../base"}
+db3-error={path="../error"}
+db3-cmd={path="../cmd"}
+db3-sdk={path="../sdk"}
+db3-event={path="../event"}
 ethers = { workspace = true }
 tonic = { workspace = true }
 tonic-web = { workspace = true }

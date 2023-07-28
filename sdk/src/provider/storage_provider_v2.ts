@@ -131,7 +131,6 @@ export class StorageProviderV2 {
             blockId: block,
             orderId: order,
         }
-
         try {
             const { response } = await this.client.getMutationHeader(request)
             return response

@@ -1,6 +1,6 @@
 [package]
 name = "db3-crypto"
-version = "0.1.0"
+version = "0.4.2"
 edition = "2021"
 authors = ["jack wang <jackwang@db3.network>"]
 description = "crypto module of db3"
@@ -18,7 +18,7 @@ base64ct = { version = "1.5.3", features = ["alloc"] }
 thiserror = "1.0.34"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = {workspace=true}
-serde_with = "2.1.0"
+serde_with = "3.1.0"
 serde_repr = "0.1"
 fastcrypto = { workspace = true, features = ["copy_key"] }
 ethers = { workspace = true }
