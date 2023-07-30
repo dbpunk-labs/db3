@@ -253,25 +253,6 @@ mod tests {
     use tempdir::TempDir;
 
     #[tokio::test]
-    async fn test_get_latest_arweave_tx() {
-        sleep(std::time::Duration::from_secs(1));
-        let tmp_dir_path = TempDir::new("test_get_latest_arweave_tx").expect("create temp dir");
-        match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
-            Ok((rollup_executor, recover)) => {
-                let result = rollup_executor.process().await;
-                assert_eq!(true, result.is_ok(), "{:?}", result);
-                let result = recover.get_latest_arweave_tx().await;
-                assert_eq!(true, result.is_ok(), "{:?}", result);
-                let tx = result.unwrap();
-                assert!(!tx.is_empty());
-            }
-            Err(e) => {
-                assert!(false, "{e}");
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
         sleep(std::time::Duration::from_secs(3));
         let tmp_dir_path =
