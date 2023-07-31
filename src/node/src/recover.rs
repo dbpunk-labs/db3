@@ -17,17 +17,14 @@
 
 use crate::ar_toolbox::ArToolBox;
 use crate::mutation_utils::MutationUtil;
-use bytes::BytesMut;
-use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationBody, MutationHeader};
+use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::db_store_v2::DBStoreV2;
 use db3_storage::meta_store_client::MetaStoreClient;
 use db3_storage::mutation_store::MutationStore;
 use db3_storage::system_store::{SystemRole, SystemStore};
 use ethers::prelude::Signer;
-use prost::Message;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -258,7 +255,7 @@ mod tests {
         let tmp_dir_path =
             TempDir::new("test_fetch_arware_tx_from_block").expect("create temp dir");
         match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
-            Ok((rollup_executor, recover)) => {
+            Ok((rollup_executor, recover, _storage)) => {
                 let result = rollup_executor.process().await;
                 assert_eq!(true, result.is_ok());
                 let result = recover.fetch_arweave_tx_from_block(0).await;

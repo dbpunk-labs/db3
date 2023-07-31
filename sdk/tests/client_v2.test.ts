@@ -63,7 +63,7 @@ describe('test db3.js client module', () => {
     async function createTestClient() {
         const db3_account = createRandomAccount()
         const client = createClient(
-            'http://127.0.0.1:26619',
+            'http://scoll.rollup.testnet.db3.network',
             'http://127.0.0.1:26639',
             db3_account
         )
