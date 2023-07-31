@@ -17,7 +17,7 @@
 
 #[cfg(test)]
 pub mod tests {
-    use crate::recover::{Recover, RecoverConfig};
+    use crate::recover::{Recover, RecoverConfig, RecoverType};
     use crate::rollup_executor::{RollupExecutor, RollupExecutorConfig};
     use db3_crypto::db3_address::DB3Address;
     use db3_error::Result;
@@ -106,16 +106,14 @@ pub mod tests {
             let recover_index_config = RecoverConfig {
                 key_root_path: key_root_path.to_string(),
                 temp_data_path: format!("{real_path}/recover_index_temp_data"),
-                enable_mutation_recover: true,
-                role: SystemRole::DataIndexNode,
+                recover_type: RecoverType::Index,
             };
             if let Err(_e) = std::fs::create_dir_all(recover_index_config.temp_data_path.as_str()) {
             }
             let recover_rollup_config = RecoverConfig {
                 key_root_path: key_root_path.to_string(),
                 temp_data_path: format!("{real_path}/recover_rollup_temp_data"),
-                enable_mutation_recover: true,
-                role: SystemRole::DataRollupNode,
+                recover_type: RecoverType::Rollup,
             };
             if let Err(_e) = std::fs::create_dir_all(recover_rollup_config.temp_data_path.as_str())
             {
@@ -193,6 +191,7 @@ pub mod tests {
                 recover_rollup_config,
                 db_store.clone(),
                 system_store.clone(),
+                None,
             )
             .await?;
             Ok((rollup_executor, rollup_recover))
