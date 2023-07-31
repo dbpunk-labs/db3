@@ -144,9 +144,35 @@ pub mod tests {
             }
         }
 
+        pub fn add_mutations(storage: &MutationStore, rows: u64) -> u64 {
+            let payload: Vec<u8> = vec![1];
+            let signature: &str = "0xasdasdsad";
+            let (_id, block, _order) = storage
+                .generate_mutation_block_and_order(payload.as_ref(), signature)
+                .unwrap();
+            for _i in 0..rows {
+                let (_id, block, order) = storage
+                    .generate_mutation_block_and_order(payload.as_ref(), signature)
+                    .unwrap();
+                let result = storage.add_mutation(
+                    payload.as_ref(),
+                    signature,
+                    "",
+                    &DB3Address::ZERO,
+                    1,
+                    block,
+                    order,
+                    1,
+                    MutationAction::CreateDocumentDb,
+                );
+                assert_eq!(true, result.is_ok());
+            }
+            block
+        }
+
         pub async fn setup_for_smoke_test(
             tmp_dir_path: &TempDir,
-        ) -> Result<(RollupExecutor, Recover)> {
+        ) -> Result<(RollupExecutor, Recover, MutationStore)> {
             let (
                 state_config,
                 system_store_config,
@@ -164,29 +190,10 @@ pub mod tests {
             let result = system_store.update_config(&SystemRole::DataRollupNode, &system_config);
             let db_store = DBStoreV2::new(db_config)?;
             assert_eq!(true, result.is_ok());
-            for _i in 0..3 {
-                let payload: Vec<u8> = vec![1];
-                let signature: &str = "0xasdasdsad";
-                let (_id, block, order) = storage
-                    .generate_mutation_block_and_order(payload.as_ref(), signature)
-                    .unwrap();
-                println!("block: {}, order: {}", block, order);
-                let result = storage.add_mutation(
-                    payload.as_ref(),
-                    signature,
-                    "",
-                    &DB3Address::ZERO,
-                    1,
-                    block,
-                    order,
-                    1,
-                    MutationAction::CreateDocumentDb,
-                );
-                assert_eq!(true, result.is_ok());
-            }
+            Self::add_mutations(&storage, 3);
             let (_, _) = storage.increase_block_return_last_state()?;
             let rollup_executor =
-                RollupExecutor::new(rollup_config, storage, system_store.clone()).await?;
+                RollupExecutor::new(rollup_config, storage.clone(), system_store.clone()).await?;
             let rollup_recover = Recover::new(
                 recover_rollup_config,
                 db_store.clone(),
@@ -194,7 +201,7 @@ pub mod tests {
                 None,
             )
             .await?;
-            Ok((rollup_executor, rollup_recover))
+            Ok((rollup_executor, rollup_recover, storage))
         }
     }
 }

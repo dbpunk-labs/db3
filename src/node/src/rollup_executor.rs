@@ -259,7 +259,7 @@ impl RollupExecutor {
         {
             let network_id = self.network_id.load(Ordering::Relaxed);
             self.storage.flush_state()?;
-            let (last_start_block, last_end_block, tx) =
+            let (_last_start_block, last_end_block, tx) =
                 match self.storage.get_last_rollup_record()? {
                     Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
                     _ => (0_u64, 0_u64, "".to_string()),
@@ -275,7 +275,7 @@ impl RollupExecutor {
                 last_end_block
             );
             self.pending_start_block
-                .store(last_start_block, Ordering::Relaxed);
+                .store(last_end_block, Ordering::Relaxed);
             self.pending_end_block
                 .store(current_block, Ordering::Relaxed);
             let mutations = self
@@ -348,6 +348,7 @@ impl RollupExecutor {
         Ok(())
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::node_test_base::tests::NodeTestBase;
@@ -357,7 +358,7 @@ mod tests {
     async fn test_rollup_smoke_test() {
         let tmp_dir_path = TempDir::new("test_rollup_smoke_test").expect("create temp dir");
         match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
-            Ok((rollup_executor, recover)) => {
+            Ok((rollup_executor, recover, storage)) => {
                 let result = rollup_executor.process().await;
                 assert_eq!(true, result.is_ok());
                 let result = recover.get_latest_arweave_tx().await;
@@ -365,6 +366,29 @@ mod tests {
                 let tx = result.unwrap();
                 println!("the tx is {}", tx);
                 assert!(!tx.is_empty());
+                let result = storage.get_last_rollup_record();
+                assert_eq!(true, result.is_ok());
+                let record = result.unwrap().unwrap();
+                println!(
+                    "start block {} end block {}",
+                    record.start_block, record.end_block
+                );
+                let result = storage.increase_block_return_last_state();
+                assert_eq!(true, result.is_ok());
+                let block = NodeTestBase::add_mutations(&storage, 10);
+                let result = storage.increase_block_return_last_state();
+                assert_eq!(true, result.is_ok());
+                let result = rollup_executor.process().await;
+                assert_eq!(true, result.is_ok());
+                let result = storage.get_last_rollup_record();
+                assert_eq!(true, result.is_ok());
+                let record = result.unwrap().unwrap();
+                println!(
+                    "start block {} end block {}",
+                    record.start_block, record.end_block
+                );
+                assert_eq!(record.end_block, 3);
+                assert_eq!(record.start_block, 1);
             }
             Err(e) => {
                 assert!(false, "{e}");
