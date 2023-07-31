@@ -259,7 +259,7 @@ impl RollupExecutor {
         {
             let network_id = self.network_id.load(Ordering::Relaxed);
             self.storage.flush_state()?;
-            let (last_start_block, last_end_block, tx) =
+            let (_last_start_block, last_end_block, tx) =
                 match self.storage.get_last_rollup_record()? {
                     Some(r) => (r.start_block, r.end_block, r.arweave_tx.to_string()),
                     _ => (0_u64, 0_u64, "".to_string()),
@@ -275,7 +275,7 @@ impl RollupExecutor {
                 last_end_block
             );
             self.pending_start_block
-                .store(last_start_block, Ordering::Relaxed);
+                .store(last_end_block, Ordering::Relaxed);
             self.pending_end_block
                 .store(current_block, Ordering::Relaxed);
             let mutations = self
@@ -373,7 +373,11 @@ mod tests {
                     "start block {} end block {}",
                     record.start_block, record.end_block
                 );
+                let result = storage.increase_block_return_last_state();
+                assert_eq!(true, result.is_ok());
                 let block = NodeTestBase::add_mutations(&storage, 10);
+                let result = storage.increase_block_return_last_state();
+                assert_eq!(true, result.is_ok());
                 let result = rollup_executor.process().await;
                 assert_eq!(true, result.is_ok());
                 let result = storage.get_last_rollup_record();
@@ -383,7 +387,8 @@ mod tests {
                     "start block {} end block {}",
                     record.start_block, record.end_block
                 );
-                assert_eq!(record.end_block, block);
+                assert_eq!(record.end_block, 3);
+                assert_eq!(record.start_block, 1);
             }
             Err(e) => {
                 assert!(false, "{e}");

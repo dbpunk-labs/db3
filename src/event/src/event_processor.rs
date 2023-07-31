@@ -29,6 +29,7 @@ use ethers::{
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use tokio::time::{sleep, Duration};
 use tracing::{info, warn};
 
 #[derive(Debug)]
@@ -43,7 +44,6 @@ pub struct EventProcessorConfig {
 
 pub struct EventProcessor {
     config: EventProcessorConfig,
-    provider: Arc<Provider<Ws>>,
     running: Arc<AtomicBool>,
     db_store: DBStoreV2,
     block_number: Arc<AtomicU64>,
@@ -56,13 +56,8 @@ unsafe impl Send for EventProcessor {}
 impl EventProcessor {
     pub async fn new(config: EventProcessorConfig, db_store: DBStoreV2) -> Result<Self> {
         info!("new event processor with config {:?}", config);
-        let provider = Provider::<Ws>::connect(&config.evm_node_url)
-            .await
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        let provider_arc = Arc::new(provider);
         Ok(Self {
             config,
-            provider: provider_arc,
             running: Arc::new(AtomicBool::new(false)),
             db_store,
             block_number: Arc::new(AtomicU64::new(0)),
@@ -91,8 +86,6 @@ impl EventProcessor {
     }
 
     pub async fn start(&self) -> Result<()> {
-        let abi: Abi = serde_json::from_str(self.config.abi.as_str())
-            .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         self.running
             .store(true, std::sync::atomic::Ordering::Relaxed);
         let address = self
@@ -102,28 +95,10 @@ impl EventProcessor {
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
         let db_addr = DB3Address::from_hex(self.config.db_addr.as_str())
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        let filter = match self.config.start_block == 0 {
-            true => Filter::new().address(address),
-            false => {
-                info!(
-                    "start process contract from block {} with address {}",
-                    self.config.start_block, self.config.contract_addr
-                );
-                Filter::new()
-                    .from_block(self.config.start_block)
-                    .address(address)
-            }
-        };
-        let mut stream = self
-            .provider
-            .subscribe_logs(&filter)
-            .await
+        let abi: Abi = serde_json::from_str(self.config.abi.as_str())
             .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
-        info!(
-            "event processor for contract {}",
-            self.config.contract_addr.as_str()
-        );
-        while let Some(log) = stream.next().await {
+        let local_evm_node_url = self.config.evm_node_url.to_string();
+        loop {
             if !self.running.load(Ordering::Relaxed) {
                 info!(
                     "stop event processor for contract {}",
@@ -131,59 +106,100 @@ impl EventProcessor {
                 );
                 break;
             }
-            if let Some(number) = log.block_number {
-                if number.as_u64() % 10 == 0 {
+            let provider =
+                Provider::<Ws>::connect_with_reconnects(local_evm_node_url.as_str(), 100)
+                    .await
+                    .map_err(|e| DB3Error::StoreEventError(format!("{e}")))?;
+            let provider_arc = Arc::new(provider);
+            let filter = match self.config.start_block == 0 {
+                true => Filter::new().address(address),
+                false => {
                     info!(
-                        "contract {} sync status block {} event number {}",
-                        self.config.contract_addr.as_str(),
-                        self.block_number.load(Ordering::Relaxed),
-                        self.event_number.load(Ordering::Relaxed)
+                        "start process contract from block {} with address {}",
+                        self.config.start_block, self.config.contract_addr
                     );
+                    Filter::new()
+                        .from_block(self.config.start_block)
+                        .address(address)
                 }
-                self.block_number.store(number.as_u64(), Ordering::Relaxed)
-            }
-            for e in abi.events() {
-                // verify
-                let event_signature = log
-                    .topics
-                    .get(0)
-                    .ok_or(DB3Error::StoreEventError(format!("")))?;
+            };
 
-                if event_signature != &e.signature() {
-                    continue;
-                }
-                if !self.config.target_events.contains(e.name.as_str()) {
-                    continue;
-                }
-                let raw_log = RawLog {
-                    topics: log.topics.clone(),
-                    data: log.data.to_vec(),
-                };
-                if let Ok(log_entry) = e.parse_log(raw_log) {
-                    let json_value = Self::log_to_doc(&log_entry);
-                    match serde_json::to_string(&json_value) {
-                        Ok(value) => {
-                            let values = vec![value.to_string()];
-                            if let Err(e) = self.db_store.add_docs(
-                                &db_addr,
-                                &DB3Address::ZERO,
-                                e.name.as_str(),
-                                &values,
-                                None,
-                            ) {
-                                warn!("fail to write json doc {} for {e}", value.as_str());
-                            } else {
-                                self.event_number.fetch_add(1, Ordering::Relaxed);
+            if let Ok(mut stream) = provider_arc.clone().subscribe_logs(&filter).await {
+                loop {
+                    if let Some(log) = stream.next().await {
+                        if !self.running.load(Ordering::Relaxed) {
+                            info!(
+                                "stop event processor for contract {}",
+                                self.config.contract_addr.as_str()
+                            );
+                            break;
+                        }
+                        if let Some(number) = log.block_number {
+                            if number.as_u64() % 10 == 0 {
+                                info!(
+                                    "contract {} sync status block {} event number {}",
+                                    self.config.contract_addr.as_str(),
+                                    self.block_number.load(Ordering::Relaxed),
+                                    self.event_number.load(Ordering::Relaxed)
+                                );
+                            }
+                            self.block_number.store(number.as_u64(), Ordering::Relaxed)
+                        }
+                        for e in abi.events() {
+                            // verify
+                            let event_signature = log
+                                .topics
+                                .get(0)
+                                .ok_or(DB3Error::StoreEventError(format!("")))?;
+                            if event_signature != &e.signature() {
+                                continue;
+                            }
+                            if !self.config.target_events.contains(e.name.as_str()) {
+                                continue;
+                            }
+                            let raw_log = RawLog {
+                                topics: log.topics.clone(),
+                                data: log.data.to_vec(),
+                            };
+                            if let Ok(log_entry) = e.parse_log(raw_log) {
+                                let json_value = Self::log_to_doc(&log_entry);
+                                match serde_json::to_string(&json_value) {
+                                    Ok(value) => {
+                                        let values = vec![value.to_string()];
+                                        if let Err(e) = self.db_store.add_docs(
+                                            &db_addr,
+                                            &DB3Address::ZERO,
+                                            e.name.as_str(),
+                                            &values,
+                                            None,
+                                        ) {
+                                            warn!(
+                                                "fail to write json doc {} for {e}",
+                                                value.as_str()
+                                            );
+                                        } else {
+                                            self.event_number.fetch_add(1, Ordering::Relaxed);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("fail to convert to json for {e} ");
+                                    }
+                                }
+                                break;
                             }
                         }
-                        Err(e) => {
-                            warn!("fail to convert to json for {e} ");
-                        }
+                    } else {
+                        warn!("empty log from stream, sleep 5 seconds and reconnect to it");
+                        sleep(Duration::from_millis(5 * 1000)).await;
+                        break;
                     }
-                    break;
                 }
+            } else {
+                warn!("fail to subscribe the log, sleep 5 seconds and reconnect to it");
+                sleep(Duration::from_millis(5 * 1000)).await;
             }
         }
+
         Ok(())
     }
 
