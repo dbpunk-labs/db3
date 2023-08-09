@@ -237,18 +237,15 @@ impl DocStore {
         }
     }
 
-    pub fn get_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<String> {
+    pub fn get_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<Option<String>> {
         let db_opt = self.get_db_ref(db_addr);
         if let Some(db) = db_opt {
             let opt = db
                 .get::<String>(col_name, id)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-            Ok(opt)
+            Ok(Some(opt))
         } else {
-            Err(DB3Error::WriteStoreError(format!(
-                "no database found with addr {}",
-                db_addr.to_hex()
-            )))
+            Ok(None)
         }
     }
 

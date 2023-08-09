@@ -40,6 +40,7 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
             id: doc.id,
         } as DocumentEntry<T>
     })
+
     return {
         docs: entries,
         collection: col,
@@ -112,6 +113,22 @@ export async function queryDoc<T = DocumentData>(
             parameters,
         }
         return runQueryInternal<T>(col, query)
+    }
+}
+
+export async function getDoc<T = DocumentData>(col: Collection, id: string) {
+    const response = await col.db.client.indexer.getDoc(
+        col.db.addr,
+        col.name,
+        id
+    )
+    if (response.document) {
+        return {
+            doc: JSON.parse(response.document.doc) as T,
+            id: response.document.id,
+        } as DocumentEntry<T>
+    } else {
+        throw new Error('no document was found with id ' + id)
     }
 }
 

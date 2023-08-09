@@ -845,6 +845,30 @@ impl DBStoreV2 {
         Ok(())
     }
 
+    pub fn get_doc(
+        &self,
+        db_addr: &DB3Address,
+        col_name: &str,
+        doc_id: i64,
+    ) -> Result<Option<Document>> {
+        if !self.is_db_collection_exist(db_addr, col_name)? {
+            return Err(DB3Error::CollectionNotFound(
+                col_name.to_string(),
+                db_addr.to_hex(),
+            ));
+        }
+        if self.config.enable_doc_store {
+            let doc = self.doc_store.get_doc(db_addr, col_name, doc_id)?;
+            if let Some(d) = doc {
+                Ok(Some(Document { id: doc_id, doc: d }))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_doc_key_from_doc_id(&self, doc_id: i64) -> Result<Vec<u8>> {
         let doc_owner_store_cf_handle = self
             .se
