@@ -116,6 +116,19 @@ export async function queryDoc<T = DocumentData>(
     }
 }
 
+/**
+ *
+ * This function gets a document from the database by its ID.
+ *
+ * ```ts
+ * const doc = await getDoc(collection, "10")
+ * const id = doc.id
+ * const content = doc.doc
+ * ```
+ * @param col    - the instance of collection
+ * @param id     - the id of document
+ * @returns the {@link DocumentEntry} if the document was found. Otherwise, raises an error.
+ **/
 export async function getDoc<T = DocumentData>(col: Collection, id: string) {
     const response = await col.db.client.indexer.getDoc(
         col.db.addr,
