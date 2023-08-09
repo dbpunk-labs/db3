@@ -40,6 +40,7 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
             id: doc.id,
         } as DocumentEntry<T>
     })
+
     return {
         docs: entries,
         collection: col,
@@ -112,6 +113,35 @@ export async function queryDoc<T = DocumentData>(
             parameters,
         }
         return runQueryInternal<T>(col, query)
+    }
+}
+
+/**
+ *
+ * This function gets a document from the database by its ID.
+ *
+ * ```ts
+ * const doc = await getDoc(collection, "10")
+ * const id = doc.id
+ * const content = doc.doc
+ * ```
+ * @param col    - the instance of collection
+ * @param id     - the id of document
+ * @returns the {@link DocumentEntry} if the document was found. Otherwise, raises an error.
+ **/
+export async function getDoc<T = DocumentData>(col: Collection, id: string) {
+    const response = await col.db.client.indexer.getDoc(
+        col.db.addr,
+        col.name,
+        id
+    )
+    if (response.document) {
+        return {
+            doc: JSON.parse(response.document.doc) as T,
+            id: response.document.id,
+        } as DocumentEntry<T>
+    } else {
+        throw new Error('no document was found with id ' + id)
     }
 }
 

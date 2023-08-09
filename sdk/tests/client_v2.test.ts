@@ -36,6 +36,7 @@ import {
     deleteDoc,
     updateDoc,
     queryDoc,
+    getDoc
 } from '../src/store/document_v2'
 import {
     createFromPrivateKey,
@@ -371,6 +372,21 @@ describe('test db3.js client module', () => {
                 })
                 await new Promise((r) => setTimeout(r, 1000))
                 {
+                    const doc = await getDoc(collection, doc2Ret.id)
+                    expect(doc).toBeDefined()
+                    expect(doc.id).toBe(doc2Ret.id)
+                    expect(doc.doc.city).toBe('beijing2')
+                    expect(doc.doc.author).toBe('imotai1')
+                    expect(doc.doc.age).toBe(1)
+                }
+                {
+                    try {
+                        const doc = await getDoc(collection, 1000000000000)
+                        except(1).toBe(0)
+                    } catch(e) {}
+                }
+
+                {
                     const queryStr = '/[city = beijing]'
                     const resultSet = await queryDoc<Profile>(
                         collection,
@@ -465,6 +481,7 @@ describe('test db3.js client module', () => {
                     age: 10,
                 })
                 await new Promise((r) => setTimeout(r, 2000))
+
                 {
                     const queryStr = '/[city = beijing]'
                     const resultSet = await queryDoc<Profile>(

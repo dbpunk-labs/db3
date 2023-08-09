@@ -23,7 +23,8 @@ use db3_event::event_processor::EventProcessorConfig;
 use db3_proto::db3_indexer_proto::indexer_node_server::IndexerNode;
 use db3_proto::db3_indexer_proto::{
     ContractSyncStatus, GetCollectionOfDatabaseRequest, GetCollectionOfDatabaseResponse,
-    GetContractSyncStatusRequest, GetContractSyncStatusResponse, RunQueryRequest, RunQueryResponse,
+    GetContractSyncStatusRequest, GetContractSyncStatusResponse, GetDocRequest, GetDocResponse,
+    RunQueryRequest, RunQueryResponse,
 };
 use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_proto::db3_storage_proto::block_response::MutationWrapper;
@@ -367,6 +368,21 @@ impl IndexerNode for IndexerNodeImpl {
         }))
     }
 
+    async fn get_doc(
+        &self,
+        request: Request<GetDocRequest>,
+    ) -> std::result::Result<Response<GetDocResponse>, Status> {
+        let r = request.into_inner();
+        let addr = DB3Address::from_hex(r.db_addr.as_str()).map_err(|e| {
+            Status::invalid_argument(format!("fail to parse the db address for {e}"))
+        })?;
+        let document = self
+            .db_store
+            .get_doc(&addr, r.col_name.as_str(), r.id)
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        Ok(Response::new(GetDocResponse { document }))
+    }
+
     async fn run_query(
         &self,
         request: Request<RunQueryRequest>,
@@ -376,7 +392,6 @@ impl IndexerNode for IndexerNodeImpl {
             Status::invalid_argument(format!("fail to parse the db address for {e}"))
         })?;
         if let Some(q) = &r.query {
-            info!("query str {} q {:?}", q.query_str, q);
             let (documents, count) = self
                 .db_store
                 .query_docs(&addr, r.col_name.as_str(), q)
