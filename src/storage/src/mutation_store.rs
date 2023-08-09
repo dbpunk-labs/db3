@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use db3_base::times;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
@@ -480,6 +480,17 @@ impl MutationStore {
         }
     }
 
+    fn set_block_state(&self, block: u64, order: u32) -> Result<()> {
+        match self.block_state.lock() {
+            Ok(mut state) => {
+                state.block = block;
+                state.order = order;
+                Ok(())
+            }
+            Err(e) => Err(DB3Error::WriteStoreError(format!("{e}"))),
+        }
+    }
+
     pub fn gc_range_mutation(&self, block_start: u64, block_end: u64) -> Result<()> {
         if block_start >= block_end {
             return Err(DB3Error::ReadStoreError("invalid block range".to_string()));
@@ -593,6 +604,48 @@ impl MutationStore {
         Ok((hex_id, block, order))
     }
 
+    fn encode_mutation_header(
+        &self,
+        hex_id: &str,
+        mutation_body_size: u32,
+        doc_ids_map: &str,
+        sender: &DB3Address,
+        nonce: u64,
+        block: u64,
+        order: u32,
+        network: u64,
+        action: MutationAction,
+    ) -> Result<Bytes> {
+        let mutation_header = MutationHeader {
+            block_id: block,
+            order_id: order,
+            sender: sender.as_ref().to_vec(),
+            time: times::get_current_time_in_secs(),
+            id: hex_id.to_string(),
+            size: mutation_body_size,
+            nonce,
+            network,
+            action: action.into(),
+            doc_ids_map: doc_ids_map.to_string(),
+        };
+        let mut header_buf = BytesMut::with_capacity(1024);
+        mutation_header
+            .encode(&mut header_buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(header_buf.freeze())
+    }
+
+    fn encode_mutation_body(&self, payload: &[u8], signature: &str) -> Result<Bytes> {
+        let mutation_body = MutationBody {
+            payload: payload.to_vec(),
+            signature: signature.to_string(),
+        };
+        let mut buf = BytesMut::with_capacity(self.config.message_max_buffer);
+        mutation_body
+            .encode(&mut buf)
+            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
+        Ok(buf.freeze())
+    }
     pub fn add_mutation(
         &self,
         payload: &[u8],
@@ -610,32 +663,18 @@ impl MutationStore {
         let mut encoded_id: Vec<u8> = Vec::new();
         encoded_id.extend_from_slice(&block.to_be_bytes());
         encoded_id.extend_from_slice(&order.to_be_bytes());
-        let mutation_body = MutationBody {
-            payload: payload.to_vec(),
-            signature: signature.to_string(),
-        };
-        let mut buf = BytesMut::with_capacity(self.config.message_max_buffer);
-        mutation_body
-            .encode(&mut buf)
-            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-        let buf = buf.freeze();
-        let mutation_header = MutationHeader {
-            block_id: block,
-            order_id: order,
-            sender: sender.as_ref().to_vec(),
-            time: times::get_current_time_in_secs(),
-            id: hex_id.to_string(),
-            size: buf.len() as u32,
+        let buf = self.encode_mutation_body(payload, signature)?;
+        let header_buf = self.encode_mutation_header(
+            hex_id.as_str(),
+            buf.len() as u32,
+            doc_ids_map,
+            sender,
             nonce,
+            block,
+            order,
             network,
-            action: action.into(),
-            doc_ids_map: doc_ids_map.to_string(),
-        };
-        let mut header_buf = BytesMut::with_capacity(1024);
-        mutation_header
-            .encode(&mut header_buf)
-            .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-        let header_buf = header_buf.freeze();
+            action,
+        )?;
         let tx_cf_handle = self
             .se
             .cf_handle(self.config.tx_store_cf_name.as_str())
@@ -656,6 +695,38 @@ impl MutationStore {
         self.total_mutation_bytes
             .fetch_add((buf.len() + header_buf.len()) as u64, Ordering::Relaxed);
         Ok((hex_id, block, order))
+    }
+
+    pub fn update_mutation_stat(
+        &self,
+        payload: &[u8],
+        signature: &str,
+        doc_ids_map: &str,
+        sender: &DB3Address,
+        nonce: u64,
+        block: u64,
+        order: u32,
+        network: u64,
+        action: MutationAction,
+    ) -> Result<()> {
+        let tx_id = TxId::from((payload, signature.as_bytes()));
+        let hex_id = tx_id.to_hex();
+        let buf = self.encode_mutation_body(payload, signature)?;
+        let header_buf = self.encode_mutation_header(
+            hex_id.as_str(),
+            buf.len() as u32,
+            doc_ids_map,
+            sender,
+            nonce,
+            block,
+            order,
+            network,
+            action,
+        )?;
+        self.mutation_count.fetch_add(1, Ordering::Relaxed);
+        self.total_mutation_bytes
+            .fetch_add((buf.len() + header_buf.len()) as u64, Ordering::Relaxed);
+        self.set_block_state(block, order)
     }
 }
 

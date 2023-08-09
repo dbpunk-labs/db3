@@ -83,15 +83,21 @@ if you have any questions, please feel free to ask us for help and you can find 
 * the doc about [queryDoc](https://docs.db3.network/functions/queryDoc.html)
 
 
-# Try Our Cloud Sandbox
+# Try the testnet
 
-* [Console](https://console.cloud.db3.network/console/home):https://console.cloud.db3.network/console/home
-* Data Rollup Node: https://rollup.cloud.db3.network
-* Data Index Node: https://index.cloud.db3.network
+## Try the testnet console
+[https://testnet.db3.network/home](https://testnet.db3.network/home)
+
+## Try the sdk
+| Public Chains   |      Testnet      |  Mainnet |
+|----------|:-------------:|:------:|
+| zksync   |data rollup node:`https://zksync.rollup.testnet.db3.network` <br> data index node:`https://zksync.index.testnet.db3.network`  | :soon: |
+| scroll   |data rollup node:`https://scroll.rollup.testnet.db3.network` <br> data index node:`https://scroll.index.testnet.db3.network`  | :soon: |
+
 
 You can connect to the Data Rollup Node and Data Index Node with db3.js
-
 Note: the cloud sandbox is just for testing and unstable
+
 
 # How it works
 

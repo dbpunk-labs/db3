@@ -22,6 +22,7 @@ use db3_proto::db3_mutation_v2_proto::MutationAction;
 use db3_storage::ar_fs::{ArFileSystem, ArFileSystemConfig};
 use db3_storage::db_store_v2::DBStoreV2;
 use db3_storage::meta_store_client::MetaStoreClient;
+use db3_storage::mutation_store::MutationStore;
 use db3_storage::system_store::{SystemRole, SystemStore};
 use ethers::prelude::Signer;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -29,17 +30,22 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 #[derive(Clone)]
+pub enum RecoverType {
+    Index,
+    Rollup,
+}
+#[derive(Clone)]
 pub struct RecoverConfig {
     pub key_root_path: String,
     pub temp_data_path: String,
-    pub enable_mutation_recover: bool,
-    pub role: SystemRole,
+    pub recover_type: RecoverType,
 }
 pub struct Recover {
     pub config: RecoverConfig,
     pub ar_toolbox: Arc<ArToolBox>,
     pub meta_store: Arc<MetaStoreClient>,
     pub db_store: Arc<DBStoreV2>,
+    pub storage: Option<Arc<MutationStore>>,
     network_id: Arc<AtomicU64>,
 }
 
@@ -48,8 +54,13 @@ impl Recover {
         config: RecoverConfig,
         db_store: DBStoreV2,
         system_store: Arc<SystemStore>,
+        storage: Option<Arc<MutationStore>>,
     ) -> Result<Self> {
-        let system_config = match system_store.get_config(&config.role) {
+        let role = match config.recover_type {
+            RecoverType::Index => SystemRole::DataIndexNode,
+            RecoverType::Rollup => SystemRole::DataRollupNode,
+        };
+        let system_config = match system_store.get_config(&role) {
             Ok(Some(system_config)) => system_config,
             Ok(None) => {
                 return Err(DB3Error::StoreEventError(
@@ -69,7 +80,8 @@ impl Recover {
             format!("0x{}", hex::encode(wallet.address().as_bytes()))
         );
         let meta_store = Arc::new(
-            MetaStoreClient::new(contract_addr.as_str(), evm_node_url.as_str(), wallet).await?,
+            MetaStoreClient::new(contract_addr.as_str(), evm_node_url.as_str(), wallet, false)
+                .await?,
         );
         let ar_fs_config = ArFileSystemConfig {
             arweave_url: ar_node_url,
@@ -86,11 +98,20 @@ impl Recover {
             ar_toolbox,
             meta_store,
             db_store: Arc::new(db_store),
+            storage,
             network_id,
         })
     }
 
     pub async fn start() -> Result<()> {
+        Ok(())
+    }
+
+    pub fn recover_stat(&self) -> Result<()> {
+        self.db_store.recover_db_state()?;
+        if let Some(s) = &self.storage {
+            s.recover()?;
+        }
         Ok(())
     }
 
@@ -133,6 +154,13 @@ impl Recover {
         Ok(from_block)
     }
 
+    pub fn is_recover_rollup(&self) -> bool {
+        match self.config.recover_type {
+            RecoverType::Rollup => true,
+            _ => false,
+        }
+    }
+
     /// recover from arweave tx
     async fn recover_from_arweave_tx(&self, tx: &str, version: Option<String>) -> Result<()> {
         debug!("recover_from_arweave_tx: {}, version {:?}", tx, version);
@@ -159,6 +187,22 @@ impl Recover {
                     order.clone(),
                     &doc_ids_map,
                 )?;
+
+                if self.is_recover_rollup() {
+                    if let Some(s) = &self.storage {
+                        s.update_mutation_stat(
+                            &body.payload,
+                            body.signature.as_str(),
+                            doc_ids.as_str(),
+                            &address,
+                            nonce,
+                            *block,
+                            *order,
+                            self.network_id.load(Ordering::Relaxed),
+                            action,
+                        )?;
+                    }
+                }
             }
         }
 
@@ -206,31 +250,12 @@ mod tests {
     use tempdir::TempDir;
 
     #[tokio::test]
-    async fn test_get_latest_arweave_tx() {
-        sleep(std::time::Duration::from_secs(1));
-        let tmp_dir_path = TempDir::new("test_get_latest_arweave_tx").expect("create temp dir");
-        match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
-            Ok((rollup_executor, recover)) => {
-                let result = rollup_executor.process().await;
-                assert_eq!(true, result.is_ok(), "{:?}", result);
-                let result = recover.get_latest_arweave_tx().await;
-                assert_eq!(true, result.is_ok(), "{:?}", result);
-                let tx = result.unwrap();
-                assert!(!tx.is_empty());
-            }
-            Err(e) => {
-                assert!(false, "{e}");
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn test_fetch_arware_tx_from_block() {
         sleep(std::time::Duration::from_secs(3));
         let tmp_dir_path =
             TempDir::new("test_fetch_arware_tx_from_block").expect("create temp dir");
         match NodeTestBase::setup_for_smoke_test(&tmp_dir_path).await {
-            Ok((rollup_executor, recover)) => {
+            Ok((rollup_executor, recover, _storage)) => {
                 let result = rollup_executor.process().await;
                 assert_eq!(true, result.is_ok());
                 let result = recover.fetch_arweave_tx_from_block(0).await;
