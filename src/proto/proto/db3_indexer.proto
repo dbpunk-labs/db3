@@ -61,9 +61,20 @@ message GetContractSyncStatusResponse {
 
 message GetContractSyncStatusRequest {}
 
+message GetDocRequest {
+  string db_addr = 1;
+  string col_name = 2;
+  int64 id = 3;
+}
+
+message GetDocResponse {
+  db3_database_v2_proto.Document document = 1;
+}
+
 service IndexerNode {
   rpc GetContractSyncStatus(GetContractSyncStatusRequest) returns (GetContractSyncStatusResponse) {}
   rpc GetCollectionOfDatabase(GetCollectionOfDatabaseRequest) returns (GetCollectionOfDatabaseResponse) {}
   // method for query document
   rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {}
+  rpc GetDoc(GetDocRequest) returns (GetDocResponse) {}
 }

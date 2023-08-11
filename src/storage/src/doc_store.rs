@@ -237,18 +237,15 @@ impl DocStore {
         }
     }
 
-    pub fn get_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<String> {
+    pub fn get_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<Option<String>> {
         let db_opt = self.get_db_ref(db_addr);
         if let Some(db) = db_opt {
             let opt = db
                 .get::<String>(col_name, id)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-            Ok(opt)
+            Ok(Some(opt))
         } else {
-            Err(DB3Error::WriteStoreError(format!(
-                "no database found with addr {}",
-                db_addr.to_hex()
-            )))
+            Ok(None)
         }
     }
 
@@ -349,7 +346,7 @@ mod tests {
     fn doc_get_test() {
         let (doc_store, id) = prepare_the_dataset();
         let doc_str = r#"{"f2":"f2", "f1":"f1"}"#;
-        if let Ok(value) = doc_store.get_doc(&DB3Address::ZERO, "col1", id) {
+        if let Ok(Some(value)) = doc_store.get_doc(&DB3Address::ZERO, "col1", id) {
             let value: serde_json::Value = serde_json::from_str(value.as_str()).unwrap();
             let right: serde_json::Value = serde_json::from_str(doc_str).unwrap();
             assert_eq!(value, right);
@@ -417,7 +414,7 @@ mod tests {
     fn doc_store_smoke_test() {
         let (doc_store, id) = prepare_the_dataset();
         let db_id = DB3Address::ZERO;
-        if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
+        if let Ok(Some(value)) = doc_store.get_doc(&db_id, "col1", id) {
             println!("{}", value.as_str());
             let value: serde_json::Value = serde_json::from_str(value.as_str()).unwrap();
             assert_eq!(value["f1"].as_str(), Some("f1"));
@@ -475,7 +472,7 @@ mod tests {
             assert!(false);
         }
 
-        if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
+        if let Ok(Some(value)) = doc_store.get_doc(&db_id, "col1", id) {
             let value: serde_json::Value = serde_json::from_str(value.as_str()).unwrap();
             assert_eq!(value["test"].as_str(), Some("v2"));
         } else {

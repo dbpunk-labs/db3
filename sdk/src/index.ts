@@ -22,6 +22,7 @@ export {
     createFromExternal,
 } from './account/db3_account'
 export type { Client, ReadClient } from './client/types'
+export type { DocumentData, DocumentEntry } from './client/base'
 export type {
     Database,
     Collection,
@@ -30,7 +31,7 @@ export type {
     MutationResult,
     QueryResult,
 } from './store/types'
-export { addDoc, updateDoc, deleteDoc, queryDoc } from './store/document_v2'
+export { addDoc, updateDoc, deleteDoc, queryDoc, getDoc } from './store/document_v2'
 
 export { SystemConfig, SystemStatus, Version } from './proto/db3_base'
 export {
