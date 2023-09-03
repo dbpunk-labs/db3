@@ -225,6 +225,13 @@ export async function updateDoc(
     }
 }
 
+/**
+ * Add a document to the collection.
+ *
+ * @param col The collection to add the document to.
+ * @param doc The document to add.
+ * @returns The ID of the newly added document.
+ */
 export async function addDoc(col: Collection, doc: DocumentData) {
     const documentMutation: DocumentMutation = {
         collectionName: col.name,
@@ -250,6 +257,7 @@ export async function addDoc(col: Collection, doc: DocumentData) {
         payload,
         col.db.client.nonce.toString()
     )
+
     if (response.code == 0 && response.items.length > 0) {
         col.db.client.nonce += 1
         return {
@@ -259,6 +267,8 @@ export async function addDoc(col: Collection, doc: DocumentData) {
             id: response.items[0].value,
         }
     } else {
-        throw new Error('fail to create collection')
+        throw new Error(
+            'fail to addDoc, maybe you can syncAccountNonce to resolve the problem'
+        )
     }
 }

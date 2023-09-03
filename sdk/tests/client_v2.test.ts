@@ -36,7 +36,7 @@ import {
     deleteDoc,
     updateDoc,
     queryDoc,
-    getDoc
+    getDoc,
 } from '../src/store/document_v2'
 import {
     createFromPrivateKey,
@@ -383,7 +383,7 @@ describe('test db3.js client module', () => {
                     try {
                         const doc = await getDoc(collection, 1000000000000)
                         except(1).toBe(0)
-                    } catch(e) {}
+                    } catch (e) {}
                 }
 
                 {
