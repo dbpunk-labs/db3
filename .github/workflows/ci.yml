@@ -51,8 +51,8 @@ jobs:
       - name: Setup Build env
         run: |
           ROOT_DIR=`pwd`
-          #sudo apt-get install protobuf-compiler -y
-          #yarn global add arlocal_db3
+          sudo apt-get install protobuf-compiler -y
+          yarn global add arlocal_db3
           cd ${ROOT_DIR}/metadata && yarn install
           cd ${ROOT_DIR}/metadata && npx hardhat test
           test -e ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json && cp -f ${ROOT_DIR}/metadata/artifacts/contracts/DB3MetaStore.sol/DB3MetaStore.json ${ROOT_DIR}/abi/
