@@ -10,7 +10,6 @@ members = [
     "src/sdk",
     "src/event"
 ]
-
 [workspace.dependencies]
 fastcrypto = {git = "https://github.com/MystenLabs/fastcrypto", rev = "306465d4fe04f6c26359d885f3b0a548b661de40"}
 ethers = {git="https://github.com/imotai/ethers-rs", rev="d526191b7972e8cf4412fee8b71cbf42e0ce7995"}

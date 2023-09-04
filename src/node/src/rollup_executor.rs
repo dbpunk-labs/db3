@@ -270,12 +270,15 @@ impl RollupExecutor {
                 return Ok(());
             }
             let now = Instant::now();
+
             info!(
                 "the next rollup start block {} and the newest block {current_block}",
                 last_end_block
             );
+
             self.pending_start_block
                 .store(last_end_block, Ordering::Relaxed);
+
             self.pending_end_block
                 .store(current_block, Ordering::Relaxed);
             let mutations = self
@@ -305,6 +308,7 @@ impl RollupExecutor {
                 self.pending_data_size.store(0, Ordering::Relaxed);
                 self.pending_mutations.store(0, Ordering::Relaxed);
             }
+
             let (id, reward, num_rows, size) = ar_toolbox
                 .compress_and_upload_record_batch(
                     tx,
@@ -318,6 +322,7 @@ impl RollupExecutor {
             let (evm_cost, tx_hash) = meta_store
                 .update_rollup_step(id.as_str(), network_id)
                 .await?;
+
             let tx_str = format!("0x{}", hex::encode(tx_hash.as_bytes()));
 
             info!("the process rollup done with num mutations {num_rows}, raw data size {memory_size}, compress data size {size} and processed time {} id {} ar cost {} and evm tx {} and cost {}", now.elapsed().as_secs(),
@@ -325,6 +330,7 @@ impl RollupExecutor {
                 tx_str.as_str(),
                 evm_cost.as_u64()
                 );
+
             let record = RollupRecord {
                 end_block: current_block,
                 raw_data_size: memory_size as u64,
@@ -338,6 +344,7 @@ impl RollupExecutor {
                 evm_tx: tx_str,
                 evm_cost: evm_cost.as_u64(),
             };
+
             self.storage
                 .add_rollup_record(&record)
                 .map_err(|e| DB3Error::RollupError(format!("{e}")))?;
