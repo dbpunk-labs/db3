@@ -9,7 +9,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: checkout db3.js
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
               with:
                   submodules: recursive
             - uses: actions/setup-node@v3.8.0
