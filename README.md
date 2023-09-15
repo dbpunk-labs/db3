@@ -13,7 +13,6 @@
 ![Java SDK](https://img.shields.io/maven-central/v/network.db3/sdk)
 ![npm](https://img.shields.io/npm/dw/db3.js?style=flat-square)
 
-
 # DB3 Network
 
 DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is designed to store and retrieve data for decentralized applications built on blockchain technology. DB3 Network has two core features:
