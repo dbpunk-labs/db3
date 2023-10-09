@@ -34,7 +34,7 @@ tokio = { version = "1.17.0", features = ["full"] }
 tokio-stream = "0.1.12"
 clap = { version = "4.0.20", features = ["derive"] }
 http = "0.2"
-shadow-rs = "0.23.0"
+shadow-rs = "0.24.1"
 tower-http = { version = "0.4", features = ["cors"] }
 ctrlc = { version = "3.0", features = ["termination"] }
 dirs = "5.0.0"
@@ -45,4 +45,4 @@ arweave-rs = {workspace=true}
 url = "2.4.0"
 arc-swap = "1.6.0"
 [build-dependencies]
-shadow-rs = "0.23.0"
+shadow-rs = "0.24.1"
