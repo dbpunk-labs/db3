@@ -21,7 +21,7 @@ jobs:
                 VERSION=${TAG#*v}
                 echo ${VERSION}
                 cd sdk && yarn version --new-version ${VERSION} && yarn && make &&  yarn build
-            - uses: JS-DevTools/npm-publish@v2
+            - uses: JS-DevTools/npm-publish@v3
               with:
                   token: ${{ secrets.NMP_TOKEN }}
                   package: ./sdk/package.json
