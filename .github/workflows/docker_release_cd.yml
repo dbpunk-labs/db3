@@ -38,7 +38,7 @@ jobs:
           cd ${ROOT_DIR}/sdk && yarn && make && yarn build && yarn link
           cd ${ROOT_DIR}/thirdparty/data-manager && yarn && yarn link db3.js && yarn build && mv -f dist ${ROOT_DIR}/docker/pages
       - name: docker login
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
