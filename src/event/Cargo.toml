@@ -12,7 +12,7 @@ db3-proto={path="../proto"}
 serde_json = { workspace=true}
 bytes = "1"
 prost = "0.11"
-prost-types = "0.11"
+prost-types = "0.12"
 db3-storage={path="../storage"}
 ethabi = { version = "18.0.0", default-features = false, features = ["full-serde", "rlp"] }
 hex = "0.4.3"
