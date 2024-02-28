@@ -77,7 +77,7 @@ jobs:
         run: |
           ROOT_DIR=`pwd`
           cd ${ROOT_DIR}/java && mvn test
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: db3-log-artifact
