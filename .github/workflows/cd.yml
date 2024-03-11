@@ -62,7 +62,7 @@ jobs:
                   tar czvf $RELEASE_NAME.tar.gz $RELEASE_NAME
                   shasum -a 256 $RELEASE_NAME.tar.gz > $RELEASE_NAME.sha256
             - name: Releasing assets
-              uses: softprops/action-gh-release@v1
+              uses: softprops/action-gh-release@v2
               with:
                   files: |
                       target/${{ matrix.job.target }}/release/db3*.tar.gz
