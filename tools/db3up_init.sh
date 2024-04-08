@@ -19,7 +19,7 @@ elif [ -f ~/.bashrc ]; then
         [Nn]* ) echo "please add PATH=~/.db3/bin:\$PATH to ~/.bashrc manually";;
     esac
 else
-    echo "please add PATH=~/.db3/bin:\$PATH to your enviroment manually"
+    echo "please add PATH=~/.db3/bin:\$PATH to your environment manually"
 fi
 echo "install db3up successfully"
 export PATH=~/.db3/bin:$PATH

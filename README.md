@@ -55,7 +55,7 @@ The console url: http://127.0.0.1:26629
 
 **3. Playground**
 
-open the `http://127.0.0.1:26629/database` to create database or collection, then go the playgound
+open the `http://127.0.0.1:26629/database` to create database or collection, then go the playground
 
 ```typescript
 // create a account

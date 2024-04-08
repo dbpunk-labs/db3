@@ -167,7 +167,7 @@ pub enum DB3ClientCommand {
 
     #[clap(name = "subscribe")]
     Subcribe {
-        /// subcribe all the events default true
+        /// subscribe all the events default true
         #[clap(long, default_value = "true")]
         all_event: bool,
     },
