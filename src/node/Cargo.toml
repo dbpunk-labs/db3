@@ -33,7 +33,7 @@ prost-types = "0.12"
 tokio = { version = "1.17.0", features = ["full"] }
 tokio-stream = "0.1.12"
 clap = { version = "4.0.20", features = ["derive"] }
-http = "0.2"
+http = "1.1"
 shadow-rs = "0.25.0"
 tower-http = { version = "0.4", features = ["cors"] }
 ctrlc = { version = "3.0", features = ["termination"] }
