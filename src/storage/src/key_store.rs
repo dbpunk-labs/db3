@@ -98,7 +98,49 @@ mod tests {
     use super::*;
     use ethers::prelude::{LocalWallet, Signer};
     use std::ops::Deref;
+    use std::fs;
     use tempdir::TempDir;
+
+    #[test]
+    fn test_has_key_existing() {
+        let tmp_dir_path = TempDir::new("tmp_dir").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let keystore = KeyStore::new(KeyStoreConfig { key_root_path: real_path.clone() });
+        let key = "test_key";
+        let value = b"value";
+        keystore.write_key(key, value).unwrap();
+        assert_eq!(keystore.has_key(key), true);
+    }
+
+    #[test]
+    fn test_has_key_non_existing() {
+        let tmp_dir_path = TempDir::new("tmp_dir").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let keystore = KeyStore::new(KeyStoreConfig { key_root_path: real_path.clone() });
+        let key = "test_key";
+        assert_eq!(keystore.has_key(key), false);
+    }
+
+    #[test]
+    fn test_has_key_invalid_input() {
+        let tmp_dir_path = TempDir::new("tmp_dir").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let keystore = KeyStore::new(KeyStoreConfig { key_root_path: real_path.clone() });
+        let empty_key = "";
+        assert_eq!(keystore.has_key(empty_key), false);
+    }
+
+    #[test]
+    fn test_has_key_file_error() {
+        let tmp_dir_path = TempDir::new("tmp_dir").expect("create temp dir");
+        let real_path = tmp_dir_path.path().to_str().unwrap().to_string();
+        let keystore = KeyStore::new(KeyStoreConfig { key_root_path: real_path.clone() });
+        let mut invalid_file = std::fs::File::create(format!("{}/INVALID", real_path)).unwrap();
+        invalid_file.write_all(b"invalid content").unwrap(); // create an invalid file
+        let invalid_key = "INVALID";
+        assert_eq!(keystore.has_key(invalid_key), false);
+    }
+
 
     #[test]
     fn evm_account_key_store_smoke_test() {
